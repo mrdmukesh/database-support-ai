@@ -1627,8 +1627,8 @@
             if (!error.message.toLowerCase().includes("exists")) throw error;
           }
 
-          await ensureDefaultWorkspace(organization.id);
           await login(email, password);
+          await ensureDefaultWorkspace(organization.id);
           setMessage("signupMessage", "Account ready and logged in.", "success");
           setView("dashboard");
         } catch (error) {

@@ -8,11 +8,15 @@ on:
 
 env:
   IMAGE_NAME: legacydb-support-copilot
+  REGISTRY: ghcr.io
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: azure-low-cost
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout
@@ -23,16 +27,17 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Login to Azure Container Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ secrets.ACR_LOGIN_SERVER }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
         run: |
-          IMAGE="${{ secrets.ACR_LOGIN_SERVER }}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"

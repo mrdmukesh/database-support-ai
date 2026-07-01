@@ -59,9 +59,6 @@ Do not commit secrets. Configure these values as GitHub repository secrets:
 - `AZURE_CREDENTIALS`: Azure service principal JSON for GitHub Actions login.
 - `AZURE_RESOURCE_GROUP`: target resource group.
 - `AZURE_CONTAINER_APP_NAME`: target Azure Container App name.
-- `ACR_LOGIN_SERVER`: Azure Container Registry login server, for example `myregistry.azurecr.io`.
-- `ACR_USERNAME`: registry username or service principal ID.
-- `ACR_PASSWORD`: registry password or service principal secret.
 
 Configure runtime secrets such as `DATABASE_URL`, `JWT_SECRET`, and
 `OPENAI_API_KEY` in Azure Container Apps, not in Git.

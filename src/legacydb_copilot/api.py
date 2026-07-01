@@ -7,6 +7,19 @@ from legacydb_copilot.ai import disclaimer_text
 from legacydb_copilot.app import ApplicationContainer, create_container
 
 
+def _static_root() -> Path | None:
+    candidates = [
+        Path.cwd(),
+        Path("/app"),
+        Path(__file__).resolve().parents[2],
+        Path(__file__).resolve().parents[3] if len(Path(__file__).resolve().parents) > 3 else Path.cwd(),
+    ]
+    for candidate in candidates:
+        if (candidate / "app.html").exists():
+            return candidate
+    return None
+
+
 def health_response(container: ApplicationContainer | None = None) -> dict[str, Any]:
     container = container or create_container()
     snapshot = container.health()
@@ -27,35 +40,35 @@ def create_fastapi_app() -> Any:
     try:
         from fastapi import FastAPI
         from fastapi.middleware.cors import CORSMiddleware
-        from fastapi.responses import FileResponse, RedirectResponse
+        from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
         from fastapi.staticfiles import StaticFiles
     except ImportError as exc:  # pragma: no cover - exercised only when optional API is used
         raise RuntimeError("Install the api extra to run FastAPI: pip install .[api]") from exc
 
     app = FastAPI(title="LegacyDB Support Copilot")
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = _static_root()
 
-    if (project_root / "assets").exists():
+    if project_root and (project_root / "assets").exists():
         app.mount("/assets", StaticFiles(directory=str(project_root / "assets")), name="assets")
 
     @app.get("/", include_in_schema=False)
     def _redirect_to_local_ui() -> Any:
-        app_page = project_root / "app.html"
-        if app_page.exists():
+        app_page = project_root / "app.html" if project_root else None
+        if app_page and app_page.exists():
             return FileResponse(str(app_page))
-        return RedirectResponse("http://127.0.0.1:8080/app.html")
+        return PlainTextResponse("UI file app.html was not found in the deployed container.", status_code=500)
 
     @app.get("/app.html", include_in_schema=False)
     def _serve_app() -> Any:
-        app_page = project_root / "app.html"
-        if app_page.exists():
+        app_page = project_root / "app.html" if project_root else None
+        if app_page and app_page.exists():
             return FileResponse(str(app_page))
-        return RedirectResponse("http://127.0.0.1:8080/app.html")
+        return PlainTextResponse("UI file app.html was not found in the deployed container.", status_code=500)
 
     @app.get("/index.html", include_in_schema=False)
     def _serve_index() -> Any:
-        index_page = project_root / "index.html"
-        if index_page.exists():
+        index_page = project_root / "index.html" if project_root else None
+        if index_page and index_page.exists():
             return FileResponse(str(index_page))
         return RedirectResponse("/")
     app.add_middleware(

@@ -63,6 +63,13 @@ Do not commit secrets. Configure these values as GitHub repository secrets:
 Configure runtime secrets such as `DATABASE_URL`, `JWT_SECRET`, and
 `OPENAI_API_KEY` in Azure Container Apps, not in Git.
 
+For persistent Azure testing, use Azure PostgreSQL for the app's internal
+database instead of temporary container SQLite. See:
+
+```text
+docs/azure-postgres-internal-db.md
+```
+
 ## Backend Modules
 
 - `auth`: password validation, consent capture, login lockout policy.

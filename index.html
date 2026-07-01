@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LegacyDB Support Copilot</title>
+    <meta
+      name="description"
+      content="Enterprise SaaS support copilot for legacy database teams, documentation, incidents, and SQL validation workflows."
+    />
+    <style>
+      :root {
+        --ink: #14202b;
+        --muted: #5b6975;
+        --line: #dce4ea;
+        --surface: #ffffff;
+        --wash: #f4f8f9;
+        --teal: #0f8f86;
+        --blue: #2563a8;
+        --green: #238052;
+        --amber: #b56b10;
+        --danger: #b43b3b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: var(--surface);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      img {
+        display: block;
+        max-width: 100%;
+      }
+
+      .nav {
+        position: fixed;
+        z-index: 5;
+        inset: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 72px;
+        padding: 0 clamp(20px, 5vw, 72px);
+        border-bottom: 1px solid rgba(20, 32, 43, 0.1);
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(18px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 780;
+        letter-spacing: 0;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 38px;
+        aspect-ratio: 1;
+        place-items: center;
+        border-radius: 8px;
+        color: white;
+        background: linear-gradient(135deg, var(--teal), var(--blue));
+        font-weight: 900;
+      }
+
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: clamp(14px, 2vw, 28px);
+        color: #31404d;
+        font-size: 14px;
+        font-weight: 650;
+      }
+
+      .button {
+        display: inline-flex;
+        min-height: 42px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--ink);
+        border-radius: 8px;
+        padding: 0 18px;
+        background: var(--ink);
+        color: white;
+        font-weight: 760;
+      }
+
+      .hero {
+        position: relative;
+        min-height: min(860px, 92vh);
+        display: grid;
+        align-items: center;
+        overflow: hidden;
+        padding: 116px clamp(20px, 5vw, 72px) 72px;
+        background: var(--wash);
+      }
+
+      .hero::before {
+        position: absolute;
+        inset: 0;
+        content: "";
+        background:
+          linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.98) 0%,
+            rgba(255, 255, 255, 0.92) 34%,
+            rgba(255, 255, 255, 0.28) 62%,
+            rgba(255, 255, 255, 0.04) 100%
+          ),
+          url("assets/images/enterprise-operations-hero.png") center / cover;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 1;
+        width: min(650px, 100%);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 18px;
+        color: var(--teal);
+        font-size: 13px;
+        font-weight: 850;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 28px;
+        height: 2px;
+        background: var(--teal);
+        content: "";
+      }
+
+      h1 {
+        margin: 0;
+        max-width: 11ch;
+        font-size: clamp(44px, 7vw, 88px);
+        line-height: 0.98;
+        letter-spacing: 0;
+      }
+
+      .hero-copy {
+        margin: 24px 0 0;
+        max-width: 590px;
+        color: #354653;
+        font-size: clamp(18px, 2vw, 22px);
+        line-height: 1.55;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 32px;
+      }
+
+      .button.secondary {
+        border-color: rgba(20, 32, 43, 0.22);
+        background: rgba(255, 255, 255, 0.84);
+        color: var(--ink);
+      }
+
+      .metrics {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1px;
+        width: min(760px, 100%);
+        margin-top: 54px;
+        border: 1px solid rgba(20, 32, 43, 0.12);
+        background: rgba(20, 32, 43, 0.12);
+      }
+
+      .metric {
+        min-height: 108px;
+        padding: 18px;
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--blue);
+        font-size: 28px;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      section {
+        padding: clamp(56px, 8vw, 104px) clamp(20px, 5vw, 72px);
+      }
+
+      .section-head {
+        max-width: 760px;
+        margin-bottom: 34px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: clamp(30px, 4vw, 54px);
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      .section-head p {
+        margin: 16px 0 0;
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.6;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .feature {
+        min-height: 176px;
+        padding: 22px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .feature-icon {
+        display: grid;
+        width: 42px;
+        aspect-ratio: 1;
+        place-items: center;
+        margin-bottom: 22px;
+        border-radius: 8px;
+        color: white;
+        background: var(--teal);
+        font-weight: 900;
+      }
+
+      .feature:nth-child(2) .feature-icon {
+        background: var(--blue);
+      }
+
+      .feature:nth-child(3) .feature-icon {
+        background: var(--green);
+      }
+
+      .feature:nth-child(4) .feature-icon {
+        background: var(--amber);
+      }
+
+      .feature h3 {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .feature p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+
+      .workflow {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 0.82fr);
+        gap: clamp(28px, 5vw, 68px);
+        align-items: center;
+        background: #eef5f4;
+      }
+
+      .workflow img {
+        width: 100%;
+        min-height: 360px;
+        border: 1px solid rgba(20, 32, 43, 0.14);
+        border-radius: 8px;
+        object-fit: cover;
+        box-shadow: 0 24px 70px rgba(18, 33, 46, 0.16);
+      }
+
+      .checklist {
+        display: grid;
+        gap: 12px;
+        margin-top: 28px;
+      }
+
+      .check {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border: 1px solid rgba(20, 32, 43, 0.12);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.7);
+      }
+
+      .check b {
+        color: var(--green);
+      }
+
+      .check strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .check span {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .legal {
+        background: #101923;
+        color: white;
+      }
+
+      .legal .section-head p,
+      .legal-link {
+        color: #c7d2dc;
+      }
+
+      .legal-links {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .legal-link {
+        min-height: 54px;
+        display: flex;
+        align-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 8px;
+        padding: 0 16px;
+        background: rgba(255, 255, 255, 0.04);
+        font-weight: 680;
+      }
+
+      footer {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: space-between;
+        padding: 28px clamp(20px, 5vw, 72px);
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      footer nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      @media (max-width: 920px) {
+        .nav {
+          position: absolute;
+        }
+
+        .nav-links a:not(.button) {
+          display: none;
+        }
+
+        .hero {
+          min-height: auto;
+          padding-top: 112px;
+        }
+
+        .hero::before {
+          background:
+            linear-gradient(
+              180deg,
+              rgba(255, 255, 255, 0.98) 0%,
+              rgba(255, 255, 255, 0.9) 42%,
+              rgba(255, 255, 255, 0.2) 100%
+            ),
+            url("assets/images/enterprise-operations-hero.png") center / cover;
+        }
+
+        .metrics,
+        .feature-grid,
+        .workflow,
+        .legal-links {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          max-width: 9ch;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="nav" aria-label="Primary navigation">
+      <a class="brand" href="#">
+        <span class="brand-mark">L</span>
+        <span>LegacyDB Support Copilot</span>
+      </a>
+      <nav class="nav-links" aria-label="Site links">
+        <a href="#features">Features</a>
+        <a href="#workflow">AI Safety</a>
+        <a href="#legal">Legal</a>
+        <a class="button" href="app.html">Open App</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-content">
+          <p class="eyebrow">Secure multi-tenant SaaS</p>
+          <h1>LegacyDB Support Copilot</h1>
+          <p class="hero-copy">
+            Help database teams investigate incidents, read legacy procedures,
+            validate SQL recommendations, and turn approved fixes into governed
+            knowledge.
+          </p>
+          <div class="hero-actions">
+            <a class="button" href="app.html">Start a workspace</a>
+            <a class="button secondary" href="#workflow">Review safeguards</a>
+          </div>
+        </div>
+
+        <div class="metrics" aria-label="Platform highlights">
+          <div class="metric">
+            <strong>RBAC</strong>
+            <span>Organization, workspace, and role-aware access control.</span>
+          </div>
+          <div class="metric">
+            <strong>RAG</strong>
+            <span>Answers grounded in uploaded docs and database metadata.</span>
+          </div>
+          <div class="metric">
+            <strong>Audit</strong>
+            <span>Approval gates, consent records, and activity history.</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="section-head">
+          <h2>Built for regulated database support teams.</h2>
+          <p>
+            The product structure supports isolated tenants, workspaces,
+            uploaded documentation, database connections, chat history,
+            incidents, subscriptions, and administrative reporting.
+          </p>
+        </div>
+
+        <div class="feature-grid">
+          <article class="feature">
+            <span class="feature-icon">S</span>
+            <h3>Security first</h3>
+            <p>
+              Secure cookies, rate limits, audit logs, file validation,
+              encryption posture, API keys, and MFA-ready authentication.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature-icon">D</span>
+            <h3>Database coverage</h3>
+            <p>
+              SQL Server, PostgreSQL, MySQL, SQLite, and plugin-oriented
+              expansion for Oracle and future platforms.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature-icon">A</span>
+            <h3>AI guardrails</h3>
+            <p>
+              Prompt injection checks, unsafe SQL detection, confidence,
+              citations, escalation, and human approval before changes.
+            </p>
+          </article>
+          <article class="feature">
+            <span class="feature-icon">P</span>
+            <h3>Plans and billing</h3>
+            <p>
+              Free, Professional, and Enterprise plans with Stripe support,
+              invoices, trials, grace periods, and refund workflows.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="workflow" id="workflow">
+        <img
+          src="assets/images/incident-workflow.png"
+          alt="AI-assisted database incident workflow dashboard with validation checklist and audit trail"
+        />
+        <div>
+          <div class="section-head">
+            <h2>AI recommendations stay behind approval gates.</h2>
+            <p>
+              Every conversation starts with a clear disclaimer: generated
+              responses are recommendations, SQL must be validated, and
+              production changes require human approval.
+            </p>
+          </div>
+          <div class="checklist">
+            <div class="check">
+              <b>01</b>
+              <span><strong>Source-grounded answers</strong>Citations connect answers back to documentation and extracted metadata.</span>
+            </div>
+            <div class="check">
+              <b>02</b>
+              <span><strong>Manual verification</strong>DBAs and developers review SQL before any operational action.</span>
+            </div>
+            <div class="check">
+              <b>03</b>
+              <span><strong>Approved learning only</strong>Verified fixes become knowledge articles after manager approval.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="legal" id="legal">
+        <div class="section-head">
+          <h2>Compliance pages are part of the product surface.</h2>
+          <p>
+            Footer links are ready for the required SaaS legal and support
+            destinations.
+          </p>
+        </div>
+        <div class="legal-links" aria-label="Required legal and support links">
+          <a class="legal-link" href="#">Terms of Service</a>
+          <a class="legal-link" href="#">Privacy Policy</a>
+          <a class="legal-link" href="#">Cookie Policy</a>
+          <a class="legal-link" href="#">Refund and Cancellation</a>
+          <a class="legal-link" href="#">Acceptable Use Policy</a>
+          <a class="legal-link" href="#">AI Usage Disclaimer</a>
+          <a class="legal-link" href="#">Data Processing Agreement</a>
+          <a class="legal-link" href="#">Security Policy</a>
+          <a class="legal-link" href="#">Responsible AI Policy</a>
+        </div>
+      </section>
+    </main>
+
+    <footer id="contact">
+      <span>Copyright 2026 LegacyDB Support Copilot</span>
+      <nav aria-label="Footer links">
+        <a href="#">Home</a>
+        <a href="#">About</a>
+        <a href="#">Pricing</a>
+        <a href="#">Documentation</a>
+        <a href="#">Support Center</a>
+        <a href="#">FAQ</a>
+      </nav>
+    </footer>
+  </body>
+</html>

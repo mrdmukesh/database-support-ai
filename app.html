@@ -1,0 +1,1875 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LegacyDB Support Copilot App</title>
+    <style>
+      :root {
+        --ink: #14202b;
+        --muted: #60707c;
+        --line: #dce5ea;
+        --wash: #f4f8f9;
+        --surface: #ffffff;
+        --teal: #0f8f86;
+        --blue: #2563a8;
+        --green: #238052;
+        --amber: #b56b10;
+        --danger: #a83d3d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: var(--wash);
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      .shell {
+        display: grid;
+        min-height: 100vh;
+        grid-template-columns: 264px 1fr;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+        padding: 24px;
+        border-right: 1px solid var(--line);
+        background: #101923;
+        color: white;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 800;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 38px;
+        aspect-ratio: 1;
+        place-items: center;
+        border-radius: 8px;
+        background: linear-gradient(135deg, var(--teal), var(--blue));
+      }
+
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+
+      .nav button {
+        min-height: 44px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 0 12px;
+        background: transparent;
+        color: #d9e4ec;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .nav button.active {
+        border-color: rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+      }
+
+      .api-status {
+        margin-top: auto;
+        padding: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: #c7d2dc;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 9px;
+        aspect-ratio: 1;
+        margin-right: 8px;
+        border-radius: 50%;
+        background: var(--amber);
+      }
+
+      .status-dot.ok {
+        background: #32b67a;
+      }
+
+      main {
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        min-height: 76px;
+        padding: 0 clamp(20px, 4vw, 44px);
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(14px);
+      }
+
+      .topbar h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      .session {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .content {
+        padding: clamp(20px, 4vw, 44px);
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .panel {
+        max-width: 880px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .panel-head {
+        padding: 24px 24px 0;
+      }
+
+      .panel-head h2 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: 0;
+      }
+
+      .panel-head p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      form {
+        display: grid;
+        gap: 18px;
+        padding: 24px;
+      }
+
+      .grid-two {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      label {
+        display: grid;
+        gap: 7px;
+        color: #31414d;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid #cdd8df;
+        border-radius: 8px;
+        padding: 0 12px;
+        background: white;
+        color: var(--ink);
+      }
+
+      .checks {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f9fbfc;
+      }
+
+      .checks label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-weight: 650;
+      }
+
+      .checks input {
+        width: 18px;
+        min-height: 18px;
+        margin-top: 1px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .button {
+        min-height: 44px;
+        border: 1px solid var(--ink);
+        border-radius: 8px;
+        padding: 0 18px;
+        background: var(--ink);
+        color: white;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
+      .button.secondary {
+        border-color: #cdd8df;
+        background: white;
+        color: var(--ink);
+      }
+
+      .button:disabled {
+        cursor: wait;
+        opacity: 0.64;
+      }
+
+      .message {
+        min-height: 24px;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .message.error {
+        color: var(--danger);
+      }
+
+      .message.success {
+        color: var(--green);
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .stat {
+        min-height: 132px;
+        padding: 20px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+
+      .stat span {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 16px;
+        color: var(--blue);
+        font-size: 34px;
+      }
+
+      .dashboard-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 18px;
+        margin-top: 18px;
+      }
+
+      .table-panel,
+      .disclaimer {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+
+      .table-panel h3,
+      .disclaimer h3 {
+        margin: 0;
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        font-size: 16px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 13px 18px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        font-size: 14px;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .disclaimer ul {
+        margin: 0;
+        padding: 18px 18px 18px 36px;
+        color: #344653;
+        line-height: 1.5;
+      }
+
+      .empty {
+        padding: 18px;
+        color: var(--muted);
+      }
+
+      .workspace-tools {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .compact-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+
+      .compact-panel h2,
+      .compact-panel h3 {
+        margin: 0;
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        font-size: 17px;
+      }
+
+      .compact-panel form {
+        padding: 18px;
+      }
+
+      .full-width {
+        max-width: none;
+      }
+
+      .muted-note {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      textarea {
+        width: 100%;
+        min-height: 128px;
+        resize: vertical;
+        border: 1px solid #cdd8df;
+        border-radius: 8px;
+        padding: 12px;
+        color: var(--ink);
+        font: inherit;
+      }
+
+      .chat-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .answer-box {
+        margin: 0 18px 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f9fbfc;
+        line-height: 1.6;
+      }
+
+      .badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 0 18px 18px;
+      }
+
+      .badge {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0 10px;
+        background: #e9f4f2;
+        color: #116a62;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .badge.warn {
+        background: #fff3df;
+        color: #8a510e;
+      }
+
+      .history-list,
+      .message-list {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+      }
+
+      .history-list button {
+        min-height: 42px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .chat-message {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: white;
+        line-height: 1.5;
+      }
+
+      .chat-message strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--blue);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      .feedback-panel {
+        display: none;
+        margin: 0 18px 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+      }
+
+      .feedback-panel.active {
+        display: grid;
+        gap: 14px;
+      }
+
+      .segmented {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .segmented button {
+        min-height: 36px;
+        border: 1px solid #cdd8df;
+        border-radius: 8px;
+        padding: 0 10px;
+        background: white;
+        cursor: pointer;
+      }
+
+      .segmented button.active {
+        border-color: var(--blue);
+        background: #e9f1fb;
+        color: var(--blue);
+        font-weight: 800;
+      }
+
+      @media (max-width: 920px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: static;
+        }
+
+        .grid-two,
+        .dashboard-grid,
+        .dashboard-layout,
+        .workspace-tools,
+        .chat-layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">L</span>
+          <span>LegacyDB Copilot</span>
+        </div>
+        <nav class="nav" aria-label="Application views">
+          <button class="active" data-view-button="signup">Signup</button>
+          <button data-view-button="login">Login</button>
+          <button data-view-button="dashboard">Dashboard</button>
+          <button data-view-button="workspaces">Workspaces</button>
+          <button data-view-button="connections">Database Connections</button>
+          <button data-view-button="documents">Documents</button>
+          <button data-view-button="chat">AI Chat</button>
+          <button data-view-button="learning">Learning Loop</button>
+        </nav>
+        <div class="api-status">
+          <span id="statusDot" class="status-dot"></span>
+          <span id="apiStatus">Checking API...</span>
+        </div>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <h1 id="pageTitle">Signup</h1>
+          <div class="session" id="sessionLabel">No active session</div>
+        </header>
+
+        <div class="content">
+          <section id="signup" class="view active" aria-label="Signup">
+            <div class="panel">
+              <div class="panel-head">
+                <h2>Create organization and admin user</h2>
+                <p>
+                  This calls the live FastAPI endpoints for organization creation
+                  and signup consent capture.
+                </p>
+              </div>
+              <form id="signupForm">
+                <div class="grid-two">
+                  <label>
+                    Organization name
+                    <input name="organizationName" value="Acme Legacy Systems" required />
+                  </label>
+                  <label>
+                    Organization slug
+                    <input name="organizationSlug" value="acme-legacy-systems" required />
+                  </label>
+                </div>
+                <div class="grid-two">
+                  <label>
+                    Admin name
+                    <input name="fullName" value="Priya Admin" required />
+                  </label>
+                  <label>
+                    Admin email
+                    <input name="email" type="email" value="admin@example.com" required />
+                  </label>
+                </div>
+                <div class="grid-two">
+                  <label>
+                    Password
+                    <input name="password" type="password" value="StrongPass123!" required />
+                  </label>
+                  <label>
+                    Role
+                    <select name="role">
+                      <option value="organization_admin">Organization Admin</option>
+                      <option value="dba">DBA</option>
+                      <option value="developer">Developer</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="checks" aria-label="Required consent">
+                  <label><input type="checkbox" name="terms_of_service" checked /> I agree to the Terms of Service</label>
+                  <label><input type="checkbox" name="privacy_policy" checked /> I agree to the Privacy Policy</label>
+                  <label><input type="checkbox" name="document_processing" checked /> I consent to processing uploaded documents</label>
+                  <label><input type="checkbox" name="ai_verification_required" checked /> I understand AI-generated answers require verification</label>
+                  <label><input type="checkbox" name="product_updates" /> Product updates</label>
+                </div>
+                <div class="actions">
+                  <button class="button" type="submit">Create account</button>
+                  <button class="button secondary" type="button" data-switch="login">Use existing account</button>
+                </div>
+                <div id="signupMessage" class="message"></div>
+              </form>
+            </div>
+          </section>
+
+          <section id="login" class="view" aria-label="Login">
+            <div class="panel">
+              <div class="panel-head">
+                <h2>Login</h2>
+                <p>
+                  Login verifies the password hash through the backend and stores
+                  a browser session token for the dashboard.
+                </p>
+              </div>
+              <form id="loginForm">
+                <label>
+                  Email
+                  <input name="email" type="email" value="admin@example.com" required />
+                </label>
+                <label>
+                  Password
+                  <input name="password" type="password" value="StrongPass123!" required />
+                </label>
+                <div class="actions">
+                  <button class="button" type="submit">Login</button>
+                  <button class="button secondary" type="button" id="logoutButton">Clear session</button>
+                </div>
+                <div id="loginMessage" class="message"></div>
+              </form>
+            </div>
+          </section>
+
+          <section id="dashboard" class="view" aria-label="Dashboard">
+            <div class="dashboard-grid">
+              <div class="stat"><span>Organizations</span><strong id="statOrganizations">0</strong></div>
+              <div class="stat"><span>Users</span><strong id="statUsers">0</strong></div>
+              <div class="stat"><span>Documents</span><strong id="statDocuments">0</strong></div>
+              <div class="stat"><span>Incidents</span><strong id="statIncidents">0</strong></div>
+            </div>
+
+            <div class="dashboard-layout">
+              <div class="table-panel">
+                <h3>Workspaces</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Slug</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workspaceRows">
+                    <tr><td colspan="3" class="empty">Login to load workspaces.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="disclaimer">
+                <h3>AI disclaimer</h3>
+                <ul id="disclaimerList">
+                  <li>Loading disclaimer...</li>
+                </ul>
+              </div>
+            </div>
+            <div id="dashboardMessage" class="message"></div>
+          </section>
+
+          <section id="workspaces" class="view" aria-label="Workspaces">
+            <div class="workspace-tools">
+              <div class="compact-panel">
+                <h2>Create workspace</h2>
+                <form id="workspaceForm">
+                  <label>
+                    Workspace name
+                    <input name="workspaceName" value="Finance" required />
+                  </label>
+                  <label>
+                    Workspace slug
+                    <input name="workspaceSlug" value="finance" required />
+                  </label>
+                  <button class="button" type="submit">Create workspace</button>
+                  <div id="workspaceMessage" class="message"></div>
+                </form>
+              </div>
+
+              <div class="compact-panel">
+                <h3>Workspace list</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Slug</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="workspaceManageRows">
+                    <tr><td colspan="4" class="empty">Login to load workspaces.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="connections" class="view" aria-label="Database connections">
+            <div class="workspace-tools">
+              <div class="compact-panel">
+                <h2>Add database connection</h2>
+                <form id="connectionForm">
+                  <label>
+                    Workspace
+                    <select name="workspaceId" id="connectionWorkspace" required></select>
+                  </label>
+                  <label>
+                    Engine
+                    <select name="engine" id="databaseEngine" required>
+                      <option value="sql_server">SQL Server</option>
+                      <option value="postgresql">PostgreSQL</option>
+                      <option value="mysql">MySQL</option>
+                      <option value="sqlite">SQLite</option>
+                      <option value="oracle">Oracle</option>
+                    </select>
+                  </label>
+                  <label>
+                    Connection name
+                    <input name="connectionName" value="Production ERP" required />
+                  </label>
+                  <div class="grid-two">
+                    <label>
+                      Host
+                      <input name="host" value="db.internal.local" />
+                    </label>
+                    <label>
+                      Port
+                      <input name="port" type="number" value="1433" />
+                    </label>
+                  </div>
+                  <label>
+                    Database name
+                    <input name="databaseName" value="LegacyERP" />
+                  </label>
+                  <label>
+                    Connection string
+                    <input name="connectionString" placeholder="mysql://user:password@localhost:3306/database" />
+                  </label>
+                  <label>
+                    Secret reference
+                    <input name="secretRef" value="secret-manager://legacy-erp/prod" />
+                  </label>
+                  <p class="muted-note">Use a MySQL connection string for local testing, or store a secret reference for production.</p>
+                  <button class="button" type="submit">Add connection</button>
+                  <div id="connectionMessage" class="message"></div>
+                </form>
+              </div>
+
+              <div class="compact-panel">
+                <h3>Connection list</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Engine</th>
+                      <th>Status</th>
+                      <th>Test</th>
+                      <th>Actions</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody id="connectionRows">
+                    <tr><td colspan="6" class="empty">Login to load connections.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="documents" class="view" aria-label="Documents">
+            <div class="workspace-tools">
+              <div class="compact-panel">
+                <h2>Upload document</h2>
+                <form id="documentForm">
+                  <label>
+                    Workspace
+                    <select name="workspaceId" id="documentWorkspace" required></select>
+                  </label>
+                  <label>
+                    Title
+                    <input name="title" value="Legacy ERP Runbook" required />
+                  </label>
+                  <label>
+                    File
+                    <input name="file" type="file" accept=".pdf,.docx,.txt,.csv,.sql,.md,.zip" required />
+                  </label>
+                  <p class="muted-note">Allowed files: PDF, DOCX, TXT, CSV, SQL, Markdown, and ZIP. Maximum size is 25 MB.</p>
+                  <button class="button" type="submit">Upload document</button>
+                  <div id="documentMessage" class="message"></div>
+                </form>
+              </div>
+
+              <div class="compact-panel">
+                <h3>Document list</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Version</th>
+                      <th>Workspace</th>
+                    </tr>
+                  </thead>
+                  <tbody id="documentRows">
+                    <tr><td colspan="3" class="empty">Login to load documents.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="chat" class="view" aria-label="AI chat">
+            <div class="chat-layout">
+              <div class="compact-panel">
+                <h2>AI chat</h2>
+                <form id="chatForm">
+                  <label>
+                    Workspace
+                    <select name="workspaceId" id="chatWorkspace" required></select>
+                  </label>
+                  <label>
+                    Question
+                    <textarea name="question" required>Why is the legacy ERP order processing query slow?</textarea>
+                  </label>
+                  <button class="button" type="submit">Ask AI</button>
+                <div id="chatMessage" class="message"></div>
+                </form>
+                <div class="badge-row" id="chatBadges"></div>
+                <div class="actions" id="reportDownloads"></div>
+                <div id="chatAnswer" class="answer-box">Ask a question to see the MVP answer and safety report.</div>
+                <div id="feedbackPanel" class="feedback-panel">
+                  <h3>Developer feedback</h3>
+                  <div class="segmented" id="feedbackRating">
+                    <button type="button" data-rating="HELPFUL">Helpful</button>
+                    <button type="button" data-rating="NOT_HELPFUL">Not Helpful</button>
+                    <button type="button" data-rating="PARTIALLY_CORRECT">Partially Correct</button>
+                    <button type="button" data-rating="WRONG_ROOT_CAUSE">Wrong Root Cause</button>
+                    <button type="button" data-rating="MISSING_EVIDENCE">Missing Evidence</button>
+                    <button type="button" data-rating="NEEDS_DBA_REVIEW">Needs DBA Review</button>
+                  </div>
+                  <form id="feedbackForm">
+                    <div class="grid-two">
+                      <label>Actual root cause<textarea name="actualRootCause"></textarea></label>
+                      <label>Actual fix applied<textarea name="actualFixApplied"></textarea></label>
+                    </div>
+                    <div class="grid-two">
+                      <label>SQL/procedure changed<textarea name="sqlChanged"></textarea></label>
+                      <label>Test cases executed<textarea name="testCases"></textarea></label>
+                    </div>
+                    <div class="grid-two">
+                      <label>Proof of fix<textarea name="proofOfFix"></textarea></label>
+                      <label>Notes<textarea name="notes"></textarea></label>
+                    </div>
+                    <div class="grid-two">
+                      <label>Rollback used?<input name="rollbackUsed" /></label>
+                      <label>Production issue resolved?
+                        <select name="productionResolved">
+                          <option value="">Unknown</option>
+                          <option value="true">Yes</option>
+                          <option value="false">No</option>
+                        </select>
+                      </label>
+                    </div>
+                    <button class="button" type="submit">Submit for DBA/Lead Approval</button>
+                    <div id="feedbackMessage" class="message"></div>
+                  </form>
+                </div>
+                <div class="message-list" id="chatMessages"></div>
+              </div>
+
+              <div class="compact-panel">
+                <h3>Required AI disclaimer</h3>
+                <ul id="chatDisclaimerList" class="muted-note">
+                  <li>Loading disclaimer...</li>
+                </ul>
+                <h3>Conversation history</h3>
+                <div id="conversationRows" class="history-list">
+                  <div class="empty">Select a workspace to load history.</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="learning" class="view" aria-label="Learning loop">
+            <div class="compact-panel full-width">
+              <h2>Human-approved learning loop</h2>
+              <form id="learningFilterForm">
+                <label>
+                  Workspace
+                  <select id="learningWorkspace" name="workspaceId" required></select>
+                </label>
+                <button class="button" type="submit">Refresh</button>
+                <div id="learningMessage" class="message"></div>
+              </form>
+              <div class="dashboard-grid">
+                <div class="stat"><span>Open Investigations</span><strong id="learnOpen">0</strong></div>
+                <div class="stat"><span>Pending Feedback</span><strong id="learnFeedback">0</strong></div>
+                <div class="stat"><span>Pending Approval</span><strong id="learnApproval">0</strong></div>
+                <div class="stat"><span>Approved Knowledge</span><strong id="learnKnowledge">0</strong></div>
+              </div>
+              <div class="dashboard-layout">
+                <div class="table-panel">
+                  <h3>Open Investigations</h3>
+                  <table><thead><tr><th>Question</th><th>Status</th><th>Created</th></tr></thead><tbody id="openInvestigationRows"></tbody></table>
+                </div>
+                <div class="table-panel">
+                  <h3>Follow-up Reminders</h3>
+                  <table><thead><tr><th>Question</th><th>Reminder</th></tr></thead><tbody id="reminderRows"></tbody></table>
+                </div>
+              </div>
+              <div class="dashboard-layout">
+                <div class="table-panel">
+                  <h3>Pending Approval</h3>
+                  <table><thead><tr><th>Rating</th><th>Root Cause</th><th>Actions</th></tr></thead><tbody id="pendingApprovalRows"></tbody></table>
+                </div>
+                <div class="table-panel">
+                  <h3>Approved Knowledge</h3>
+                  <table><thead><tr><th>Article</th><th>Root Cause</th></tr></thead><tbody id="knowledgeRows"></tbody></table>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const API_BASE =
+        window.API_BASE ||
+        (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
+          ? "http://127.0.0.1:8001"
+          : "");
+      const sessionKey = "legacydb-session";
+      const buttons = document.querySelectorAll("[data-view-button]");
+      const views = document.querySelectorAll(".view");
+      const pageTitle = document.getElementById("pageTitle");
+      const sessionLabel = document.getElementById("sessionLabel");
+      let currentInvestigationId = null;
+      let currentFeedbackRating = "HELPFUL";
+
+      const requiredConsents = [
+        "terms_of_service",
+        "privacy_policy",
+        "document_processing",
+        "ai_verification_required",
+      ];
+
+      function slugify(value) {
+        return value
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 90);
+      }
+
+      function setView(name) {
+        buttons.forEach((button) => button.classList.toggle("active", button.dataset.viewButton === name));
+        views.forEach((view) => view.classList.toggle("active", view.id === name));
+        pageTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        if (name === "dashboard") loadDashboard();
+        if (name === "workspaces") loadWorkspaceManager();
+        if (name === "connections") loadConnectionManager();
+        if (name === "documents") loadDocumentManager();
+        if (name === "chat") loadChatManager();
+        if (name === "learning") loadLearningManager();
+      }
+
+      function setMessage(id, text, type = "") {
+        const element = document.getElementById(id);
+        element.textContent = text;
+        element.className = `message ${type}`.trim();
+      }
+
+      async function api(path, options = {}) {
+        const session = getSession();
+        const authHeaders = session?.access_token
+          ? { Authorization: `${session.token_type || "bearer"} ${session.access_token}` }
+          : {};
+        const response = await fetch(`${API_BASE}${path}`, {
+          headers: {
+            "Content-Type": "application/json",
+            ...authHeaders,
+            ...(options.headers || {}),
+          },
+          ...options,
+        });
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+        if (!response.ok) {
+          const detail = data?.detail;
+          if (response.status === 401) {
+            localStorage.removeItem(sessionKey);
+            updateSessionLabel();
+          }
+          throw new Error(Array.isArray(detail) ? detail.join(", ") : detail || "Request failed");
+        }
+        return data;
+      }
+
+      function getSession() {
+        try {
+          return JSON.parse(localStorage.getItem(sessionKey));
+        } catch {
+          return null;
+        }
+      }
+
+      function saveSession(session) {
+        localStorage.setItem(sessionKey, JSON.stringify(session));
+        updateSessionLabel();
+      }
+
+      function updateSessionLabel() {
+        const session = getSession();
+        if (!session?.user) {
+          sessionLabel.textContent = "No active session";
+          return;
+        }
+        sessionLabel.textContent = `${session.user.email} - ${session.user.role}`;
+      }
+
+      async function checkApi() {
+        try {
+          const health = await api("/health");
+          document.getElementById("statusDot").classList.add("ok");
+          document.getElementById("apiStatus").textContent = `API ${health.status}`;
+        } catch (error) {
+          document.getElementById("statusDot").classList.remove("ok");
+          document.getElementById("apiStatus").textContent = "API unavailable";
+        }
+      }
+
+      async function loadDisclaimer() {
+        try {
+          const data = await api("/ai/disclaimer");
+          document.getElementById("disclaimerList").innerHTML = data.disclaimer
+            .map((line) => `<li>${line.replace(/^- /, "")}</li>`)
+            .join("");
+          const chatDisclaimer = document.getElementById("chatDisclaimerList");
+          if (chatDisclaimer) {
+            chatDisclaimer.innerHTML = data.disclaimer
+              .map((line) => `<li>${line.replace(/^- /, "")}</li>`)
+              .join("");
+          }
+        } catch {
+          document.getElementById("disclaimerList").innerHTML = "<li>Disclaimer could not be loaded.</li>";
+          const chatDisclaimer = document.getElementById("chatDisclaimerList");
+          if (chatDisclaimer) chatDisclaimer.innerHTML = "<li>Disclaimer could not be loaded.</li>";
+        }
+      }
+
+      async function login(email, password) {
+        const session = await api("/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+        saveSession(session);
+        return session;
+      }
+
+      async function findOrganizationBySlug(slug) {
+        const organizations = await api("/organizations");
+        return organizations.find((organization) => organization.slug === slug);
+      }
+
+      async function ensureDefaultWorkspace(organizationId) {
+        try {
+          await api("/workspaces", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: organizationId,
+              name: "Legacy ERP",
+              slug: "legacy-erp",
+            }),
+          });
+        } catch (error) {
+          if (!error.message.toLowerCase().includes("already")) throw error;
+        }
+      }
+
+      function requireSession(messageId) {
+        const session = getSession();
+        if (!session?.user) {
+          if (messageId) setMessage(messageId, "Login first to use this screen.", "error");
+          return null;
+        }
+        return session;
+      }
+
+      async function loadWorkspacesForSession(messageId) {
+        const session = requireSession(messageId);
+        if (!session) return [];
+        return api(`/workspaces?organization_id=${encodeURIComponent(session.user.organization_id)}`);
+      }
+
+      function renderWorkspaceTable(rowId, workspaces) {
+        document.getElementById(rowId).innerHTML = workspaces.length
+          ? workspaces
+              .map(
+                (workspace) =>
+                  `<tr><td>${workspace.name}</td><td>${workspace.slug}</td><td>${workspace.is_active ? "Active" : "Inactive"}</td></tr>`,
+              )
+              .join("")
+          : '<tr><td colspan="3" class="empty">No workspaces yet.</td></tr>';
+      }
+
+      function renderWorkspaceOptions(selectId, workspaces) {
+        const select = document.getElementById(selectId);
+        select.innerHTML = workspaces.length
+          ? workspaces
+              .map((workspace) => `<option value="${workspace.id}">${workspace.name}</option>`)
+              .join("")
+          : '<option value="">Create a workspace first</option>';
+      }
+
+      async function loadWorkspaceManager() {
+        try {
+          const workspaces = await loadWorkspacesForSession("workspaceMessage");
+          document.getElementById("workspaceManageRows").innerHTML = workspaces.length
+            ? workspaces
+                .map(
+                  (workspace) =>
+                    `<tr><td>${workspace.name}</td><td>${workspace.slug}</td><td>${workspace.is_active ? "Active" : "Inactive"}</td><td><button class="button secondary" type="button" data-edit-workspace="${workspace.id}" data-workspace-name="${workspace.name}" data-workspace-slug="${workspace.slug}">Edit</button> <button class="button secondary" type="button" data-delete-workspace="${workspace.id}" ${workspace.is_active ? "" : "disabled"}>Delete</button></td></tr>`,
+                )
+                .join("")
+            : '<tr><td colspan="4" class="empty">No workspaces yet.</td></tr>';
+          document.querySelectorAll("[data-edit-workspace]").forEach((button) =>
+            button.addEventListener("click", () => editWorkspace(button)),
+          );
+          document.querySelectorAll("[data-delete-workspace]").forEach((button) =>
+            button.addEventListener("click", () => deleteWorkspace(button.dataset.deleteWorkspace)),
+          );
+          setMessage("workspaceMessage", workspaces.length ? "Workspaces loaded." : "No workspaces yet.");
+        } catch (error) {
+          setMessage("workspaceMessage", error.message, "error");
+        }
+      }
+
+      async function editWorkspace(button) {
+        const workspaceId = button.dataset.editWorkspace;
+        const name = prompt("Workspace name", button.dataset.workspaceName || "");
+        if (name === null) return;
+        const slug = prompt("Workspace slug", button.dataset.workspaceSlug || "");
+        if (slug === null) return;
+        try {
+          await api(`/workspaces/${workspaceId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ name: name.trim(), slug: slug.trim() }),
+          });
+          setMessage("workspaceMessage", "Workspace updated.", "success");
+          await loadWorkspaceManager();
+          await loadDashboard();
+        } catch (error) {
+          setMessage("workspaceMessage", error.message, "error");
+        }
+      }
+
+      async function deleteWorkspace(workspaceId) {
+        if (!confirm("Deactivate this workspace? Existing history is kept.")) return;
+        try {
+          await api(`/workspaces/${workspaceId}`, { method: "DELETE" });
+          setMessage("workspaceMessage", "Workspace deactivated.", "success");
+          await loadWorkspaceManager();
+          await loadDashboard();
+        } catch (error) {
+          setMessage("workspaceMessage", error.message, "error");
+        }
+      }
+
+      async function loadConnectionManager() {
+        const session = requireSession("connectionMessage");
+        if (!session) return;
+        try {
+          const [workspaces, connections] = await Promise.all([
+            loadWorkspacesForSession("connectionMessage"),
+            api(`/databases/connections?organization_id=${encodeURIComponent(session.user.organization_id)}`),
+          ]);
+          renderWorkspaceOptions("connectionWorkspace", workspaces);
+          document.getElementById("connectionRows").innerHTML = connections.length
+            ? connections
+                .map(
+                  (connection) =>
+                    `<tr><td>${connection.name}</td><td>${connection.engine}</td><td>${connection.is_active ? "Active" : "Inactive"}</td><td><button class="button secondary" type="button" data-test-connection="${connection.id}" ${connection.is_active ? "" : "disabled"}>Test</button></td><td><button class="button secondary" type="button" data-edit-connection="${connection.id}" data-connection-name="${connection.name}">Edit</button> <button class="button secondary" type="button" data-delete-connection="${connection.id}" ${connection.is_active ? "" : "disabled"}>Delete</button></td><td id="connection-test-${connection.id}" class="message">Not tested</td></tr>`,
+                )
+                .join("")
+            : '<tr><td colspan="6" class="empty">No database connections yet.</td></tr>';
+          document.querySelectorAll("[data-test-connection]").forEach((button) =>
+            button.addEventListener("click", () => testDatabaseConnection(button)),
+          );
+          document.querySelectorAll("[data-edit-connection]").forEach((button) =>
+            button.addEventListener("click", () => editDatabaseConnection(button)),
+          );
+          document.querySelectorAll("[data-delete-connection]").forEach((button) =>
+            button.addEventListener("click", () => deleteDatabaseConnection(button.dataset.deleteConnection)),
+          );
+          setMessage("connectionMessage", "Database connections loaded.", "success");
+        } catch (error) {
+          setMessage("connectionMessage", error.message, "error");
+        }
+      }
+
+      async function editDatabaseConnection(button) {
+        const connectionId = button.dataset.editConnection;
+        const name = prompt("Connection name", button.dataset.connectionName || "");
+        if (name === null) return;
+        const connectionString = prompt("New connection string. Leave blank to keep existing secret.");
+        const payload = { name: name.trim() };
+        if (connectionString && connectionString.trim()) payload.connection_string = connectionString.trim();
+        try {
+          await api(`/databases/connections/${connectionId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          });
+          setMessage("connectionMessage", "Database connection updated.", "success");
+          await loadConnectionManager();
+        } catch (error) {
+          setMessage("connectionMessage", error.message, "error");
+        }
+      }
+
+      async function deleteDatabaseConnection(connectionId) {
+        if (!confirm("Deactivate this database connection? Existing history is kept.")) return;
+        try {
+          await api(`/databases/connections/${connectionId}`, { method: "DELETE" });
+          setMessage("connectionMessage", "Database connection deactivated.", "success");
+          await loadConnectionManager();
+        } catch (error) {
+          setMessage("connectionMessage", error.message, "error");
+        }
+      }
+
+      async function testDatabaseConnection(button) {
+        const connectionId = button.dataset.testConnection;
+        const resultCell = document.getElementById(`connection-test-${connectionId}`);
+        button.disabled = true;
+        button.textContent = "Testing...";
+        resultCell.textContent = "Testing...";
+        resultCell.className = "message";
+        setMessage("connectionMessage", "Testing database connection...");
+        try {
+          const result = await api(`/databases/connections/${connectionId}/test`, { method: "POST" });
+          resultCell.textContent = result.message;
+          resultCell.className = `message ${result.is_valid ? "success" : "error"}`;
+          setMessage(
+            "connectionMessage",
+            result.message,
+            result.is_valid ? "success" : "error",
+          );
+        } catch (error) {
+          resultCell.textContent = error.message;
+          resultCell.className = "message error";
+          setMessage("connectionMessage", error.message, "error");
+        } finally {
+          button.disabled = false;
+          button.textContent = "Test";
+        }
+      }
+
+      async function loadDocumentManager() {
+        const session = requireSession("documentMessage");
+        if (!session) return;
+        try {
+          const [workspaces, documents] = await Promise.all([
+            loadWorkspacesForSession("documentMessage"),
+            api(`/documents?organization_id=${encodeURIComponent(session.user.organization_id)}`),
+          ]);
+          renderWorkspaceOptions("documentWorkspace", workspaces);
+          const workspaceById = Object.fromEntries(workspaces.map((workspace) => [workspace.id, workspace.name]));
+          document.getElementById("documentRows").innerHTML = documents.length
+            ? documents
+                .map(
+                  (document) =>
+                    `<tr><td>${document.title}</td><td>${document.current_version}</td><td>${workspaceById[document.workspace_id] || "Unknown"}</td></tr>`,
+                )
+                .join("")
+            : '<tr><td colspan="3" class="empty">No documents yet.</td></tr>';
+          setMessage("documentMessage", "Documents loaded.", "success");
+        } catch (error) {
+          setMessage("documentMessage", error.message, "error");
+        }
+      }
+
+      async function sha256Hex(value) {
+        const encoded = new TextEncoder().encode(value);
+        const digest = await crypto.subtle.digest("SHA-256", encoded);
+        return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+      }
+
+      function renderChatBadges(response) {
+        const badges = [
+          `<span class="badge">Confidence ${Math.round(response.confidence * 100)}%</span>`,
+          `<span class="badge ${response.requires_human_review ? "warn" : ""}">${
+            response.requires_human_review ? "Human review required" : "No safety findings"
+          }</span>`,
+          ...response.findings.map((finding) => `<span class="badge warn">${finding.replace(/_/g, " ")}</span>`),
+        ];
+        document.getElementById("chatBadges").innerHTML = badges.join("");
+      }
+
+      async function fetchReportBlob(path) {
+        const session = requireSession("chatMessage");
+        if (!session) return null;
+        const response = await fetch(`${API_BASE}${path}`, {
+          headers: { Authorization: `${session.token_type || "bearer"} ${session.access_token}` },
+        });
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(error.detail || "Report download failed");
+        }
+        return response.blob();
+      }
+
+      async function downloadReport(path, filename) {
+        try {
+          const blob = await fetchReportBlob(path);
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = filename;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        }
+      }
+
+      async function viewHtmlReport(path) {
+        try {
+          const blob = await fetchReportBlob(path);
+          if (!blob) return;
+          const html = await blob.text();
+          const win = window.open("", "_blank");
+          if (!win) throw new Error("Popup blocked. Allow popups to view HTML report.");
+          win.document.open();
+          win.document.write(html);
+          win.document.close();
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        }
+      }
+
+      function renderReportDownloads(report) {
+        const container = document.getElementById("reportDownloads");
+        if (!report) {
+          container.innerHTML = "";
+          return;
+        }
+        const filenameFromPath = (path) => decodeURIComponent(path.split("/").pop() || "investigation_report");
+        container.innerHTML = `
+          <button class="button secondary" type="button" data-view-report="${report.html}">View HTML Report</button>
+          <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">Download PDF</button>
+          <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">Download Word</button>
+          <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">Download Excel</button>
+        `;
+        container.querySelector("[data-view-report]").addEventListener("click", (event) =>
+          viewHtmlReport(event.currentTarget.dataset.viewReport),
+        );
+        container.querySelectorAll("[data-download-report]").forEach((button) =>
+          button.addEventListener("click", () =>
+            downloadReport(button.dataset.downloadReport, button.dataset.filename),
+          ),
+        );
+      }
+
+      function showFeedbackPanel(investigationId) {
+        currentInvestigationId = investigationId;
+        const panel = document.getElementById("feedbackPanel");
+        panel.classList.toggle("active", Boolean(investigationId));
+        setMessage(
+          "feedbackMessage",
+          investigationId
+            ? "Feedback will be saved as Pending Approval. It will not train the knowledge base until approved."
+            : "",
+        );
+      }
+
+      function renderLearningRows(targetId, rows, columns, emptyText) {
+        const body = document.getElementById(targetId);
+        body.innerHTML = rows.length
+          ? rows
+              .map(
+                (row) =>
+                  `<tr>${columns.map((column) => `<td>${column(row)}</td>`).join("")}</tr>`,
+              )
+              .join("")
+          : `<tr><td colspan="${columns.length}" class="empty">${emptyText}</td></tr>`;
+      }
+
+      async function loadLearningManager() {
+        const session = requireSession("learningMessage");
+        if (!session) return;
+        try {
+          const workspaces = await loadWorkspacesForSession("learningMessage");
+          renderWorkspaceOptions("learningWorkspace", workspaces);
+          await refreshLearningDashboard();
+        } catch (error) {
+          setMessage("learningMessage", error.message, "error");
+        }
+      }
+
+      async function refreshLearningDashboard() {
+        const session = requireSession("learningMessage");
+        const workspaceId = document.getElementById("learningWorkspace").value;
+        if (!session || !workspaceId) return;
+        setMessage("learningMessage", "Loading learning workflow...");
+        const query = `organization_id=${encodeURIComponent(session.user.organization_id)}&workspace_id=${encodeURIComponent(workspaceId)}`;
+        try {
+          const [dashboard, investigations, feedback, knowledge] = await Promise.all([
+            api(`/learning/dashboard?${query}`),
+            api(`/learning/investigations?${query}`),
+            api(`/learning/feedback?${query}&status_filter=PENDING_APPROVAL`),
+            api(`/learning/knowledge?${query}`),
+          ]);
+          document.getElementById("learnOpen").textContent = dashboard.open_investigations;
+          document.getElementById("learnFeedback").textContent = dashboard.pending_feedback;
+          document.getElementById("learnApproval").textContent = dashboard.pending_approval;
+          document.getElementById("learnKnowledge").textContent = dashboard.approved_knowledge;
+          renderLearningRows(
+            "openInvestigationRows",
+            investigations.filter((item) => ["OPEN", "AI_ANSWERED", "DEVELOPER_REVIEW"].includes(item.status)).slice(0, 12),
+            [
+              (item) => item.user_question,
+              (item) => item.status,
+              (item) => new Date(item.created_at).toLocaleString(),
+            ],
+            "No open investigations.",
+          );
+          renderLearningRows(
+            "reminderRows",
+            dashboard.reminders,
+            [
+              (item) => item.user_question,
+              () => "Were you able to fix this issue?",
+            ],
+            "No reminders older than 24 hours.",
+          );
+          renderLearningRows(
+            "pendingApprovalRows",
+            feedback,
+            [
+              (item) => item.rating,
+              (item) => item.actual_root_cause || "Not provided",
+              (item) => `<button class="button secondary" type="button" data-approve-feedback="${item.id}">Approve</button>
+                         <button class="button secondary" type="button" data-reject-feedback="${item.id}">Reject</button>`,
+            ],
+            "No feedback awaiting approval.",
+          );
+          renderLearningRows(
+            "knowledgeRows",
+            knowledge,
+            [
+              (item) => item.title,
+              (item) => item.actual_root_cause || "Not recorded",
+            ],
+            "No approved knowledge yet.",
+          );
+          document.querySelectorAll("[data-approve-feedback]").forEach((button) =>
+            button.addEventListener("click", () => reviewFeedback(button.dataset.approveFeedback, true)),
+          );
+          document.querySelectorAll("[data-reject-feedback]").forEach((button) =>
+            button.addEventListener("click", () => reviewFeedback(button.dataset.rejectFeedback, false)),
+          );
+          setMessage("learningMessage", "Learning workflow loaded.", "success");
+        } catch (error) {
+          setMessage("learningMessage", error.message, "error");
+        }
+      }
+
+      async function reviewFeedback(feedbackId, approved) {
+        const title = approved ? prompt("Knowledge article title", "Approved investigation fix") : "";
+        try {
+          await api(`/learning/feedback/${feedbackId}/review`, {
+            method: "POST",
+            body: JSON.stringify({
+              approved,
+              title: title || null,
+              review_notes: approved ? "Approved from learning dashboard." : "Rejected from learning dashboard.",
+              confidence_after_approval: 0.95,
+            }),
+          });
+          await refreshLearningDashboard();
+        } catch (error) {
+          setMessage("learningMessage", error.message, "error");
+        }
+      }
+
+      function renderMessages(messages) {
+        document.getElementById("chatMessages").innerHTML = messages.length
+          ? messages
+              .map(
+                (message) =>
+                  `<div class="chat-message"><strong>${message.role}</strong>${message.content}</div>`,
+              )
+              .join("")
+          : "";
+      }
+
+      async function loadConversationMessages(conversationId) {
+        const session = requireSession("chatMessage");
+        const workspaceId = document.getElementById("chatWorkspace").value;
+        if (!session || !workspaceId) return;
+        try {
+          const messages = await api(
+            `/chat/conversations/${conversationId}/messages?organization_id=${encodeURIComponent(session.user.organization_id)}&workspace_id=${encodeURIComponent(workspaceId)}&user_id=${encodeURIComponent(session.user.id)}`,
+          );
+          renderMessages(messages);
+          const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+          if (lastAssistant) document.getElementById("chatAnswer").textContent = lastAssistant.content;
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        }
+      }
+
+      async function loadChatHistory() {
+        const session = requireSession("chatMessage");
+        const workspaceId = document.getElementById("chatWorkspace").value;
+        if (!session || !workspaceId) return;
+        try {
+          const conversations = await api(
+            `/chat/conversations?organization_id=${encodeURIComponent(session.user.organization_id)}&workspace_id=${encodeURIComponent(workspaceId)}&user_id=${encodeURIComponent(session.user.id)}`,
+          );
+          document.getElementById("conversationRows").innerHTML = conversations.length
+            ? conversations
+                .map(
+                  (conversation) =>
+                    `<button type="button" data-conversation-id="${conversation.id}">${conversation.title}</button>`,
+                )
+                .join("")
+            : '<div class="empty">No conversations yet.</div>';
+          document.querySelectorAll("[data-conversation-id]").forEach((button) =>
+            button.addEventListener("click", () => loadConversationMessages(button.dataset.conversationId)),
+          );
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        }
+      }
+
+      async function loadChatManager() {
+        try {
+          const workspaces = await loadWorkspacesForSession("chatMessage");
+          renderWorkspaceOptions("chatWorkspace", workspaces);
+          await loadChatHistory();
+          setMessage("chatMessage", "Chat ready.", "success");
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        }
+      }
+
+      document.querySelector("[name='organizationName']").addEventListener("input", (event) => {
+        const slugInput = document.querySelector("[name='organizationSlug']");
+        if (!slugInput.dataset.touched) slugInput.value = slugify(event.target.value);
+      });
+
+      document.querySelector("[name='organizationSlug']").addEventListener("input", (event) => {
+        event.target.dataset.touched = "true";
+      });
+
+      buttons.forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewButton)));
+      document.querySelectorAll("[data-switch]").forEach((button) =>
+        button.addEventListener("click", () => setView(button.dataset.switch)),
+      );
+
+      document.getElementById("signupForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const submit = event.currentTarget.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("signupMessage", "Creating organization and admin user...");
+
+        const organizationName = form.get("organizationName").trim();
+        const organizationSlug = form.get("organizationSlug").trim() || slugify(organizationName);
+        const email = form.get("email").trim();
+        const password = form.get("password");
+        const consents = [...requiredConsents, "product_updates"].filter((key) => form.get(key));
+
+        try {
+          let organization;
+          try {
+            organization = await api("/organizations", {
+              method: "POST",
+              body: JSON.stringify({ name: organizationName, slug: organizationSlug }),
+            });
+          } catch (error) {
+            if (!error.message.toLowerCase().includes("already")) throw error;
+            organization = await findOrganizationBySlug(organizationSlug);
+            if (!organization) throw error;
+          }
+
+          try {
+            await api("/auth/signup", {
+              method: "POST",
+              body: JSON.stringify({
+                organization_id: organization.id,
+                email,
+                password,
+                full_name: form.get("fullName").trim(),
+                role: form.get("role"),
+                consents,
+                ip_address: "127.0.0.1",
+              }),
+            });
+          } catch (error) {
+            if (!error.message.toLowerCase().includes("exists")) throw error;
+          }
+
+          await ensureDefaultWorkspace(organization.id);
+          await login(email, password);
+          setMessage("signupMessage", "Account ready and logged in.", "success");
+          setView("dashboard");
+        } catch (error) {
+          setMessage("signupMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      document.getElementById("loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+        const submit = event.currentTarget.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("loginMessage", "Logging in...");
+        try {
+          await login(form.get("email").trim(), form.get("password"));
+          setMessage("loginMessage", "Logged in.", "success");
+          setView("dashboard");
+        } catch (error) {
+          setMessage("loginMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      document.getElementById("logoutButton").addEventListener("click", () => {
+        localStorage.removeItem(sessionKey);
+        updateSessionLabel();
+        setMessage("loginMessage", "Session cleared.", "success");
+      });
+
+      document.getElementById("workspaceForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const session = requireSession("workspaceMessage");
+        if (!session) return;
+        const form = new FormData(event.currentTarget);
+        const submit = event.currentTarget.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("workspaceMessage", "Creating workspace...");
+        try {
+          await api("/workspaces", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: session.user.organization_id,
+              name: form.get("workspaceName").trim(),
+              slug: form.get("workspaceSlug").trim() || slugify(form.get("workspaceName")),
+            }),
+          });
+          setMessage("workspaceMessage", "Workspace created.", "success");
+          await loadWorkspaceManager();
+        } catch (error) {
+          setMessage("workspaceMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      document.getElementById("connectionForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const session = requireSession("connectionMessage");
+        if (!session) return;
+        const form = new FormData(event.currentTarget);
+        const connectionString = form.get("connectionString").trim();
+        const submit = event.currentTarget.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("connectionMessage", "Adding database connection...");
+        try {
+          await api("/databases/connections", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: session.user.organization_id,
+              workspace_id: form.get("workspaceId"),
+              engine: form.get("engine"),
+              name: form.get("connectionName").trim(),
+              host: form.get("host").trim(),
+              port: form.get("port") ? Number(form.get("port")) : null,
+              database_name: form.get("databaseName").trim(),
+              secret_ref: form.get("secretRef").trim(),
+              connection_string: connectionString || null,
+            }),
+          });
+          setMessage("connectionMessage", "Database connection added.", "success");
+          await loadConnectionManager();
+        } catch (error) {
+          setMessage("connectionMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      document.getElementById("documentForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const session = requireSession("documentMessage");
+        if (!session) return;
+        const formElement = event.currentTarget;
+        const form = new FormData(formElement);
+        const submit = formElement.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("documentMessage", "Uploading document...");
+        try {
+          const upload = new FormData();
+          upload.append("organization_id", session.user.organization_id);
+          upload.append("workspace_id", form.get("workspaceId"));
+          upload.append("title", form.get("title").trim());
+          upload.append("file", form.get("file"));
+          const response = await fetch(`${API_BASE}/documents/upload`, {
+            method: "POST",
+            headers: {
+              Authorization: `${session.token_type || "bearer"} ${session.access_token}`,
+            },
+            body: upload,
+          });
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({ detail: response.statusText }));
+            throw new Error(error.detail || "Upload failed");
+          }
+          formElement.reset();
+          setMessage("documentMessage", "Document uploaded.", "success");
+          await loadDocumentManager();
+        } catch (error) {
+          setMessage("documentMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      document.querySelectorAll("[data-rating]").forEach((button) =>
+        button.addEventListener("click", () => {
+          currentFeedbackRating = button.dataset.rating;
+          document.querySelectorAll("[data-rating]").forEach((item) =>
+            item.classList.toggle("active", item.dataset.rating === currentFeedbackRating),
+          );
+        }),
+      );
+      document.querySelector("[data-rating='HELPFUL']").classList.add("active");
+
+      document.getElementById("feedbackForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const session = requireSession("feedbackMessage");
+        if (!session || !currentInvestigationId) return;
+        const form = new FormData(event.currentTarget);
+        const productionValue = form.get("productionResolved");
+        try {
+          await api(`/learning/investigations/${currentInvestigationId}/feedback`, {
+            method: "POST",
+            body: JSON.stringify({
+              rating: currentFeedbackRating,
+              actual_root_cause: form.get("actualRootCause").trim(),
+              actual_fix_applied: form.get("actualFixApplied").trim(),
+              sql_or_procedure_changed: form.get("sqlChanged").trim(),
+              test_cases_executed: form.get("testCases").trim(),
+              proof_of_fix: form.get("proofOfFix").trim(),
+              rollback_used: form.get("rollbackUsed").trim(),
+              production_issue_resolved: productionValue === "" ? null : productionValue === "true",
+              notes: form.get("notes").trim(),
+            }),
+          });
+          event.currentTarget.reset();
+          setMessage("feedbackMessage", "Feedback submitted. Status is Pending Approval.", "success");
+          if (document.getElementById("learning").classList.contains("active")) await refreshLearningDashboard();
+        } catch (error) {
+          setMessage("feedbackMessage", error.message, "error");
+        }
+      });
+
+      document.getElementById("learningFilterForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await refreshLearningDashboard();
+      });
+
+      document.getElementById("chatWorkspace").addEventListener("change", () => {
+        renderMessages([]);
+        document.getElementById("chatAnswer").textContent = "Ask a question to see the MVP answer and safety report.";
+        document.getElementById("chatBadges").innerHTML = "";
+        document.getElementById("reportDownloads").innerHTML = "";
+        showFeedbackPanel(null);
+        loadChatHistory();
+      });
+
+      document.getElementById("chatForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const session = requireSession("chatMessage");
+        if (!session) return;
+        const form = new FormData(event.currentTarget);
+        const submit = event.currentTarget.querySelector("button[type='submit']");
+        submit.disabled = true;
+        setMessage("chatMessage", "Analyzing prompt and saving chat...");
+        try {
+          const response = await api("/chat/ask", {
+            method: "POST",
+            body: JSON.stringify({
+              organization_id: session.user.organization_id,
+              workspace_id: form.get("workspaceId"),
+              user_id: session.user.id,
+              question: form.get("question").trim(),
+            }),
+          });
+          document.getElementById("chatAnswer").textContent = response.assistant_message.content;
+          renderChatBadges(response);
+          renderReportDownloads(response.report);
+          showFeedbackPanel(response.investigation_id);
+          await loadConversationMessages(response.conversation.id);
+          await loadChatHistory();
+          setMessage("chatMessage", response.report ? "Investigation Complete. Reports generated." : "Answer generated and saved to history.", "success");
+        } catch (error) {
+          setMessage("chatMessage", error.message, "error");
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      async function loadDashboard() {
+        const session = getSession();
+        if (!session?.user) {
+          setMessage("dashboardMessage", "Login or signup first to load tenant data.", "error");
+          return;
+        }
+
+        setMessage("dashboardMessage", "Loading dashboard...");
+        try {
+          const [summary, workspaces] = await Promise.all([
+            api("/admin/summary"),
+            api(`/workspaces?organization_id=${encodeURIComponent(session.user.organization_id)}`),
+          ]);
+
+          document.getElementById("statOrganizations").textContent = summary.organizations;
+          document.getElementById("statUsers").textContent = summary.users;
+          document.getElementById("statDocuments").textContent = summary.documents;
+          document.getElementById("statIncidents").textContent = summary.incidents;
+
+          renderWorkspaceTable("workspaceRows", workspaces);
+          setMessage("dashboardMessage", "Dashboard loaded from FastAPI.", "success");
+        } catch (error) {
+          setMessage("dashboardMessage", error.message, "error");
+        }
+      }
+
+      updateSessionLabel();
+      checkApi();
+      loadDisclaimer();
+    </script>
+  </body>
+</html>

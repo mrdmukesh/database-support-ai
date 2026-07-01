@@ -1,0 +1,77 @@
+﻿from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class ExtractedEntity:
+    entity_type: str
+    value: str
+
+
+@dataclass(frozen=True)
+class EntityExtractionResult:
+    entities: list[ExtractedEntity]
+    suspected_issue: str | None
+    likely_module: str | None
+    application_name: str | None = None
+    business_keywords: list[str] | None = None
+
+
+def _unique(entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
+    seen: set[tuple[str, str]] = set()
+    result: list[ExtractedEntity] = []
+    for entity in entities:
+        key = (entity.entity_type, entity.value)
+        if key not in seen:
+            seen.add(key)
+            result.append(entity)
+    return result
+
+
+def extract_entities(question: str) -> EntityExtractionResult:
+    entities: list[ExtractedEntity] = []
+    application_name = None
+    app_match = re.search(r"\b([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)\s+(System|Application|App|Database|DB)\b", question)
+    if app_match:
+        application_name = f"{app_match.group(1)} {app_match.group(2)}"
+        entities.append(ExtractedEntity("application_name", application_name))
+    business_keys = set(re.findall(r"\b[A-Z]{2,10}-\d+[A-Z]?\b", question))
+    for value in re.findall(r"\b[A-Z]{2,10}-\d+[A-Z]?\b", question):
+        entities.append(ExtractedEntity("exact_id_or_code", value))
+    for value in re.findall(r"\bsp_[a-zA-Z0-9_]+\b", question):
+        entities.append(ExtractedEntity("stored_procedure", value))
+    ignored_codes = {"SQL", "DB", "AI", "MVP"}
+    for value in re.findall(r"\b[A-Z_]{3,}\b", question):
+        if value in ignored_codes or (application_name and value in application_name.upper().split()):
+            continue
+        if any(value == business_key.split("-", 1)[0] for business_key in business_keys):
+            continue
+        if value not in {entity.value for entity in entities}:
+            entities.append(ExtractedEntity("status_or_code", value))
+    suspected_issue = None
+    lowered = question.lower()
+    for phrase in ("duplicate", "not generated", "not created", "query slow", "batch failed", "mismatch", "missing"):
+        if phrase in lowered:
+            suspected_issue = phrase
+            break
+    module = None
+    generic_noise = {"find", "show", "where", "with", "without", "missing", "duplicate", "records", "record", "investigate", "group", "root", "cause"}
+    for candidate in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{3,}\b", question):
+        candidate = candidate.lower()
+        if candidate not in generic_noise:
+            module = candidate
+            break
+    business_keywords = [
+        token.lower()
+        for token in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{3,}\b", question)
+        if token.upper() not in ignored_codes
+    ][:20]
+    return EntityExtractionResult(
+        entities=_unique(entities),
+        suspected_issue=suspected_issue,
+        likely_module=module,
+        application_name=application_name,
+        business_keywords=business_keywords,
+    )

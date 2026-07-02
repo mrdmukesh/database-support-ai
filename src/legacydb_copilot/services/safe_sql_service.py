@@ -102,6 +102,116 @@ def _duplicate_target_terms(entities: EntityExtractionResult) -> set[str]:
     return terms
 
 
+def _status_literal_from_terms(terms: list[str], table: TableMetadata) -> str | None:
+    table_tokens = set(re.split(r"[_\-\s]+", table.name.lower()))
+    for column in table.columns:
+        table_tokens.update(part for part in re.split(r"[_\-\s]+", column.lower()) if part)
+    status_terms = [
+        term
+        for term in terms
+        if term not in table_tokens
+        and term not in {"process", "processing", "job", "batch", "query", "report"}
+    ]
+    if not status_terms:
+        return None
+    return "_".join(status_terms[:3]).upper()
+
+
+def _performance_target_table(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> tuple[TableMetadata | None, list[str]]:
+    question_text = " ".join(entities.business_keywords or [])
+    problem = parse_problem_phrase(question_text)
+    terms = problem.target_terms or [
+        term
+        for term in (entities.business_keywords or [])
+        if term not in {"analyze", "explain", "indexes", "index", "rows", "scans", "recommend", "optimization"}
+    ]
+    resolved = resolve_table_from_terms(terms, metadata)
+    if resolved:
+        return resolved, terms
+    if metadata.tables:
+        return metadata.tables[0], terms
+    return None, terms
+
+
+def _index_inspection_query(table: TableMetadata, engine_type: str | None) -> str:
+    engine = (engine_type or "").lower()
+    escaped = table.name.replace("'", "''")
+    if engine == "mysql":
+        return f"SHOW INDEX FROM {table.name}"
+    if engine == "postgresql":
+        return (
+            "SELECT indexname, indexdef "
+            "FROM pg_indexes "
+            f"WHERE tablename = '{escaped}' "
+            "ORDER BY indexname"
+        )
+    if engine == "sql_server":
+        return f"""
+SELECT
+    i.name AS index_name,
+    i.is_unique,
+    c.name AS column_name,
+    ic.key_ordinal
+FROM sys.indexes i
+JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+WHERE i.object_id = OBJECT_ID('{escaped}')
+ORDER BY i.name, ic.key_ordinal
+""".strip()
+    return f"SELECT * FROM {table.name} WHERE 1 = 0"
+
+
+def _performance_queries(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    table, terms = _performance_target_table(metadata, entities)
+    if table is None:
+        return []
+    status_col = _find_column(table, ("status",)) or _find_column(table, ("state",))
+    time_col = (
+        _find_column(table, ("time",), ("created", "updated", "checkout", "processed"))
+        or _find_column(table, ("date",), ("created", "updated", "processed"))
+        or _find_column(table, ("at",), ("created", "updated", "processed"))
+    )
+    columns = ", ".join(table.columns[:6]) if table.columns else "*"
+    filters: list[str] = []
+    status_literal = _status_literal_from_terms(terms, table)
+    if status_col and status_literal:
+        filters.append(f"{status_col} = '{status_literal}'")
+    where_clause = " WHERE " + " AND ".join(filters) if filters else ""
+    order_clause = f" ORDER BY {time_col}" if time_col else ""
+    queries = [
+        PlannedQuery(
+            purpose=f"Review indexes on performance target table {table.name}",
+            sql=_index_inspection_query(table, metadata.engine_type),
+        ),
+    ]
+    if status_col:
+        queries.append(
+            PlannedQuery(
+                purpose=f"Count rows by status/state in {table.name}",
+                sql=f"SELECT {status_col}, COUNT(*) AS row_count FROM {table.name} GROUP BY {status_col} ORDER BY row_count DESC",
+            )
+        )
+    queries.append(
+        PlannedQuery(
+            purpose=f"EXPLAIN performance target query for {table.name}",
+            sql=f"EXPLAIN SELECT {columns} FROM {table.name}{where_clause}{order_clause}",
+        )
+    )
+    if time_col:
+        time_filters = [*filters, f"{time_col} IS NOT NULL"]
+        queries.append(
+            PlannedQuery(
+                purpose=f"Inspect time distribution for {table.name}",
+                sql=(
+                    f"SELECT MIN({time_col}) AS oldest_value, MAX({time_col}) AS newest_value, "
+                    f"COUNT(*) AS row_count FROM {table.name}"
+                    + (" WHERE " + " AND ".join(time_filters) if time_filters else "")
+                ),
+            )
+        )
+    return queries
+
+
 def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> MissingChildFlow | None:
     question_text = " ".join(entities.business_keywords or [])
     problem = parse_problem_phrase(question_text)
@@ -328,15 +438,12 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
                 ),
             ]
         )
+    if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
+        planned.extend(_performance_queries(metadata, entities))
     for table in metadata.tables[:5]:
         where_clause = _where_for_table(table, entities, metadata.engine_type)
         columns = ", ".join(table.columns[:8]) if table.columns else "*"
         planned.append(PlannedQuery(purpose=f"Inspect relevant rows in {table.name}", sql=f"SELECT {columns} FROM {table.name}{where_clause}"))
-    if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION and metadata.tables:
-        table = metadata.tables[0]
-        columns = table.columns
-        if columns:
-            planned.append(PlannedQuery(purpose=f"Review execution plan for {table.name}", sql=f"EXPLAIN SELECT {', '.join(columns[:4])} FROM {table.name}"))
     if intent == InvestigationIntent.DUPLICATE_DATA:
         for table in metadata.tables[:3]:
             unique_cols = [

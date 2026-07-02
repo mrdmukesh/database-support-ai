@@ -7,6 +7,22 @@ from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationInte
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 
+_NOISE_TOKENS = {
+    "analyze",
+    "explain",
+    "index",
+    "indexes",
+    "logic",
+    "optimization",
+    "recommend",
+    "row",
+    "rows",
+    "scan",
+    "scans",
+    "stored",
+    "procedure",
+}
+
 
 @dataclass(frozen=True)
 class RankedObject:
@@ -24,9 +40,13 @@ class ObjectRankingResult:
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
     tokens = {token.strip(".,:;()[]{}").lower() for token in question.replace("_", " ").replace("-", " ").split()}
-    tokens = {token for token in tokens if len(token) >= 3}
+    tokens = {token for token in tokens if len(token) >= 3 and token not in _NOISE_TOKENS}
     for entity in entities.entities:
-        tokens.update(part.lower() for part in entity.value.replace("-", " ").split() if len(part) >= 3)
+        tokens.update(
+            part.lower()
+            for part in entity.value.replace("-", " ").split()
+            if len(part) >= 3 and part.lower() not in _NOISE_TOKENS
+        )
     if entities.likely_module:
         tokens.add(entities.likely_module.lower())
     if entities.suspected_issue:

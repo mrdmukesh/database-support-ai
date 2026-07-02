@@ -5,6 +5,22 @@ from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 
+_NOISE_TOKENS = {
+    "analyze",
+    "explain",
+    "index",
+    "indexes",
+    "logic",
+    "optimization",
+    "recommend",
+    "row",
+    "rows",
+    "scan",
+    "scans",
+    "stored",
+    "procedure",
+}
+
 
 @dataclass(frozen=True)
 class TableMetadata:
@@ -27,9 +43,18 @@ class MetadataSearchResult:
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
     raw = question.lower().replace("_", " ").replace("-", " ").split()
-    tokens = {token.strip(".,:;()[]{}") for token in raw if len(token.strip(".,:;()[]{}")) >= 3}
+    tokens = {
+        token.strip(".,:;()[]{}")
+        for token in raw
+        if len(token.strip(".,:;()[]{}")) >= 3
+        and token.strip(".,:;()[]{}") not in _NOISE_TOKENS
+    }
     for entity in entities.entities:
-        tokens.update(entity.value.lower().replace("-", " ").split())
+        tokens.update(
+            token
+            for token in entity.value.lower().replace("-", " ").split()
+            if token not in _NOISE_TOKENS
+        )
     if entities.likely_module:
         tokens.add(entities.likely_module.lower())
     if entities.suspected_issue:

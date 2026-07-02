@@ -239,13 +239,12 @@ jobs:
               --name openai-api-key \
               --query value \
               --output tsv 2>/dev/null || true)"
-            LLM_ENABLED_VALUE=false
             OPENAI_SECRET_ARGS=()
-            OPENAI_ENV_ARGS=("LLM_ENABLED=false")
+            OPENAI_ENV_ARGS=("AI_REASONING_ENABLED=false" "LLM_ENABLED=false")
             if [ -n "$OPENAI_API_KEY_VALUE" ]; then
-              LLM_ENABLED_VALUE=true
               OPENAI_SECRET_ARGS=("openai-api-key=$OPENAI_API_KEY_VALUE")
               OPENAI_ENV_ARGS=(
+                "AI_REASONING_ENABLED=true"
                 "LLM_ENABLED=true"
                 "LLM_PROVIDER=openai"
                 "LLM_MODEL=$LLM_MODEL"

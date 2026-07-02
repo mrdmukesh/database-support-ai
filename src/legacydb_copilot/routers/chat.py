@@ -932,7 +932,7 @@ def _run_dynamic_investigation(
         f"Investigation Mode: {mode.mode.value}\n"
         f"Detected Intent: {intent.intent.value}\n"
         f"Extracted Entities: {entity_text}\n"
-        f"LLM Reasoning Layer: {'applied' if llm_used else ('configured but not applied' if llm_configured else 'disabled')}\n"
+        f"AI Reasoning Layer: {'AI-assisted reasoning over collected evidence' if llm_used else ('configured but deterministic output kept because no usable evidence-cited AI reasoning was returned' if llm_configured else 'LLM reasoning disabled')}\n"
         "Professional report files have been generated for download.\n\n"
         f"{approved_context}"
         "## Stage 1 - Understand the Question\n"
@@ -968,12 +968,13 @@ def _run_dynamic_investigation(
         "## Stage 6 - Reason\n"
         f"{reasoning.summary}\n\n"
         + (
-            "LLM note: optional model reasoning was applied only after safe SQL evidence collection; the model did not execute SQL.\n\n"
+            "## AI-assisted reasoning over collected evidence\n"
+            "OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.\n\n"
             if llm_used
             else (
-                "LLM note: deterministic reasoning only; the configured model did not return usable evidence-cited reasoning.\n\n"
+                "AI reasoning note: deterministic reasoning only; the configured model did not return usable evidence-cited reasoning, so its output was not used.\n\n"
                 if llm_configured
-                else "LLM note: deterministic reasoning only; set LLM_ENABLED=true and OPENAI_API_KEY to enable evidence-grounded LLM explanation.\n\n"
+                else "AI reasoning note: LLM reasoning disabled. Set AI_REASONING_ENABLED=true and configure OPENAI_API_KEY to enable evidence-grounded AI explanation after evidence collection.\n\n"
             )
         )
         + "## Root Cause Analysis\n"

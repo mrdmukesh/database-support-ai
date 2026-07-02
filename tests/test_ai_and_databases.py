@@ -18,7 +18,10 @@ from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     classify_investigation_mode,
 )
-from legacydb_copilot.services.llm_reasoning_service import enhance_reasoning_with_llm
+from legacydb_copilot.services.llm_reasoning_service import (
+    enhance_reasoning_with_llm,
+    llm_reasoning_enabled,
+)
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.safe_sql_service import plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
@@ -960,3 +963,28 @@ def test_optional_llm_reasoning_is_disabled_by_default() -> None:
     )
 
     assert result is reasoning
+
+
+def test_ai_reasoning_requires_explicit_switch_and_openai_key() -> None:
+    disabled = Settings(
+        environment=Environment.DEVELOPMENT,
+        ai_reasoning_enabled=False,
+        llm_enabled=True,
+        openai_api_key="test-key",
+    )
+    missing_key = Settings(
+        environment=Environment.DEVELOPMENT,
+        ai_reasoning_enabled=True,
+        llm_enabled=True,
+        openai_api_key=None,
+    )
+    enabled = Settings(
+        environment=Environment.DEVELOPMENT,
+        ai_reasoning_enabled=True,
+        llm_enabled=True,
+        openai_api_key="test-key",
+    )
+
+    assert llm_reasoning_enabled(disabled) is False
+    assert llm_reasoning_enabled(missing_key) is False
+    assert llm_reasoning_enabled(enabled) is True

@@ -22,15 +22,22 @@ Rules:
 - Do not ask to run SQL directly.
 - Do not invent tables, procedures, business rules, rows, or errors.
 - Reason only over the evidence payload provided by the deterministic application.
+- Never override SQL evidence, metadata evidence, stored procedure analysis, or evidence-gate results.
+- If the deterministic evidence contradicts a likely explanation, reject that explanation.
 - Every root-cause conclusion, recommendation, test case, and proof-of-fix step must cite evidence_refs.
 - If evidence is insufficient, say confidence is low and list the missing evidence.
+- You may improve wording, summarization, senior-engineer explanation, confidence explanation, and next investigative questions.
 - Return only valid JSON matching the requested schema.
 """
 
 
 def llm_reasoning_enabled(settings: Settings | None = None) -> bool:
     settings = settings or Settings.from_env()
-    return bool(settings.llm_enabled and settings.llm_provider == "openai" and settings.openai_api_key)
+    return bool(
+        settings.ai_reasoning_enabled
+        and settings.llm_provider == "openai"
+        and settings.openai_api_key
+    )
 
 
 def enhance_reasoning_with_llm(
@@ -122,7 +129,7 @@ def _build_llm_payload(
         for index, item in enumerate(correlated_evidence[:20], start=1)
     ]
     return {
-        "task": "Improve the database investigation reasoning using only this evidence.",
+        "task": "Improve the database investigation reasoning using only this evidence. Do not create new SQL or facts.",
         "question": question,
         "detected_intent": intent.intent.value,
         "intent_confidence": intent.confidence,
@@ -156,10 +163,13 @@ def _build_llm_payload(
         else None,
         "required_json_schema": {
             "summary": "string",
+            "senior_engineer_explanation": "string",
             "confidence_note": "string",
             "likely_root_causes": [{"conclusion": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
             "missing_evidence": ["string"],
             "recommended_fix": [{"step": "string", "evidence_refs": ["SQL-1"]}],
+            "recommended_next_questions": [{"question": "string", "evidence_refs": ["SQL-1"]}],
+            "clearer_report_wording": "string",
             "test_cases": [{"test_id": "string", "scenario": "string", "steps": "string", "expected_result": "string", "evidence_refs": ["SQL-1"]}],
             "proof_of_fix": [{"step": "string", "evidence_refs": ["SQL-1"]}],
             "risks": [{"risk": "string", "evidence_refs": ["SQL-1"]}],
@@ -210,16 +220,25 @@ def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> Rea
     fixes = _cited_items(llm_json.get("recommended_fix"), "step")
     proof = _cited_items(llm_json.get("proof_of_fix"), "step")
     risks = _cited_items(llm_json.get("risks"), "risk")
+    next_questions = _cited_items(llm_json.get("recommended_next_questions"), "question")
     test_cases = _cited_test_cases(llm_json.get("test_cases"))
     if not root_causes:
         return base
-    summary = str(llm_json.get("summary") or base.summary)
+    summary_parts = [str(llm_json.get("summary") or base.summary)]
+    senior_explanation = str(llm_json.get("senior_engineer_explanation") or "").strip()
+    clearer_wording = str(llm_json.get("clearer_report_wording") or "").strip()
+    if senior_explanation:
+        summary_parts.append(f"Senior engineer explanation: {senior_explanation}")
+    if clearer_wording:
+        summary_parts.append(f"Clearer report wording: {clearer_wording}")
     confidence_note = str(llm_json.get("confidence_note") or "").strip()
     if confidence_note:
-        summary = f"{summary} Confidence note: {confidence_note}"
+        summary_parts.append(f"Confidence note: {confidence_note}")
+    if next_questions:
+        summary_parts.append("Recommended next questions: " + " ".join(next_questions))
     return replace(
         base,
-        summary=summary,
+        summary=" ".join(summary_parts),
         likely_root_causes=root_causes,
         missing_evidence=_string_list(llm_json.get("missing_evidence")) or base.missing_evidence,
         recommended_fix=fixes or base.recommended_fix,

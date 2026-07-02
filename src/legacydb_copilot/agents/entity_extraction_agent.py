@@ -57,15 +57,33 @@ def extract_entities(question: str) -> EntityExtractionResult:
             suspected_issue = phrase
             break
     module = None
-    generic_noise = {"find", "show", "where", "with", "without", "missing", "duplicate", "records", "record", "investigate", "group", "root", "cause"}
-    for candidate in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{3,}\b", question):
+    generic_noise = {
+        "are",
+        "cause",
+        "duplicate",
+        "find",
+        "group",
+        "how",
+        "investigate",
+        "missing",
+        "record",
+        "records",
+        "root",
+        "show",
+        "the",
+        "where",
+        "why",
+        "with",
+        "without",
+    }
+    for candidate in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{2,}\b", question):
         candidate = candidate.lower()
         if candidate not in generic_noise:
             module = candidate
             break
     business_keywords = [
         token.lower()
-        for token in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{3,}\b", question)
+        for token in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{2,}\b", question)
         if token.upper() not in ignored_codes
     ][:20]
     return EntityExtractionResult(

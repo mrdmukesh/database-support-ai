@@ -720,6 +720,54 @@ def test_problem_phrase_separates_target_from_secondary_causes() -> None:
     assert {"lab", "batch", "payment"} & set(parsed.secondary_cause_terms)
 
 
+def test_performance_phrase_uses_noun_phrase_before_slow_not_instruction_words() -> None:
+    parsed = parse_problem_phrase(
+        "Why is Checked Out Appointment Processing slow? Analyze EXPLAIN, indexes, row scans, stored procedure logic, and recommend optimization."
+    )
+
+    assert parsed.issue_kind == "performance"
+    assert {"checked", "out", "appointment", "processing"}.issubset(set(parsed.target_terms))
+    assert not {"analyze", "explain", "indexes", "row", "scans", "recommend", "optimization"} & set(parsed.target_terms)
+
+
+def test_performance_plan_collects_explain_indexes_and_status_counts_for_resolved_target() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata(
+                "appointments",
+                ["appointment_id", "appointment_number", "appointment_status", "checkout_time", "created_at"],
+                3,
+                indexes=[{"name": "idx_appointments_status", "columns": ["appointment_status"], "unique": False}],
+            ),
+            TableMetadata("job_run_history", ["job_name", "run_status", "duration_seconds"], 2),
+            TableMetadata("batch_control", ["batch_name", "batch_status"], 2),
+        ],
+        views=[],
+        procedures=["sp_process_checked_out_appointments"],
+        version="test",
+        engine_type="mysql",
+    )
+    question = "Why is Checked Out Appointment Processing slow? Analyze EXPLAIN, indexes, row scans, stored procedure logic, and recommend optimization."
+    entities = extract_entities(question)
+    ranking = rank_relevant_objects(
+        question=question,
+        intent=IntentResult(InvestigationIntent.PERFORMANCE_INVESTIGATION, 0.9, "test"),
+        entities=entities,
+        metadata=metadata,
+    )
+    queries = plan_safe_queries(InvestigationIntent.PERFORMANCE_INVESTIGATION, ranking.metadata, entities)
+
+    assert ranking.metadata.tables[0].name == "appointments"
+    assert ranking.metadata.procedures[0] == "sp_process_checked_out_appointments"
+    assert any(query.sql == "SHOW INDEX FROM appointments" for query in queries)
+    assert any("GROUP BY appointment_status" in query.sql for query in queries)
+    explain = next(query.sql for query in queries if query.purpose == "EXPLAIN performance target query for appointments")
+    assert "EXPLAIN SELECT" in explain
+    assert "FROM appointments" in explain
+    assert "appointment_status = 'CHECKED_OUT'" in explain
+    assert "ORDER BY checkout_time" in explain
+
+
 def test_question_understanding_classifies_investigation_modes() -> None:
     knowledge = classify_investigation_mode(
         "Search approved knowledge and previous investigations for duplicate event fixes",

@@ -225,6 +225,42 @@ def evaluate_hypotheses(
         if rank.writes_affected_object
     ] or [proc.name for proc in procedure_analysis if proc.tables_written]
     unique_index_hint = any("unique" in str(table_evidence).lower() for table_evidence in correlated_evidence)
+    if evidence_focus and evidence_focus.ranked_procedures:
+        direct_writer = next(
+            (rank for rank in evidence_focus.ranked_procedures if rank.writes_affected_object),
+            None,
+        )
+        duplicate_confirmed = any(
+            "duplicate" in item.purpose.lower() and item.rows
+            for item in evidence
+        )
+        if direct_writer:
+            support = [
+                f"{direct_writer.procedure} directly writes {evidence_focus.affected_object}.",
+                "Procedure Analysis confirms tables_written for the affected object.",
+            ]
+            if duplicate_confirmed:
+                support.append("Duplicate child rows were confirmed by parent-child evidence SQL.")
+            if direct_writer.error_log_support:
+                support.append("Error-log evidence references the direct writer and affected object.")
+            evaluations.append(
+                HypothesisEvaluation(
+                    hypothesis_id="H-DIRECT-WRITER",
+                    description=(
+                        f"Confirmed direct writer {direct_writer.procedure} is the leading root-cause candidate "
+                        f"because it writes affected object {evidence_focus.affected_object}."
+                    ),
+                    supporting_evidence=support,
+                    contradicting_evidence=["No stronger confirmed direct writer was ranked above this procedure."],
+                    missing_evidence=(
+                        ["Retry/job/audit execution timing is still needed to prove the exact run instance."]
+                        if not direct_writer.error_log_support
+                        else ["Transaction-level execution timing may still improve proof."]
+                    ),
+                    confidence=0.92 if duplicate_confirmed else 0.82,
+                    reason="Evidence-first ranking prioritizes confirmed writers of the affected object over metadata-only hypotheses.",
+                )
+            )
 
     for hypothesis in hypotheses:
         supporting: list[str] = []
@@ -355,7 +391,11 @@ def run_hypothesis_investigation(
         documents=documents,
         evidence_focus=evidence_focus,
     )
-    ranked = sorted(evaluations, key=lambda item: item.confidence, reverse=True)
+    ranked = sorted(
+        evaluations,
+        key=lambda item: (item.hypothesis_id == "H-DIRECT-WRITER", item.confidence),
+        reverse=True,
+    )
     return HypothesisReasoningResult(
         understanding=understanding,
         hypotheses=hypotheses,

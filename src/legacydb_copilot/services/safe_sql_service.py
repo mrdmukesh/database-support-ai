@@ -243,6 +243,35 @@ def _duplicate_child_query(flow: DuplicateChildFlow) -> str:
     return _duplicate_child_query_for_engine(flow, None)
 
 
+def _duplicate_child_detail_query_for_engine(flow: DuplicateChildFlow, engine_type: str | None) -> str:
+    child_columns = [
+        column
+        for column in flow.child_table.columns
+        if column in {
+            flow.child_fk_to_parent,
+            flow.child_label,
+            flow.child_status,
+        }
+        or column.lower().endswith(("_id", "_number", "_code", "_status", "_state"))
+        or column.lower() in {"retry_source", "created_at", "updated_at", "ordered_at"}
+    ][:10]
+    if not child_columns:
+        child_columns = flow.child_table.columns[:8]
+    child_select = ",\n    ".join(f"c.{column} AS child_{column}" for column in child_columns)
+    parent_filter = ""
+    if flow.parent_key_value:
+        escaped = flow.parent_key_value.replace("'", "''")
+        parent_filter = f"\nWHERE p.{flow.parent_label} = '{escaped}'"
+    return f"""
+SELECT
+    p.{flow.parent_label} AS parent_reference,
+    {child_select}
+FROM {flow.parent_table.name} p
+JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}{parent_filter}
+ORDER BY p.{flow.parent_label}{', c.' + flow.child_label if flow.child_label else ''}
+""".strip()
+
+
 def _duplicate_child_query_for_engine(flow: DuplicateChildFlow, engine_type: str | None) -> str:
     child_name = flow.child_table.name.rstrip("s")
     count_alias = f"{child_name}_count" if flow.child_status else f"duplicate_{child_name}_count"
@@ -274,11 +303,17 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
     missing_child_flow = _infer_missing_child_flow(metadata, entities) if intent == InvestigationIntent.MISSING_DATA else None
     duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if intent == InvestigationIntent.DUPLICATE_DATA else None
     if duplicate_child_flow:
-        planned.append(
+        planned.extend(
+            [
                 PlannedQuery(
                     purpose=f"Find duplicate {duplicate_child_flow.child_table.name} per {duplicate_child_flow.parent_table.name}",
                     sql=_duplicate_child_query_for_engine(duplicate_child_flow, metadata.engine_type),
-                )
+                ),
+                PlannedQuery(
+                    purpose=f"Inspect {duplicate_child_flow.child_table.name} rows through {duplicate_child_flow.parent_table.name} key",
+                    sql=_duplicate_child_detail_query_for_engine(duplicate_child_flow, metadata.engine_type),
+                ),
+            ]
         )
     if missing_child_flow:
         planned.extend(

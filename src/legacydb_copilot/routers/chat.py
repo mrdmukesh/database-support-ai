@@ -793,6 +793,7 @@ def _run_dynamic_investigation(
         correlated_evidence=correlated_evidence,
         procedure_analysis=procedure_analysis,
         documents=context.documents,
+        evidence_focus=evidence_focus,
     )
     evidence_gate = run_evidence_gate(
         question=payload.question,

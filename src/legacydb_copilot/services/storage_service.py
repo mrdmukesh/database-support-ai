@@ -27,7 +27,7 @@ class LocalStorage:
     root: Path
 
     def _path(self, key: str) -> Path:
-        normalized = normalize_storage_key(key)
+        normalized = key.replace("\\", "/")
         candidate = Path(normalized)
         if candidate.is_absolute():
             return candidate.resolve()

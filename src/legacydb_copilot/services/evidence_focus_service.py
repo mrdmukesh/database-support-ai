@@ -119,6 +119,9 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, metad
     table = _table(metadata, affected_object)
     if table is None:
         return None, "No affected table metadata available."
+    parent_key = _parent_business_key_from_duplicate_evidence(evidence)
+    if parent_key and intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
+        return parent_key, "Inferred from parent-child duplicate evidence; supplied business key belongs to the parent object, not the duplicated child object."
     natural_cols = [
         column
         for column in table.columns
@@ -129,11 +132,30 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, metad
     for column in duplicate_cols:
         if column in table.columns and not _is_primary_key(column, table):
             return column, "Inferred from duplicate evidence grouped by a non-primary business column."
-    if intent == InvestigationIntent.DUPLICATE_DATA and natural_cols:
+    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and natural_cols:
         return natural_cols[0], "Inferred from natural-key column naming; primary key was not used as duplicate key."
     if natural_cols:
         return natural_cols[0], "Inferred from natural-key column naming."
     return None, "No non-primary natural key column was identified."
+
+
+def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult]) -> str | None:
+    for item in evidence:
+        purpose = item.purpose.lower()
+        sql = item.sql
+        if "duplicate" not in purpose and "parent business key" not in purpose and "through" not in purpose:
+            continue
+        for pattern in (
+            r"\bp\.([`\"\[\]\w]+)\s+AS\s+parent_reference\b",
+            r"\b([`\"\[\]\w]+)\s+AS\s+parent_reference\b",
+            r"\bGROUP\s+BY\s+p\.([`\"\[\]\w]+)\b",
+        ):
+            match = re.search(pattern, sql, re.I)
+            if match:
+                column = _clean_identifier(match.group(1))
+                if not column.lower().endswith("_id") and column.lower() != "id":
+                    return column
+    return None
 
 
 def _rank_procedures(
@@ -249,7 +271,7 @@ def _inferred_findings(intent: InvestigationIntent, ranked_procedures: list[Proc
         findings.append("At least one read-only evidence query returned rows, so reasoning should prioritize observed data over metadata-only matches.")
     if documents:
         findings.append("Retrieved documents/knowledge can support business interpretation but do not override SQL evidence.")
-    if intent == InvestigationIntent.DUPLICATE_DATA:
+    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         findings.append("Duplicate analysis is based on inferred natural/business key columns, not primary key uniqueness.")
     return findings
 
@@ -258,7 +280,7 @@ def _hypotheses(intent: InvestigationIntent, affected_object: str, business_key:
     hypotheses: list[str] = []
     if ranked_procedures and ranked_procedures[0].writes_affected_object:
         hypotheses.append(f"Direct write logic in {ranked_procedures[0].procedure} may explain the observed evidence for {affected_object}.")
-    if intent == InvestigationIntent.DUPLICATE_DATA and business_key:
+    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and business_key:
         hypotheses.append(f"Duplicate records may be caused by missing idempotency or uniqueness around business key {business_key}.")
         if ranked_procedures and ranked_procedures[0].writes_affected_object:
             hypotheses.append(f"The likely write path is {ranked_procedures[0].procedure} because it writes {affected_object}; it may lack existing-active-record validation. Retry, job, or audit evidence is still needed to fully prove the exact execution path.")

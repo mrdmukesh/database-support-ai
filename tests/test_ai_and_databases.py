@@ -8,7 +8,7 @@ from legacydb_copilot.ai import (
 )
 from legacydb_copilot.agents.entity_extraction_agent import extract_entities
 from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
-from legacydb_copilot.agents.intent_agent import InvestigationIntent, IntentResult
+from legacydb_copilot.agents.intent_agent import InvestigationIntent, IntentResult, detect_intent
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
 from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
@@ -272,6 +272,105 @@ def test_duplicate_child_question_targets_child_object_and_write_path() -> None:
     assert "JOIN activity_entries c ON c.ticket_id = p.ticket_id" in detail_query.sql
     assert "p.ticket_number = 'TCK-1005'" in detail_query.sql
     assert "activity_code = 'TCK-1005'" not in detail_query.sql
+
+
+def test_production_incident_intent_wins_over_test_case_bullets() -> None:
+    question = (
+        "Appointment APT-2005 created two active lab orders. "
+        "Investigate this production incident using live database evidence. "
+        "Show affected object, parent object, SQL evidence, fix, test cases, proof of fix, and rollback."
+    )
+
+    result = detect_intent(question)
+
+    assert result.intent == InvestigationIntent.PRODUCTION_INVESTIGATION
+
+
+def test_production_duplicate_planner_resolves_parent_key_before_child_rows() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("appointments", ["appointment_id", "appointment_number", "appointment_status"], 5),
+            TableMetadata(
+                "lab_orders",
+                ["lab_order_id", "appointment_id", "lab_order_number", "lab_order_status", "retry_source", "created_at"],
+                5,
+                foreign_keys=[
+                    {
+                        "columns": ["appointment_id"],
+                        "referred_table": "appointments",
+                        "referred_columns": ["appointment_id"],
+                    }
+                ],
+            ),
+        ],
+        views=[],
+        procedures=["sp_retry_failed_lab_orders"],
+        version="test",
+        engine_type="mysql",
+    )
+    entities = extract_entities(
+        "Appointment APT-2005 created two active lab orders. Investigate this production incident using live database evidence."
+    )
+
+    queries = plan_safe_queries(InvestigationIntent.PRODUCTION_INVESTIGATION, metadata, entities)
+
+    parent_lookup = next(query for query in queries if query.purpose == "Resolve parent business key in appointments")
+    assert "FROM appointments p" in parent_lookup.sql
+    assert "p.appointment_number = 'APT-2005'" in parent_lookup.sql
+    duplicate_query = next(query for query in queries if query.purpose == "Find duplicate lab_orders per appointments")
+    assert "FROM appointments p" in duplicate_query.sql
+    assert "JOIN lab_orders c ON c.appointment_id = p.appointment_id" in duplicate_query.sql
+    assert "p.appointment_number = 'APT-2005'" in duplicate_query.sql
+    assert all("FROM lab_orders" not in query.sql or "lab_order_number = 'APT-2005'" not in query.sql for query in queries)
+
+
+def test_duplicate_business_key_prefers_parent_reference_column() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("appointments", ["appointment_id", "appointment_number"], 5),
+            TableMetadata(
+                "lab_orders",
+                ["lab_order_id", "appointment_id", "lab_order_number", "lab_order_status"],
+                5,
+                foreign_keys=[
+                    {
+                        "columns": ["appointment_id"],
+                        "referred_table": "appointments",
+                        "referred_columns": ["appointment_id"],
+                    }
+                ],
+            ),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+
+    focus = build_evidence_focus(
+        question="Appointment APT-2005 created two active lab orders. Investigate this production incident.",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=extract_entities("Appointment APT-2005 created two active lab orders. Investigate this production incident."),
+        metadata=metadata,
+        evidence=[
+            EvidenceResult(
+                "Resolve parent business key in appointments",
+                "SELECT p.appointment_id AS parent_id, p.appointment_number AS parent_reference, COUNT(c.appointment_id) AS lab_order_count FROM appointments p LEFT JOIN lab_orders c ON c.appointment_id = p.appointment_id WHERE p.appointment_number = 'APT-2005' GROUP BY p.appointment_id, p.appointment_number",
+                [{"parent_id": 2005, "parent_reference": "APT-2005", "lab_order_count": 2}],
+            ),
+            EvidenceResult(
+                "Find duplicate lab_orders per appointments",
+                "SELECT p.appointment_number AS parent_reference, COUNT(*) AS lab_order_count FROM appointments p JOIN lab_orders c ON c.appointment_id = p.appointment_id WHERE p.appointment_number = 'APT-2005' GROUP BY p.appointment_number HAVING COUNT(*) > 1",
+                [{"parent_reference": "APT-2005", "lab_order_count": 2}],
+            ),
+        ],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+    )
+
+    assert focus.affected_object == "lab_orders"
+    assert focus.inferred_business_key == "appointment_number"
+    assert "parent object" in focus.business_key_reason
 
 
 def test_evidence_focus_prefers_duplicated_child_and_direct_writer() -> None:

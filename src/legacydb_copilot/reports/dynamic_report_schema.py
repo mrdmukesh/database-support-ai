@@ -37,3 +37,4 @@ class DynamicInvestigationBundle:
     confidence_factors: list[str] | None = None
     investigation_mode: str = "INVESTIGATION"
     mode_rationale: str = ""
+    ai_reasoning_status: dict[str, str] | None = None

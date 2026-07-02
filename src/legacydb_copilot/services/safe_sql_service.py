@@ -353,6 +353,21 @@ def _duplicate_child_query(flow: DuplicateChildFlow) -> str:
     return _duplicate_child_query_for_engine(flow, None)
 
 
+def _duplicate_parent_lookup_query(flow: DuplicateChildFlow) -> str:
+    escaped = (flow.parent_key_value or "").replace("'", "''")
+    child_count_alias = f"{flow.child_table.name.rstrip('s')}_count"
+    parent_filter = f"\nWHERE p.{flow.parent_label} = '{escaped}'" if flow.parent_key_value else ""
+    return f"""
+SELECT
+    p.{flow.parent_id} AS parent_id,
+    p.{flow.parent_label} AS parent_reference,
+    COUNT(c.{flow.child_fk_to_parent}) AS {child_count_alias}
+FROM {flow.parent_table.name} p
+LEFT JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}{parent_filter}
+GROUP BY p.{flow.parent_id}, p.{flow.parent_label}
+""".strip()
+
+
 def _duplicate_child_detail_query_for_engine(flow: DuplicateChildFlow, engine_type: str | None) -> str:
     child_columns = [
         column
@@ -408,13 +423,26 @@ HAVING COUNT(*) > 1
 """.strip()
 
 
+def _duplicate_like_investigation(intent: InvestigationIntent, entities: EntityExtractionResult) -> bool:
+    if intent == InvestigationIntent.DUPLICATE_DATA:
+        return True
+    if intent != InvestigationIntent.PRODUCTION_INVESTIGATION:
+        return False
+    text = " ".join([entities.suspected_issue or "", *(entities.business_keywords or [])]).lower()
+    return any(term in text for term in ("duplicate", "duplicated", "two", "multiple", "double", "created twice"))
+
+
 def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
     planned: list[PlannedQuery] = []
     missing_child_flow = _infer_missing_child_flow(metadata, entities) if intent == InvestigationIntent.MISSING_DATA else None
-    duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if intent == InvestigationIntent.DUPLICATE_DATA else None
+    duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if _duplicate_like_investigation(intent, entities) else None
     if duplicate_child_flow:
         planned.extend(
             [
+                PlannedQuery(
+                    purpose=f"Resolve parent business key in {duplicate_child_flow.parent_table.name}",
+                    sql=_duplicate_parent_lookup_query(duplicate_child_flow),
+                ),
                 PlannedQuery(
                     purpose=f"Find duplicate {duplicate_child_flow.child_table.name} per {duplicate_child_flow.parent_table.name}",
                     sql=_duplicate_child_query_for_engine(duplicate_child_flow, metadata.engine_type),
@@ -440,12 +468,21 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         )
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
         planned.extend(_performance_queries(metadata, entities))
+    targeted_duplicate_tables = (
+        {duplicate_child_flow.parent_table.name.lower(), duplicate_child_flow.child_table.name.lower()}
+        if duplicate_child_flow
+        else set()
+    )
     for table in metadata.tables[:5]:
+        if table.name.lower() in targeted_duplicate_tables:
+            continue
         where_clause = _where_for_table(table, entities, metadata.engine_type)
         columns = ", ".join(table.columns[:8]) if table.columns else "*"
         planned.append(PlannedQuery(purpose=f"Inspect relevant rows in {table.name}", sql=f"SELECT {columns} FROM {table.name}{where_clause}"))
-    if intent == InvestigationIntent.DUPLICATE_DATA:
+    if _duplicate_like_investigation(intent, entities):
         for table in metadata.tables[:3]:
+            if table.name.lower() in targeted_duplicate_tables:
+                continue
             unique_cols = [
                 column
                 for index in table.indexes or []

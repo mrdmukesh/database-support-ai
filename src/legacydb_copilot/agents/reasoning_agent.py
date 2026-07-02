@@ -79,7 +79,11 @@ def reason_about_evidence(
     else:
         write_procs = [proc for proc in procedure_analysis if proc.tables_written]
     complex_procs = [proc for proc in procedure_analysis if proc.complexity == "High" or proc.locking_risk == "High"]
-    if intent.intent == InvestigationIntent.DUPLICATE_DATA:
+    duplicate_like = intent.intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and any(
+        "duplicate" in item.purpose.lower() or (item.rows and "duplicate" in item.sql.lower())
+        for item in evidence
+    )
+    if duplicate_like:
         if evidence_focus and evidence_focus.confirmed_facts:
             duplicate_facts = [fact for fact in evidence_focus.confirmed_facts if " has " in fact and evidence_focus.affected_object in fact]
             root_causes.extend(duplicate_facts[:2])

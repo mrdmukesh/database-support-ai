@@ -64,6 +64,7 @@ _BUSINESS_RULE_MARKERS = (
 )
 
 _LIVE_INVESTIGATION_INTENTS = {
+    InvestigationIntent.PRODUCTION_INVESTIGATION,
     InvestigationIntent.PERFORMANCE_INVESTIGATION,
     InvestigationIntent.PROCESS_FLOW_BREAK,
     InvestigationIntent.DUPLICATE_DATA,

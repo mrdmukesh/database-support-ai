@@ -78,6 +78,18 @@ string in Azure Key Vault, then injects them into the Container App as runtime
 secrets. Configure optional secrets such as `OPENAI_API_KEY` separately when you
 enable LLM reasoning.
 
+To enable evidence-grounded LLM reasoning in Azure, add a GitHub repository
+secret named `OPENAI_API_KEY`. The deployment workflow copies it into Key Vault
+as `openai-api-key` and sets these Container App values:
+
+- `LLM_ENABLED=true`
+- `LLM_PROVIDER=openai`
+- `LLM_MODEL=gpt-4.1-mini`
+- `OPENAI_API_KEY=secretref:openai-api-key`
+
+If `OPENAI_API_KEY` is not configured, deployment keeps `LLM_ENABLED=false` so
+Ask AI continues to use the deterministic evidence engine.
+
 For the persistent Azure platform layer, see:
 
 ```text

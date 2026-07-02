@@ -5,6 +5,7 @@ from enum import StrEnum
 
 
 class InvestigationIntent(StrEnum):
+    PRODUCTION_INVESTIGATION = "PRODUCTION_INVESTIGATION"
     PERFORMANCE_INVESTIGATION = "PERFORMANCE_INVESTIGATION"
     PROCESS_FLOW_BREAK = "PROCESS_FLOW_BREAK"
     DUPLICATE_DATA = "DUPLICATE_DATA"
@@ -28,6 +29,7 @@ class IntentResult:
 
 
 _INTENT_SIGNALS: tuple[tuple[InvestigationIntent, tuple[str, ...]], ...] = (
+    (InvestigationIntent.PRODUCTION_INVESTIGATION, ("production incident", "production issue", "prod incident", "live database evidence", "production support")),
     (InvestigationIntent.PERFORMANCE_INVESTIGATION, ("slow", "timeout", "performance", "full scan", "index", "explain", "long running")),
     (InvestigationIntent.DUPLICATE_DATA, ("duplicate", "double", "created twice", "two records", "two ", "multiple ", "idempot")),
     (InvestigationIntent.MISSING_DATA, ("missing", "not generated", "not created", "does not exist", "no row")),
@@ -74,6 +76,7 @@ def detect_intent(question: str) -> IntentResult:
             rationale="No strong incident signal found; treating as a general database question.",
         )
     priority = [
+        InvestigationIntent.PRODUCTION_INVESTIGATION,
         InvestigationIntent.DUPLICATE_DATA,
         InvestigationIntent.MISSING_DATA,
         InvestigationIntent.PERFORMANCE_INVESTIGATION,

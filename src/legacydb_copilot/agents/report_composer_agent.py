@@ -98,6 +98,8 @@ def _intent_sections(bundle: DynamicInvestigationBundle) -> list[ReportSection]:
         ])]
     if intent == InvestigationIntent.DUPLICATE_DATA:
         return [ReportSection(title="Duplicate Data Analysis", items=["Review duplicate business keys, insert source, retry/idempotency controls, and uniqueness protection."])]
+    if intent == InvestigationIntent.PRODUCTION_INVESTIGATION:
+        return [ReportSection(title="Production Incident Analysis", items=["Use live database evidence, evidence gate results, affected-object discovery, and write-path ranking to explain the reported production condition."])]
     if intent == InvestigationIntent.MISSING_DATA:
         return [ReportSection(title="Missing Data Analysis", items=["Identify the expected record, upstream dependency, guard condition, and validation SQL."])]
     if intent == InvestigationIntent.FAILED_BATCH_JOB:
@@ -149,6 +151,27 @@ def _evidence_gate_section(bundle: DynamicInvestigationBundle) -> ReportSection:
         ],
         items=items or ["No gate notes generated."],
         tables=[ReportTable(title="Gate Checks", columns=["Check", "Result"], rows=rows)],
+    )
+
+
+def _ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    status = bundle.ai_reasoning_status or {
+        "ai_assisted_reasoning": "Disabled",
+        "reason": "AI reasoning status was not recorded for this investigation.",
+        "evidence_package_sent": "No",
+        "llm_evidence_validation": "Not applicable",
+        "evidence_citations": "Not applicable",
+    }
+    rows = [
+        {"Item": "AI-assisted reasoning", "Value": status.get("ai_assisted_reasoning", "Disabled")},
+        {"Item": "Reason", "Value": status.get("reason", "")},
+        {"Item": "Evidence package sent", "Value": status.get("evidence_package_sent", "No")},
+        {"Item": "LLM evidence validation", "Value": status.get("llm_evidence_validation", "Not applicable")},
+        {"Item": "Evidence citations", "Value": status.get("evidence_citations", "Not applicable")},
+    ]
+    return ReportSection(
+        title="AI Reasoning Status",
+        tables=[ReportTable(title="AI-assisted Reasoning", columns=["Item", "Value"], rows=rows)],
     )
 
 
@@ -298,6 +321,7 @@ def compose_report(
             f"User Goal: {bundle.hypothesis_reasoning.understanding.user_goal}",
             f"Working Hypothesis: {bundle.hypothesis_reasoning.understanding.user_hypothesis}",
         ]),
+        _ai_reasoning_section(bundle),
         ReportSection(title="Stage 2 - Discover Context", tables=[
             ReportTable(title="Discovered Objects", columns=["Object Type", "Name", "Columns", "Indexes", "Foreign Keys", "Score"], rows=metadata_rows),
             ReportTable(title="Procedure Analysis", columns=["Procedure", "Definition", "Tables Read", "Tables Written", "Joins", "INSERT", "UPDATE", "DELETE", "MERGE", "Loops", "Transactions", "TRY/CATCH", "Rollback", "Cursors", "Temp Tables", "Dynamic SQL", "Missing EXISTS", "Missing Unique Check", "Deadlock Risk", "Complexity", "Complexity Score", "Locking Risk"], rows=proc_rows or [{"Procedure": "None", "Definition": "No stored procedures analyzed", "Tables Read": "", "Tables Written": "", "Joins": "", "INSERT": "", "UPDATE": "", "DELETE": "", "MERGE": "", "Loops": "", "Transactions": "", "TRY/CATCH": "", "Rollback": "", "Cursors": "", "Temp Tables": "", "Dynamic SQL": "", "Missing EXISTS": "", "Missing Unique Check": "", "Deadlock Risk": "", "Complexity": "", "Complexity Score": "", "Locking Risk": ""}]),

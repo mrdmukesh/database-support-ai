@@ -41,6 +41,7 @@ def run_evidence_gate(
     documents: list[RetrievedDocument],
 ) -> EvidenceGateResult:
     required = intent in {
+        InvestigationIntent.PRODUCTION_INVESTIGATION,
         InvestigationIntent.DUPLICATE_DATA,
         InvestigationIntent.MISSING_DATA,
         InvestigationIntent.PERFORMANCE_INVESTIGATION,
@@ -70,7 +71,7 @@ def run_evidence_gate(
     relationship_exists = _relationship_exists(metadata, evidence, evidence_focus)
     if relationship_exists:
         facts.append("Parent-child relationship was confirmed by metadata or join evidence.")
-    elif intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.MISSING_DATA, InvestigationIntent.PROCESS_FLOW_BREAK}:
+    elif intent in {InvestigationIntent.PRODUCTION_INVESTIGATION, InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.MISSING_DATA, InvestigationIntent.PROCESS_FLOW_BREAK}:
         blockers.append("Parent-child relationship was not confirmed by metadata or SQL join evidence.")
     condition_exists = _reported_condition_exists(question, intent, evidence, documents, status_notes)
     if condition_exists:
@@ -152,7 +153,7 @@ def _reported_condition_exists(
     documents: list[RetrievedDocument],
     status_notes: list[str],
 ) -> bool:
-    if intent == InvestigationIntent.DUPLICATE_DATA:
+    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         rows = [row for item in evidence if "duplicate" in item.purpose.lower() for row in item.rows]
         if not rows:
             return False
@@ -219,6 +220,8 @@ def _row_contains(row: dict[str, Any], value: str) -> bool:
 def _condition_blocker(intent: InvestigationIntent) -> str:
     if intent == InvestigationIntent.DUPLICATE_DATA:
         return "Duplicate condition was not confirmed by returned rows."
+    if intent == InvestigationIntent.PRODUCTION_INVESTIGATION:
+        return "Production incident condition was not confirmed by returned rows."
     if intent == InvestigationIntent.MISSING_DATA:
         return "Missing related records were not confirmed by returned rows."
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:

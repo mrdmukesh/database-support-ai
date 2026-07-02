@@ -63,7 +63,7 @@ def _intent_bonus(intent: InvestigationIntent, table: TableMetadata) -> float:
     has_status = any(term in columns for term in ("status", "state", "stage"))
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION and (has_history_or_log or table.indexes):
         return 1.5
-    if intent == InvestigationIntent.DUPLICATE_DATA and has_business_key:
+    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and has_business_key:
         return 1.5
     if intent == InvestigationIntent.MISSING_DATA and (table.foreign_keys or has_status):
         return 1.2

@@ -17,6 +17,7 @@ from legacydb_copilot.agents.recommendation_agent import recommend_actions
 from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
 from legacydb_copilot.agents.report_composer_agent import compose_report
 from legacydb_copilot.databases import DatabaseEngine
+from legacydb_copilot.config import Settings
 from legacydb_copilot.db.connector import DatabaseConnectionError, get_connection_pool
 from legacydb_copilot.db.models import (
     ChatConversationModel,
@@ -707,6 +708,49 @@ def _self_validation_lines(*, target_context: dict[str, str], evidence, hypothes
     ]
 
 
+def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, str]:
+    settings = Settings.from_env()
+    if llm_used:
+        return {
+            "ai_assisted_reasoning": "Enabled",
+            "reason": "OpenAI LLM reasoning was applied after deterministic evidence collection.",
+            "evidence_package_sent": "Yes",
+            "llm_evidence_validation": "Passed",
+            "evidence_citations": "Passed",
+        }
+    if not settings.openai_api_key:
+        return {
+            "ai_assisted_reasoning": "Disabled",
+            "reason": "OPENAI_API_KEY not configured",
+            "evidence_package_sent": "No",
+            "llm_evidence_validation": "Not applicable",
+            "evidence_citations": "Not applicable",
+        }
+    if not settings.ai_reasoning_enabled:
+        return {
+            "ai_assisted_reasoning": "Disabled",
+            "reason": "AI_REASONING_ENABLED=false",
+            "evidence_package_sent": "No",
+            "llm_evidence_validation": "Not applicable",
+            "evidence_citations": "Not applicable",
+        }
+    if not llm_configured:
+        return {
+            "ai_assisted_reasoning": "Disabled",
+            "reason": "LLM provider is not configured for OpenAI evidence-grounded reasoning.",
+            "evidence_package_sent": "No",
+            "llm_evidence_validation": "Not applicable",
+            "evidence_citations": "Not applicable",
+        }
+    return {
+        "ai_assisted_reasoning": "Enabled",
+        "reason": "OpenAI was configured, but deterministic output was kept because no usable evidence-cited AI reasoning was returned.",
+        "evidence_package_sent": "Yes",
+        "llm_evidence_validation": "Failed",
+        "evidence_citations": "Failed",
+    }
+
+
 def _run_dynamic_investigation(
     db: Session,
     payload: ChatAskRequest,
@@ -853,6 +897,7 @@ def _run_dynamic_investigation(
     if evidence_gate.required and not evidence_gate.reproduced:
         confidence = min(confidence, 0.35)
         confidence_notes.extend(f"- Evidence gate blocked root-cause analysis: {item}" for item in evidence_gate.blocking_reasons)
+    ai_status = _ai_reasoning_status(llm_configured=llm_configured, llm_used=llm_used)
     bundle = DynamicInvestigationBundle(
         question=payload.question,
         intent=intent,
@@ -872,6 +917,7 @@ def _run_dynamic_investigation(
         confidence_factors=confidence_notes,
         investigation_mode=mode.mode.value,
         mode_rationale=mode.rationale,
+        ai_reasoning_status=ai_status,
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(
@@ -932,7 +978,11 @@ def _run_dynamic_investigation(
         f"Investigation Mode: {mode.mode.value}\n"
         f"Detected Intent: {intent.intent.value}\n"
         f"Extracted Entities: {entity_text}\n"
-        f"AI Reasoning Layer: {'AI-assisted reasoning over collected evidence' if llm_used else ('configured but deterministic output kept because no usable evidence-cited AI reasoning was returned' if llm_configured else 'LLM reasoning disabled')}\n"
+        f"AI-assisted reasoning: {ai_status['ai_assisted_reasoning']}\n"
+        f"Reason: {ai_status['reason']}\n"
+        f"Evidence package sent: {ai_status['evidence_package_sent']}\n"
+        f"LLM evidence validation: {ai_status['llm_evidence_validation']}\n"
+        f"Evidence citations: {ai_status['evidence_citations']}\n"
         "Professional report files have been generated for download.\n\n"
         f"{approved_context}"
         "## Stage 1 - Understand the Question\n"
@@ -974,7 +1024,7 @@ def _run_dynamic_investigation(
             else (
                 "AI reasoning note: deterministic reasoning only; the configured model did not return usable evidence-cited reasoning, so its output was not used.\n\n"
                 if llm_configured
-                else "AI reasoning note: LLM reasoning disabled. Set AI_REASONING_ENABLED=true and configure OPENAI_API_KEY to enable evidence-grounded AI explanation after evidence collection.\n\n"
+                else f"AI reasoning note: {ai_status['reason']}.\n\n"
             )
         )
         + "## Root Cause Analysis\n"

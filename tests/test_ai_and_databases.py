@@ -264,6 +264,11 @@ def test_duplicate_child_question_targets_child_object_and_write_path() -> None:
     assert "p.ticket_number = 'TCK-1005'" in duplicate_query.sql
     assert "activity_status IN" not in duplicate_query.sql
     assert "child_statuses" in duplicate_query.sql
+    detail_query = next(query for query in queries if query.purpose == "Inspect activity_entries rows through tickets key")
+    assert "FROM tickets p" in detail_query.sql
+    assert "JOIN activity_entries c ON c.ticket_id = p.ticket_id" in detail_query.sql
+    assert "p.ticket_number = 'TCK-1005'" in detail_query.sql
+    assert "activity_code = 'TCK-1005'" not in detail_query.sql
 
 
 def test_evidence_focus_prefers_duplicated_child_and_direct_writer() -> None:
@@ -445,6 +450,22 @@ def test_duplicate_root_cause_uses_evidence_first_write_path() -> None:
     assert "Procedure Analysis confirms it writes activity_entries" in reasoning.likely_root_causes[1]
     assert "No uniqueness protection" in reasoning.likely_root_causes[2]
     assert "Retry, job, or audit evidence" in reasoning.likely_root_causes[3]
+
+    hypothesis_result = run_hypothesis_investigation(
+        question="Why did TCK-1005 create two active activity entries?",
+        intent=IntentResult(InvestigationIntent.DUPLICATE_DATA, 0.9, "test"),
+        entities=entities,
+        ranked_objects=[],
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[writer],
+        documents=[],
+        evidence_focus=focus,
+    )
+
+    assert hypothesis_result.ranked_root_causes[0].hypothesis_id == "H-DIRECT-WRITER"
+    assert hypothesis_result.ranked_root_causes[0].description.startswith("Confirmed direct writer retry_failed_activity_entries")
 
 
 def test_read_only_procedure_is_not_reported_as_writer() -> None:

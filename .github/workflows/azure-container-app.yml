@@ -159,7 +159,7 @@ jobs:
             az postgres flexible-server db create \
               --resource-group "$AZURE_RESOURCE_GROUP" \
               --server-name "$POSTGRES_SERVER" \
-              --database-name "$AZURE_POSTGRES_DATABASE" >/dev/null || true
+              --name "$AZURE_POSTGRES_DATABASE" >/dev/null || true
 
             DATABASE_URL="$(az keyvault secret show \
               --vault-name "$KEY_VAULT_NAME" \

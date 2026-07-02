@@ -63,22 +63,25 @@ low-cost Azure hosting resources exist before deploying:
 - Region: `centralindia`
 
 If the resource group is deleted, the next workflow run can recreate the app
-hosting resources. For that to work, the `AZURE_CREDENTIALS` service principal
-must have permission at the subscription scope, not only inside the deleted
-resource group.
+hosting resources and the persistent Azure platform layer. For that to work, the
+`AZURE_CREDENTIALS` service principal must have permission at the subscription
+scope, not only inside the deleted resource group.
 
 Do not commit secrets. Configure this value as a GitHub repository secret:
 
 - `AZURE_CREDENTIALS`: Azure service principal JSON for GitHub Actions login.
+- `AZURE_POSTGRES_ADMIN_PASSWORD`: PostgreSQL admin password used only when the
+  internal app database server must be created.
 
-Configure runtime secrets such as `DATABASE_URL`, `JWT_SECRET`, and
-`OPENAI_API_KEY` in Azure Container Apps, not in Git.
+The workflow stores `DATABASE_URL`, `JWT_SECRET`, and the Blob Storage connection
+string in Azure Key Vault, then injects them into the Container App as runtime
+secrets. Configure optional secrets such as `OPENAI_API_KEY` separately when you
+enable LLM reasoning.
 
-For persistent Azure testing, use Azure PostgreSQL for the app's internal
-database instead of temporary container SQLite. See:
+For the persistent Azure platform layer, see:
 
 ```text
-docs/azure-postgres-internal-db.md
+docs/azure-persistent-platform-layer.md
 ```
 
 ## Backend Modules

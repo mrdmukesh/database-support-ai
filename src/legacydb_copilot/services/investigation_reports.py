@@ -10,6 +10,15 @@ from legacydb_copilot.services.report_generator import (
     report_output_dir,
     write_html,
 )
+from legacydb_copilot.services.storage_service import get_app_storage
+
+
+_REPORT_CONTENT_TYPES = {
+    ".html": "text/html",
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 
 
 def generate_investigation_report_files(report: InvestigationReport) -> GeneratedReport:
@@ -24,6 +33,14 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
     write_pdf(report, pdf_path)
     write_docx(report, docx_path)
     write_xlsx(report, xlsx_path)
+
+    storage = get_app_storage()
+    for path in (html_path, pdf_path, docx_path, xlsx_path):
+        storage.save_bytes(
+            path.as_posix(),
+            path.read_bytes(),
+            _REPORT_CONTENT_TYPES.get(path.suffix.lower()),
+        )
 
     return GeneratedReport(
         investigation_id=report.cover.investigation_id,

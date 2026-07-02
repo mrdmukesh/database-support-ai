@@ -14,6 +14,7 @@ from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.documents import UploadPolicy, content_sha256, detect_mime_type
 from legacydb_copilot.schemas import DocumentCreate, DocumentRead
 from legacydb_copilot.services.rag_retrieval_service import index_document_knowledge
+from legacydb_copilot.services.storage_service import get_app_storage
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 LOCAL_DOCUMENT_ROOT = Path("storage/documents")
@@ -88,11 +89,13 @@ async def upload_document(
 
     sha256 = content_sha256(content)
     mime_type = file.content_type or detect_mime_type(filename)
-    document_dir = LOCAL_DOCUMENT_ROOT / organization_id / workspace_id
-    document_dir.mkdir(parents=True, exist_ok=True)
-    storage_path = document_dir / f"{sha256}-{filename}"
-    storage_path.write_bytes(content)
-    storage_key = storage_path.as_posix()
+    storage_key = (
+        LOCAL_DOCUMENT_ROOT
+        / organization_id
+        / workspace_id
+        / f"{sha256}-{filename}"
+    ).as_posix()
+    get_app_storage().save_bytes(storage_key, content, mime_type)
 
     document = DocumentModel(
         organization_id=organization_id,

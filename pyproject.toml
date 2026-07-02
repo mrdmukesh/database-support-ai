@@ -26,6 +26,8 @@ api = [
   "openpyxl>=3.1",
   "python-docx>=1.1",
   "reportlab>=4.2",
+  "azure-storage-blob>=12.22",
+  "azure-core>=1.30",
 ]
 
 [tool.pytest.ini_options]

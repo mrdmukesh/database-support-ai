@@ -42,3 +42,6 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+legacydb_copilot = ["reports/templates/*.html"]

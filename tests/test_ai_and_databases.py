@@ -28,6 +28,8 @@ from legacydb_copilot.services.report_generator import (
     ExecutiveSummary,
     InvestigationReport,
     ReportCover,
+    ReportSection,
+    render_html,
     report_file_stem,
 )
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
@@ -582,6 +584,36 @@ def test_report_file_stem_uses_question_title_and_investigation_id() -> None:
     )
 
     assert report_file_stem(report) == "ticket_tck_1004_activity_note_is_not_generated_INV-20260630-ABC123"
+
+
+def test_report_html_template_is_packaged_and_renderable() -> None:
+    report = InvestigationReport(
+        cover=ReportCover(
+            title="Enterprise Investigation Report",
+            workspace="Test",
+            database="demo",
+            generated_by="tester",
+            generated_on="2026-07-02 10:00:00",
+            investigation_id="INV-20260702-TEMPLATE",
+            report_version="1.0",
+        ),
+        executive_summary=ExecutiveSummary(
+            issue_title="Template smoke test",
+            issue_description="Verify packaged report template renders.",
+            severity="Low",
+            business_impact="None",
+            confidence_score=90,
+            estimated_root_cause="Not applicable",
+            recommendation_summary="Template rendered",
+            status="Complete",
+        ),
+        sections=[ReportSection(title="Smoke Test", paragraphs=["Template exists."])],
+    )
+
+    html = render_html(report)
+
+    assert "Template smoke test" in html
+    assert "Smoke Test" in html
 
 
 def test_evidence_gate_reproduces_duplicate_child_with_dynamic_open_status() -> None:

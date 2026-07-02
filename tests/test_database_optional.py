@@ -48,10 +48,22 @@ def test_mysql_connection_string_is_normalized_for_sqlalchemy() -> None:
         "mysql://user:password@localhost:3306/legacy",
     )
 
-    assert (
-        connector._build_connection_string()
-        == "mysql+pymysql://user:password@localhost:3306/legacy"
+    connection_string, connect_args = connector._build_connection_config()
+
+    assert connection_string == "mysql+pymysql://user:password@localhost:3306/legacy"
+    assert connect_args == {}
+
+
+def test_mysql_ssl_query_parameter_becomes_pymysql_connect_args() -> None:
+    connector = DatabaseConnector(
+        DatabaseEngine.MYSQL,
+        "mysql://appadmin:secret@example.mysql.database.azure.com:3306/clinic_ops_ai_demo?ssl=true",
     )
+
+    connection_string, connect_args = connector._build_connection_config()
+
+    assert connection_string == "mysql+pymysql://appadmin:secret@example.mysql.database.azure.com:3306/clinic_ops_ai_demo"
+    assert connect_args == {"ssl": {}}
 
 
 def test_secret_manager_reference_is_not_treated_as_connection_string() -> None:

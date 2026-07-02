@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from legacydb_copilot.common import DomainError
@@ -12,6 +13,27 @@ from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.db.adapters import BaseDatabaseAdapter, adapter_for
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_mysql_ssl_options(connection_string: str) -> tuple[str, dict[str, Any]]:
+    """Translate common MySQL URL SSL flags into PyMySQL connect_args.
+
+    PyMySQL expects the ``ssl`` option to be a dictionary. If the URL contains
+    ``?ssl=true`` or ``?ssl-mode=require``, SQLAlchemy passes a string through
+    to PyMySQL, which raises ``'str' object has no attribute 'get'``.
+    """
+
+    url = make_url(connection_string)
+    query = dict(url.query)
+    ssl_requested = False
+    for key in ("ssl", "ssl_mode", "ssl-mode"):
+        value = query.pop(key, None)
+        if value is None:
+            continue
+        ssl_requested = str(value).lower() in {"1", "true", "yes", "on", "require", "required"}
+    if not ssl_requested:
+        return connection_string, {}
+    return url.set(query=query).render_as_string(hide_password=False), {"ssl": {}}
 
 
 class DatabaseConnectionError(DomainError):
@@ -56,25 +78,27 @@ class DatabaseConnector:
         self._engine: Engine | None = None
         self._adapter: BaseDatabaseAdapter | None = None
 
-    def _build_connection_string(self) -> str:
-        """Build SQLAlchemy connection string based on engine type."""
+    def _build_connection_config(self) -> tuple[str, dict[str, Any]]:
+        """Build SQLAlchemy connection string and driver options based on engine type."""
         if self.database_engine == DatabaseEngine.MYSQL:
             # Use pymysql as the driver
+            connection_string = self.connection_string
             if not self.connection_string.startswith("mysql+pymysql://"):
                 if self.connection_string.startswith("mysql://"):
-                    return self.connection_string.replace("mysql://", "mysql+pymysql://")
-            return self.connection_string
-        return self.connection_string
+                    connection_string = self.connection_string.replace("mysql://", "mysql+pymysql://", 1)
+            return _normalize_mysql_ssl_options(connection_string)
+        return self.connection_string, {}
 
     def connect(self) -> None:
         """Establish connection to the database."""
         try:
-            conn_string = self._build_connection_string()
+            conn_string, connect_args = self._build_connection_config()
             self._engine = create_engine(
                 conn_string,
                 pool_size=5,
                 max_overflow=10,
                 pool_pre_ping=True,
+                connect_args=connect_args,
                 echo=False,
             )
             # Test the connection

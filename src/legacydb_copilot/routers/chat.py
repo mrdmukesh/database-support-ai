@@ -1089,11 +1089,17 @@ def ask_chat_question(
         report_links = None
         investigation_metadata = _empty_investigation_metadata()
     else:
-        answer, sources, confidence, report_links, investigation_metadata = _run_dynamic_investigation(
-        db,
-        payload,
-        current_user.email or current_user.full_name or current_user.id,
-        )
+        try:
+            answer, sources, confidence, report_links, investigation_metadata = _run_dynamic_investigation(
+                db,
+                payload,
+                current_user.email or current_user.full_name or current_user.id,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Ask AI failed while collecting evidence or generating the report: {exc}",
+            ) from exc
 
     user_message = ChatMessageModel(
         conversation_id=conversation.id,

@@ -20,6 +20,8 @@ env:
   AZURE_STORAGE_ACCOUNT_PREFIX: stdsai
   AZURE_STORAGE_CONTAINER: app-artifacts
   AZURE_KEY_VAULT_PREFIX: kv-dsai-dev
+  LLM_MODEL: gpt-4.1-mini
+  OPENAI_BASE_URL: https://api.openai.com/v1
 
 jobs:
   deploy:
@@ -42,6 +44,7 @@ jobs:
         uses: azure/cli@v2
         env:
           POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           inlineScript: |
             set -euo pipefail
@@ -188,6 +191,13 @@ jobs:
                 --value "$(openssl rand -base64 48 | tr -d '\n')" >/dev/null
             fi
 
+            if [ -n "${OPENAI_API_KEY:-}" ]; then
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name openai-api-key \
+                --value "$OPENAI_API_KEY" >/dev/null
+            fi
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -224,6 +234,25 @@ jobs:
               --name azure-storage-connection-string \
               --query value \
               --output tsv)"
+            OPENAI_API_KEY_VALUE="$(az keyvault secret show \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name openai-api-key \
+              --query value \
+              --output tsv 2>/dev/null || true)"
+            LLM_ENABLED_VALUE=false
+            OPENAI_SECRET_ARGS=()
+            OPENAI_ENV_ARGS=("LLM_ENABLED=false")
+            if [ -n "$OPENAI_API_KEY_VALUE" ]; then
+              LLM_ENABLED_VALUE=true
+              OPENAI_SECRET_ARGS=("openai-api-key=$OPENAI_API_KEY_VALUE")
+              OPENAI_ENV_ARGS=(
+                "LLM_ENABLED=true"
+                "LLM_PROVIDER=openai"
+                "LLM_MODEL=$LLM_MODEL"
+                "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+                "OPENAI_API_KEY=secretref:openai-api-key"
+              )
+            fi
 
             if az containerapp show \
               --name "$AZURE_CONTAINER_APP_NAME" \
@@ -234,7 +263,8 @@ jobs:
                 --secrets \
                   "database-url=$DATABASE_URL" \
                   "jwt-secret=$JWT_SECRET" \
-                  "storage-connection-string=$STORAGE_CONNECTION_STRING"
+                  "storage-connection-string=$STORAGE_CONNECTION_STRING" \
+                  "${OPENAI_SECRET_ARGS[@]}"
               az containerapp update \
                 --name "$AZURE_CONTAINER_APP_NAME" \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
@@ -247,7 +277,7 @@ jobs:
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
-                  "LLM_ENABLED=false"
+                  "${OPENAI_ENV_ARGS[@]}"
             else
               az containerapp create \
                 --name "$AZURE_CONTAINER_APP_NAME" \
@@ -264,6 +294,7 @@ jobs:
                   "database-url=$DATABASE_URL" \
                   "jwt-secret=$JWT_SECRET" \
                   "storage-connection-string=$STORAGE_CONNECTION_STRING" \
+                  "${OPENAI_SECRET_ARGS[@]}" \
                 --env-vars \
                   "APP_ENV=production" \
                   "DATABASE_URL=secretref:database-url" \
@@ -272,7 +303,7 @@ jobs:
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
-                  "LLM_ENABLED=false"
+                  "${OPENAI_ENV_ARGS[@]}"
             fi
 
       - name: Show app URL

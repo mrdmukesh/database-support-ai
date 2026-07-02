@@ -9,6 +9,11 @@ on:
 env:
   IMAGE_NAME: legacydb-support-copilot
   REGISTRY: ghcr.io
+  AZURE_RESOURCE_GROUP: rg-database-support-ai-dev
+  AZURE_LOCATION: centralindia
+  AZURE_CONTAINER_APP_NAME: ca-database-support-ai-dev
+  AZURE_CONTAINER_ENV_NAME: cae-database-support-ai-dev
+  CONTAINER_PORT: "8000"
 
 jobs:
   deploy:
@@ -27,6 +32,28 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Ensure Azure infrastructure exists
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            set -euo pipefail
+
+            az provider register --namespace Microsoft.App --wait
+            az provider register --namespace Microsoft.OperationalInsights --wait
+
+            az group create \
+              --name "$AZURE_RESOURCE_GROUP" \
+              --location "$AZURE_LOCATION"
+
+            if ! az containerapp env show \
+              --name "$AZURE_CONTAINER_ENV_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              az containerapp env create \
+                --name "$AZURE_CONTAINER_ENV_NAME" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION"
+            fi
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -42,21 +69,49 @@ jobs:
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 
-      - name: Deploy image to Container App
+      - name: Create or update Container App
         uses: azure/cli@v2
         with:
           inlineScript: |
-            az containerapp update \
-              --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
-              --image "$IMAGE"
+            set -euo pipefail
+
+            JWT_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+
+            if az containerapp show \
+              --name "$AZURE_CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              az containerapp update \
+                --name "$AZURE_CONTAINER_APP_NAME" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --image "$IMAGE"
+            else
+              az containerapp create \
+                --name "$AZURE_CONTAINER_APP_NAME" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --environment "$AZURE_CONTAINER_ENV_NAME" \
+                --image "$IMAGE" \
+                --target-port "$CONTAINER_PORT" \
+                --ingress external \
+                --min-replicas 0 \
+                --max-replicas 1 \
+                --cpu 0.25 \
+                --memory 0.5Gi \
+                --secrets "jwt-secret=$JWT_SECRET" \
+                --env-vars \
+                  "APP_ENV=production" \
+                  "DATABASE_URL=sqlite:////tmp/database-support-ai.db" \
+                  "JWT_SECRET=secretref:jwt-secret" \
+                  "STORAGE_BACKEND=local" \
+                  "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "LLM_ENABLED=false"
+            fi
 
       - name: Show app URL
         uses: azure/cli@v2
         with:
           inlineScript: |
             az containerapp show \
-              --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
-              --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+              --name "$AZURE_CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
               --query "properties.configuration.ingress.fqdn" \
               --output tsv

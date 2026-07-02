@@ -16,6 +16,9 @@ class Settings:
     session_timeout_minutes: int = 60
     upload_max_size_bytes: int = 25 * 1024 * 1024
     storage_backend: str = "local"
+    local_storage_root: str = "."
+    azure_storage_connection_string: str | None = None
+    azure_storage_container: str = "app-artifacts"
     sentry_dsn: str | None = None
     llm_enabled: bool = False
     llm_provider: str = "openai"
@@ -36,7 +39,10 @@ class Settings:
             jwt_access_token_minutes=int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "60")),
             session_timeout_minutes=int(os.getenv("SESSION_TIMEOUT_MINUTES", "60")),
             upload_max_size_bytes=int(os.getenv("UPLOAD_MAX_SIZE_BYTES", str(25 * 1024 * 1024))),
-            storage_backend=os.getenv("STORAGE_BACKEND", "local"),
+            storage_backend=os.getenv("STORAGE_BACKEND", "local").lower(),
+            local_storage_root=os.getenv("LOCAL_STORAGE_ROOT", "."),
+            azure_storage_connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING") or None,
+            azure_storage_container=os.getenv("AZURE_STORAGE_CONTAINER", "app-artifacts"),
             sentry_dsn=os.getenv("SENTRY_DSN") or None,
             llm_enabled=os.getenv("LLM_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
             llm_provider=os.getenv("LLM_PROVIDER", "openai"),

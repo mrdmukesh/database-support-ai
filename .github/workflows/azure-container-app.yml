@@ -14,6 +14,12 @@ env:
   AZURE_CONTAINER_APP_NAME: ca-database-support-ai-dev
   AZURE_CONTAINER_ENV_NAME: cae-database-support-ai-dev
   CONTAINER_PORT: "8000"
+  AZURE_POSTGRES_SERVER_PREFIX: pg-dsai-dev
+  AZURE_POSTGRES_DATABASE: database_support_ai
+  AZURE_POSTGRES_ADMIN_USER: appadmin
+  AZURE_STORAGE_ACCOUNT_PREFIX: stdsai
+  AZURE_STORAGE_CONTAINER: app-artifacts
+  AZURE_KEY_VAULT_PREFIX: kv-dsai-dev
 
 jobs:
   deploy:
@@ -34,16 +40,33 @@ jobs:
 
       - name: Ensure Azure infrastructure exists
         uses: azure/cli@v2
+        env:
+          POSTGRES_ADMIN_PASSWORD: ${{ secrets.AZURE_POSTGRES_ADMIN_PASSWORD }}
         with:
           inlineScript: |
             set -euo pipefail
 
             az provider register --namespace Microsoft.App --wait
             az provider register --namespace Microsoft.OperationalInsights --wait
+            az provider register --namespace Microsoft.DBforPostgreSQL --wait
+            az provider register --namespace Microsoft.Storage --wait
+            az provider register --namespace Microsoft.KeyVault --wait
 
             az group create \
               --name "$AZURE_RESOURCE_GROUP" \
               --location "$AZURE_LOCATION"
+
+            SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+            RESOURCE_SUFFIX="$(echo "$SUBSCRIPTION_ID" | tr -d '-' | cut -c1-8)"
+            POSTGRES_SERVER="${AZURE_POSTGRES_SERVER_PREFIX}-${RESOURCE_SUFFIX}"
+            STORAGE_ACCOUNT="$(echo "${AZURE_STORAGE_ACCOUNT_PREFIX}${RESOURCE_SUFFIX}" | tr '[:upper:]' '[:lower:]' | cut -c1-24)"
+            KEY_VAULT_NAME="${AZURE_KEY_VAULT_PREFIX}-${RESOURCE_SUFFIX}"
+
+            {
+              echo "AZURE_POSTGRES_SERVER=$POSTGRES_SERVER"
+              echo "AZURE_STORAGE_ACCOUNT=$STORAGE_ACCOUNT"
+              echo "AZURE_KEY_VAULT_NAME=$KEY_VAULT_NAME"
+            } >> "$GITHUB_ENV"
 
             if ! az containerapp env show \
               --name "$AZURE_CONTAINER_ENV_NAME" \
@@ -52,6 +75,117 @@ jobs:
                 --name "$AZURE_CONTAINER_ENV_NAME" \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
                 --location "$AZURE_LOCATION"
+            fi
+
+            if ! az storage account show \
+              --name "$STORAGE_ACCOUNT" \
+              --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              az storage account create \
+                --name "$STORAGE_ACCOUNT" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION" \
+                --sku Standard_LRS \
+                --kind StorageV2 \
+                --allow-blob-public-access false \
+                --min-tls-version TLS1_2
+            fi
+
+            STORAGE_CONNECTION_STRING="$(az storage account show-connection-string \
+              --name "$STORAGE_ACCOUNT" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --query connectionString \
+              --output tsv)"
+            az storage container create \
+              --name "$AZURE_STORAGE_CONTAINER" \
+              --connection-string "$STORAGE_CONNECTION_STRING" \
+              --auth-mode key >/dev/null
+
+            if ! az keyvault show \
+              --name "$KEY_VAULT_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              az keyvault create \
+                --name "$KEY_VAULT_NAME" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION" \
+                --sku standard \
+                --enable-rbac-authorization false
+            fi
+
+            AZURE_LOGIN_NAME="$(az account show --query user.name -o tsv)"
+            AZURE_LOGIN_TYPE="$(az account show --query user.type -o tsv)"
+            if [ "$AZURE_LOGIN_TYPE" = "servicePrincipal" ]; then
+              az keyvault set-policy \
+                --name "$KEY_VAULT_NAME" \
+                --spn "$AZURE_LOGIN_NAME" \
+                --secret-permissions get list set >/dev/null
+            else
+              az keyvault set-policy \
+                --name "$KEY_VAULT_NAME" \
+                --upn "$AZURE_LOGIN_NAME" \
+                --secret-permissions get list set >/dev/null
+            fi
+
+            az keyvault secret set \
+              --vault-name "$KEY_VAULT_NAME" \
+              --name azure-storage-connection-string \
+              --value "$STORAGE_CONNECTION_STRING" >/dev/null
+
+            if ! az postgres flexible-server show \
+              --name "$POSTGRES_SERVER" \
+              --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+                echo "::error::AZURE_POSTGRES_ADMIN_PASSWORD GitHub secret is required to create PostgreSQL after the resource group is deleted."
+                exit 1
+              fi
+              az postgres flexible-server create \
+                --name "$POSTGRES_SERVER" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --location "$AZURE_LOCATION" \
+                --admin-user "$AZURE_POSTGRES_ADMIN_USER" \
+                --admin-password "$POSTGRES_ADMIN_PASSWORD" \
+                --sku-name Standard_B1ms \
+                --tier Burstable \
+                --storage-size 32 \
+                --version 16 \
+                --public-access 0.0.0.0
+            fi
+
+            az postgres flexible-server firewall-rule create \
+              --name AllowAzureContainerAppsDev \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --server-name "$POSTGRES_SERVER" \
+              --start-ip-address 0.0.0.0 \
+              --end-ip-address 255.255.255.255 >/dev/null
+            az postgres flexible-server db create \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --server-name "$POSTGRES_SERVER" \
+              --database-name "$AZURE_POSTGRES_DATABASE" >/dev/null || true
+
+            DATABASE_URL="$(az keyvault secret show \
+              --vault-name "$KEY_VAULT_NAME" \
+              --name database-url \
+              --query value \
+              --output tsv 2>/dev/null || true)"
+            if [ -z "$DATABASE_URL" ]; then
+              if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+                echo "::error::database-url secret is missing in Key Vault and AZURE_POSTGRES_ADMIN_PASSWORD was not provided."
+                exit 1
+              fi
+              ENCODED_POSTGRES_PASSWORD="$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
+              DATABASE_URL="postgresql+psycopg://${AZURE_POSTGRES_ADMIN_USER}:${ENCODED_POSTGRES_PASSWORD}@${POSTGRES_SERVER}.postgres.database.azure.com:5432/${AZURE_POSTGRES_DATABASE}?sslmode=require"
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name database-url \
+                --value "$DATABASE_URL" >/dev/null
+            fi
+
+            if ! az keyvault secret show \
+              --vault-name "$KEY_VAULT_NAME" \
+              --name jwt-secret >/dev/null 2>&1; then
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name jwt-secret \
+                --value "$(openssl rand -base64 48 | tr -d '\n')" >/dev/null
             fi
 
       - name: Login to GitHub Container Registry
@@ -75,15 +209,45 @@ jobs:
           inlineScript: |
             set -euo pipefail
 
-            JWT_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+            DATABASE_URL="$(az keyvault secret show \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name database-url \
+              --query value \
+              --output tsv)"
+            JWT_SECRET="$(az keyvault secret show \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name jwt-secret \
+              --query value \
+              --output tsv)"
+            STORAGE_CONNECTION_STRING="$(az keyvault secret show \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name azure-storage-connection-string \
+              --query value \
+              --output tsv)"
 
             if az containerapp show \
               --name "$AZURE_CONTAINER_APP_NAME" \
               --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
+              az containerapp secret set \
+                --name "$AZURE_CONTAINER_APP_NAME" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --secrets \
+                  "database-url=$DATABASE_URL" \
+                  "jwt-secret=$JWT_SECRET" \
+                  "storage-connection-string=$STORAGE_CONNECTION_STRING"
               az containerapp update \
                 --name "$AZURE_CONTAINER_APP_NAME" \
                 --resource-group "$AZURE_RESOURCE_GROUP" \
-                --image "$IMAGE"
+                --image "$IMAGE" \
+                --set-env-vars \
+                  "APP_ENV=production" \
+                  "DATABASE_URL=secretref:database-url" \
+                  "JWT_SECRET=secretref:jwt-secret" \
+                  "STORAGE_BACKEND=azure_blob" \
+                  "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
+                  "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
+                  "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "LLM_ENABLED=false"
             else
               az containerapp create \
                 --name "$AZURE_CONTAINER_APP_NAME" \
@@ -96,12 +260,17 @@ jobs:
                 --max-replicas 1 \
                 --cpu 0.25 \
                 --memory 0.5Gi \
-                --secrets "jwt-secret=$JWT_SECRET" \
+                --secrets \
+                  "database-url=$DATABASE_URL" \
+                  "jwt-secret=$JWT_SECRET" \
+                  "storage-connection-string=$STORAGE_CONNECTION_STRING" \
                 --env-vars \
                   "APP_ENV=production" \
-                  "DATABASE_URL=sqlite:////tmp/database-support-ai.db" \
+                  "DATABASE_URL=secretref:database-url" \
                   "JWT_SECRET=secretref:jwt-secret" \
-                  "STORAGE_BACKEND=local" \
+                  "STORAGE_BACKEND=azure_blob" \
+                  "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
+                  "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
                   "LLM_ENABLED=false"
             fi

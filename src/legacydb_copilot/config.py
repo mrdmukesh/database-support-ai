@@ -20,6 +20,7 @@ class Settings:
     azure_storage_connection_string: str | None = None
     azure_storage_container: str = "app-artifacts"
     sentry_dsn: str | None = None
+    ai_reasoning_enabled: bool = False
     llm_enabled: bool = False
     llm_provider: str = "openai"
     llm_model: str = "gpt-4.1-mini"
@@ -44,7 +45,16 @@ class Settings:
             azure_storage_connection_string=os.getenv("AZURE_STORAGE_CONNECTION_STRING") or None,
             azure_storage_container=os.getenv("AZURE_STORAGE_CONTAINER", "app-artifacts"),
             sentry_dsn=os.getenv("SENTRY_DSN") or None,
-            llm_enabled=os.getenv("LLM_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
+            ai_reasoning_enabled=os.getenv(
+                "AI_REASONING_ENABLED",
+                os.getenv("LLM_ENABLED", "false"),
+            ).lower()
+            in {"1", "true", "yes", "on"},
+            llm_enabled=os.getenv(
+                "AI_REASONING_ENABLED",
+                os.getenv("LLM_ENABLED", "false"),
+            ).lower()
+            in {"1", "true", "yes", "on"},
             llm_provider=os.getenv("LLM_PROVIDER", "openai"),
             llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,

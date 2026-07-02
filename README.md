@@ -82,13 +82,33 @@ To enable evidence-grounded LLM reasoning in Azure, add a GitHub repository
 secret named `OPENAI_API_KEY`. The deployment workflow copies it into Key Vault
 as `openai-api-key` and sets these Container App values:
 
+- `AI_REASONING_ENABLED=true`
 - `LLM_ENABLED=true`
 - `LLM_PROVIDER=openai`
 - `LLM_MODEL=gpt-4.1-mini`
 - `OPENAI_API_KEY=secretref:openai-api-key`
 
-If `OPENAI_API_KEY` is not configured, deployment keeps `LLM_ENABLED=false` so
-Ask AI continues to use the deterministic evidence engine.
+If `OPENAI_API_KEY` is not configured, deployment keeps
+`AI_REASONING_ENABLED=false` and `LLM_ENABLED=false` so Ask AI continues to use
+the deterministic evidence engine.
+
+The LLM is not autonomous. The required flow is:
+
+1. User asks a question.
+2. Deterministic engine detects intent and target.
+3. Metadata discovery runs.
+4. Safe SQL planner creates read-only SQL.
+5. SQL validator allows only `SELECT`, `SHOW`, `DESCRIBE`, `DESC`, and `EXPLAIN`.
+6. Evidence collector executes safe SQL.
+7. The app creates an evidence package.
+8. OpenAI receives only that evidence package.
+9. OpenAI improves explanation, root-cause narrative, confidence explanation,
+   next questions, and report wording.
+10. Deterministic code keeps only evidence-cited LLM output.
+11. Final report is generated.
+
+The LLM must never connect to the database, execute SQL, invent evidence, or
+override SQL evidence.
 
 For the persistent Azure platform layer, see:
 

@@ -54,11 +54,22 @@ This repository includes:
 - `.github/workflows/ci.yml` for tests and Docker build validation.
 - `.github/workflows/azure-container-app.yml` for Azure Container App deployment.
 
-Do not commit secrets. Configure these values as GitHub repository secrets:
+The Azure deployment workflow is idempotent. On every run it ensures the
+low-cost Azure hosting resources exist before deploying:
+
+- Resource group: `rg-database-support-ai-dev`
+- Container Apps environment: `cae-database-support-ai-dev`
+- Container App: `ca-database-support-ai-dev`
+- Region: `centralindia`
+
+If the resource group is deleted, the next workflow run can recreate the app
+hosting resources. For that to work, the `AZURE_CREDENTIALS` service principal
+must have permission at the subscription scope, not only inside the deleted
+resource group.
+
+Do not commit secrets. Configure this value as a GitHub repository secret:
 
 - `AZURE_CREDENTIALS`: Azure service principal JSON for GitHub Actions login.
-- `AZURE_RESOURCE_GROUP`: target resource group.
-- `AZURE_CONTAINER_APP_NAME`: target Azure Container App name.
 
 Configure runtime secrets such as `DATABASE_URL`, `JWT_SECRET`, and
 `OPENAI_API_KEY` in Azure Container Apps, not in Git.

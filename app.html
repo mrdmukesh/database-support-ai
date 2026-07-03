@@ -490,6 +490,12 @@
         line-height: 1.45;
       }
 
+      .verification-complete-note {
+        color: var(--green);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
       .chat-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 340px;
@@ -1539,45 +1545,37 @@
             </div>
             ${check.actual_result_summary ? `<div class="verification-result">${escapeHtml(check.actual_result_summary)}</div>` : ""}
             <div class="verification-actions">
-              <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
-              <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
+              ${check.status === "Pending"
+                ? `<button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
+                   <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>`
+                : `<span class="verification-complete-note">This check is ${escapeHtml(check.status)}.</span>`}
             </div>
           </div>
         `).join("");
         bindVerificationCardButtons();
       }
 
-      function clickElement(event) {
-        return event.target && event.target.nodeType === 1 ? event.target : event.target?.parentElement;
-      }
-
-      async function handleVerificationClick(event) {
-        const target = clickElement(event);
-        if (!target) return;
-        const runButton = target.closest("[data-run-check]");
-        const skipButton = target.closest("[data-skip-check]");
-        if (!runButton && !skipButton) return;
-        event.preventDefault();
-        event.stopPropagation();
-        if (runButton) {
-          const card = runButton.closest(".verification-card");
-          const sql = card.querySelector(".sql-edit").value;
-          await runVerificationCheck(runButton.dataset.runCheck, sql);
-          return;
-        }
-        await skipVerificationCheck(skipButton.dataset.skipCheck);
-      }
-
       function bindVerificationCardButtons() {
-        document.querySelectorAll("[data-run-check], [data-skip-check]").forEach((button) => {
-          button.onclick = (event) => handleVerificationClick(event);
+        document.querySelectorAll("[data-run-check]").forEach((button) => {
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const card = button.closest(".verification-card");
+            const sql = card.querySelector(".sql-edit").value;
+            await runVerificationCheck(button, button.dataset.runCheck, sql);
+          });
+        });
+        document.querySelectorAll("[data-skip-check]").forEach((button) => {
+          button.addEventListener("click", async (event) => {
+            event.preventDefault();
+            await skipVerificationCheck(button, button.dataset.skipCheck);
+          });
         });
       }
 
-      document.getElementById("verificationRows").addEventListener("click", handleVerificationClick);
-
-      async function runVerificationCheck(checkId, sql) {
+      async function runVerificationCheck(button, checkId, sql) {
         setMessage("verificationMessage", "Running selected read-only verification check...");
+        button.disabled = true;
+        button.textContent = "Running...";
         try {
           await api(`/chat/verification-checks/${checkId}/run`, {
             method: "POST",
@@ -1586,17 +1584,23 @@
           await loadVerificationChecks(currentInvestigationId);
           setMessage("verificationMessage", "Verification check completed and report regenerated.", "success");
         } catch (error) {
+          button.disabled = false;
+          button.textContent = "Run this check";
           setMessage("verificationMessage", error.message, "error");
         }
       }
 
-      async function skipVerificationCheck(checkId) {
+      async function skipVerificationCheck(button, checkId) {
         setMessage("verificationMessage", "Skipping verification check...");
+        button.disabled = true;
+        button.textContent = "Skipping...";
         try {
           await api(`/chat/verification-checks/${checkId}/skip`, { method: "POST" });
           await loadVerificationChecks(currentInvestigationId);
           setMessage("verificationMessage", "Verification check skipped and report regenerated.", "success");
         } catch (error) {
+          button.disabled = false;
+          button.textContent = "Skip";
           setMessage("verificationMessage", error.message, "error");
         }
       }

@@ -1378,11 +1378,16 @@
         }
         const filenameFromPath = (path) => decodeURIComponent(path.split("/").pop() || "investigation_report");
         container.innerHTML = `
+          <button class="button primary" type="button" data-verify-conclusions>Verify AI conclusions</button>
           <button class="button secondary" type="button" data-view-report="${report.html}">View HTML Report</button>
           <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">Download PDF</button>
           <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">Download Word</button>
           <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">Download Excel</button>
         `;
+        container.querySelector("[data-verify-conclusions]").addEventListener("click", () => {
+          setMessage("chatMessage", "Running evidence verification and regenerating reports...");
+          document.getElementById("chatForm").requestSubmit();
+        });
         container.querySelector("[data-view-report]").addEventListener("click", (event) =>
           viewHtmlReport(event.currentTarget.dataset.viewReport),
         );

@@ -175,6 +175,34 @@ def _ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     )
 
 
+def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    rows = [
+        {
+            "Claim": item.claim,
+            "Verification SQL": item.verification_sql,
+            "Expected Result": item.expected_result,
+            "Actual Result Summary": item.actual_result_summary,
+            "Status": item.status,
+            "Confidence Impact": item.confidence_impact,
+            "Notes": item.notes,
+        }
+        for item in (bundle.verification_results or [])
+    ]
+    return ReportSection(
+        title="Evidence Verification Results",
+        paragraphs=[
+            "The verification agent checks root-cause claims, recommendations, and hypotheses against collected metadata, procedure analysis, documents, and read-only live SQL. It never executes writes or stored procedures."
+        ],
+        tables=[
+            ReportTable(
+                title="Evidence Verification Results",
+                columns=["Claim", "Verification SQL", "Expected Result", "Actual Result Summary", "Status", "Confidence Impact", "Notes"],
+                rows=rows or [{"Claim": "Verification not run", "Verification SQL": "", "Expected Result": "", "Actual Result Summary": "", "Status": "Not Enough Evidence", "Confidence Impact": "", "Notes": "VERIFICATION_AGENT_ENABLED may be false."}],
+            )
+        ],
+    )
+
+
 def compose_report(
     *,
     bundle: DynamicInvestigationBundle,
@@ -338,6 +366,7 @@ def compose_report(
         ReportSection(title="Stage 4 - Plan Investigation", tables=[ReportTable(title="Investigation Plan", columns=["Hypothesis", "Objects To Inspect", "Evidence Required", "SQL Focus", "Confidence Impact"], rows=plan_rows)]),
         ReportSection(title="Stage 5 - Collect Evidence", tables=_evidence_tables(bundle)),
         _evidence_gate_section(bundle),
+        _verification_section(bundle),
         ReportSection(title="Stage 6 - Reason", tables=[ReportTable(title="Ranked Hypotheses", columns=["Rank", "Hypothesis", "Description", "Confidence", "Supporting Evidence", "Contradicting Evidence", "Missing Evidence", "Reason"], rows=evaluation_rows)]),
         ReportSection(title="Stage 7 - Generate Dynamic Report", items=["This report was generated after context discovery, hypothesis generation, evidence planning, evidence collection, reasoning, and self-validation."]),
         ReportSection(title="Self Validation", tables=[ReportTable(title="Validation Checks", columns=["Question", "Answer"], rows=self_validation_rows)]),

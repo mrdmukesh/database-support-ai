@@ -27,6 +27,7 @@ class Settings:
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     knowledge_retriever_backend: str = "sqlite"
+    verification_agent_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -60,4 +61,6 @@ class Settings:
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
             knowledge_retriever_backend=os.getenv("KNOWLEDGE_RETRIEVER_BACKEND", "sqlite").lower(),
+            verification_agent_enabled=os.getenv("VERIFICATION_AGENT_ENABLED", "true").lower()
+            in {"1", "true", "yes", "on"},
         )

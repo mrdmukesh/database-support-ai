@@ -417,6 +417,12 @@
         gap: 8px;
         flex-wrap: wrap;
         margin-top: 10px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .verification-actions button {
+        cursor: pointer;
       }
 
       .verification-card-list {
@@ -1538,17 +1544,21 @@
             </div>
           </div>
         `).join("");
-        body.querySelectorAll("[data-run-check]").forEach((button) => {
-          button.addEventListener("click", async () => {
-            const card = button.closest(".verification-card");
-            const sql = card.querySelector(".sql-edit").value;
-            await runVerificationCheck(button.dataset.runCheck, sql);
-          });
-        });
-        body.querySelectorAll("[data-skip-check]").forEach((button) => {
-          button.addEventListener("click", () => skipVerificationCheck(button.dataset.skipCheck));
-        });
       }
+
+      document.getElementById("verificationRows").addEventListener("click", async (event) => {
+        const runButton = event.target.closest("[data-run-check]");
+        const skipButton = event.target.closest("[data-skip-check]");
+        if (!runButton && !skipButton) return;
+        event.preventDefault();
+        if (runButton) {
+          const card = runButton.closest(".verification-card");
+          const sql = card.querySelector(".sql-edit").value;
+          await runVerificationCheck(runButton.dataset.runCheck, sql);
+          return;
+        }
+        await skipVerificationCheck(skipButton.dataset.skipCheck);
+      });
 
       async function runVerificationCheck(checkId, sql) {
         setMessage("verificationMessage", "Running selected read-only verification check...");

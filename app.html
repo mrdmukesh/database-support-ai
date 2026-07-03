@@ -490,6 +490,28 @@
         line-height: 1.45;
       }
 
+      .verification-result table {
+        margin-top: 8px;
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+      }
+
+      .verification-result th,
+      .verification-result td {
+        padding: 9px 10px;
+        border: 1px solid var(--line);
+        font-size: 13px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .verification-result th {
+        background: #f2f6f8;
+        color: var(--ink);
+        text-transform: none;
+      }
+
       .verification-complete-note {
         color: var(--green);
         font-size: 13px;
@@ -1543,7 +1565,7 @@
               <div class="verification-meta-item"><span>Risk</span>${escapeHtml(check.risk_level)}</div>
               <div class="verification-meta-item"><span>Source</span>${escapeHtml(check.source)}</div>
             </div>
-            ${check.actual_result_summary ? `<div class="verification-result">${escapeHtml(check.actual_result_summary)}</div>` : ""}
+            ${renderVerificationResult(check.actual_result_summary)}
             <div class="verification-actions">
               ${check.status === "Pending"
                 ? `<button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
@@ -1553,6 +1575,37 @@
           </div>
         `).join("");
         bindVerificationCardButtons();
+      }
+
+      function renderVerificationResult(summary) {
+        if (!summary) return "";
+        const parsed = parseFirstRowSummary(summary);
+        if (!parsed) return `<div class="verification-result">${escapeHtml(summary)}</div>`;
+        const headers = Object.keys(parsed.row);
+        return `
+          <div class="verification-result">
+            <strong>${escapeHtml(parsed.count)} row(s) returned</strong>
+            <table>
+              <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
+              <tbody>
+                <tr>${headers.map((header) => `<td>${escapeHtml(parsed.row[header])}</td>`).join("")}</tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+
+      function parseFirstRowSummary(summary) {
+        const match = summary.match(/^(\d+)\s+row\(s\) returned;\s+first row:\s+(.+)$/);
+        if (!match) return null;
+        try {
+          const jsonText = match[2].replace(/'/g, '"').replace(/\bNone\b/g, "null");
+          const row = JSON.parse(jsonText);
+          if (!row || Array.isArray(row) || typeof row !== "object") return null;
+          return { count: match[1], row };
+        } catch (_) {
+          return null;
+        }
       }
 
       function bindVerificationCardButtons() {

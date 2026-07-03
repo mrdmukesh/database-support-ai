@@ -400,6 +400,25 @@
         font: inherit;
       }
 
+      .verification-sql-cell {
+        min-width: 640px;
+      }
+
+      .verification-sql-cell textarea {
+        min-height: 260px;
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 13px;
+        line-height: 1.45;
+        white-space: pre;
+      }
+
+      .verification-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+
       .chat-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 340px;
@@ -864,11 +883,10 @@
                           <th>Risk</th>
                           <th>Source</th>
                           <th>Status</th>
-                          <th>Action</th>
                         </tr>
                       </thead>
                       <tbody id="verificationRows">
-                        <tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>
+                        <tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -1431,7 +1449,7 @@
         document.getElementById("verificationPanel").classList.toggle("active", Boolean(investigationId));
         const body = document.getElementById("verificationRows");
         if (!investigationId) {
-          body.innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+          body.innerHTML = `<tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>`;
           return;
         }
         try {
@@ -1445,21 +1463,23 @@
       function renderVerificationChecks(checks) {
         const body = document.getElementById("verificationRows");
         if (!checks.length) {
-          body.innerHTML = `<tr><td colspan="7" class="empty">No verification checks were suggested.</td></tr>`;
+          body.innerHTML = `<tr><td colspan="6" class="empty">No verification checks were suggested.</td></tr>`;
           return;
         }
         body.innerHTML = checks.map((check) => `
           <tr data-check-id="${check.id}">
             <td>${escapeHtml(check.claim)}</td>
-            <td><textarea class="sql-edit" rows="4">${escapeHtml(check.verification_sql)}</textarea></td>
+            <td class="verification-sql-cell">
+              <textarea class="sql-edit" rows="10">${escapeHtml(check.verification_sql)}</textarea>
+              <div class="verification-actions">
+                <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
+                <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
+              </div>
+            </td>
             <td>${escapeHtml(check.expected_result)}</td>
             <td>${escapeHtml(check.risk_level)}</td>
             <td>${escapeHtml(check.source)}</td>
             <td>${escapeHtml(check.status)}${check.actual_result_summary ? `<br><small>${escapeHtml(check.actual_result_summary)}</small>` : ""}</td>
-            <td>
-              <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
-              <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
-            </td>
           </tr>
         `).join("");
         body.querySelectorAll("[data-run-check]").forEach((button) => {
@@ -1935,7 +1955,7 @@
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
         document.getElementById("verificationPanel").classList.remove("active");
-        document.getElementById("verificationRows").innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+        document.getElementById("verificationRows").innerHTML = `<tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>`;
         setMessage("verificationMessage", "");
         showFeedbackPanel(null);
         loadChatHistory();

@@ -12,7 +12,7 @@ from legacydb_copilot.ai import SafetyFinding, analyze_prompt
 from legacydb_copilot.agents.context_discovery_agent import discover_context
 from legacydb_copilot.agents.entity_extraction_agent import extract_entities
 from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
-from legacydb_copilot.agents.intent_agent import detect_intent
+from legacydb_copilot.agents.intent_agent import InvestigationIntent, detect_intent
 from legacydb_copilot.agents.investigation_planner_agent import build_investigation_plan
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
 from legacydb_copilot.agents.recommendation_agent import recommend_actions
@@ -433,13 +433,20 @@ def _run_knowledge_search(
     return answer, sources, confidence, report_links, metadata
 
 
-def _target_object_not_found(question: str, metadata) -> tuple[bool, str, list[str]]:
+def _target_object_not_found(question: str, metadata, intent=None) -> tuple[bool, str, list[str]]:
+    if intent and intent.intent == InvestigationIntent.STORED_PROCEDURE_ANALYSIS:
+        return False, "", []
     problem = parse_problem_phrase(question)
     if not problem.issue_kind or not problem.target_terms:
         return False, "", []
     target = resolve_table_from_terms(problem.target_terms, metadata)
     if target is not None:
         return False, target.name, problem.target_terms
+    if problem.issue_kind == "duplicate":
+        for table in metadata.tables:
+            name = table.name.lower()
+            if any(term.rstrip("s") in name or term in name for term in problem.target_terms):
+                return False, table.name, problem.target_terms
     return True, " ".join(problem.target_terms), problem.target_terms
 
 
@@ -888,7 +895,7 @@ def _run_dynamic_investigation(
         payload.question,
         entities,
     )
-    target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata)
+    target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata, intent)
     if target_missing:
         return _object_not_found_answer(
             db=db,

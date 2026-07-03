@@ -14,6 +14,10 @@ from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
+from legacydb_copilot.services.evidence_verification_agent import (
+    adjust_confidence_with_verification,
+    run_evidence_verification,
+)
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     classify_investigation_mode,
@@ -371,6 +375,142 @@ def test_duplicate_business_key_prefers_parent_reference_column() -> None:
     assert focus.affected_object == "lab_orders"
     assert focus.inferred_business_key == "appointment_number"
     assert "parent object" in focus.business_key_reason
+
+
+def test_evidence_verification_agent_checks_duplicate_incident_claims() -> None:
+    class FakeConnector:
+        def execute_read_only_query(self, sql: str, limit: int = 25):
+            if "HAVING COUNT(*) > 1" in sql:
+                return [
+                    {
+                        "parent_reference": "APT-2005",
+                        "lab_order_count": 2,
+                        "lab_order_numbers": "LAB-2005-A,LAB-2005-B",
+                        "child_statuses": "ORDERED",
+                    }
+                ]
+            return []
+
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("appointments", ["appointment_id", "appointment_number"], 5),
+            TableMetadata(
+                "lab_orders",
+                ["lab_order_id", "appointment_id", "lab_order_number", "lab_status"],
+                5,
+                foreign_keys=[
+                    {
+                        "columns": ["appointment_id"],
+                        "referred_table": "appointments",
+                        "referred_columns": ["appointment_id"],
+                    }
+                ],
+            ),
+        ],
+        views=[],
+        procedures=["sp_retry_failed_lab_orders"],
+        version="test",
+    )
+    duplicate_sql = """
+SELECT
+ p.appointment_number AS parent_reference,
+ COUNT(*) AS lab_order_count,
+ GROUP_CONCAT(CAST(c.lab_order_number AS CHAR) ORDER BY c.lab_order_number) AS lab_order_numbers,
+ GROUP_CONCAT(DISTINCT CAST(c.lab_status AS CHAR) ORDER BY c.lab_status) AS child_statuses
+FROM appointments p
+JOIN lab_orders c ON c.appointment_id = p.appointment_id
+WHERE p.appointment_number = 'APT-2005'
+GROUP BY p.appointment_number
+HAVING COUNT(*) > 1
+""".strip()
+    evidence = [
+        EvidenceResult(
+            "Find duplicate lab_orders per appointments",
+            duplicate_sql,
+            [{"parent_reference": "APT-2005", "lab_order_count": 2, "lab_order_numbers": "LAB-2005-A,LAB-2005-B", "child_statuses": "ORDERED"}],
+        )
+    ]
+    proc = ProcedureAnalysis(
+        name="sp_retry_failed_lab_orders",
+        definition_available=True,
+        tables_read=["appointments"],
+        tables_written=["lab_orders"],
+        joins=1,
+        insert_statements=1,
+        update_statements=0,
+        delete_statements=0,
+        merge_statements=0,
+        loops=0,
+        transactions=1,
+        try_catch=False,
+        rollback_statements=0,
+        cursors=0,
+        temp_tables=0,
+        dynamic_sql=False,
+        missing_exists_checks=True,
+        missing_uniqueness_checks=True,
+        deadlock_risk="Medium",
+        locking_risk="Medium",
+        complexity_score=3,
+        complexity="Medium",
+        business_rules=[],
+        definition_excerpt="INSERT INTO lab_orders SELECT ...",
+    )
+    focus = build_evidence_focus(
+        question="Appointment APT-2005 created two active lab orders.",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=extract_entities("Appointment APT-2005 created two active lab orders."),
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[proc],
+        documents=[],
+    )
+    gate = run_evidence_gate(
+        question="Appointment APT-2005 created two active lab orders.",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=extract_entities("Appointment APT-2005 created two active lab orders."),
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        documents=[],
+    )
+    reasoning = ReasoningResult(
+        summary="test",
+        likely_root_causes=["sp_retry_failed_lab_orders likely lacks idempotency around duplicate lab_orders."],
+        supporting_evidence=[],
+        missing_evidence=[],
+        recommended_fix=["Add EXISTS/idempotency check before inserting duplicate lab_orders."],
+        test_cases=[],
+        proof_of_fix=[],
+        rollback_plan=[],
+        risks=[],
+    )
+
+    results = run_evidence_verification(
+        connector=FakeConnector(),
+        question="Appointment APT-2005 created two active lab orders.",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        evidence_gate=gate,
+        procedure_analysis=[proc],
+        documents=[],
+        reasoning=reasoning,
+    )
+
+    by_claim = {item.claim: item.status for item in results}
+    assert by_claim["lab_orders is the affected object."] == "Verified"
+    assert by_claim["appointments is the parent/supporting object for lab_orders."] == "Verified"
+    assert by_claim["Duplicate condition is reproduced by live database evidence."] == "Verified"
+    assert by_claim["sp_retry_failed_lab_orders writes lab_orders."] == "Verified"
+    assert by_claim["Exact execution path is supported by live operational evidence."] == "Partially Verified"
+    assert by_claim["Recommended fix is consistent with collected evidence."] == "Verified"
+    assert by_claim["Proof and investigation SQL are valid read-only statements."] == "Verified"
+    adjusted, notes = adjust_confidence_with_verification(0.7, results)
+    assert adjusted > 0.7
+    assert any("Verification partial" in note for note in notes)
 
 
 def test_evidence_focus_prefers_duplicated_child_and_direct_writer() -> None:

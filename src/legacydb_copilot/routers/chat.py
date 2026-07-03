@@ -42,6 +42,10 @@ from legacydb_copilot.services.evidence_execution_service import execute_evidenc
 from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
+from legacydb_copilot.services.evidence_verification_agent import (
+    adjust_confidence_with_verification,
+    run_evidence_verification,
+)
 from legacydb_copilot.services.investigation_reports import generate_investigation_report_files
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
@@ -897,6 +901,22 @@ def _run_dynamic_investigation(
     if evidence_gate.required and not evidence_gate.reproduced:
         confidence = min(confidence, 0.35)
         confidence_notes.extend(f"- Evidence gate blocked root-cause analysis: {item}" for item in evidence_gate.blocking_reasons)
+    verification_results = []
+    if Settings.from_env().verification_agent_enabled:
+        verification_results = run_evidence_verification(
+            connector=connector,
+            question=payload.question,
+            intent=intent.intent,
+            metadata=ranking.metadata,
+            evidence=evidence,
+            evidence_focus=evidence_focus,
+            evidence_gate=evidence_gate,
+            procedure_analysis=procedure_analysis,
+            documents=context.documents,
+            reasoning=reasoning,
+        )
+        confidence, verification_notes = adjust_confidence_with_verification(confidence, verification_results)
+        confidence_notes.extend(verification_notes)
     ai_status = _ai_reasoning_status(llm_configured=llm_configured, llm_used=llm_used)
     bundle = DynamicInvestigationBundle(
         question=payload.question,
@@ -918,6 +938,7 @@ def _run_dynamic_investigation(
         investigation_mode=mode.mode.value,
         mode_rationale=mode.rationale,
         ai_reasoning_status=ai_status,
+        verification_results=verification_results,
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(
@@ -953,6 +974,10 @@ def _run_dynamic_investigation(
     )
     final_root_cause_text = "\n".join(f"- {item}" for item in reasoning.likely_root_causes) or "- No root cause generated."
     confidence_text = "\n".join(f"- {item}" for item in confidence_notes)
+    verification_text = "\n".join(
+        f"- {item.status}: {item.claim} | {item.actual_result_summary} | {item.confidence_impact}"
+        for item in verification_results
+    ) or "- Verification agent did not run."
     missing_related_rows = next((item.rows for item in evidence if item.purpose == "Confirmed Missing Related Record Candidates"), [])
     missing_related_conclusion = ""
     if missing_related_rows:
@@ -1013,6 +1038,8 @@ def _run_dynamic_investigation(
         f"{correlated_text}\n\n"
         "## Evidence Gate\n"
         f"{gate_text}\n\n"
+        "## Evidence Verification Results\n"
+        f"{verification_text}\n\n"
         "## Relevant Objects Investigated\n"
         f"{ranked_text}\n\n"
         "## Stage 6 - Reason\n"

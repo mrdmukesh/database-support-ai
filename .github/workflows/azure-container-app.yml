@@ -276,6 +276,7 @@ jobs:
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "VERIFICATION_AGENT_ENABLED=true" \
                   "${OPENAI_ENV_ARGS[@]}"
             else
               az containerapp create \
@@ -302,6 +303,7 @@ jobs:
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "VERIFICATION_AGENT_ENABLED=true" \
                   "${OPENAI_ENV_ARGS[@]}"
             fi
 

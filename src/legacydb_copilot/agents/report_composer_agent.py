@@ -179,12 +179,13 @@ def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     rows = [
         {
             "Claim": item.claim,
-            "Verification SQL": item.verification_sql,
-            "Expected Result": item.expected_result,
-            "Actual Result Summary": item.actual_result_summary,
+            "SQL executed": item.verification_sql,
+            "Expected result": item.expected_result,
+            "Actual result summary": item.actual_result_summary,
             "Status": item.status,
-            "Confidence Impact": item.confidence_impact,
-            "Notes": item.notes,
+            "Confidence impact": item.confidence_impact,
+            "Timestamp": item.timestamp,
+            "Verified by": item.verified_by,
         }
         for item in (bundle.verification_results or [])
     ]
@@ -196,8 +197,35 @@ def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
         tables=[
             ReportTable(
                 title="Evidence Verification Results",
-                columns=["Claim", "Verification SQL", "Expected Result", "Actual Result Summary", "Status", "Confidence Impact", "Notes"],
-                rows=rows or [{"Claim": "Verification not run", "Verification SQL": "", "Expected Result": "", "Actual Result Summary": "", "Status": "Not Enough Evidence", "Confidence Impact": "", "Notes": "VERIFICATION_AGENT_ENABLED may be false."}],
+                columns=["Claim", "SQL executed", "Expected result", "Actual result summary", "Status", "Confidence impact", "Timestamp", "Verified by"],
+                rows=rows or [{"Claim": "No checks have been executed yet", "SQL executed": "", "Expected result": "", "Actual result summary": "", "Status": "Pending", "Confidence impact": "", "Timestamp": "", "Verified by": ""}],
+            )
+        ],
+    )
+
+
+def _suggested_verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    rows = [
+        {
+            "Claim to verify": item.claim,
+            "Generated read-only SQL": item.verification_sql,
+            "Expected result": item.expected_result,
+            "Risk level": item.risk_level,
+            "Source": item.source,
+            "Status": item.status,
+        }
+        for item in (bundle.verification_checks or [])
+    ]
+    return ReportSection(
+        title="Suggested Verification Checks",
+        paragraphs=[
+            "These checks are suggestions only. A user must approve execution. The app validates every SQL statement before running it and allows only SELECT, SHOW, DESCRIBE, DESC, or EXPLAIN."
+        ],
+        tables=[
+            ReportTable(
+                title="Suggested Verification Checks",
+                columns=["Claim to verify", "Generated read-only SQL", "Expected result", "Risk level", "Source", "Status"],
+                rows=rows or [{"Claim to verify": "Verification suggestions disabled", "Generated read-only SQL": "", "Expected result": "", "Risk level": "Read-only", "Source": "", "Status": "Pending"}],
             )
         ],
     )
@@ -366,6 +394,7 @@ def compose_report(
         ReportSection(title="Stage 4 - Plan Investigation", tables=[ReportTable(title="Investigation Plan", columns=["Hypothesis", "Objects To Inspect", "Evidence Required", "SQL Focus", "Confidence Impact"], rows=plan_rows)]),
         ReportSection(title="Stage 5 - Collect Evidence", tables=_evidence_tables(bundle)),
         _evidence_gate_section(bundle),
+        _suggested_verification_section(bundle),
         _verification_section(bundle),
         ReportSection(title="Stage 6 - Reason", tables=[ReportTable(title="Ranked Hypotheses", columns=["Rank", "Hypothesis", "Description", "Confidence", "Supporting Evidence", "Contradicting Evidence", "Missing Evidence", "Reason"], rows=evaluation_rows)]),
         ReportSection(title="Stage 7 - Generate Dynamic Report", items=["This report was generated after context discovery, hypothesis generation, evidence planning, evidence collection, reasoning, and self-validation."]),

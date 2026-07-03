@@ -265,12 +265,50 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ai_answer: Mapped[str] = mapped_column(Text, default="", nullable=False)
     confidence_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
     report_path: Mapped[str] = mapped_column(String(700), default="", nullable=False)
+    report_snapshot_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="AI_ANSWERED", nullable=False, index=True)
 
     workspace: Mapped["WorkspaceModel"] = relationship(back_populates="investigations")
     feedback_items: Mapped[list["InvestigationFeedbackModel"]] = relationship(
         back_populates="investigation"
     )
+    verification_checks: Mapped[list["VerificationCheckModel"]] = relationship(
+        back_populates="investigation"
+    )
+
+
+class VerificationCheckModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "verification_checks"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    claim: Mapped[str] = mapped_column(Text, nullable=False)
+    verification_sql: Mapped[str] = mapped_column(Text, nullable=False)
+    expected_result: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    risk_level: Mapped[str] = mapped_column(String(60), default="Read-only", nullable=False)
+    source: Mapped[str] = mapped_column(String(80), default="SQL evidence", nullable=False)
+    status: Mapped[str] = mapped_column(String(60), default="Pending", nullable=False, index=True)
+    actual_result_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    confidence_impact: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    verified_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
+    verified_by: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    verified_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+
+    investigation: Mapped["InvestigationModel"] = relationship(back_populates="verification_checks")
 
 
 class InvestigationFeedbackModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):

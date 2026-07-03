@@ -419,6 +419,71 @@
         margin-top: 10px;
       }
 
+      .verification-card-list {
+        display: grid;
+        gap: 16px;
+      }
+
+      .verification-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 16px;
+      }
+
+      .verification-card-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 12px;
+      }
+
+      .verification-claim {
+        font-weight: 700;
+        line-height: 1.45;
+      }
+
+      .verification-status {
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        background: #f7fafc;
+      }
+
+      .verification-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .verification-meta-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #f9fbfc;
+      }
+
+      .verification-meta-item span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }
+
+      .verification-result {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
       .chat-layout {
         display: grid;
         grid-template-columns: minmax(0, 1fr) 340px;
@@ -873,22 +938,8 @@
                     <button class="button secondary" type="button" id="runAllVerification">Run all safe checks</button>
                   </div>
                   <div id="verificationMessage" class="message"></div>
-                  <div class="table-scroll">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Claim</th>
-                          <th>SQL</th>
-                          <th>Expected</th>
-                          <th>Risk</th>
-                          <th>Source</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody id="verificationRows">
-                        <tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>
-                      </tbody>
-                    </table>
+                  <div id="verificationRows" class="verification-card-list">
+                    <div class="empty">Generate an investigation to see verification checks.</div>
                   </div>
                 </div>
                 <div id="chatAnswer" class="answer-box">Ask a question to see the MVP answer and safety report.</div>
@@ -1449,7 +1500,7 @@
         document.getElementById("verificationPanel").classList.toggle("active", Boolean(investigationId));
         const body = document.getElementById("verificationRows");
         if (!investigationId) {
-          body.innerHTML = `<tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+          body.innerHTML = `<div class="empty">Generate an investigation to see verification checks.</div>`;
           return;
         }
         try {
@@ -1463,29 +1514,34 @@
       function renderVerificationChecks(checks) {
         const body = document.getElementById("verificationRows");
         if (!checks.length) {
-          body.innerHTML = `<tr><td colspan="6" class="empty">No verification checks were suggested.</td></tr>`;
+          body.innerHTML = `<div class="empty">No verification checks were suggested.</div>`;
           return;
         }
         body.innerHTML = checks.map((check) => `
-          <tr data-check-id="${check.id}">
-            <td>${escapeHtml(check.claim)}</td>
-            <td class="verification-sql-cell">
+          <div class="verification-card" data-check-id="${check.id}">
+            <div class="verification-card-header">
+              <div class="verification-claim">${escapeHtml(check.claim)}</div>
+              <div class="verification-status">${escapeHtml(check.status)}</div>
+            </div>
+            <div class="verification-sql-cell">
               <textarea class="sql-edit" rows="10">${escapeHtml(check.verification_sql)}</textarea>
-              <div class="verification-actions">
-                <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
-                <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
-              </div>
-            </td>
-            <td>${escapeHtml(check.expected_result)}</td>
-            <td>${escapeHtml(check.risk_level)}</td>
-            <td>${escapeHtml(check.source)}</td>
-            <td>${escapeHtml(check.status)}${check.actual_result_summary ? `<br><small>${escapeHtml(check.actual_result_summary)}</small>` : ""}</td>
-          </tr>
+            </div>
+            <div class="verification-meta">
+              <div class="verification-meta-item"><span>Expected</span>${escapeHtml(check.expected_result)}</div>
+              <div class="verification-meta-item"><span>Risk</span>${escapeHtml(check.risk_level)}</div>
+              <div class="verification-meta-item"><span>Source</span>${escapeHtml(check.source)}</div>
+            </div>
+            ${check.actual_result_summary ? `<div class="verification-result">${escapeHtml(check.actual_result_summary)}</div>` : ""}
+            <div class="verification-actions">
+              <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
+              <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
+            </div>
+          </div>
         `).join("");
         body.querySelectorAll("[data-run-check]").forEach((button) => {
           button.addEventListener("click", async () => {
-            const row = button.closest("tr");
-            const sql = row.querySelector(".sql-edit").value;
+            const card = button.closest(".verification-card");
+            const sql = card.querySelector(".sql-edit").value;
             await runVerificationCheck(button.dataset.runCheck, sql);
           });
         });

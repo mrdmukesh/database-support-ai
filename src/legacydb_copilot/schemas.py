@@ -218,6 +218,33 @@ class ChatAskResponse(BaseModel):
     investigation_id: str | None = None
 
 
+class VerificationCheckRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    claim: str
+    verification_sql: str
+    expected_result: str
+    risk_level: str
+    source: str
+    status: str
+    actual_result_summary: str
+    confidence_impact: str
+    notes: str
+    verified_by: str
+    verified_at: datetime | None
+
+
+class VerificationRunRequest(BaseModel):
+    verification_sql: str | None = None
+
+
+class VerificationRunAllResponse(BaseModel):
+    checks: list[VerificationCheckRead]
+    report: dict[str, str] | None = None
+
+
 class InvestigationStatus(StrEnum):
     OPEN = "OPEN"
     AI_ANSWERED = "AI_ANSWERED"

@@ -27,13 +27,23 @@ _KNOWLEDGE_COLUMNS: dict[str, str] = {
     "indexed_at": "DATETIME",
 }
 
+_INVESTIGATION_COLUMNS: dict[str, str] = {
+    "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
+}
+
 
 def initialize_application_schema(database_url: str) -> None:
     engine = create_db_engine(database_url)
     Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+    if "investigations" in inspector.get_table_names():
+        existing_investigation_columns = {column["name"] for column in inspector.get_columns("investigations")}
+        with engine.begin() as connection:
+            for column_name, ddl in _INVESTIGATION_COLUMNS.items():
+                if column_name not in existing_investigation_columns:
+                    connection.execute(text(f"ALTER TABLE investigations ADD COLUMN {column_name} {ddl}"))
     if not database_url.startswith("sqlite"):
         return
-    inspector = inspect(engine)
     if "knowledge_articles" not in inspector.get_table_names():
         return
     existing = {column["name"] for column in inspector.get_columns("knowledge_articles")}

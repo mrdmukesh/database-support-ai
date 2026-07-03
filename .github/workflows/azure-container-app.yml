@@ -153,6 +153,34 @@ jobs:
                 --public-access 0.0.0.0
             fi
 
+            POSTGRES_STATE="$(az postgres flexible-server show \
+              --name "$POSTGRES_SERVER" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --query state \
+              --output tsv)"
+            if [ "$POSTGRES_STATE" = "Stopped" ]; then
+              echo "PostgreSQL server $POSTGRES_SERVER is stopped. Starting it for deployment..."
+              az postgres flexible-server start \
+                --name "$POSTGRES_SERVER" \
+                --resource-group "$AZURE_RESOURCE_GROUP"
+            fi
+            for attempt in $(seq 1 30); do
+              POSTGRES_STATE="$(az postgres flexible-server show \
+                --name "$POSTGRES_SERVER" \
+                --resource-group "$AZURE_RESOURCE_GROUP" \
+                --query state \
+                --output tsv)"
+              if [ "$POSTGRES_STATE" = "Ready" ]; then
+                break
+              fi
+              echo "Waiting for PostgreSQL server to become Ready. Current state: $POSTGRES_STATE"
+              sleep 20
+            done
+            if [ "$POSTGRES_STATE" != "Ready" ]; then
+              echo "::error::PostgreSQL server $POSTGRES_SERVER did not become Ready. Current state: $POSTGRES_STATE"
+              exit 1
+            fi
+
             az postgres flexible-server firewall-rule create \
               --name AllowAzureContainerAppsDev \
               --resource-group "$AZURE_RESOURCE_GROUP" \

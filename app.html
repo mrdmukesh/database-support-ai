@@ -848,6 +848,31 @@
                 </form>
                 <div class="badge-row" id="chatBadges"></div>
                 <div class="actions" id="reportDownloads"></div>
+                <div id="verificationPanel" class="feedback-panel">
+                  <h3>Suggested Verification Checks</h3>
+                  <div class="actions">
+                    <button class="button secondary" type="button" id="runAllVerification">Run all safe checks</button>
+                  </div>
+                  <div id="verificationMessage" class="message"></div>
+                  <div class="table-scroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Claim</th>
+                          <th>SQL</th>
+                          <th>Expected</th>
+                          <th>Risk</th>
+                          <th>Source</th>
+                          <th>Status</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody id="verificationRows">
+                        <tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
                 <div id="chatAnswer" class="answer-box">Ask a question to see the MVP answer and safety report.</div>
                 <div id="feedbackPanel" class="feedback-panel">
                   <h3>Developer feedback</h3>
@@ -990,6 +1015,15 @@
         const element = document.getElementById(id);
         element.textContent = text;
         element.className = `message ${type}`.trim();
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
       }
 
       async function api(path, options = {}) {
@@ -1378,16 +1412,11 @@
         }
         const filenameFromPath = (path) => decodeURIComponent(path.split("/").pop() || "investigation_report");
         container.innerHTML = `
-          <button class="button primary" type="button" data-verify-conclusions>Verify AI conclusions</button>
           <button class="button secondary" type="button" data-view-report="${report.html}">View HTML Report</button>
           <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">Download PDF</button>
           <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">Download Word</button>
           <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">Download Excel</button>
         `;
-        container.querySelector("[data-verify-conclusions]").addEventListener("click", () => {
-          setMessage("chatMessage", "Running evidence verification and regenerating reports...");
-          document.getElementById("chatForm").requestSubmit();
-        });
         container.querySelector("[data-view-report]").addEventListener("click", (event) =>
           viewHtmlReport(event.currentTarget.dataset.viewReport),
         );
@@ -1397,6 +1426,93 @@
           ),
         );
       }
+
+      async function loadVerificationChecks(investigationId) {
+        const body = document.getElementById("verificationRows");
+        if (!investigationId) {
+          body.innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+          return;
+        }
+        try {
+          const checks = await api(`/chat/investigations/${investigationId}/verification-checks`);
+          renderVerificationChecks(checks);
+        } catch (error) {
+          setMessage("verificationMessage", error.message, "error");
+        }
+      }
+
+      function renderVerificationChecks(checks) {
+        const body = document.getElementById("verificationRows");
+        if (!checks.length) {
+          body.innerHTML = `<tr><td colspan="7" class="empty">No verification checks were suggested.</td></tr>`;
+          return;
+        }
+        body.innerHTML = checks.map((check) => `
+          <tr data-check-id="${check.id}">
+            <td>${escapeHtml(check.claim)}</td>
+            <td><textarea class="sql-edit" rows="4">${escapeHtml(check.verification_sql)}</textarea></td>
+            <td>${escapeHtml(check.expected_result)}</td>
+            <td>${escapeHtml(check.risk_level)}</td>
+            <td>${escapeHtml(check.source)}</td>
+            <td>${escapeHtml(check.status)}${check.actual_result_summary ? `<br><small>${escapeHtml(check.actual_result_summary)}</small>` : ""}</td>
+            <td>
+              <button class="button secondary" type="button" data-run-check="${check.id}">Run this check</button>
+              <button class="button ghost" type="button" data-skip-check="${check.id}">Skip</button>
+            </td>
+          </tr>
+        `).join("");
+        body.querySelectorAll("[data-run-check]").forEach((button) => {
+          button.addEventListener("click", async () => {
+            const row = button.closest("tr");
+            const sql = row.querySelector(".sql-edit").value;
+            await runVerificationCheck(button.dataset.runCheck, sql);
+          });
+        });
+        body.querySelectorAll("[data-skip-check]").forEach((button) => {
+          button.addEventListener("click", () => skipVerificationCheck(button.dataset.skipCheck));
+        });
+      }
+
+      async function runVerificationCheck(checkId, sql) {
+        setMessage("verificationMessage", "Running selected read-only verification check...");
+        try {
+          await api(`/chat/verification-checks/${checkId}/run`, {
+            method: "POST",
+            body: JSON.stringify({ verification_sql: sql }),
+          });
+          await loadVerificationChecks(currentInvestigationId);
+          setMessage("verificationMessage", "Verification check completed and report regenerated.", "success");
+        } catch (error) {
+          setMessage("verificationMessage", error.message, "error");
+        }
+      }
+
+      async function skipVerificationCheck(checkId) {
+        setMessage("verificationMessage", "Skipping verification check...");
+        try {
+          await api(`/chat/verification-checks/${checkId}/skip`, { method: "POST" });
+          await loadVerificationChecks(currentInvestigationId);
+          setMessage("verificationMessage", "Verification check skipped and report regenerated.", "success");
+        } catch (error) {
+          setMessage("verificationMessage", error.message, "error");
+        }
+      }
+
+      document.getElementById("runAllVerification").addEventListener("click", async () => {
+        if (!currentInvestigationId) {
+          setMessage("verificationMessage", "Generate an investigation first.", "error");
+          return;
+        }
+        setMessage("verificationMessage", "Running all pending safe verification checks...");
+        try {
+          const response = await api(`/chat/investigations/${currentInvestigationId}/verification-checks/run-all`, { method: "POST" });
+          renderVerificationChecks(response.checks || []);
+          if (response.report) renderReportDownloads(response.report);
+          setMessage("verificationMessage", "All pending safe checks completed and report regenerated.", "success");
+        } catch (error) {
+          setMessage("verificationMessage", error.message, "error");
+        }
+      });
 
       function showFeedbackPanel(investigationId) {
         currentInvestigationId = investigationId;
@@ -1817,6 +1933,8 @@
         document.getElementById("chatAnswer").textContent = "Ask a question to see the MVP answer and safety report.";
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
+        document.getElementById("verificationRows").innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+        setMessage("verificationMessage", "");
         showFeedbackPanel(null);
         loadChatHistory();
       });
@@ -1843,6 +1961,8 @@
           renderChatBadges(response);
           renderReportDownloads(response.report);
           showFeedbackPanel(response.investigation_id);
+          currentInvestigationId = response.investigation_id;
+          await loadVerificationChecks(response.investigation_id);
           await loadConversationMessages(response.conversation.id);
           await loadChatHistory();
           setMessage("chatMessage", response.report ? "Investigation Complete. Reports generated." : "Answer generated and saved to history.", "success");

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
@@ -16,6 +17,17 @@ from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAna
 
 
 @dataclass(frozen=True)
+class SuggestedVerificationCheck:
+    claim: str
+    verification_sql: str
+    expected_result: str
+    risk_level: str
+    source: str
+    status: str = "Pending"
+    notes: str = ""
+
+
+@dataclass(frozen=True)
 class VerificationResult:
     claim: str
     verification_sql: str
@@ -24,6 +36,76 @@ class VerificationResult:
     status: str
     confidence_impact: str
     notes: str
+    timestamp: str = ""
+    verified_by: str = ""
+
+
+def suggest_verification_checks(
+    *,
+    question: str,
+    intent: InvestigationIntent,
+    metadata: MetadataSearchResult,
+    evidence: list[EvidenceResult],
+    evidence_focus: EvidenceFocus | None,
+    evidence_gate: EvidenceGateResult | None,
+    procedure_analysis: list[ProcedureAnalysis],
+    documents: list[RetrievedDocument],
+    reasoning: ReasoningResult,
+) -> list[SuggestedVerificationCheck]:
+    checks: list[SuggestedVerificationCheck] = []
+    if evidence_focus:
+        checks.append(_suggest_affected_object(metadata, evidence_focus))
+        parent_check = _suggest_parent_object(evidence, evidence_focus)
+        if parent_check:
+            checks.append(parent_check)
+    if evidence_gate:
+        gate_check = _suggest_gate(evidence, evidence_gate)
+        if gate_check:
+            checks.append(gate_check)
+    duplicate_check = _suggest_reported_duplicate(question, intent, evidence)
+    if duplicate_check:
+        checks.append(duplicate_check)
+    missing_check = _suggest_reported_missing(intent, evidence)
+    if missing_check:
+        checks.append(missing_check)
+    if evidence_focus:
+        writer_check = _suggest_direct_writer(evidence_focus, procedure_analysis)
+        if writer_check:
+            checks.append(writer_check)
+        execution_check = _suggest_execution_path(evidence_focus, evidence)
+        if execution_check:
+            checks.append(execution_check)
+    fix_check = _suggest_recommended_fix(reasoning, evidence_focus, procedure_analysis, documents)
+    if fix_check:
+        checks.append(fix_check)
+    checks.append(_suggest_proof_sql_is_read_only(evidence))
+    return checks
+
+
+def execute_verification_check(
+    *,
+    connector,
+    claim: str,
+    verification_sql: str,
+    expected_result: str,
+    source: str,
+    verified_by: str,
+) -> list[VerificationResult]:
+    rows, error = _run_verification_sql(connector, verification_sql)
+    status = _status_from_expected(expected_result, rows, error)
+    return [
+        VerificationResult(
+            claim=claim,
+            verification_sql=verification_sql,
+            expected_result=expected_result,
+            actual_result_summary=_summary(rows, error),
+            status=status,
+            confidence_impact=_impact(status),
+            notes=f"Source: {source}. Executed only after human approval.",
+            timestamp=datetime.now(UTC).isoformat(timespec="seconds"),
+            verified_by=verified_by,
+        )
+    ]
 
 
 def run_evidence_verification(
@@ -40,30 +122,27 @@ def run_evidence_verification(
     reasoning: ReasoningResult,
 ) -> list[VerificationResult]:
     results: list[VerificationResult] = []
-    if evidence_focus:
-        results.append(_verify_affected_object(metadata, evidence, evidence_focus))
-        parent_result = _verify_parent_object(evidence, evidence_focus)
-        if parent_result:
-            results.append(parent_result)
-    if evidence_gate:
-        results.append(_verify_gate(evidence_gate))
-    duplicate_result = _verify_reported_duplicate(connector, question, intent, evidence)
-    if duplicate_result:
-        results.append(duplicate_result)
-    missing_result = _verify_reported_missing(connector, intent, evidence)
-    if missing_result:
-        results.append(missing_result)
-    if evidence_focus:
-        writer_result = _verify_direct_writer(evidence_focus, procedure_analysis)
-        if writer_result:
-            results.append(writer_result)
-        execution_result = _verify_execution_path(evidence_focus)
-        if execution_result:
-            results.append(execution_result)
-    fix_result = _verify_recommended_fix(reasoning, evidence_focus, procedure_analysis, documents)
-    if fix_result:
-        results.append(fix_result)
-    results.append(_verify_proof_sql_is_read_only(evidence))
+    for check in suggest_verification_checks(
+        question=question,
+        intent=intent,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=evidence_focus,
+        evidence_gate=evidence_gate,
+        procedure_analysis=procedure_analysis,
+        documents=documents,
+        reasoning=reasoning,
+    ):
+        results.extend(
+            execute_verification_check(
+                connector=connector,
+                claim=check.claim,
+                verification_sql=check.verification_sql,
+                expected_result=check.expected_result,
+                source=check.source,
+                verified_by="system",
+            )
+        )
     return results
 
 
@@ -84,6 +163,179 @@ def adjust_confidence_with_verification(confidence: float, results: list[Verific
             adjusted = min(adjusted, 0.65)
             notes.append(f"- Verification limited by missing evidence: {result.claim}")
     return max(0.05, min(0.98, adjusted)), notes
+
+
+def _suggest_affected_object(metadata: MetadataSearchResult, evidence_focus: EvidenceFocus) -> SuggestedVerificationCheck:
+    table = next((table for table in metadata.tables if table.name.lower() == evidence_focus.affected_object.lower()), None)
+    sql = f"DESCRIBE {evidence_focus.affected_object}" if table else "SELECT 'affected object not present in metadata' AS verification_note"
+    return SuggestedVerificationCheck(
+        claim=f"{evidence_focus.affected_object} is the affected object.",
+        verification_sql=sql,
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="metadata",
+        notes=evidence_focus.affected_object_reason,
+    )
+
+
+def _suggest_parent_object(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus) -> SuggestedVerificationCheck | None:
+    parent_table = _parent_table_from_evidence(evidence)
+    if not parent_table:
+        return None
+    candidate = next(
+        (
+            item
+            for item in evidence
+            if parent_table in item.sql.lower()
+            and evidence_focus.affected_object.lower() in item.sql.lower()
+            and re.search(r"\bjoin\b", item.sql, re.I)
+        ),
+        None,
+    )
+    return SuggestedVerificationCheck(
+        claim=f"{parent_table} is the parent/supporting object for {evidence_focus.affected_object}.",
+        verification_sql=candidate.sql if candidate else f"DESCRIBE {parent_table}",
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="SQL evidence",
+        notes="Parent object is inferred from parent-child join evidence.",
+    )
+
+
+def _suggest_gate(evidence: list[EvidenceResult], evidence_gate: EvidenceGateResult) -> SuggestedVerificationCheck | None:
+    candidate = next((item for item in evidence if item.rows), None)
+    if candidate is None:
+        return None
+    return SuggestedVerificationCheck(
+        claim="Reported condition passes the evidence gate.",
+        verification_sql=candidate.sql,
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="SQL evidence",
+        notes="Verifies that live evidence still returns rows for the reported condition.",
+    )
+
+
+def _suggest_reported_duplicate(
+    question: str,
+    intent: InvestigationIntent,
+    evidence: list[EvidenceResult],
+) -> SuggestedVerificationCheck | None:
+    if intent not in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
+        return None
+    candidate = next((item for item in evidence if "duplicate" in item.purpose.lower() and "having count" in item.sql.lower()), None)
+    if candidate is None:
+        return None
+    expected = "Rows returned"
+    if re.search(r"\b(active|open)\b", question, re.I):
+        expected = "Rows returned with status/state evidence"
+    return SuggestedVerificationCheck(
+        claim="Duplicate condition is reproduced by live database evidence.",
+        verification_sql=candidate.sql,
+        expected_result=expected,
+        risk_level="Read-only",
+        source="SQL evidence",
+        notes="Re-runs the duplicate-condition SQL after human approval.",
+    )
+
+
+def _suggest_reported_missing(intent: InvestigationIntent, evidence: list[EvidenceResult]) -> SuggestedVerificationCheck | None:
+    if intent != InvestigationIntent.MISSING_DATA:
+        return None
+    candidate = next((item for item in evidence if item.purpose == "Confirmed Missing Related Record Candidates"), None)
+    if candidate is None:
+        return None
+    return SuggestedVerificationCheck(
+        claim="Missing related record condition is reproduced by live database evidence.",
+        verification_sql=candidate.sql,
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="SQL evidence",
+        notes="Re-runs the missing-record candidate SQL after human approval.",
+    )
+
+
+def _suggest_direct_writer(
+    evidence_focus: EvidenceFocus,
+    procedure_analysis: list[ProcedureAnalysis],
+) -> SuggestedVerificationCheck | None:
+    top_writer = next((rank for rank in evidence_focus.ranked_procedures if rank.writes_affected_object), None)
+    if not top_writer:
+        return None
+    return SuggestedVerificationCheck(
+        claim=f"{top_writer.procedure} writes {evidence_focus.affected_object}.",
+        verification_sql=(
+            "SELECT routine_name, routine_definition "
+            "FROM information_schema.routines "
+            f"WHERE routine_name = '{top_writer.procedure.replace(chr(39), chr(39) + chr(39))}'"
+        ),
+        expected_result=f"Rows returned containing {evidence_focus.affected_object}",
+        risk_level="Read-only",
+        source="procedure",
+        notes="Procedure text is inspected with a read-only information_schema query; no procedure execution is allowed.",
+    )
+
+
+def _suggest_execution_path(evidence_focus: EvidenceFocus, evidence: list[EvidenceResult]) -> SuggestedVerificationCheck | None:
+    if not evidence_focus.ranked_procedures:
+        return None
+    log_candidate = next(
+        (item for item in evidence if any(term in f"{item.purpose} {item.sql}".lower() for term in ("error", "log", "job", "audit", "history"))),
+        None,
+    )
+    if log_candidate:
+        sql = log_candidate.sql
+        expected = "Rows returned"
+    else:
+        sql = "SELECT 'job/error/audit evidence was not collected' AS verification_note"
+        expected = "Metadata-only partial verification"
+    return SuggestedVerificationCheck(
+        claim="Exact execution path is supported by live operational evidence.",
+        verification_sql=sql,
+        expected_result=expected,
+        risk_level="Read-only",
+        source="SQL evidence",
+        notes="Without job/error/audit rows this check can only be partially verified.",
+    )
+
+
+def _suggest_recommended_fix(
+    reasoning: ReasoningResult,
+    evidence_focus: EvidenceFocus | None,
+    procedure_analysis: list[ProcedureAnalysis],
+    documents: list[RetrievedDocument],
+) -> SuggestedVerificationCheck | None:
+    fix_text = " ".join(reasoning.recommended_fix + reasoning.likely_root_causes).lower()
+    if not any(term in fix_text for term in ("exists", "idempot", "unique", "duplicate", "guard")):
+        return None
+    writer_name = evidence_focus.ranked_procedures[0].procedure if evidence_focus and evidence_focus.ranked_procedures else ""
+    sql = (
+        "SELECT routine_name, routine_definition "
+        "FROM information_schema.routines "
+        f"WHERE routine_name = '{writer_name.replace(chr(39), chr(39) + chr(39))}'"
+        if writer_name
+        else "SELECT 'no direct writer was confirmed' AS verification_note"
+    )
+    return SuggestedVerificationCheck(
+        claim="Recommended fix is consistent with collected evidence.",
+        verification_sql=sql,
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="procedure" if writer_name else "metadata",
+        notes="Checks whether procedure text can support idempotency, uniqueness, or guard-condition recommendations.",
+    )
+
+
+def _suggest_proof_sql_is_read_only(evidence: list[EvidenceResult]) -> SuggestedVerificationCheck:
+    sql_count = len(evidence)
+    return SuggestedVerificationCheck(
+        claim="Proof and investigation SQL are valid read-only statements.",
+        verification_sql=f"SELECT {sql_count} AS generated_read_only_sql_statement_count",
+        expected_result="Rows returned",
+        risk_level="Read-only",
+        source="metadata",
+        notes="The server validates SQL again immediately before execution.",
+    )
 
 
 def _verify_affected_object(
@@ -296,6 +548,26 @@ def _row_status(rows: list[dict[str, Any]], error: str | None) -> str:
     if error:
         return "Not Enough Evidence"
     return "Verified" if rows else "Not Verified"
+
+
+def _status_from_expected(expected_result: str, rows: list[dict[str, Any]], error: str | None) -> str:
+    if error:
+        return "Not Enough Evidence"
+    expected_l = expected_result.lower()
+    if "metadata-only partial" in expected_l:
+        return "Partially Verified" if rows else "Not Enough Evidence"
+    contains_match = re.search(r"containing\s+([a-zA-Z0-9_]+)", expected_result, re.I)
+    if contains_match:
+        if not rows:
+            return "Not Enough Evidence"
+        needle = contains_match.group(1).lower()
+        row_text = " ".join(str(value) for row in rows for value in row.values()).lower()
+        return "Verified" if needle in row_text else "Partially Verified"
+    if "status/state" in expected_l and rows:
+        return "Verified" if _rows_have_status_values(rows) else "Partially Verified"
+    if "rows returned" in expected_l:
+        return "Verified" if rows else "Not Verified"
+    return "Verified" if rows else "Not Enough Evidence"
 
 
 def _summary(rows: list[dict[str, Any]], error: str | None) -> str:

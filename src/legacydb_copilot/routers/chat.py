@@ -1,6 +1,8 @@
 ﻿from __future__ import annotations
 
 import json
+from dataclasses import asdict, replace
+from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -25,6 +27,7 @@ from legacydb_copilot.db.models import (
     DatabaseConnectionModel,
     DocumentModel,
     InvestigationModel,
+    VerificationCheckModel,
     WorkspaceModel,
 )
 from legacydb_copilot.dependencies import assert_same_organization, assert_same_user, require_permission
@@ -36,16 +39,16 @@ from legacydb_copilot.schemas import (
     ChatAskResponse,
     ChatConversationRead,
     ChatMessageRead,
+    VerificationCheckRead,
+    VerificationRunAllResponse,
+    VerificationRunRequest,
 )
 from legacydb_copilot.services.confidence_scoring_service import confidence_factors, score_confidence
 from legacydb_copilot.services.evidence_execution_service import execute_evidence_plan
 from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
-from legacydb_copilot.services.evidence_verification_agent import (
-    adjust_confidence_with_verification,
-    run_evidence_verification,
-)
+from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
 from legacydb_copilot.services.investigation_reports import generate_investigation_report_files
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
@@ -68,6 +71,7 @@ from legacydb_copilot.services.report_generator import (
     new_investigation_id,
     now_label,
 )
+from legacydb_copilot.services.report_snapshot_service import report_from_dict, report_to_dict
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -174,6 +178,8 @@ def _empty_investigation_metadata() -> dict[str, Any]:
         "evidence": "[]",
         "sql_queries": "[]",
         "report_path": "",
+        "report_snapshot": "",
+        "verification_checks": "[]",
     }
 
 
@@ -755,6 +761,83 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
     }
 
 
+def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> list[ReportSection]:
+    suggested_rows = [
+        {
+            "Claim to verify": item.claim,
+            "Generated read-only SQL": item.verification_sql,
+            "Expected result": item.expected_result,
+            "Risk level": item.risk_level,
+            "Source": item.source,
+            "Status": item.status,
+        }
+        for item in checks
+    ]
+    executed_rows = [
+        {
+            "Claim": item.claim,
+            "SQL executed": item.verification_sql,
+            "Expected result": item.expected_result,
+            "Actual result summary": item.actual_result_summary,
+            "Status": item.status,
+            "Confidence impact": item.confidence_impact,
+            "Timestamp": item.verified_at.isoformat() if item.verified_at else "",
+            "Verified by": item.verified_by,
+        }
+        for item in checks
+        if item.status not in {"Pending", "Skipped"}
+    ]
+    return [
+        ReportSection(
+            title="Suggested Verification Checks",
+            paragraphs=[
+                "These checks are suggestions only. A user must approve execution. The app validates every SQL statement before running it and allows only SELECT, SHOW, DESCRIBE, DESC, or EXPLAIN."
+            ],
+            tables=[
+                ReportTable(
+                    title="Suggested Verification Checks",
+                    columns=["Claim to verify", "Generated read-only SQL", "Expected result", "Risk level", "Source", "Status"],
+                    rows=suggested_rows,
+                )
+            ],
+        ),
+        ReportSection(
+            title="Evidence Verification Results",
+            paragraphs=[
+                "Verification results were produced only after a user approved execution. No write SQL or stored procedure execution is allowed."
+            ],
+            tables=[
+                ReportTable(
+                    title="Evidence Verification Results",
+                    columns=["Claim", "SQL executed", "Expected result", "Actual result summary", "Status", "Confidence impact", "Timestamp", "Verified by"],
+                    rows=executed_rows
+                    or [{"Claim": "No checks have been executed yet", "SQL executed": "", "Expected result": "", "Actual result summary": "", "Status": "Pending", "Confidence impact": "", "Timestamp": "", "Verified by": ""}],
+                )
+            ],
+        ),
+    ]
+
+
+def _regenerate_report_with_verification(db: Session, investigation: InvestigationModel) -> dict[str, str] | None:
+    if not investigation.report_snapshot_json:
+        return None
+    report = report_from_dict(json.loads(investigation.report_snapshot_json))
+    checks = list(
+        db.query(VerificationCheckModel)
+        .filter(VerificationCheckModel.investigation_id == investigation.id)
+        .order_by(VerificationCheckModel.created_at.asc())
+        .all()
+    )
+    verification_titles = {"Suggested Verification Checks", "Evidence Verification Results"}
+    sections = [section for section in report.sections if section.title not in verification_titles]
+    sections.extend(_verification_sections_from_models(checks))
+    updated_report = replace(report, sections=sections)
+    generated = generate_investigation_report_files(updated_report)
+    investigation.report_snapshot_json = json.dumps(report_to_dict(updated_report), default=str)
+    investigation.report_path = str(generated.directory)
+    return generated.links()
+
+
 def _run_dynamic_investigation(
     db: Session,
     payload: ChatAskRequest,
@@ -901,10 +984,9 @@ def _run_dynamic_investigation(
     if evidence_gate.required and not evidence_gate.reproduced:
         confidence = min(confidence, 0.35)
         confidence_notes.extend(f"- Evidence gate blocked root-cause analysis: {item}" for item in evidence_gate.blocking_reasons)
-    verification_results = []
+    verification_checks = []
     if Settings.from_env().verification_agent_enabled:
-        verification_results = run_evidence_verification(
-            connector=connector,
+        verification_checks = suggest_verification_checks(
             question=payload.question,
             intent=intent.intent,
             metadata=ranking.metadata,
@@ -915,8 +997,6 @@ def _run_dynamic_investigation(
             documents=context.documents,
             reasoning=reasoning,
         )
-        confidence, verification_notes = adjust_confidence_with_verification(confidence, verification_results)
-        confidence_notes.extend(verification_notes)
     ai_status = _ai_reasoning_status(llm_configured=llm_configured, llm_used=llm_used)
     bundle = DynamicInvestigationBundle(
         question=payload.question,
@@ -938,7 +1018,8 @@ def _run_dynamic_investigation(
         investigation_mode=mode.mode.value,
         mode_rationale=mode.rationale,
         ai_reasoning_status=ai_status,
-        verification_results=verification_results,
+        verification_checks=verification_checks,
+        verification_results=[],
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(
@@ -975,9 +1056,9 @@ def _run_dynamic_investigation(
     final_root_cause_text = "\n".join(f"- {item}" for item in reasoning.likely_root_causes) or "- No root cause generated."
     confidence_text = "\n".join(f"- {item}" for item in confidence_notes)
     verification_text = "\n".join(
-        f"- {item.status}: {item.claim} | {item.actual_result_summary} | {item.confidence_impact}"
-        for item in verification_results
-    ) or "- Verification agent did not run."
+        f"- Pending: {item.claim} | Source: {item.source} | Risk: {item.risk_level} | Expected: {item.expected_result}"
+        for item in verification_checks
+    ) or "- Verification suggestions disabled."
     missing_related_rows = next((item.rows for item in evidence if item.purpose == "Confirmed Missing Related Record Candidates"), [])
     missing_related_conclusion = ""
     if missing_related_rows:
@@ -1038,7 +1119,7 @@ def _run_dynamic_investigation(
         f"{correlated_text}\n\n"
         "## Evidence Gate\n"
         f"{gate_text}\n\n"
-        "## Evidence Verification Results\n"
+        "## Suggested Verification Checks\n"
         f"{verification_text}\n\n"
         "## Relevant Objects Investigated\n"
         f"{ranked_text}\n\n"
@@ -1114,6 +1195,8 @@ def _run_dynamic_investigation(
         "evidence": _evidence_to_json(evidence),
         "sql_queries": json.dumps([item.sql for item in evidence], default=str),
         "report_path": str(generated_report.directory),
+        "report_snapshot": json.dumps(report_to_dict(report), default=str),
+        "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata
 
@@ -1212,9 +1295,25 @@ def ask_chat_question(
         ai_answer=answer,
         confidence_score=confidence,
         report_path=investigation_metadata["report_path"],
+        report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
         status="AI_ANSWERED",
     )
     db.add(investigation)
+    for check in json.loads(investigation_metadata.get("verification_checks", "[]") or "[]"):
+        db.add(
+            VerificationCheckModel(
+                organization_id=payload.organization_id,
+                workspace_id=payload.workspace_id,
+                investigation_id=investigation_id,
+                claim=check.get("claim", ""),
+                verification_sql=check.get("verification_sql", ""),
+                expected_result=check.get("expected_result", ""),
+                risk_level=check.get("risk_level", "Read-only"),
+                source=check.get("source", ""),
+                status=check.get("status", "Pending"),
+                notes=check.get("notes", ""),
+            )
+        )
     db.commit()
     db.refresh(conversation)
     db.refresh(user_message)
@@ -1231,6 +1330,162 @@ def ask_chat_question(
         "sources": sources,
         "report": report_links,
         "investigation_id": investigation.id,
+    }
+
+
+def _get_verification_investigation(
+    db: Session,
+    investigation_id: str,
+    current_user,
+) -> InvestigationModel:
+    investigation = db.get(InvestigationModel, investigation_id)
+    if investigation is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    assert_same_organization(current_user, investigation.organization_id)
+    return investigation
+
+
+def _active_connector_for_investigation(db: Session, investigation: InvestigationModel):
+    connection = (
+        db.query(DatabaseConnectionModel)
+        .filter(
+            DatabaseConnectionModel.organization_id == investigation.organization_id,
+            DatabaseConnectionModel.workspace_id == investigation.workspace_id,
+            DatabaseConnectionModel.is_active.is_(True),
+        )
+        .order_by(DatabaseConnectionModel.updated_at.desc())
+        .first()
+    )
+    if connection is None:
+        raise HTTPException(status_code=404, detail="No active database connection found for verification")
+    try:
+        connector = get_connection_pool().get_or_create(
+            connection.id,
+            DatabaseEngine(connection.engine),
+            _build_connection_string(connection),
+        )
+        connector.connect()
+        return connector
+    except (DatabaseConnectionError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=f"Verification connection failed: {exc}") from exc
+
+
+@router.get("/investigations/{investigation_id}/verification-checks", response_model=list[VerificationCheckRead])
+def list_verification_checks(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> list[VerificationCheckModel]:
+    investigation = _get_verification_investigation(db, investigation_id, current_user)
+    return list(
+        db.query(VerificationCheckModel)
+        .filter(VerificationCheckModel.investigation_id == investigation.id)
+        .order_by(VerificationCheckModel.created_at.asc())
+        .all()
+    )
+
+
+@router.post("/verification-checks/{check_id}/run", response_model=VerificationCheckRead)
+def run_verification_check(
+    check_id: str,
+    payload: VerificationRunRequest,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> VerificationCheckModel:
+    check = db.get(VerificationCheckModel, check_id)
+    if check is None:
+        raise HTTPException(status_code=404, detail="Verification check not found")
+    investigation = _get_verification_investigation(db, check.investigation_id, current_user)
+    connector = _active_connector_for_investigation(db, investigation)
+    sql = (payload.verification_sql or check.verification_sql).strip()
+    result = execute_verification_check(
+        connector=connector,
+        claim=check.claim,
+        verification_sql=sql,
+        expected_result=check.expected_result,
+        source=check.source,
+        verified_by=current_user.email or current_user.full_name or current_user.id,
+    )[0]
+    check.verification_sql = sql
+    check.actual_result_summary = result.actual_result_summary
+    check.status = result.status
+    check.confidence_impact = result.confidence_impact
+    check.notes = result.notes
+    check.verified_by_id = current_user.id
+    check.verified_by = result.verified_by
+    check.verified_at = datetime.utcnow()
+    _regenerate_report_with_verification(db, investigation)
+    db.commit()
+    db.refresh(check)
+    return check
+
+
+@router.post("/verification-checks/{check_id}/skip", response_model=VerificationCheckRead)
+def skip_verification_check(
+    check_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> VerificationCheckModel:
+    check = db.get(VerificationCheckModel, check_id)
+    if check is None:
+        raise HTTPException(status_code=404, detail="Verification check not found")
+    investigation = _get_verification_investigation(db, check.investigation_id, current_user)
+    check.status = "Skipped"
+    check.actual_result_summary = "Skipped by user."
+    check.confidence_impact = "No confidence impact"
+    check.verified_by_id = current_user.id
+    check.verified_by = current_user.email or current_user.full_name or current_user.id
+    check.verified_at = datetime.utcnow()
+    _regenerate_report_with_verification(db, investigation)
+    db.commit()
+    db.refresh(check)
+    return check
+
+
+@router.post("/investigations/{investigation_id}/verification-checks/run-all", response_model=VerificationRunAllResponse)
+def run_all_verification_checks(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> dict[str, object]:
+    investigation = _get_verification_investigation(db, investigation_id, current_user)
+    connector = _active_connector_for_investigation(db, investigation)
+    checks = list(
+        db.query(VerificationCheckModel)
+        .filter(
+            VerificationCheckModel.investigation_id == investigation.id,
+            VerificationCheckModel.status == "Pending",
+        )
+        .order_by(VerificationCheckModel.created_at.asc())
+        .all()
+    )
+    verified_by = current_user.email or current_user.full_name or current_user.id
+    for check in checks:
+        result = execute_verification_check(
+            connector=connector,
+            claim=check.claim,
+            verification_sql=check.verification_sql,
+            expected_result=check.expected_result,
+            source=check.source,
+            verified_by=verified_by,
+        )[0]
+        check.actual_result_summary = result.actual_result_summary
+        check.status = result.status
+        check.confidence_impact = result.confidence_impact
+        check.notes = result.notes
+        check.verified_by_id = current_user.id
+        check.verified_by = result.verified_by
+        check.verified_at = datetime.utcnow()
+    links = _regenerate_report_with_verification(db, investigation)
+    db.commit()
+    return {
+        "checks": list(
+            db.query(VerificationCheckModel)
+            .filter(VerificationCheckModel.investigation_id == investigation.id)
+            .order_by(VerificationCheckModel.created_at.asc())
+            .all()
+        ),
+        "report": links,
     }
 
 

@@ -16,7 +16,9 @@ from legacydb_copilot.services.evidence_focus_service import build_evidence_focu
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import (
     adjust_confidence_with_verification,
+    execute_verification_check,
     run_evidence_verification,
+    suggest_verification_checks,
 )
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
@@ -387,8 +389,16 @@ def test_evidence_verification_agent_checks_duplicate_incident_claims() -> None:
                         "lab_order_count": 2,
                         "lab_order_numbers": "LAB-2005-A,LAB-2005-B",
                         "child_statuses": "ORDERED",
-                    }
-                ]
+                        }
+                    ]
+            if sql.startswith("DESCRIBE "):
+                return [{"Field": "lab_order_id"}, {"Field": "appointment_id"}]
+            if "information_schema.routines" in sql:
+                return [{"routine_name": "sp_retry_failed_lab_orders", "routine_definition": "INSERT INTO lab_orders SELECT ..."}]
+            if "generated_read_only_sql_statement_count" in sql:
+                return [{"generated_read_only_sql_statement_count": 1}]
+            if "verification_note" in sql:
+                return [{"verification_note": "job/error/audit evidence was not collected"}]
             return []
 
     metadata = MetadataSearchResult(
@@ -487,6 +497,23 @@ HAVING COUNT(*) > 1
         risks=[],
     )
 
+    suggestions = suggest_verification_checks(
+        question="Appointment APT-2005 created two active lab orders.",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        evidence_gate=gate,
+        procedure_analysis=[proc],
+        documents=[],
+        reasoning=reasoning,
+    )
+
+    assert suggestions
+    assert all(item.status == "Pending" for item in suggestions)
+    assert all(item.risk_level == "Read-only" for item in suggestions)
+    assert any(item.claim == "Duplicate condition is reproduced by live database evidence." for item in suggestions)
+
     results = run_evidence_verification(
         connector=FakeConnector(),
         question="Appointment APT-2005 created two active lab orders.",
@@ -508,6 +535,16 @@ HAVING COUNT(*) > 1
     assert by_claim["Exact execution path is supported by live operational evidence."] == "Partially Verified"
     assert by_claim["Recommended fix is consistent with collected evidence."] == "Verified"
     assert by_claim["Proof and investigation SQL are valid read-only statements."] == "Verified"
+    explicit_result = execute_verification_check(
+        connector=FakeConnector(),
+        claim="Duplicate condition is reproduced by live database evidence.",
+        verification_sql=duplicate_sql,
+        expected_result="Rows returned with status/state evidence",
+        source="SQL evidence",
+        verified_by="tester@example.com",
+    )[0]
+    assert explicit_result.status == "Verified"
+    assert explicit_result.verified_by == "tester@example.com"
     adjusted, notes = adjust_confidence_with_verification(0.7, results)
     assert adjusted > 0.7
     assert any("Verification partial" in note for note in notes)

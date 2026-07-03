@@ -1428,6 +1428,7 @@
       }
 
       async function loadVerificationChecks(investigationId) {
+        document.getElementById("verificationPanel").classList.toggle("active", Boolean(investigationId));
         const body = document.getElementById("verificationRows");
         if (!investigationId) {
           body.innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
@@ -1933,6 +1934,7 @@
         document.getElementById("chatAnswer").textContent = "Ask a question to see the MVP answer and safety report.";
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
+        document.getElementById("verificationPanel").classList.remove("active");
         document.getElementById("verificationRows").innerHTML = `<tr><td colspan="7" class="empty">Generate an investigation to see verification checks.</td></tr>`;
         setMessage("verificationMessage", "");
         showFeedbackPanel(null);

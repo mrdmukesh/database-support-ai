@@ -400,23 +400,21 @@
         font: inherit;
       }
 
-      .verification-sql-cell {
-        min-width: 640px;
-      }
-
       .verification-sql-cell textarea {
         min-height: 260px;
+        max-height: 420px;
         font-family: Consolas, "Courier New", monospace;
         font-size: 13px;
         line-height: 1.45;
         white-space: pre;
+        overflow: auto;
       }
 
       .verification-actions {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         flex-wrap: wrap;
-        margin-top: 10px;
+        margin-top: 14px;
         position: relative;
         z-index: 1;
       }
@@ -434,7 +432,10 @@
         border: 1px solid var(--line);
         border-radius: 8px;
         background: #fff;
-        padding: 16px;
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+        min-width: 0;
       }
 
       .verification-card-header {
@@ -442,12 +443,12 @@
         justify-content: space-between;
         gap: 14px;
         align-items: flex-start;
-        margin-bottom: 12px;
       }
 
       .verification-claim {
         font-weight: 700;
         line-height: 1.45;
+        min-width: 0;
       }
 
       .verification-status {
@@ -464,7 +465,6 @@
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-        margin-top: 12px;
       }
 
       .verification-meta-item {
@@ -1544,13 +1544,21 @@
             </div>
           </div>
         `).join("");
+        bindVerificationCardButtons();
       }
 
-      document.getElementById("verificationRows").addEventListener("click", async (event) => {
-        const runButton = event.target.closest("[data-run-check]");
-        const skipButton = event.target.closest("[data-skip-check]");
+      function clickElement(event) {
+        return event.target && event.target.nodeType === 1 ? event.target : event.target?.parentElement;
+      }
+
+      async function handleVerificationClick(event) {
+        const target = clickElement(event);
+        if (!target) return;
+        const runButton = target.closest("[data-run-check]");
+        const skipButton = target.closest("[data-skip-check]");
         if (!runButton && !skipButton) return;
         event.preventDefault();
+        event.stopPropagation();
         if (runButton) {
           const card = runButton.closest(".verification-card");
           const sql = card.querySelector(".sql-edit").value;
@@ -1558,7 +1566,15 @@
           return;
         }
         await skipVerificationCheck(skipButton.dataset.skipCheck);
-      });
+      }
+
+      function bindVerificationCardButtons() {
+        document.querySelectorAll("[data-run-check], [data-skip-check]").forEach((button) => {
+          button.onclick = (event) => handleVerificationClick(event);
+        });
+      }
+
+      document.getElementById("verificationRows").addEventListener("click", handleVerificationClick);
 
       async function runVerificationCheck(checkId, sql) {
         setMessage("verificationMessage", "Running selected read-only verification check...");
@@ -2021,7 +2037,7 @@
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
         document.getElementById("verificationPanel").classList.remove("active");
-        document.getElementById("verificationRows").innerHTML = `<tr><td colspan="6" class="empty">Generate an investigation to see verification checks.</td></tr>`;
+        document.getElementById("verificationRows").innerHTML = `<div class="empty">Generate an investigation to see verification checks.</div>`;
         setMessage("verificationMessage", "");
         showFeedbackPanel(null);
         loadChatHistory();

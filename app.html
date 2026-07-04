@@ -972,6 +972,7 @@
                     <button class="button secondary" type="button" id="runAllVerification">Run all safe checks</button>
                   </div>
                   <div id="verificationMessage" class="message"></div>
+                  <div id="verificationReportDownloads" class="actions"></div>
                   <div id="verificationRows" class="verification-card-list">
                     <div class="empty">Generate an investigation to see verification checks.</div>
                   </div>
@@ -1085,6 +1086,7 @@
       const pageTitle = document.getElementById("pageTitle");
       const sessionLabel = document.getElementById("sessionLabel");
       let currentInvestigationId = null;
+      let currentReportLinks = null;
       let currentFeedbackRating = "HELPFUL";
 
       const requiredConsents = [
@@ -1507,18 +1509,21 @@
         }
       }
 
-      function renderReportDownloads(report) {
-        const container = document.getElementById("reportDownloads");
+      function renderReportDownloads(report, containerId = "reportDownloads", label = "") {
+        const container = document.getElementById(containerId);
+        if (!container) return;
         if (!report) {
           container.innerHTML = "";
           return;
         }
+        currentReportLinks = report;
         const filenameFromPath = (path) => decodeURIComponent(path.split("/").pop() || "investigation_report");
         container.innerHTML = `
+          ${label ? `<span class="muted-note">${escapeHtml(label)}</span>` : ""}
           <button class="button secondary" type="button" data-view-report="${report.html}">View HTML Report</button>
-          <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">Download PDF</button>
-          <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">Download Word</button>
-          <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">Download Excel</button>
+          <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">${label ? "Download Verified PDF" : "Download PDF"}</button>
+          <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">${label ? "Download Verified Word" : "Download Word"}</button>
+          <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">${label ? "Download Verified Excel" : "Download Excel"}</button>
         `;
         container.querySelector("[data-view-report]").addEventListener("click", (event) =>
           viewHtmlReport(event.currentTarget.dataset.viewReport),
@@ -1635,6 +1640,7 @@
             body: JSON.stringify({ verification_sql: sql }),
           });
           await loadVerificationChecks(currentInvestigationId);
+          renderReportDownloads(currentReportLinks, "verificationReportDownloads", "Verification report regenerated.");
           setMessage("verificationMessage", "Verification check completed and report regenerated.", "success");
         } catch (error) {
           button.disabled = false;
@@ -1650,6 +1656,7 @@
         try {
           await api(`/chat/verification-checks/${checkId}/skip`, { method: "POST" });
           await loadVerificationChecks(currentInvestigationId);
+          renderReportDownloads(currentReportLinks, "verificationReportDownloads", "Verification report regenerated.");
           setMessage("verificationMessage", "Verification check skipped and report regenerated.", "success");
         } catch (error) {
           button.disabled = false;
@@ -1667,7 +1674,10 @@
         try {
           const response = await api(`/chat/investigations/${currentInvestigationId}/verification-checks/run-all`, { method: "POST" });
           renderVerificationChecks(response.checks || []);
-          if (response.report) renderReportDownloads(response.report);
+          if (response.report) {
+            renderReportDownloads(response.report);
+            renderReportDownloads(response.report, "verificationReportDownloads", "Verification report regenerated.");
+          }
           setMessage("verificationMessage", "All pending safe checks completed and report regenerated.", "success");
         } catch (error) {
           setMessage("verificationMessage", error.message, "error");
@@ -2093,6 +2103,7 @@
         document.getElementById("chatAnswer").textContent = "Ask a question to see the MVP answer and safety report.";
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
+        document.getElementById("verificationReportDownloads").innerHTML = "";
         document.getElementById("verificationPanel").classList.remove("active");
         document.getElementById("verificationRows").innerHTML = `<div class="empty">Generate an investigation to see verification checks.</div>`;
         setMessage("verificationMessage", "");
@@ -2121,6 +2132,7 @@
           document.getElementById("chatAnswer").textContent = response.assistant_message.content;
           renderChatBadges(response);
           renderReportDownloads(response.report);
+          renderReportDownloads(null, "verificationReportDownloads");
           showFeedbackPanel(response.investigation_id);
           currentInvestigationId = response.investigation_id;
           await loadVerificationChecks(response.investigation_id);

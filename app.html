@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -99,6 +99,9 @@
       }
 
       .nav button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
         min-height: 44px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 8px;
@@ -107,6 +110,13 @@
         color: #d9e4ec;
         text-align: left;
         cursor: pointer;
+      }
+
+      .nav-icon {
+        width: 18px;
+        min-width: 18px;
+        height: 18px;
+        color: #8fd3cb;
       }
 
       .nav button.active {
@@ -183,6 +193,26 @@
         cursor: pointer;
       }
 
+      .menu-lines {
+        display: grid;
+        gap: 4px;
+      }
+
+      .menu-lines span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .button-icon {
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+        vertical-align: -3px;
+      }
+
       .session {
         color: var(--muted);
         font-size: 14px;
@@ -206,6 +236,59 @@
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--surface);
+      }
+
+      .auth-layout {
+        display: grid;
+        grid-template-columns: minmax(360px, 640px) minmax(320px, 1fr);
+        gap: 18px;
+        align-items: stretch;
+      }
+
+      .auth-layout .panel {
+        max-width: none;
+      }
+
+      .product-visual {
+        position: relative;
+        min-height: 460px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #0f1b24;
+      }
+
+      .product-visual img {
+        width: 100%;
+        height: 100%;
+        min-height: 460px;
+        object-fit: cover;
+        display: block;
+      }
+
+      .product-visual-caption {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        bottom: 18px;
+        padding: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        border-radius: 8px;
+        background: rgba(16, 25, 35, 0.78);
+        color: white;
+        backdrop-filter: blur(14px);
+      }
+
+      .product-visual-caption strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 16px;
+      }
+
+      .product-visual-caption span {
+        color: #d7e6ee;
+        font-size: 13px;
+        line-height: 1.45;
       }
 
       .panel-head {
@@ -353,6 +436,39 @@
         grid-template-columns: minmax(0, 1fr) 360px;
         gap: 18px;
         margin-top: 18px;
+      }
+
+      .dashboard-visual {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 340px;
+        gap: 18px;
+        margin-bottom: 18px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: white;
+      }
+
+      .dashboard-visual-copy {
+        padding: 22px;
+      }
+
+      .dashboard-visual-copy h2 {
+        margin: 0 0 8px;
+        font-size: 22px;
+      }
+
+      .dashboard-visual-copy p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .dashboard-visual img {
+        width: 100%;
+        height: 100%;
+        min-height: 190px;
+        object-fit: cover;
       }
 
       .table-panel,
@@ -785,8 +901,10 @@
         .grid-two,
         .dashboard-grid,
         .dashboard-layout,
+        .dashboard-visual,
         .workspace-tools,
         .help-layout,
+        .auth-layout,
         .chat-layout {
           grid-template-columns: 1fr;
         }
@@ -806,6 +924,43 @@
     </style>
   </head>
   <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <symbol id="icon-user-plus" viewBox="0 0 24 24">
+        <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="8.5" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M19 8v6M16 11h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-login" viewBox="0 0 24 24">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M10 17l5-5-5-5M15 12H3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-dashboard" viewBox="0 0 24 24">
+        <path d="M3 13h8V3H3v10ZM13 21h8V11h-8v10ZM13 3v6h8V3h-8ZM3 21h8v-6H3v6Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="icon-workspace" viewBox="0 0 24 24">
+        <path d="M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-database" viewBox="0 0 24 24">
+        <ellipse cx="12" cy="5" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" fill="none" stroke="currentColor" stroke-width="2"/>
+      </symbol>
+      <symbol id="icon-document" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M14 2v6h6M8 13h8M8 17h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-chat" viewBox="0 0 24 24">
+        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M8 9h8M8 13h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-learning" viewBox="0 0 24 24">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M9 7h7M9 11h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="icon-help" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M9.5 9a2.6 2.6 0 0 1 5 1c0 2-2.5 2-2.5 4M12 18h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </symbol>
+    </svg>
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
@@ -813,15 +968,15 @@
           <span>LegacyDB Copilot</span>
         </div>
         <nav class="nav" aria-label="Application views">
-          <button class="active" data-view-button="signup">Signup</button>
-          <button data-view-button="login">Login</button>
-          <button data-view-button="dashboard">Dashboard</button>
-          <button data-view-button="workspaces">Workspaces</button>
-          <button data-view-button="connections">Database Connections</button>
-          <button data-view-button="documents">Documents</button>
-          <button data-view-button="chat">AI Chat</button>
-          <button data-view-button="learning">Learning Loop</button>
-          <button type="button" data-open-help>Help Assistant</button>
+          <button class="active" data-view-button="signup"><svg class="nav-icon"><use href="#icon-user-plus"></use></svg><span>Signup</span></button>
+          <button data-view-button="login"><svg class="nav-icon"><use href="#icon-login"></use></svg><span>Login</span></button>
+          <button data-view-button="dashboard"><svg class="nav-icon"><use href="#icon-dashboard"></use></svg><span>Dashboard</span></button>
+          <button data-view-button="workspaces"><svg class="nav-icon"><use href="#icon-workspace"></use></svg><span>Workspaces</span></button>
+          <button data-view-button="connections"><svg class="nav-icon"><use href="#icon-database"></use></svg><span>Database Connections</span></button>
+          <button data-view-button="documents"><svg class="nav-icon"><use href="#icon-document"></use></svg><span>Documents</span></button>
+          <button data-view-button="chat"><svg class="nav-icon"><use href="#icon-chat"></use></svg><span>AI Chat</span></button>
+          <button data-view-button="learning"><svg class="nav-icon"><use href="#icon-learning"></use></svg><span>Learning Loop</span></button>
+          <button type="button" data-open-help><svg class="nav-icon"><use href="#icon-help"></use></svg><span>Help Assistant</span></button>
         </nav>
         <div class="api-status">
           <span id="statusDot" class="status-dot"></span>
@@ -833,19 +988,20 @@
       <main>
         <header class="topbar">
           <div class="topbar-left">
-            <button class="icon-button" type="button" id="menuToggle" aria-label="Open navigation menu">☰</button>
+            <button class="icon-button" type="button" id="menuToggle" aria-label="Open navigation menu"><span class="menu-lines"><span></span><span></span><span></span></span></button>
             <h1 id="pageTitle">Signup</h1>
           </div>
           <div class="topbar-actions">
-            <button class="button secondary" type="button" id="topHelpButton">Help</button>
-            <button class="button secondary" type="button" id="topLoginButton">Login</button>
-            <button class="button secondary" type="button" id="topLogoutButton" hidden>Logout</button>
+            <button class="button secondary" type="button" id="topHelpButton"><svg class="button-icon"><use href="#icon-help"></use></svg>Help</button>
+            <button class="button secondary" type="button" id="topLoginButton"><svg class="button-icon"><use href="#icon-login"></use></svg>Login</button>
+            <button class="button secondary" type="button" id="topLogoutButton" hidden><svg class="button-icon"><use href="#icon-login"></use></svg>Logout</button>
             <div class="session" id="sessionLabel">No active session</div>
           </div>
         </header>
 
         <div class="content">
           <section id="signup" class="view active" aria-label="Signup">
+            <div class="auth-layout">
             <div class="panel">
               <div class="panel-head">
                 <h2>Create organization and admin user</h2>
@@ -903,9 +1059,18 @@
                 <div id="signupMessage" class="message"></div>
               </form>
             </div>
+              <div class="product-visual" aria-hidden="true">
+                <img src="/assets/images/enterprise-operations-hero.png" alt="" />
+                <div class="product-visual-caption">
+                  <strong>Evidence-first database support</strong>
+                  <span>Connect metadata, safe SQL evidence, approved knowledge, verification checks, and professional reports in one workflow.</span>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section id="login" class="view" aria-label="Login">
+            <div class="auth-layout">
             <div class="panel">
               <div class="panel-head">
                 <h2>Login</h2>
@@ -930,9 +1095,24 @@
                 <div id="loginMessage" class="message"></div>
               </form>
             </div>
+              <div class="product-visual" aria-hidden="true">
+                <img src="/assets/images/enterprise-operations-hero.png" alt="" />
+                <div class="product-visual-caption">
+                  <strong>Production support command center</strong>
+                  <span>Review live evidence, ask investigation questions, run safe verification checks, and download reports.</span>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section id="dashboard" class="view" aria-label="Dashboard">
+            <div class="dashboard-visual">
+              <div class="dashboard-visual-copy">
+                <h2>AI-assisted incident workflow</h2>
+                <p>Use the dashboard to move from workspace setup to database evidence, human-approved feedback, verification checks, and downloadable investigation reports.</p>
+              </div>
+              <img src="/assets/images/incident-workflow.png" alt="Database incident workflow interface preview" />
+            </div>
             <div class="dashboard-grid">
               <div class="stat"><span>Organizations</span><strong id="statOrganizations">0</strong></div>
               <div class="stat"><span>Users</span><strong id="statUsers">0</strong></div>
@@ -2544,3 +2724,4 @@
     </script>
   </body>
 </html>
+

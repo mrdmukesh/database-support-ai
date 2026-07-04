@@ -8,11 +8,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.common import DomainError
+from legacydb_copilot.config import Settings
 from legacydb_copilot.dependencies import assert_same_organization, require_permission
-from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel
+from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, WorkspaceMembershipModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.documents import UploadPolicy, content_sha256, detect_mime_type
 from legacydb_copilot.schemas import DocumentCreate, DocumentRead
+from legacydb_copilot.security.access_control import require_workspace_access
+from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.rag_retrieval_service import index_document_knowledge
 from legacydb_copilot.services.storage_service import get_app_storage
 
@@ -27,6 +30,7 @@ def create_document(
     current_user=Depends(require_permission("documents:manage")),
 ) -> DocumentModel:
     assert_same_organization(current_user, payload.organization_id)
+    require_workspace_access(db, current_user, payload.workspace_id, action="upload")
     try:
         UploadPolicy().validate(payload.filename, payload.size_bytes)
     except DomainError as exc:
@@ -52,6 +56,16 @@ def create_document(
         )
         db.add(version)
         db.flush()
+        record_audit_event(
+            db,
+            organization_id=document.organization_id,
+            workspace_id=document.workspace_id,
+            user_id=current_user.id,
+            action="document.create",
+            resource_type="document",
+            resource_id=document.id,
+            metadata={"title": document.title, "filename": payload.filename},
+        )
         try:
             index_document_knowledge(
                 db,
@@ -80,6 +94,7 @@ async def upload_document(
     current_user=Depends(require_permission("documents:manage")),
 ) -> DocumentModel:
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="upload")
     filename = Path(file.filename or "").name
     content = await file.read()
     try:
@@ -117,6 +132,16 @@ async def upload_document(
         )
         db.add(version)
         db.flush()
+        record_audit_event(
+            db,
+            organization_id=document.organization_id,
+            workspace_id=document.workspace_id,
+            user_id=current_user.id,
+            action="document.upload",
+            resource_type="document",
+            resource_id=document.id,
+            metadata={"title": document.title, "filename": filename, "size_bytes": len(content)},
+        )
         try:
             index_document_knowledge(
                 db,
@@ -148,5 +173,17 @@ def list_documents(
         DocumentModel.is_deleted.is_(False),
     )
     if workspace_id:
+        require_workspace_access(db, current_user, workspace_id, action="read")
         query = query.filter(DocumentModel.workspace_id == workspace_id)
+    elif Settings.from_env().feature_enterprise_rbac_enabled:
+        workspace_ids = [
+            item.workspace_id
+            for item in db.query(WorkspaceMembershipModel.workspace_id)
+            .filter(
+                WorkspaceMembershipModel.user_id == current_user.id,
+                WorkspaceMembershipModel.is_active.is_(True),
+            )
+            .all()
+        ]
+        query = query.filter(DocumentModel.workspace_id.in_(workspace_ids or [""]))
     return list(query.order_by(DocumentModel.created_at.desc()).all())

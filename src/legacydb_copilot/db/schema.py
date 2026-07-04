@@ -31,6 +31,12 @@ _INVESTIGATION_COLUMNS: dict[str, str] = {
     "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
 }
 
+_AUDIT_COLUMNS: dict[str, str] = {
+    "workspace_id": "VARCHAR",
+    "status": "VARCHAR(40) NOT NULL DEFAULT 'success'",
+    "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+}
+
 
 def initialize_application_schema(database_url: str) -> None:
     engine = create_db_engine(database_url)
@@ -42,6 +48,12 @@ def initialize_application_schema(database_url: str) -> None:
             for column_name, ddl in _INVESTIGATION_COLUMNS.items():
                 if column_name not in existing_investigation_columns:
                     connection.execute(text(f"ALTER TABLE investigations ADD COLUMN {column_name} {ddl}"))
+    if "audit_logs" in inspector.get_table_names():
+        existing_audit_columns = {column["name"] for column in inspector.get_columns("audit_logs")}
+        with engine.begin() as connection:
+            for column_name, ddl in _AUDIT_COLUMNS.items():
+                if column_name not in existing_audit_columns:
+                    connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
     if not database_url.startswith("sqlite"):
         return
     if "knowledge_articles" not in inspector.get_table_names():

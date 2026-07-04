@@ -15,6 +15,8 @@ from legacydb_copilot.db.models import (
 )
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import assert_same_organization, require_permission
+from legacydb_copilot.security.access_control import require_resource_owner_workspace, require_workspace_access
+from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.schemas import (
     FeedbackApprovalRequest,
     InvestigationFeedbackCreate,
@@ -44,6 +46,7 @@ def learning_dashboard(
     current_user=Depends(require_permission("learning:read")),
 ) -> dict[str, object]:
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     filters = (
         InvestigationModel.organization_id == organization_id,
         InvestigationModel.workspace_id == workspace_id,
@@ -100,6 +103,7 @@ def list_investigations(
     status_filter: str | None = None,
 ) -> list[InvestigationModel]:
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     query = db.query(InvestigationModel).filter(
         InvestigationModel.organization_id == organization_id,
         InvestigationModel.workspace_id == workspace_id,
@@ -121,7 +125,7 @@ def submit_feedback(
     current_user=Depends(require_permission("learning:feedback")),
 ) -> InvestigationFeedbackModel:
     investigation = _get_investigation(db, investigation_id)
-    assert_same_organization(current_user, investigation.organization_id)
+    require_resource_owner_workspace(db, current_user, investigation, action="write")
     feedback = InvestigationFeedbackModel(
         organization_id=investigation.organization_id,
         workspace_id=investigation.workspace_id,
@@ -154,6 +158,7 @@ def list_feedback(
     status_filter: str | None = None,
 ) -> list[InvestigationFeedbackModel]:
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     query = db.query(InvestigationFeedbackModel).filter(
         InvestigationFeedbackModel.organization_id == organization_id,
         InvestigationFeedbackModel.workspace_id == workspace_id,
@@ -173,7 +178,7 @@ def review_feedback(
     feedback = db.get(InvestigationFeedbackModel, feedback_id)
     if feedback is None:
         raise HTTPException(status_code=404, detail="Feedback not found")
-    assert_same_organization(current_user, feedback.organization_id)
+    require_resource_owner_workspace(db, current_user, feedback, action="approve")
     investigation = _get_investigation(db, feedback.investigation_id)
     feedback.reviewed_by_id = current_user.id
     feedback.reviewed_at = utc_now()
@@ -182,6 +187,17 @@ def review_feedback(
     if not payload.approved:
         feedback.status = InvestigationStatus.REJECTED.value
         investigation.status = InvestigationStatus.REJECTED.value
+        record_audit_event(
+            db,
+            organization_id=feedback.organization_id,
+            workspace_id=feedback.workspace_id,
+            user_id=current_user.id,
+            action="knowledge_approval.rejected",
+            resource_type="investigation_feedback",
+            resource_id=feedback.id,
+            status="rejected",
+            metadata={"investigation_id": investigation.id},
+        )
         db.commit()
         db.refresh(feedback)
         return feedback
@@ -215,6 +231,17 @@ def review_feedback(
     investigation.status = InvestigationStatus.APPROVED_KNOWLEDGE.value
     db.add(article)
     db.flush()
+    record_audit_event(
+        db,
+        organization_id=feedback.organization_id,
+        workspace_id=feedback.workspace_id,
+        user_id=current_user.id,
+        action="knowledge_approval.approved",
+        resource_type="knowledge_article",
+        resource_id=article.id,
+        status="approved",
+        metadata={"feedback_id": feedback.id, "investigation_id": investigation.id},
+    )
     try:
         index_approved_knowledge_article(db, article)
     except Exception:
@@ -232,6 +259,7 @@ def list_knowledge(
     current_user=Depends(require_permission("learning:read")),
 ) -> list[KnowledgeArticleModel]:
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     return list(
         db.query(KnowledgeArticleModel)
         .filter(
@@ -256,6 +284,7 @@ def similar_issues(
     from legacydb_copilot.services.approved_knowledge_service import search_approved_knowledge
 
     assert_same_organization(current_user, organization_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     return search_approved_knowledge(
         db,
         organization_id=organization_id,

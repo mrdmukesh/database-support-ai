@@ -305,6 +305,9 @@ jobs:
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
                   "VERIFICATION_AGENT_ENABLED=true" \
+                  "FEATURE_AUDIT_LOGGING_ENABLED=true" \
+                  "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \
+                  "FEATURE_KEYVAULT_SECRETS_ENABLED=false" \
                   "${OPENAI_ENV_ARGS[@]}"
             else
               az containerapp create \
@@ -332,6 +335,9 @@ jobs:
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
                   "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
                   "VERIFICATION_AGENT_ENABLED=true" \
+                  "FEATURE_AUDIT_LOGGING_ENABLED=true" \
+                  "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \
+                  "FEATURE_KEYVAULT_SECRETS_ENABLED=false" \
                   "${OPENAI_ENV_ARGS[@]}"
             fi
 

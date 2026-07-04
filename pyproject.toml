@@ -28,6 +28,8 @@ api = [
   "reportlab>=4.2",
   "azure-storage-blob>=12.22",
   "azure-core>=1.30",
+  "azure-identity>=1.17",
+  "azure-keyvault-secrets>=4.8",
 ]
 
 [tool.pytest.ini_options]

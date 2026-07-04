@@ -43,6 +43,11 @@ from legacydb_copilot.schemas import (
     VerificationRunAllResponse,
     VerificationRunRequest,
 )
+from legacydb_copilot.security.access_control import (
+    require_resource_owner_workspace,
+    require_workspace_access,
+)
+from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.confidence_scoring_service import confidence_factors, score_confidence
 from legacydb_copilot.services.evidence_execution_service import execute_evidence_plan
 from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
@@ -1248,6 +1253,7 @@ def ask_chat_question(
 ) -> dict[str, object]:
     assert_same_organization(current_user, payload.organization_id)
     assert_same_user(current_user, payload.user_id)
+    require_workspace_access(db, current_user, payload.workspace_id, action="investigate")
     conversation = _get_or_create_conversation(db, payload)
     report = analyze_prompt(payload.question, has_sources=True)
     if report.findings:
@@ -1306,6 +1312,18 @@ def ask_chat_question(
         status="AI_ANSWERED",
     )
     db.add(investigation)
+    db.flush()
+    record_audit_event(
+        db,
+        organization_id=payload.organization_id,
+        workspace_id=payload.workspace_id,
+        user_id=current_user.id,
+        action="INVESTIGATION_STARTED",
+        resource_type="investigation",
+        resource_id=investigation.id,
+        status="success",
+        metadata={"detected_intent": investigation.detected_intent},
+    )
     for check in json.loads(investigation_metadata.get("verification_checks", "[]") or "[]"):
         db.add(
             VerificationCheckModel(
@@ -1348,7 +1366,7 @@ def _get_verification_investigation(
     investigation = db.get(InvestigationModel, investigation_id)
     if investigation is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
-    assert_same_organization(current_user, investigation.organization_id)
+    require_resource_owner_workspace(db, current_user, investigation, action="verify")
     return investigation
 
 
@@ -1421,6 +1439,17 @@ def run_verification_check(
     check.verified_by_id = current_user.id
     check.verified_by = result.verified_by
     check.verified_at = datetime.utcnow()
+    record_audit_event(
+        db,
+        organization_id=check.organization_id,
+        workspace_id=check.workspace_id,
+        user_id=current_user.id,
+        action="VERIFICATION_SQL_EXECUTED",
+        resource_type="verification_check",
+        resource_id=check.id,
+        status=result.status,
+        metadata={"investigation_id": investigation.id, "source": check.source},
+    )
     _regenerate_report_with_verification(db, investigation)
     db.commit()
     db.refresh(check)
@@ -1443,6 +1472,17 @@ def skip_verification_check(
     check.verified_by_id = current_user.id
     check.verified_by = current_user.email or current_user.full_name or current_user.id
     check.verified_at = datetime.utcnow()
+    record_audit_event(
+        db,
+        organization_id=check.organization_id,
+        workspace_id=check.workspace_id,
+        user_id=current_user.id,
+        action="VERIFICATION_SQL_SKIPPED",
+        resource_type="verification_check",
+        resource_id=check.id,
+        status="skipped",
+        metadata={"investigation_id": investigation.id},
+    )
     _regenerate_report_with_verification(db, investigation)
     db.commit()
     db.refresh(check)
@@ -1483,6 +1523,17 @@ def run_all_verification_checks(
         check.verified_by_id = current_user.id
         check.verified_by = result.verified_by
         check.verified_at = datetime.utcnow()
+        record_audit_event(
+            db,
+            organization_id=check.organization_id,
+            workspace_id=check.workspace_id,
+            user_id=current_user.id,
+            action="VERIFICATION_SQL_EXECUTED",
+            resource_type="verification_check",
+            resource_id=check.id,
+            status=result.status,
+            metadata={"investigation_id": investigation.id, "source": check.source, "run_all": True},
+        )
     links = _regenerate_report_with_verification(db, investigation)
     db.commit()
     return {
@@ -1506,6 +1557,7 @@ def list_chat_conversations(
 ) -> list[ChatConversationModel]:
     assert_same_organization(current_user, organization_id)
     assert_same_user(current_user, user_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     return list(
         db.query(ChatConversationModel)
         .filter(
@@ -1529,6 +1581,7 @@ def list_chat_messages(
 ) -> list[ChatMessageModel]:
     assert_same_organization(current_user, organization_id)
     assert_same_user(current_user, user_id)
+    require_workspace_access(db, current_user, workspace_id, action="read")
     conversation = db.get(ChatConversationModel, conversation_id)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")

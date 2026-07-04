@@ -16,7 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from legacydb_copilot.auth import Role
 from legacydb_copilot.billing import Plan
-from legacydb_copilot.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from legacydb_copilot.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utc_now
 from legacydb_copilot.incidents import IncidentStatus
 
 
@@ -50,6 +50,9 @@ class UserModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     organization: Mapped["OrganizationModel"] = relationship(back_populates="users")
     consents: Mapped[list["ConsentModel"]] = relationship(back_populates="user")
+    workspace_memberships: Mapped[list["WorkspaceMembershipModel"]] = relationship(
+        back_populates="user"
+    )
 
     __table_args__ = (UniqueConstraint("organization_id", "email", name="uq_user_org_email"),)
 
@@ -86,8 +89,41 @@ class WorkspaceModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     documents: Mapped[list["DocumentModel"]] = relationship(back_populates="workspace")
     incidents: Mapped[list["IncidentModel"]] = relationship(back_populates="workspace")
     investigations: Mapped[list["InvestigationModel"]] = relationship(back_populates="workspace")
+    memberships: Mapped[list["WorkspaceMembershipModel"]] = relationship(
+        back_populates="workspace"
+    )
 
     __table_args__ = (UniqueConstraint("organization_id", "slug", name="uq_workspace_org_slug"),)
+
+
+class WorkspaceMembershipModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "workspace_memberships"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    workspace: Mapped["WorkspaceModel"] = relationship(back_populates="memberships")
+    user: Mapped["UserModel"] = relationship(back_populates="workspace_memberships")
+
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_membership_user"),
+        Index("ix_workspace_memberships_user_active", "user_id", "is_active"),
+    )
 
 
 class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -439,10 +475,17 @@ class AuditLogModel(UUIDPrimaryKeyMixin, Base):
         index=True,
     )
     actor_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"))
+    workspace_id: Mapped[str | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     action: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     target_type: Mapped[str] = mapped_column(String(80), nullable=False)
     target_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="success", nullable=False, index=True)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
     occurred_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
@@ -486,3 +529,4 @@ Index("ix_investigations_tenant_workspace_status", InvestigationModel.organizati
 Index("ix_feedback_tenant_workspace_status", InvestigationFeedbackModel.organization_id, InvestigationFeedbackModel.workspace_id, InvestigationFeedbackModel.status)
 Index("ix_knowledge_tenant_workspace_active", KnowledgeArticleModel.organization_id, KnowledgeArticleModel.workspace_id, KnowledgeArticleModel.is_active)
 Index("ix_chat_messages_conversation_created", ChatMessageModel.conversation_id, ChatMessageModel.created_at)
+Index("ix_audit_logs_tenant_workspace_action", AuditLogModel.organization_id, AuditLogModel.workspace_id, AuditLogModel.action)

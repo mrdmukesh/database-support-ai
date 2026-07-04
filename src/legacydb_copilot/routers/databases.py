@@ -7,18 +7,25 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.databases import DatabaseEngine, default_connector_registry
+from legacydb_copilot.config import Settings
 from legacydb_copilot.db.connector import (
     DatabaseConnectionError,
     get_connection_pool,
 )
 from legacydb_copilot.dependencies import assert_same_organization, require_permission
-from legacydb_copilot.db.models import DatabaseConnectionModel
+from legacydb_copilot.db.models import DatabaseConnectionModel, WorkspaceMembershipModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.schemas import (
     DatabaseConnectionCreate,
     DatabaseConnectionRead,
     DatabaseConnectionUpdate,
 )
+from legacydb_copilot.security.access_control import (
+    require_resource_owner_workspace,
+    require_workspace_access,
+)
+from legacydb_copilot.services.audit_service import record_audit_event
+from legacydb_copilot.services.secrets_service import get_secret_store
 
 router = APIRouter(prefix="/databases", tags=["databases"])
 
@@ -38,15 +45,16 @@ def _looks_like_connection_string(value: str) -> bool:
 
 def _build_connection_string(connection: DatabaseConnectionModel) -> str:
     """Build SQLAlchemy connection string from model data."""
-    if _looks_like_connection_string(connection.secret_ref):
-        return connection.secret_ref
+    secret_value = get_secret_store().get_secret(connection.secret_ref)
+    if _looks_like_connection_string(secret_value):
+        return secret_value
 
     engine = connection.engine
     host = connection.host
     port = connection.port or (3306 if engine == "mysql" else 5432)
     database = connection.database_name
     # secret_ref contains the password (or user@password format)
-    secret = connection.secret_ref
+    secret = secret_value
 
     if engine == "mysql":
         return f"mysql+pymysql://{secret}@{host}:{port}/{database}"
@@ -74,14 +82,32 @@ def create_database_connection(
     current_user=Depends(require_permission("database:manage")),
 ) -> DatabaseConnectionModel:
     assert_same_organization(current_user, payload.organization_id)
+    require_workspace_access(db, current_user, payload.workspace_id, action="database")
     data = payload.model_dump(exclude={"connection_string"})
     if payload.connection_string:
-        data["secret_ref"] = payload.connection_string
+        try:
+            data["secret_ref"] = get_secret_store().store_secret(
+                name=f"{payload.organization_id}-{payload.workspace_id}-{payload.name}",
+                value=payload.connection_string,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not data["secret_ref"]:
         raise HTTPException(status_code=422, detail="Secret reference or connection string is required")
     connection = DatabaseConnectionModel(**data)
     db.add(connection)
     try:
+        db.flush()
+        record_audit_event(
+            db,
+            organization_id=connection.organization_id,
+            workspace_id=connection.workspace_id,
+            user_id=current_user.id,
+            action="database_connection.create",
+            resource_type="database_connection",
+            resource_id=connection.id,
+            metadata={"engine": connection.engine, "name": connection.name},
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -102,7 +128,19 @@ def list_database_connections(
         DatabaseConnectionModel.organization_id == organization_id
     )
     if workspace_id:
+        require_workspace_access(db, current_user, workspace_id, action="read")
         query = query.filter(DatabaseConnectionModel.workspace_id == workspace_id)
+    elif Settings.from_env().feature_enterprise_rbac_enabled:
+        workspace_ids = [
+            item.workspace_id
+            for item in db.query(WorkspaceMembershipModel.workspace_id)
+            .filter(
+                WorkspaceMembershipModel.user_id == current_user.id,
+                WorkspaceMembershipModel.is_active.is_(True),
+            )
+            .all()
+        ]
+        query = query.filter(DatabaseConnectionModel.workspace_id.in_(workspace_ids or [""]))
     return list(query.order_by(DatabaseConnectionModel.name).all())
 
 
@@ -116,14 +154,30 @@ def update_database_connection(
     connection = db.get(DatabaseConnectionModel, connection_id)
     if connection is None:
         raise HTTPException(status_code=404, detail="Connection not found")
-    assert_same_organization(current_user, connection.organization_id)
+    require_resource_owner_workspace(db, current_user, connection, action="database")
     data = payload.model_dump(exclude_unset=True)
     connection_string = data.pop("connection_string", None)
     if connection_string:
-        connection.secret_ref = connection_string
+        try:
+            connection.secret_ref = get_secret_store().store_secret(
+                name=f"{connection.organization_id}-{connection.workspace_id}-{connection.name}",
+                value=connection_string,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     for field, value in data.items():
         setattr(connection, field, value)
     try:
+        record_audit_event(
+            db,
+            organization_id=connection.organization_id,
+            workspace_id=connection.workspace_id,
+            user_id=current_user.id,
+            action="database_connection.update",
+            resource_type="database_connection",
+            resource_id=connection.id,
+            metadata={"fields": sorted([*data.keys(), *(["connection_string"] if connection_string else [])])},
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -142,8 +196,17 @@ def delete_database_connection(
     connection = db.get(DatabaseConnectionModel, connection_id)
     if connection is None:
         raise HTTPException(status_code=404, detail="Connection not found")
-    assert_same_organization(current_user, connection.organization_id)
+    require_resource_owner_workspace(db, current_user, connection, action="database")
     connection.is_active = False
+    record_audit_event(
+        db,
+        organization_id=connection.organization_id,
+        workspace_id=connection.workspace_id,
+        user_id=current_user.id,
+        action="database_connection.delete",
+        resource_type="database_connection",
+        resource_id=connection.id,
+    )
     db.commit()
     get_connection_pool().close(connection_id)
 
@@ -159,7 +222,7 @@ def test_database_connection(
     if connection_model is None:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    assert_same_organization(current_user, connection_model.organization_id)
+    require_resource_owner_workspace(db, current_user, connection_model, action="database")
 
     try:
         conn_string = _build_connection_string(connection_model)
@@ -191,7 +254,7 @@ def get_database_schema(
     if connection_model is None:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    assert_same_organization(current_user, connection_model.organization_id)
+    require_resource_owner_workspace(db, current_user, connection_model, action="read")
 
     try:
         conn_string = _build_connection_string(connection_model)
@@ -216,7 +279,7 @@ def get_table_schema(
     if connection_model is None:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    assert_same_organization(current_user, connection_model.organization_id)
+    require_resource_owner_workspace(db, current_user, connection_model, action="read")
 
     try:
         conn_string = _build_connection_string(connection_model)
@@ -241,7 +304,7 @@ def execute_query(
     if connection_model is None:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    assert_same_organization(current_user, connection_model.organization_id)
+    require_resource_owner_workspace(db, current_user, connection_model, action="read")
 
     sql = payload.get("sql", "").strip()
     if not sql:

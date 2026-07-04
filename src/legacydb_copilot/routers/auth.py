@@ -14,6 +14,7 @@ from legacydb_copilot.db.models import ConsentModel, UserModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.schemas import LoginRequest, SessionRead, UserCreate, UserRead
 from legacydb_copilot.security import create_access_token, hash_password, verify_password
+from legacydb_copilot.services.audit_service import record_audit_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -67,12 +68,33 @@ def login(payload: LoginRequest, db: Annotated[Session, Depends(get_db_session)]
         .order_by(UserModel.created_at.desc())
         .first()
     )
-    if user is None or user.password_hash is None or not verify_password(
-        payload.password,
-        user.password_hash,
-    ):
+    if user is None or user.password_hash is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not verify_password(payload.password, user.password_hash):
+        record_audit_event(
+            db,
+            organization_id=user.organization_id,
+            user_id=user.id,
+            action="USER_LOGIN",
+            resource_type="user",
+            resource_id=user.id,
+            status="failure",
+            metadata={"email": str(payload.email)},
+        )
+        db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     settings = Settings.from_env()
+    record_audit_event(
+        db,
+        organization_id=user.organization_id,
+        user_id=user.id,
+        action="USER_LOGIN",
+        resource_type="user",
+        resource_id=user.id,
+        status="success",
+        metadata={"email": user.email},
+    )
+    db.commit()
 
     return {
         "access_token": create_access_token(

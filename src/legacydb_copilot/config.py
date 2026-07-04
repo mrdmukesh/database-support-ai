@@ -28,6 +28,10 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1"
     knowledge_retriever_backend: str = "sqlite"
     verification_agent_enabled: bool = True
+    feature_enterprise_rbac_enabled: bool = False
+    feature_audit_logging_enabled: bool = True
+    feature_keyvault_secrets_enabled: bool = False
+    azure_key_vault_url: str | None = None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -63,4 +67,20 @@ class Settings:
             knowledge_retriever_backend=os.getenv("KNOWLEDGE_RETRIEVER_BACKEND", "sqlite").lower(),
             verification_agent_enabled=os.getenv("VERIFICATION_AGENT_ENABLED", "true").lower()
             in {"1", "true", "yes", "on"},
+            feature_enterprise_rbac_enabled=os.getenv(
+                "FEATURE_ENTERPRISE_RBAC_ENABLED",
+                "false",
+            ).lower()
+            in {"1", "true", "yes", "on"},
+            feature_audit_logging_enabled=os.getenv(
+                "FEATURE_AUDIT_LOGGING_ENABLED",
+                "true",
+            ).lower()
+            in {"1", "true", "yes", "on"},
+            feature_keyvault_secrets_enabled=os.getenv(
+                "FEATURE_KEYVAULT_SECRETS_ENABLED",
+                "false",
+            ).lower()
+            in {"1", "true", "yes", "on"},
+            azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
         )

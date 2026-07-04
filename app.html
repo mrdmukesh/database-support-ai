@@ -41,17 +41,40 @@
       .shell {
         display: grid;
         min-height: 100vh;
-        grid-template-columns: 264px 1fr;
+        grid-template-columns: 1fr;
       }
 
       .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 40;
         display: flex;
         flex-direction: column;
         gap: 26px;
+        width: min(292px, calc(100vw - 44px));
         padding: 24px;
         border-right: 1px solid var(--line);
         background: #101923;
         color: white;
+        box-shadow: 18px 0 40px rgba(20, 32, 43, 0.18);
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
+      }
+
+      body.menu-open .sidebar {
+        transform: translateX(0);
+      }
+
+      .menu-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 35;
+        display: none;
+        background: rgba(16, 25, 35, 0.38);
+      }
+
+      body.menu-open .menu-backdrop {
+        display: block;
       }
 
       .brand {
@@ -131,15 +154,39 @@
         backdrop-filter: blur(14px);
       }
 
+      .topbar-left,
+      .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+
       .topbar h1 {
         margin: 0;
         font-size: 22px;
         letter-spacing: 0;
       }
 
+      .icon-button {
+        display: inline-grid;
+        width: 44px;
+        min-width: 44px;
+        aspect-ratio: 1;
+        place-items: center;
+        border: 1px solid #cdd8df;
+        border-radius: 8px;
+        background: white;
+        color: var(--ink);
+        font-size: 24px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+
       .session {
         color: var(--muted);
         font-size: 14px;
+        overflow-wrap: anywhere;
       }
 
       .content {
@@ -666,6 +713,52 @@
         cursor: pointer;
       }
 
+      .help-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 70;
+        display: none;
+        place-items: center;
+        padding: 24px;
+        background: rgba(16, 25, 35, 0.42);
+      }
+
+      .help-modal-backdrop.active {
+        display: grid;
+      }
+
+      .help-modal {
+        width: min(1040px, 100%);
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        box-shadow: 0 24px 70px rgba(20, 32, 43, 0.24);
+      }
+
+      .help-modal-head {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.96);
+      }
+
+      .help-modal-head h2 {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .help-modal-body {
+        padding: 18px;
+      }
+
       .segmented {
         display: flex;
         flex-wrap: wrap;
@@ -689,14 +782,6 @@
       }
 
       @media (max-width: 920px) {
-        .shell {
-          grid-template-columns: 1fr;
-        }
-
-        .sidebar {
-          position: static;
-        }
-
         .grid-two,
         .dashboard-grid,
         .dashboard-layout,
@@ -704,6 +789,18 @@
         .help-layout,
         .chat-layout {
           grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding-top: 14px;
+          padding-bottom: 14px;
+        }
+
+        .topbar-actions {
+          width: 100%;
+          flex-wrap: wrap;
         }
       }
     </style>
@@ -724,18 +821,27 @@
           <button data-view-button="documents">Documents</button>
           <button data-view-button="chat">AI Chat</button>
           <button data-view-button="learning">Learning Loop</button>
-          <button data-view-button="help">Help Assistant</button>
+          <button type="button" data-open-help>Help Assistant</button>
         </nav>
         <div class="api-status">
           <span id="statusDot" class="status-dot"></span>
           <span id="apiStatus">Checking API...</span>
         </div>
       </aside>
+      <div class="menu-backdrop" id="menuBackdrop"></div>
 
       <main>
         <header class="topbar">
-          <h1 id="pageTitle">Signup</h1>
-          <div class="session" id="sessionLabel">No active session</div>
+          <div class="topbar-left">
+            <button class="icon-button" type="button" id="menuToggle" aria-label="Open navigation menu">☰</button>
+            <h1 id="pageTitle">Signup</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="button secondary" type="button" id="topHelpButton">Help</button>
+            <button class="button secondary" type="button" id="topLoginButton">Login</button>
+            <button class="button secondary" type="button" id="topLogoutButton" hidden>Logout</button>
+            <div class="session" id="sessionLabel">No active session</div>
+          </div>
         </header>
 
         <div class="content">
@@ -1134,40 +1240,48 @@
             </div>
           </section>
 
-          <section id="help" class="view" aria-label="Help Assistant">
-            <div class="help-layout">
-              <div class="compact-panel full-width">
-                <h2>Help Assistant</h2>
-                <form id="helpForm">
-                  <label>
-                    Ask about using the app
-                    <textarea name="question" required>How do I run suggested verification checks?</textarea>
-                  </label>
-                  <input type="hidden" name="currentPage" id="helpCurrentPage" />
-                  <button class="button" type="submit">Ask Help Assistant</button>
-                  <div id="helpMessage" class="message"></div>
-                </form>
-                <div id="helpAnswer" class="help-answer">
-                  <p class="muted-note">Ask how to use workspaces, database connections, document upload, AI Chat, verification checks, reports, the learning loop, feedback, approvals, or audit logs.</p>
-                </div>
-              </div>
-              <div class="compact-panel">
-                <h3>Quick questions</h3>
-                <div class="quick-help">
-                  <button type="button" data-help-question="How do I create a workspace?">Create a workspace</button>
-                  <button type="button" data-help-question="How do I connect a database?">Connect a database</button>
-                  <button type="button" data-help-question="How do I upload documents?">Upload documents</button>
-                  <button type="button" data-help-question="How do I ask a good investigation question?">Ask a good question</button>
-                  <button type="button" data-help-question="How do I run suggested verification checks?">Run verification checks</button>
-                  <button type="button" data-help-question="How do I download reports?">Download reports</button>
-                  <button type="button" data-help-question="How do I use Human-approved learning loop?">Use learning loop</button>
-                  <button type="button" data-help-question="How do I check audit logs?">Check audit logs</button>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
       </main>
+    </div>
+
+    <div id="helpModalBackdrop" class="help-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+      <div class="help-modal">
+        <div class="help-modal-head">
+          <h2 id="helpModalTitle">Help Assistant</h2>
+          <button class="button secondary" type="button" id="closeHelpModal">Close</button>
+        </div>
+        <div class="help-modal-body">
+          <div class="help-layout">
+            <div class="compact-panel full-width">
+              <form id="helpForm">
+                <label>
+                  Ask about using the app
+                  <textarea name="question" required>How do I run suggested verification checks?</textarea>
+                </label>
+                <input type="hidden" name="currentPage" id="helpCurrentPage" />
+                <button class="button" type="submit">Ask Help Assistant</button>
+                <div id="helpMessage" class="message"></div>
+              </form>
+              <div id="helpAnswer" class="help-answer">
+                <p class="muted-note">Ask how to use workspaces, database connections, document upload, AI Chat, verification checks, reports, the learning loop, feedback, approvals, or audit logs.</p>
+              </div>
+            </div>
+            <div class="compact-panel">
+              <h3>Quick questions</h3>
+              <div class="quick-help">
+                <button type="button" data-help-question="How do I create a workspace?">Create a workspace</button>
+                <button type="button" data-help-question="How do I connect a database?">Connect a database</button>
+                <button type="button" data-help-question="How do I upload documents?">Upload documents</button>
+                <button type="button" data-help-question="How do I ask a good investigation question?">Ask a good question</button>
+                <button type="button" data-help-question="How do I run suggested verification checks?">Run verification checks</button>
+                <button type="button" data-help-question="How do I download reports?">Download reports</button>
+                <button type="button" data-help-question="How do I use Human-approved learning loop?">Use learning loop</button>
+                <button type="button" data-help-question="How do I check audit logs?">Check audit logs</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
@@ -1181,6 +1295,11 @@
       const views = document.querySelectorAll(".view");
       const pageTitle = document.getElementById("pageTitle");
       const sessionLabel = document.getElementById("sessionLabel");
+      const menuToggle = document.getElementById("menuToggle");
+      const menuBackdrop = document.getElementById("menuBackdrop");
+      const helpModalBackdrop = document.getElementById("helpModalBackdrop");
+      const topLoginButton = document.getElementById("topLoginButton");
+      const topLogoutButton = document.getElementById("topLogoutButton");
       let currentInvestigationId = null;
       let currentReportLinks = null;
       let currentFeedbackRating = "HELPFUL";
@@ -1204,13 +1323,31 @@
         buttons.forEach((button) => button.classList.toggle("active", button.dataset.viewButton === name));
         views.forEach((view) => view.classList.toggle("active", view.id === name));
         pageTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+        closeMenu();
         if (name === "dashboard") loadDashboard();
         if (name === "workspaces") loadWorkspaceManager();
         if (name === "connections") loadConnectionManager();
         if (name === "documents") loadDocumentManager();
         if (name === "chat") loadChatManager();
         if (name === "learning") loadLearningManager();
-        if (name === "help") loadHelpAssistant();
+      }
+
+      function openMenu() {
+        document.body.classList.add("menu-open");
+      }
+
+      function closeMenu() {
+        document.body.classList.remove("menu-open");
+      }
+
+      function openHelpAssistant() {
+        closeMenu();
+        helpModalBackdrop.classList.add("active");
+        loadHelpAssistant();
+      }
+
+      function closeHelpAssistant() {
+        helpModalBackdrop.classList.remove("active");
       }
 
       function setMessage(id, text, type = "") {
@@ -1278,9 +1415,20 @@
         const session = getSession();
         if (!session?.user) {
           sessionLabel.textContent = "No active session";
+          topLoginButton.hidden = false;
+          topLogoutButton.hidden = true;
           return;
         }
         sessionLabel.textContent = `${session.user.email} - ${session.user.role}`;
+        topLoginButton.hidden = true;
+        topLogoutButton.hidden = false;
+      }
+
+      function clearSession() {
+        localStorage.removeItem(sessionKey);
+        updateSessionLabel();
+        setView("login");
+        setMessage("loginMessage", "Session cleared.", "success");
       }
 
       async function checkApi() {
@@ -2091,9 +2239,26 @@
       });
 
       document.getElementById("logoutButton").addEventListener("click", () => {
-        localStorage.removeItem(sessionKey);
-        updateSessionLabel();
-        setMessage("loginMessage", "Session cleared.", "success");
+        clearSession();
+      });
+
+      menuToggle.addEventListener("click", () => {
+        document.body.classList.contains("menu-open") ? closeMenu() : openMenu();
+      });
+
+      menuBackdrop.addEventListener("click", closeMenu);
+
+      topLoginButton.addEventListener("click", () => setView("login"));
+      topLogoutButton.addEventListener("click", clearSession);
+
+      document.querySelectorAll("[data-open-help]").forEach((button) =>
+        button.addEventListener("click", openHelpAssistant),
+      );
+
+      document.getElementById("topHelpButton").addEventListener("click", openHelpAssistant);
+      document.getElementById("closeHelpModal").addEventListener("click", closeHelpAssistant);
+      helpModalBackdrop.addEventListener("click", (event) => {
+        if (event.target === helpModalBackdrop) closeHelpAssistant();
       });
 
       document.getElementById("workspaceForm").addEventListener("submit", async (event) => {

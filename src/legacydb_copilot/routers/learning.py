@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+import json
 
 from legacydb_copilot.db.base import utc_now
 from legacydb_copilot.db.models import (
@@ -27,6 +28,8 @@ from legacydb_copilot.schemas import (
     LearningDashboardRead,
 )
 from legacydb_copilot.services.rag_retrieval_service import index_approved_knowledge_article
+from legacydb_copilot.services.report_generator import REPORT_HISTORY_DIR, report_file_stem
+from legacydb_copilot.services.report_snapshot_service import report_from_dict
 
 router = APIRouter(prefix="/learning", tags=["learning"])
 
@@ -36,6 +39,37 @@ def _get_investigation(db: Session, investigation_id: str) -> InvestigationModel
     if investigation is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
     return investigation
+
+
+def _report_links_for_investigation(investigation: InvestigationModel) -> dict[str, str] | None:
+    if not investigation.report_snapshot_json:
+        report_dir = (REPORT_HISTORY_DIR / investigation.id).resolve()
+        history_root = REPORT_HISTORY_DIR.resolve()
+        if report_dir.exists() and (report_dir == history_root or history_root in report_dir.parents):
+            by_extension = {path.suffix.lower(): path.name for path in report_dir.iterdir() if path.is_file()}
+            if {".html", ".pdf", ".docx", ".xlsx"}.issubset(by_extension):
+                base = f"/reports/{investigation.id}"
+                return {
+                    "investigation_id": investigation.id,
+                    "html": f"{base}/{by_extension['.html']}",
+                    "pdf": f"{base}/{by_extension['.pdf']}",
+                    "docx": f"{base}/{by_extension['.docx']}",
+                    "xlsx": f"{base}/{by_extension['.xlsx']}",
+                }
+        return None
+    try:
+        report = report_from_dict(json.loads(investigation.report_snapshot_json))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    stem = report_file_stem(report)
+    base = f"/reports/{investigation.id}"
+    return {
+        "investigation_id": investigation.id,
+        "html": f"{base}/{stem}.html",
+        "pdf": f"{base}/{stem}.pdf",
+        "docx": f"{base}/{stem}.docx",
+        "xlsx": f"{base}/{stem}.xlsx",
+    }
 
 
 @router.get("/dashboard", response_model=LearningDashboardRead)
@@ -111,6 +145,29 @@ def list_investigations(
     if status_filter:
         query = query.filter(InvestigationModel.status == status_filter)
     return list(query.order_by(InvestigationModel.created_at.desc()).limit(100).all())
+
+
+@router.get("/investigations/{investigation_id}")
+def get_investigation(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("learning:read")),
+) -> dict[str, object]:
+    investigation = _get_investigation(db, investigation_id)
+    require_resource_owner_workspace(db, current_user, investigation, action="read")
+    return {
+        "id": investigation.id,
+        "organization_id": investigation.organization_id,
+        "workspace_id": investigation.workspace_id,
+        "user_question": investigation.user_question,
+        "detected_intent": investigation.detected_intent,
+        "ai_answer": investigation.ai_answer,
+        "confidence_score": float(investigation.confidence_score or 0),
+        "report_path": investigation.report_path,
+        "status": investigation.status,
+        "created_at": investigation.created_at,
+        "report": _report_links_for_investigation(investigation),
+    }
 
 
 @router.post(

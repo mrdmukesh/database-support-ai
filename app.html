@@ -1220,7 +1220,7 @@
               <div class="dashboard-layout">
                 <div class="table-panel">
                   <h3>Open Investigations</h3>
-                  <table><thead><tr><th>Question</th><th>Status</th><th>Created</th></tr></thead><tbody id="openInvestigationRows"></tbody></table>
+                  <table><thead><tr><th>Question</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody id="openInvestigationRows"></tbody></table>
                 </div>
                 <div class="table-panel">
                   <h3>Follow-up Reminders</h3>
@@ -1953,6 +1953,50 @@
           : `<tr><td colspan="${columns.length}" class="empty">${emptyText}</td></tr>`;
       }
 
+      async function openSavedInvestigation(investigationId, mode = "open") {
+        try {
+          setMessage("learningMessage", "Opening saved investigation...");
+          const investigation = await api(`/learning/investigations/${investigationId}`);
+          currentInvestigationId = investigation.id;
+          setView("chat");
+          document.getElementById("chatAnswer").textContent =
+            investigation.ai_answer || "Saved investigation opened. Review the report and provide feedback.";
+          document.getElementById("chatBadges").innerHTML = `
+            <span class="badge">Status ${escapeHtml(investigation.status)}</span>
+            <span class="badge">Confidence ${Math.round((investigation.confidence_score || 0) * 100)}%</span>
+          `;
+          renderReportDownloads(investigation.report, "reportDownloads");
+          showFeedbackPanel(investigation.id);
+          await loadVerificationChecks(investigation.id);
+          setMessage(
+            "chatMessage",
+            mode === "feedback"
+              ? "Saved investigation opened. Add feedback below and submit it for approval."
+              : "Saved investigation opened.",
+            "success",
+          );
+          if (mode === "feedback") {
+            document.getElementById("feedbackPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+          } else if (mode === "verify") {
+            document.getElementById("verificationPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        } catch (error) {
+          setMessage("learningMessage", error.message, "error");
+        }
+      }
+
+      function bindLearningInvestigationActions() {
+        document.querySelectorAll("[data-open-investigation]").forEach((button) =>
+          button.addEventListener("click", () => openSavedInvestigation(button.dataset.openInvestigation, "open")),
+        );
+        document.querySelectorAll("[data-feedback-investigation]").forEach((button) =>
+          button.addEventListener("click", () => openSavedInvestigation(button.dataset.feedbackInvestigation, "feedback")),
+        );
+        document.querySelectorAll("[data-verify-investigation]").forEach((button) =>
+          button.addEventListener("click", () => openSavedInvestigation(button.dataset.verifyInvestigation, "verify")),
+        );
+      }
+
       async function loadLearningManager() {
         const session = requireSession("learningMessage");
         if (!session) return;
@@ -1989,9 +2033,15 @@
               (item) => item.user_question,
               (item) => item.status,
               (item) => new Date(item.created_at).toLocaleString(),
+              (item) => `<div class="actions">
+                <button class="button secondary" type="button" data-open-investigation="${item.id}">Open</button>
+                <button class="button secondary" type="button" data-feedback-investigation="${item.id}">Feedback</button>
+                <button class="button secondary" type="button" data-verify-investigation="${item.id}">Verify</button>
+              </div>`,
             ],
             "No open investigations.",
           );
+          bindLearningInvestigationActions();
           renderLearningRows(
             "reminderRows",
             dashboard.reminders,

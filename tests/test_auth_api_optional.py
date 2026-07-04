@@ -367,6 +367,36 @@ def test_feedback_requires_approval_before_knowledge_creation(client: TestClient
     assert knowledge_after[0]["actual_root_cause"].startswith("Retry procedure")
 
 
+def test_saved_investigation_can_be_reopened_for_feedback(client: TestClient) -> None:
+    org, user, workspace, headers = _create_chat_fixture(client)
+    chat_response = client.post(
+        "/chat/ask",
+        json={
+            "organization_id": org["id"],
+            "workspace_id": workspace["id"],
+            "user_id": user["id"],
+            "question": "Appointment APT-2005 created two active lab orders.",
+        },
+        headers=headers,
+    )
+    assert chat_response.status_code == 201
+    investigation_id = chat_response.json()["investigation_id"]
+
+    detail_response = client.get(
+        f"/learning/investigations/{investigation_id}",
+        headers=headers,
+    )
+
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["id"] == investigation_id
+    assert detail["user_question"].startswith("Appointment APT-2005")
+    assert "report" in detail
+    if detail["report"]:
+        assert detail["report"]["pdf"].startswith(f"/reports/{investigation_id}/")
+        assert detail["report"]["html"].endswith(".html")
+
+
 def test_document_file_upload_records_document(
     client: TestClient, tmp_path, monkeypatch
 ) -> None:

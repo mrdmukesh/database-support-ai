@@ -351,3 +351,16 @@ class LearningDashboardRead(BaseModel):
     pending_approval: int
     approved_knowledge: int
     reminders: list[InvestigationRead]
+
+
+class HelpAskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    current_page: str | None = None
+
+
+class HelpAskResponse(BaseModel):
+    answer: str
+    steps: list[str]
+    related_pages: list[str]
+    warnings: list[str]
+    links: list[str]

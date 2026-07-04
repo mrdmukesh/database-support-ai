@@ -13,6 +13,7 @@ COPY pyproject.toml README.md alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 COPY assets ./assets
+COPY docs ./docs
 COPY app.html index.html ASSETS.md ./
 
 RUN pip install --upgrade pip && pip install ".[api]"

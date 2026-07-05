@@ -919,7 +919,12 @@ def _run_dynamic_investigation(
         metadata=context.metadata,
     )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
-    plan = build_investigation_plan(intent.intent, ranking.metadata, entities)
+    planning_warning = ""
+    try:
+        plan = build_investigation_plan(intent.intent, ranking.metadata, entities)
+    except Exception as exc:
+        plan = []
+        planning_warning = f"Evidence SQL planning was skipped because generated SQL did not pass safety validation: {exc}"
     evidence = execute_evidence_plan(connector, plan)
     evidence.extend(_expand_related_id_evidence(connector, ranking.metadata, evidence))
     correlated_evidence = correlate_evidence(
@@ -993,22 +998,31 @@ def _run_dynamic_investigation(
     )
     confidence = score_confidence(ranking.metadata, evidence, context.documents, evidence_focus)
     confidence_notes = confidence_factors(ranking.metadata, evidence, context.documents, evidence_focus)
+    if planning_warning:
+        confidence = min(confidence, 0.35)
+        confidence_notes.append(f"- {planning_warning}")
     if evidence_gate.required and not evidence_gate.reproduced:
         confidence = min(confidence, 0.35)
         confidence_notes.extend(f"- Evidence gate blocked root-cause analysis: {item}" for item in evidence_gate.blocking_reasons)
     verification_checks = []
     if Settings.from_env().verification_agent_enabled:
-        verification_checks = suggest_verification_checks(
-            question=payload.question,
-            intent=intent.intent,
-            metadata=ranking.metadata,
-            evidence=evidence,
-            evidence_focus=evidence_focus,
-            evidence_gate=evidence_gate,
-            procedure_analysis=procedure_analysis,
-            documents=context.documents,
-            reasoning=reasoning,
-        )
+        try:
+            verification_checks = suggest_verification_checks(
+                question=payload.question,
+                intent=intent.intent,
+                metadata=ranking.metadata,
+                evidence=evidence,
+                evidence_focus=evidence_focus,
+                evidence_gate=evidence_gate,
+                procedure_analysis=procedure_analysis,
+                documents=context.documents,
+                reasoning=reasoning,
+            )
+        except Exception as exc:
+            verification_checks = []
+            confidence_notes.append(
+                f"- Verification check suggestions were skipped because generated check SQL did not pass safety validation: {exc}"
+            )
     ai_status = _ai_reasoning_status(llm_configured=llm_configured, llm_used=llm_used)
     bundle = DynamicInvestigationBundle(
         question=payload.question,

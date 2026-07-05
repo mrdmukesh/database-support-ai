@@ -17,6 +17,7 @@ from legacydb_copilot.documents import (
 )
 from legacydb_copilot.services.rag_retrieval_service import (
     KnowledgeQuery,
+    PgVectorKnowledgeRetriever,
     SQLiteKnowledgeRetriever,
     chunk_text,
     embed_text,
@@ -125,9 +126,71 @@ def test_sqlite_knowledge_retriever_indexes_chunks_and_semantic_searches(tmp_pat
 
     assert indexed >= 1
     assert db.query(KnowledgeChunkModel).count() >= 1
+    stored_chunk = db.query(KnowledgeChunkModel).first()
+    assert stored_chunk is not None
+    assert stored_chunk.embedding_json
+    assert len(embed_text("duplicate gate event")) == 128
     assert results
     assert results[0].metadata["retriever"] == "sqlite-vector"
     assert "GATE_IN" in results[0].snippet
+
+
+def test_workspace_isolation_for_retrieved_knowledge(tmp_path) -> None:
+    db = _memory_session()
+    org = OrganizationModel(name="Isolation Org", slug="isolation-org")
+    db.add(org)
+    db.flush()
+    user = UserModel(organization_id=org.id, email="i@example.com", full_name="Isolation User", role="organization_admin")
+    workspace_a = WorkspaceModel(organization_id=org.id, name="A", slug="a")
+    workspace_b = WorkspaceModel(organization_id=org.id, name="B", slug="b")
+    db.add_all([user, workspace_a, workspace_b])
+    db.flush()
+    path = tmp_path / "workspace-b.md"
+    path.write_text("Private duplicate shipment retry notes for workspace B only.", encoding="utf-8")
+    document = DocumentModel(organization_id=org.id, workspace_id=workspace_b.id, owner_id=user.id, title="Workspace B Notes")
+    db.add(document)
+    db.flush()
+    version = DocumentVersionModel(
+        document_id=document.id,
+        version=1,
+        filename=path.name,
+        mime_type="text/markdown",
+        size_bytes=path.stat().st_size,
+        sha256=content_sha256(path.read_bytes()),
+        storage_key=str(path),
+    )
+    db.add(version)
+    db.flush()
+
+    retriever = SQLiteKnowledgeRetriever()
+    retriever.index_document(
+        db,
+        organization_id=org.id,
+        workspace_id=workspace_b.id,
+        document=document,
+        version=version,
+    )
+    db.commit()
+
+    workspace_a_results = retriever.retrieve(
+        db,
+        KnowledgeQuery(
+            organization_id=org.id,
+            workspace_id=workspace_a.id,
+            question="duplicate shipment retry",
+        ),
+    )
+    workspace_b_results = retriever.retrieve(
+        db,
+        KnowledgeQuery(
+            organization_id=org.id,
+            workspace_id=workspace_b.id,
+            question="duplicate shipment retry",
+        ),
+    )
+
+    assert workspace_a_results == []
+    assert workspace_b_results
 
 
 def test_embedding_and_chunking_are_deterministic() -> None:
@@ -135,6 +198,58 @@ def test_embedding_and_chunking_are_deterministic() -> None:
 
     assert chunk_text(text, max_tokens=20, overlap=5)
     assert embed_text("duplicate gate event") == embed_text("duplicate gate event")
+
+
+def test_pgvector_missing_openai_key_falls_back_safely(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("KNOWLEDGE_RETRIEVER_BACKEND", "pgvector")
+    monkeypatch.setenv("EMBEDDING_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    db = _memory_session()
+    org = OrganizationModel(name="PgVector Fallback Org", slug="pgvector-fallback-org")
+    db.add(org)
+    db.flush()
+    user = UserModel(organization_id=org.id, email="p@example.com", full_name="PgVector User", role="organization_admin")
+    workspace = WorkspaceModel(organization_id=org.id, name="Ops", slug="ops")
+    db.add_all([user, workspace])
+    db.flush()
+    path = tmp_path / "fallback.md"
+    path.write_text("Approved runbook says duplicate retry needs idempotency.", encoding="utf-8")
+    document = DocumentModel(organization_id=org.id, workspace_id=workspace.id, owner_id=user.id, title="Fallback Runbook")
+    db.add(document)
+    db.flush()
+    version = DocumentVersionModel(
+        document_id=document.id,
+        version=1,
+        filename=path.name,
+        mime_type="text/markdown",
+        size_bytes=path.stat().st_size,
+        sha256=content_sha256(path.read_bytes()),
+        storage_key=str(path),
+    )
+    db.add(version)
+    db.flush()
+
+    retriever = PgVectorKnowledgeRetriever()
+    indexed = retriever.index_document(
+        db,
+        organization_id=org.id,
+        workspace_id=workspace.id,
+        document=document,
+        version=version,
+    )
+    db.commit()
+    results = retriever.retrieve(
+        db,
+        KnowledgeQuery(
+            organization_id=org.id,
+            workspace_id=workspace.id,
+            question="duplicate retry idempotency",
+        ),
+    )
+
+    assert indexed >= 1
+    assert results
+    assert results[0].metadata["retriever"] == "sqlite-vector"
 
 
 def test_keyword_fallback_returns_documents_when_no_vectors(tmp_path) -> None:

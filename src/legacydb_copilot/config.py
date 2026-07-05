@@ -26,7 +26,9 @@ class Settings:
     llm_model: str = "gpt-4.1-mini"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-    knowledge_retriever_backend: str = "sqlite"
+    knowledge_retriever_backend: str = "local"
+    embedding_provider: str = "local"
+    embedding_model: str = "text-embedding-3-small"
     verification_agent_enabled: bool = True
     feature_enterprise_rbac_enabled: bool = False
     feature_audit_logging_enabled: bool = True
@@ -64,7 +66,9 @@ class Settings:
             llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-            knowledge_retriever_backend=os.getenv("KNOWLEDGE_RETRIEVER_BACKEND", "sqlite").lower(),
+            knowledge_retriever_backend=os.getenv("KNOWLEDGE_RETRIEVER_BACKEND", "local").lower(),
+            embedding_provider=os.getenv("EMBEDDING_PROVIDER", "local").lower(),
+            embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             verification_agent_enabled=os.getenv("VERIFICATION_AGENT_ENABLED", "true").lower()
             in {"1", "true", "yes", "on"},
             feature_enterprise_rbac_enabled=os.getenv(

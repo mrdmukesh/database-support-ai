@@ -9,14 +9,18 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib import request
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, KnowledgeArticleModel, KnowledgeChunkModel
 
 
-EMBEDDING_DIMENSIONS = 128
+LOCAL_EMBEDDING_DIMENSIONS = 128
+OPENAI_EMBEDDING_DIMENSIONS = 1536
+EMBEDDING_DIMENSIONS = LOCAL_EMBEDDING_DIMENSIONS
 
 
 @dataclass(frozen=True)
@@ -42,6 +46,14 @@ class KnowledgeQuery:
     question: str
     top_k: int = 8
     metadata_filters: dict[str, str] | None = None
+
+
+@dataclass(frozen=True)
+class EmbeddingResult:
+    vector: list[float]
+    provider: str
+    model: str
+    dimensions: int
 
 
 class KnowledgeRetriever(ABC):
@@ -184,11 +196,122 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
         self.fallback = fallback or SQLiteKnowledgeRetriever()
 
     def index_document(self, db: Session, **kwargs) -> int:
-        # pgvector-specific SQL belongs here when pgvector is enabled.
-        return self.fallback.index_document(db, **kwargs)
+        settings = Settings.from_env()
+        if not _pgvector_ready(db) or _missing_required_embedding_key(settings):
+            return self.fallback.index_document(db, **kwargs)
+        organization_id = kwargs["organization_id"]
+        workspace_id = kwargs["workspace_id"]
+        document = kwargs["document"]
+        version = kwargs["version"]
+        text_content = extract_text(Path(version.storage_key), version.mime_type)
+        if not text_content.strip():
+            text_content = f"{document.title}\n{version.filename}\nUploaded document text extraction unavailable."
+        chunks = chunk_text(text_content)
+        db.query(KnowledgeChunkModel).filter(
+            KnowledgeChunkModel.organization_id == organization_id,
+            KnowledgeChunkModel.workspace_id == workspace_id,
+            KnowledgeChunkModel.document_id == document.id,
+            KnowledgeChunkModel.document_version_id == version.id,
+        ).delete(synchronize_session=False)
+        inferred = infer_metadata(document.title, text_content)
+        _ensure_pgvector_schema(db)
+        for index, chunk in enumerate(chunks):
+            embedding = create_embedding(chunk, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
+            if embedding is None:
+                return self.fallback.index_document(db, **kwargs)
+            chunk_metadata = infer_metadata(document.title, chunk)
+            metadata = {**inferred, **{key: value for key, value in chunk_metadata.items() if value}}
+            model = KnowledgeChunkModel(
+                organization_id=organization_id,
+                workspace_id=workspace_id,
+                document_id=document.id,
+                document_version_id=version.id,
+                source="document",
+                source_title=document.title,
+                chunk_index=index,
+                content=chunk,
+                embedding_json=json.dumps(embedding.vector),
+                module_name=metadata.get("module", ""),
+                table_name=metadata.get("table", ""),
+                procedure_name=metadata.get("procedure", ""),
+                business_object=metadata.get("business_object", ""),
+                issue_type=metadata.get("issue_type", ""),
+                tags=json.dumps(metadata.get("tags", [])),
+                approval_status="uploaded",
+                confidence=0.65,
+            )
+            db.add(model)
+            db.flush()
+            _store_pgvector_embedding(db, model.id, embedding.vector)
+        version.indexed_at = _utc_now()
+        return len(chunks)
 
     def retrieve(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
-        return self.fallback.retrieve(db, query)
+        settings = Settings.from_env()
+        if not _pgvector_ready(db) or _missing_required_embedding_key(settings):
+            return self.fallback.retrieve(db, query)
+        embedding = create_embedding(query.question, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
+        if embedding is None:
+            return self.fallback.retrieve(db, query)
+        _ensure_pgvector_schema(db)
+        where_sql = [
+            "organization_id = :organization_id",
+            "workspace_id = :workspace_id",
+            "embedding IS NOT NULL",
+        ]
+        params: dict[str, Any] = {
+            "organization_id": query.organization_id,
+            "workspace_id": query.workspace_id,
+            "embedding": _pgvector_literal(embedding.vector),
+            "limit": query.top_k,
+        }
+        for field_name, value in (query.metadata_filters or {}).items():
+            column_name = _filter_column_name(field_name)
+            if column_name and value:
+                param_name = f"filter_{column_name}"
+                where_sql.append(f"{column_name} = :{param_name}")
+                params[param_name] = value
+        rows = (
+            db.execute(
+                text(
+                    "SELECT id, document_id, source, source_title, content, module_name, table_name, "
+                    "procedure_name, business_object, issue_type, tags, approval_status, confidence, "
+                    "1 - (embedding <=> CAST(:embedding AS vector)) AS score "
+                    "FROM knowledge_chunks "
+                    f"WHERE {' AND '.join(where_sql)} "
+                    "ORDER BY embedding <=> CAST(:embedding AS vector) "
+                    "LIMIT :limit"
+                ),
+                params,
+            )
+            .mappings()
+            .all()
+        )
+        return [
+            RetrievedDocument(
+                title=row["source_title"],
+                filename=row["source_title"],
+                snippet=row["content"],
+                score=round(float(row["score"] or 0), 4),
+                source=row["source"],
+                metadata={
+                    "chunk_id": row["id"],
+                    "document_id": row["document_id"],
+                    "module": row["module_name"],
+                    "table": row["table_name"],
+                    "procedure": row["procedure_name"],
+                    "business_object": row["business_object"],
+                    "issue_type": row["issue_type"],
+                    "tags": _safe_json(row["tags"], []),
+                    "approval_status": row["approval_status"],
+                    "confidence": float(row["confidence"] or 0),
+                    "retriever": "pgvector",
+                    "embedding_provider": embedding.provider,
+                    "embedding_model": embedding.model,
+                },
+            )
+            for row in rows
+        ]
 
 
 def get_knowledge_retriever(settings: Settings | None = None) -> KnowledgeRetriever:
@@ -231,6 +354,12 @@ def index_document_knowledge(
 
 
 def index_approved_knowledge_article(db: Session, article: KnowledgeArticleModel) -> int:
+    settings = Settings.from_env()
+    use_pgvector = (
+        settings.knowledge_retriever_backend == "pgvector"
+        and _pgvector_ready(db)
+        and not _missing_required_embedding_key(settings)
+    )
     text = "\n".join(
         [
             article.title,
@@ -253,28 +382,38 @@ def index_approved_knowledge_article(db: Session, article: KnowledgeArticleModel
         KnowledgeChunkModel.document_id.is_(None),
         KnowledgeChunkModel.source_title == article.title,
     ).delete(synchronize_session=False)
+    if use_pgvector:
+        _ensure_pgvector_schema(db)
     for index, chunk in enumerate(chunks):
-        db.add(
-            KnowledgeChunkModel(
-                organization_id=article.organization_id,
-                workspace_id=article.workspace_id,
-                document_id=None,
-                document_version_id=None,
-                source="approved_knowledge",
-                source_title=article.title,
-                chunk_index=index,
-                content=chunk,
-                embedding_json=json.dumps(embed_text(chunk)),
-                module_name=article.module_name,
-                table_name="",
-                procedure_name=article.procedures_changed,
-                business_object=article.module_name,
-                issue_type=article.issue_type,
-                tags=json.dumps(tokenize(article.detected_entities)[:20]),
-                approval_status="approved",
-                confidence=article.confidence_after_approval,
-            )
+        embedding = (
+            create_embedding(chunk, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
+            if use_pgvector
+            else None
         )
+        vector = embedding.vector if embedding else embed_text(chunk)
+        model = KnowledgeChunkModel(
+            organization_id=article.organization_id,
+            workspace_id=article.workspace_id,
+            document_id=None,
+            document_version_id=None,
+            source="approved_knowledge",
+            source_title=article.title,
+            chunk_index=index,
+            content=chunk,
+            embedding_json=json.dumps(vector),
+            module_name=article.module_name,
+            table_name="",
+            procedure_name=article.procedures_changed,
+            business_object=article.module_name,
+            issue_type=article.issue_type,
+            tags=json.dumps(tokenize(article.detected_entities)[:20]),
+            approval_status="approved",
+            confidence=article.confidence_after_approval,
+        )
+        db.add(model)
+        db.flush()
+        if use_pgvector and embedding:
+            _store_pgvector_embedding(db, model.id, embedding.vector)
     article.indexed_at = _utc_now()
     return len(chunks)
 
@@ -343,6 +482,32 @@ def chunk_text(text: str, max_tokens: int = 180, overlap: int = 35) -> list[str]
     return chunks[:500]
 
 
+def create_embedding(
+    text: str,
+    *,
+    settings: Settings | None = None,
+    dimensions: int = OPENAI_EMBEDDING_DIMENSIONS,
+) -> EmbeddingResult | None:
+    resolved = settings or Settings.from_env()
+    if resolved.embedding_provider == "openai":
+        if not resolved.openai_api_key:
+            return None
+        vector = _call_openai_embedding(resolved, text)
+        return EmbeddingResult(
+            vector=vector,
+            provider="openai",
+            model=resolved.embedding_model,
+            dimensions=len(vector),
+        )
+    vector = embed_text(text, dimensions=dimensions)
+    return EmbeddingResult(
+        vector=vector,
+        provider="local",
+        model="hashed-token-vector",
+        dimensions=len(vector),
+    )
+
+
 def embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
     vector = [0.0] * dimensions
     for token in tokenize(text):
@@ -358,6 +523,25 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
         return 0.0
     size = min(len(left), len(right))
     return sum(left[index] * right[index] for index in range(size))
+
+
+def _call_openai_embedding(settings: Settings, text_value: str) -> list[float]:
+    payload = json.dumps({"model": settings.embedding_model, "input": text_value[:12000]}).encode("utf-8")
+    req = request.Request(
+        f"{settings.openai_base_url}/embeddings",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {settings.openai_api_key}",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=30) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    vector = body.get("data", [{}])[0].get("embedding", [])
+    if len(vector) != OPENAI_EMBEDDING_DIMENSIONS:
+        raise RuntimeError("OpenAI embedding response had unexpected dimensions")
+    return [float(value) for value in vector]
 
 
 def tokenize(text: str) -> list[str]:
@@ -423,6 +607,52 @@ def _filter_column(field_name: str):
         "source": KnowledgeChunkModel.source,
         "approval_status": KnowledgeChunkModel.approval_status,
     }.get(field_name)
+
+
+def _filter_column_name(field_name: str) -> str | None:
+    return {
+        "workspace": "workspace_id",
+        "document": "document_id",
+        "module": "module_name",
+        "table": "table_name",
+        "procedure": "procedure_name",
+        "business_object": "business_object",
+        "issue_type": "issue_type",
+        "source": "source",
+        "approval_status": "approval_status",
+    }.get(field_name)
+
+
+def _missing_required_embedding_key(settings: Settings) -> bool:
+    return settings.embedding_provider == "openai" and not settings.openai_api_key
+
+
+def _pgvector_ready(db: Session) -> bool:
+    return db.bind is not None and db.bind.dialect.name == "postgresql"
+
+
+def _ensure_pgvector_schema(db: Session) -> None:
+    if not _pgvector_ready(db):
+        return
+    db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    db.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+    db.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+            "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+        )
+    )
+
+
+def _store_pgvector_embedding(db: Session, chunk_id: str, vector: list[float]) -> None:
+    db.execute(
+        text("UPDATE knowledge_chunks SET embedding = CAST(:embedding AS vector) WHERE id = :chunk_id"),
+        {"embedding": _pgvector_literal(vector), "chunk_id": chunk_id},
+    )
+
+
+def _pgvector_literal(vector: list[float]) -> str:
+    return "[" + ",".join(f"{value:.8f}" for value in vector) + "]"
 
 
 def _metadata_score(question_tokens: set[str], chunk: KnowledgeChunkModel) -> float:

@@ -151,9 +151,41 @@ def test_read_only_sql_guard_allows_metadata_reads_and_rejects_writes() -> None:
     validate_read_only_sql("SHOW TABLES")
     validate_read_only_sql("DESCRIBE activity_entries")
     validate_read_only_sql("EXPLAIN SELECT * FROM activity_entries")
+    validate_read_only_sql("SELECT 'DROP command mentioned in log text' AS error_message")
+    validate_read_only_sql("SELECT * FROM audit_log WHERE action = 'CREATE_RECORD'")
 
     with pytest.raises(ValueError):
         validate_read_only_sql("CALL retry_failed_activity_entries()")
+    with pytest.raises(ValueError):
+        validate_read_only_sql("SELECT * FROM accounts; DROP TABLE accounts")
+
+
+def test_planner_skips_generated_queries_that_fail_safety_validation(monkeypatch) -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("activity_entries", ["activity_id", "activity_code"], 5),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    entities = extract_entities("Find duplicate activity entries")
+
+    original_validate = validate_read_only_sql
+
+    def reject_duplicate_scan(sql: str) -> None:
+        if "GROUP BY" in sql:
+            raise ValueError("Unsafe SQL command rejected")
+        original_validate(sql)
+
+    monkeypatch.setattr(
+        "legacydb_copilot.services.safe_sql_service.validate_read_only_sql",
+        reject_duplicate_scan,
+    )
+
+    queries = plan_safe_queries(InvestigationIntent.DUPLICATE_DATA, metadata, entities)
+
+    assert all("GROUP BY" not in query.sql for query in queries)
 
 
 def test_missing_data_planner_and_reasoning_use_metadata_relationships() -> None:

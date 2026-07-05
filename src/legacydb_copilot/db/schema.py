@@ -54,6 +54,16 @@ def initialize_application_schema(database_url: str) -> None:
             for column_name, ddl in _AUDIT_COLUMNS.items():
                 if column_name not in existing_audit_columns:
                     connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
+    if engine.dialect.name == "postgresql" and "knowledge_chunks" in inspector.get_table_names():
+        with engine.begin() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            connection.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+                    "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+                )
+            )
     if not database_url.startswith("sqlite"):
         return
     if "knowledge_articles" not in inspector.get_table_names():

@@ -43,11 +43,23 @@ class DuplicateChildFlow:
 _DESTRUCTIVE = re.compile(r"\b(insert|update|delete|drop|alter|truncate|call|exec|execute|merge|replace|create|grant|revoke)\b", re.I)
 
 
+def _sql_without_literals_and_comments(sql: str) -> str:
+    without_block_comments = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
+    without_line_comments = re.sub(r"--[^\r\n]*", " ", without_block_comments)
+    without_single_quotes = re.sub(r"'(?:''|[^'])*'", "''", without_line_comments)
+    without_double_quotes = re.sub(r'"(?:""|[^"])*"', '""', without_single_quotes)
+    without_backticks = re.sub(r"`(?:``|[^`])*`", "``", without_double_quotes)
+    return without_backticks
+
+
 def validate_read_only_sql(sql: str) -> None:
     stripped = sql.strip().rstrip(";")
     if not re.match(r"^(select|show|describe|desc|explain)\b", stripped, re.I):
         raise ValueError("Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed")
-    if _DESTRUCTIVE.search(stripped):
+    normalized = _sql_without_literals_and_comments(stripped)
+    if ";" in normalized:
+        raise ValueError("Multiple SQL statements are not allowed")
+    if _DESTRUCTIVE.search(normalized):
         raise ValueError("Unsafe SQL command rejected")
 
 
@@ -502,7 +514,10 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
     safe: list[PlannedQuery] = []
     for query in planned:
         sql = ensure_limit(query.sql)
-        validate_read_only_sql(sql)
+        try:
+            validate_read_only_sql(sql)
+        except ValueError:
+            continue
         safe.append(PlannedQuery(query.purpose, sql, query.risk))
     return safe[:8]
 

@@ -303,7 +303,9 @@ jobs:
                   "STORAGE_BACKEND=azure_blob" \
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
-                  "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "KNOWLEDGE_RETRIEVER_BACKEND=pgvector" \
+                  "EMBEDDING_PROVIDER=openai" \
+                  "EMBEDDING_MODEL=text-embedding-3-small" \
                   "VERIFICATION_AGENT_ENABLED=true" \
                   "FEATURE_AUDIT_LOGGING_ENABLED=true" \
                   "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \
@@ -333,7 +335,9 @@ jobs:
                   "STORAGE_BACKEND=azure_blob" \
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
-                  "KNOWLEDGE_RETRIEVER_BACKEND=sqlite" \
+                  "KNOWLEDGE_RETRIEVER_BACKEND=pgvector" \
+                  "EMBEDDING_PROVIDER=openai" \
+                  "EMBEDDING_MODEL=text-embedding-3-small" \
                   "VERIFICATION_AGENT_ENABLED=true" \
                   "FEATURE_AUDIT_LOGGING_ENABLED=true" \
                   "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \

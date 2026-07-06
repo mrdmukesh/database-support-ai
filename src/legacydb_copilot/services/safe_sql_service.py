@@ -40,7 +40,24 @@ class DuplicateChildFlow:
     parent_key_value: str | None
 
 
-_DESTRUCTIVE = re.compile(r"\b(insert|update|delete|drop|alter|truncate|call|exec|execute|merge|replace|create|grant|revoke)\b", re.I)
+_ALLOWED_COMMANDS = {"select", "show", "describe", "desc", "explain"}
+_BLOCKED_COMMANDS = {
+    "alter",
+    "call",
+    "create",
+    "delete",
+    "drop",
+    "exec",
+    "execute",
+    "grant",
+    "insert",
+    "merge",
+    "replace",
+    "revoke",
+    "truncate",
+    "update",
+}
+_WRITE_LOCK_CLAUSES = re.compile(r"\b(for\s+update|lock\s+in\s+share\s+mode)\b", re.I)
 
 
 def _sql_without_literals_and_comments(sql: str) -> str:
@@ -52,14 +69,26 @@ def _sql_without_literals_and_comments(sql: str) -> str:
     return without_backticks
 
 
+def _first_sql_word(sql: str) -> str:
+    match = re.match(r"\s*([a-zA-Z_][a-zA-Z0-9_]*)\b", sql)
+    return match.group(1).lower() if match else ""
+
+
 def validate_read_only_sql(sql: str) -> None:
     stripped = sql.strip().rstrip(";")
-    if not re.match(r"^(select|show|describe|desc|explain)\b", stripped, re.I):
-        raise ValueError("Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed")
     normalized = _sql_without_literals_and_comments(stripped)
+    command = _first_sql_word(normalized)
+    if command in _BLOCKED_COMMANDS:
+        raise ValueError("Unsafe SQL command rejected")
+    if command not in _ALLOWED_COMMANDS:
+        raise ValueError("Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed")
     if ";" in normalized:
         raise ValueError("Multiple SQL statements are not allowed")
-    if _DESTRUCTIVE.search(normalized):
+    if command == "explain":
+        explain_target = _first_sql_word(re.sub(r"^\s*explain\b", "", normalized, count=1, flags=re.I))
+        if explain_target != "select":
+            raise ValueError("Only EXPLAIN SELECT statements are allowed")
+    if _WRITE_LOCK_CLAUSES.search(normalized):
         raise ValueError("Unsafe SQL command rejected")
 
 

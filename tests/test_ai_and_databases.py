@@ -153,11 +153,55 @@ def test_read_only_sql_guard_allows_metadata_reads_and_rejects_writes() -> None:
     validate_read_only_sql("EXPLAIN SELECT * FROM activity_entries")
     validate_read_only_sql("SELECT 'DROP command mentioned in log text' AS error_message")
     validate_read_only_sql("SELECT * FROM audit_log WHERE action = 'CREATE_RECORD'")
+    validate_read_only_sql(
+        "SELECT routine_name, routine_definition "
+        "FROM information_schema.routines "
+        "WHERE routine_name = 'sp_retry_failed_lab_orders'"
+    )
+    validate_read_only_sql("SELECT 'INSERT INTO lab_orders SELECT ...' AS routine_definition")
 
+    with pytest.raises(ValueError):
+        validate_read_only_sql("DELETE FROM activity_entries WHERE activity_id = 10")
     with pytest.raises(ValueError):
         validate_read_only_sql("CALL retry_failed_activity_entries()")
     with pytest.raises(ValueError):
         validate_read_only_sql("SELECT * FROM accounts; DROP TABLE accounts")
+    with pytest.raises(ValueError):
+        validate_read_only_sql("EXPLAIN DELETE FROM activity_entries WHERE activity_id = 10")
+
+
+def test_prompt_words_about_fix_and_rollback_are_not_sql_validation_failures() -> None:
+    report = analyze_prompt("Investigate the fix, rollback, delete retry, and update recommendation.")
+
+    assert SafetyFinding.UNSAFE_SQL not in report.findings
+
+
+def test_verification_agent_inspects_stored_procedure_text_safely() -> None:
+    class FakeConnector:
+        def execute_read_only_query(self, sql: str, limit: int = 25):
+            assert "information_schema.routines" in sql
+            return [
+                {
+                    "routine_name": "sp_retry_failed_lab_orders",
+                    "routine_definition": "INSERT INTO lab_orders SELECT ... UPDATE retry_log SET status = 'DONE'",
+                }
+            ]
+
+    result = execute_verification_check(
+        connector=FakeConnector(),
+        claim="sp_retry_failed_lab_orders writes lab_orders.",
+        verification_sql=(
+            "SELECT routine_name, routine_definition "
+            "FROM information_schema.routines "
+            "WHERE routine_name = 'sp_retry_failed_lab_orders'"
+        ),
+        expected_result="Rows returned containing lab_orders",
+        source="procedure",
+        verified_by="tester@example.com",
+    )[0]
+
+    assert result.status == "Verified"
+    assert "Unsafe SQL command rejected" not in result.actual_result_summary
 
 
 def test_planner_skips_generated_queries_that_fail_safety_validation(monkeypatch) -> None:

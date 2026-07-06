@@ -2,12 +2,14 @@ from uuid import uuid4
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from legacydb_copilot.common import DomainError
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, KnowledgeChunkModel, OrganizationModel, UserModel, WorkspaceModel
+from legacydb_copilot.db.schema import _try_enable_pgvector
 from legacydb_copilot.documents import (
     DocumentVersion,
     UploadPolicy,
@@ -250,6 +252,14 @@ def test_pgvector_missing_openai_key_falls_back_safely(tmp_path, monkeypatch) ->
     assert indexed >= 1
     assert results
     assert results[0].metadata["retriever"] == "sqlite-vector"
+
+
+def test_pgvector_schema_setup_is_non_fatal_when_extension_is_unavailable() -> None:
+    class UnsupportedVectorConnection:
+        def execute(self, statement):
+            raise SQLAlchemyError("extension vector is not allow-listed")
+
+    assert _try_enable_pgvector(UnsupportedVectorConnection()) is False
 
 
 def test_keyword_fallback_returns_documents_when_no_vectors(tmp_path) -> None:

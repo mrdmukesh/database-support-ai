@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.session import create_db_engine
@@ -38,6 +39,21 @@ _AUDIT_COLUMNS: dict[str, str] = {
 }
 
 
+def _try_enable_pgvector(connection) -> bool:
+    try:
+        connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        connection.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+                "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+            )
+        )
+        return True
+    except SQLAlchemyError:
+        return False
+
+
 def initialize_application_schema(database_url: str) -> None:
     engine = create_db_engine(database_url)
     Base.metadata.create_all(engine)
@@ -56,14 +72,7 @@ def initialize_application_schema(database_url: str) -> None:
                     connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
     if engine.dialect.name == "postgresql" and "knowledge_chunks" in inspector.get_table_names():
         with engine.begin() as connection:
-            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            connection.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
-            connection.execute(
-                text(
-                    "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
-                    "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
-                )
-            )
+            _try_enable_pgvector(connection)
     if not database_url.startswith("sqlite"):
         return
     if "knowledge_articles" not in inspector.get_table_names():

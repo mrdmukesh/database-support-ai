@@ -44,6 +44,9 @@ class BaseDatabaseAdapter(ABC):
     def get_version(self) -> str:
         return "unknown"
 
+    def estimate_table_rows(self, table_name: str) -> int | None:
+        return None
+
     def explain_query(self, sql: str) -> list[dict[str, Any]]:
         explain_sql = sql if sql.strip().lower().startswith("explain") else f"EXPLAIN {sql}"
         with self.engine.connect() as conn:
@@ -92,6 +95,17 @@ class MySQLAdapter(BaseDatabaseAdapter):
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT VERSION()")).scalar() or "unknown"
 
+    def estimate_table_rows(self, table_name: str) -> int | None:
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                text(
+                    "SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES "
+                    "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:name"
+                ),
+                {"name": table_name.strip("`[]\"").split(".")[-1]},
+            ).scalar()
+            return int(value) if value is not None else None
+
 
 class PostgreSQLAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.POSTGRESQL
@@ -118,6 +132,20 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT version()")).scalar() or "unknown"
 
+    def estimate_table_rows(self, table_name: str) -> int | None:
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                text(
+                    "SELECT reltuples::bigint "
+                    "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE c.relname = :name AND c.relkind IN ('r', 'p') "
+                    "ORDER BY CASE WHEN n.nspname = current_schema() THEN 0 ELSE 1 END "
+                    "LIMIT 1"
+                ),
+                {"name": table_name.strip("`[]\"").split(".")[-1]},
+            ).scalar()
+            return int(value) if value is not None and int(value) >= 0 else None
+
 
 class SQLServerAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.SQL_SERVER
@@ -135,6 +163,18 @@ class SQLServerAdapter(BaseDatabaseAdapter):
     def get_version(self) -> str:
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT @@VERSION")).scalar() or "unknown"
+
+    def estimate_table_rows(self, table_name: str) -> int | None:
+        with self.engine.connect() as conn:
+            value = conn.execute(
+                text(
+                    "SELECT SUM(row_count) "
+                    "FROM sys.dm_db_partition_stats "
+                    "WHERE object_id = OBJECT_ID(:name) AND index_id IN (0, 1)"
+                ),
+                {"name": table_name.strip("`[]\"")},
+            ).scalar()
+            return int(value) if value is not None else None
 
     def explain_query(self, sql: str) -> list[dict[str, Any]]:
         stripped = sql.strip().rstrip(";")

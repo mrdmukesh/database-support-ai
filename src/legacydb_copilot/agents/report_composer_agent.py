@@ -18,6 +18,20 @@ from legacydb_copilot.services.report_generator import (
 def _evidence_tables(bundle: DynamicInvestigationBundle) -> list[ReportTable]:
     tables: list[ReportTable] = []
     for item in bundle.evidence:
+        if item.safety_note:
+            tables.append(
+                ReportTable(
+                    title=f"{item.purpose} - SQL Safety",
+                    columns=["Original SQL", "Executed SQL", "Reason"],
+                    rows=[
+                        {
+                            "Original SQL": item.original_sql or item.sql,
+                            "Executed SQL": item.sql,
+                            "Reason": item.safety_note,
+                        }
+                    ],
+                )
+            )
         if item.rows:
             columns = list(item.rows[0].keys())
             tables.append(ReportTable(title=item.purpose, columns=columns, rows=item.rows[:10]))
@@ -36,7 +50,10 @@ def _sql_blocks(bundle: DynamicInvestigationBundle) -> list[ReportSqlBlock]:
     return [
         ReportSqlBlock(
             purpose=item.purpose,
-            expected_result="Rows should confirm or rule out the suspected issue. If no rows return, evidence is missing or object names differ.",
+            expected_result=(
+                "Rows should confirm or rule out the suspected issue. If no rows return, evidence is missing or object names differ."
+                + (f" SQL changed from `{item.original_sql}`. Reason: {item.safety_note}" if item.safety_note and item.original_sql else "")
+            ),
             risk="Read-only",
             sql=item.sql,
         )

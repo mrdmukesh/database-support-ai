@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, KnowledgeArticleModel, KnowledgeChunkModel
+from legacydb_copilot.services.storage_service import get_app_storage
 
 
 LOCAL_EMBEDDING_DIMENSIONS = 128
@@ -84,7 +85,7 @@ class SQLiteKnowledgeRetriever(KnowledgeRetriever):
         document: DocumentModel,
         version: DocumentVersionModel,
     ) -> int:
-        text = extract_text(Path(version.storage_key), version.mime_type)
+        text = extract_version_text(version)
         if not text.strip():
             text = f"{document.title}\n{version.filename}\nUploaded document text extraction unavailable."
         chunks = chunk_text(text)
@@ -203,7 +204,7 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
         workspace_id = kwargs["workspace_id"]
         document = kwargs["document"]
         version = kwargs["version"]
-        text_content = extract_text(Path(version.storage_key), version.mime_type)
+        text_content = extract_version_text(version)
         if not text_content.strip():
             text_content = f"{document.title}\n{version.filename}\nUploaded document text extraction unavailable."
         chunks = chunk_text(text_content)
@@ -433,7 +434,7 @@ def keyword_fallback_retrieve(db: Session, query: KnowledgeQuery) -> list[Retrie
     tokens = set(tokenize(query.question))
     results: list[RetrievedDocument] = []
     for document, version in documents:
-        text = extract_text(Path(version.storage_key), version.mime_type)
+        text = extract_version_text(version)
         snippet = "Uploaded document available; vector index unavailable, keyword fallback used."
         if text:
             matching_lines = [line.strip() for line in text.splitlines() if any(token in line.lower() for token in tokens)]
@@ -456,17 +457,43 @@ def keyword_fallback_retrieve(db: Session, query: KnowledgeQuery) -> list[Retrie
 def extract_text(path: Path, mime_type: str = "") -> str:
     if not path.exists():
         return ""
+    return extract_text_from_bytes(path.read_bytes(), filename=path.name, mime_type=mime_type)
+
+
+def extract_version_text(version: DocumentVersionModel) -> str:
+    try:
+        data = get_app_storage().read_bytes(version.storage_key)
+        return extract_text_from_bytes(data, filename=version.filename, mime_type=version.mime_type)
+    except Exception:
+        return extract_text(Path(version.storage_key), version.mime_type)
+
+
+def extract_text_from_bytes(data: bytes, *, filename: str = "", mime_type: str = "") -> str:
+    if not data:
+        return ""
+    path = Path(filename)
     suffix = path.suffix.lower()
     if suffix in {".txt", ".md", ".sql", ".csv"}:
-        return path.read_text(encoding="utf-8", errors="ignore")
+        return data.decode("utf-8", errors="ignore")
     if suffix == ".docx":
-        return _extract_docx_text(path)
+        return _extract_docx_text_from_bytes(data)
     if suffix == ".pdf":
         # Best-effort only. Full PDF extraction needs a dedicated parser.
-        data = path.read_bytes()
         text = data.decode("latin-1", errors="ignore")
         return "\n".join(re.findall(r"[A-Za-z0-9_.,:;() /\\-]{20,}", text))[:10000]
-    return path.read_text(encoding="utf-8", errors="ignore") if "text" in mime_type else ""
+    return data.decode("utf-8", errors="ignore") if "text" in mime_type else ""
+
+
+def _extract_docx_text_from_bytes(data: bytes) -> str:
+    from io import BytesIO
+
+    try:
+        with zipfile.ZipFile(BytesIO(data)) as archive:
+            xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+    except Exception:
+        return ""
+    text = re.sub(r"<[^>]+>", " ", xml)
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def chunk_text(text: str, max_tokens: int = 180, overlap: int = 35) -> list[str]:

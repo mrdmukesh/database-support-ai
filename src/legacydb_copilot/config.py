@@ -30,6 +30,8 @@ class Settings:
     embedding_provider: str = "local"
     embedding_model: str = "text-embedding-3-small"
     verification_agent_enabled: bool = True
+    max_investigation_rows: int = 100
+    allow_full_table_scan: bool = False
     feature_enterprise_rbac_enabled: bool = False
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
@@ -70,6 +72,9 @@ class Settings:
             embedding_provider=os.getenv("EMBEDDING_PROVIDER", "local").lower(),
             embedding_model=os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"),
             verification_agent_enabled=os.getenv("VERIFICATION_AGENT_ENABLED", "true").lower()
+            in {"1", "true", "yes", "on"},
+            max_investigation_rows=int(os.getenv("MAX_INVESTIGATION_ROWS", "100")),
+            allow_full_table_scan=os.getenv("ALLOW_FULL_TABLE_SCAN", "false").lower()
             in {"1", "true", "yes", "on"},
             feature_enterprise_rbac_enabled=os.getenv(
                 "FEATURE_ENTERPRISE_RBAC_ENABLED",

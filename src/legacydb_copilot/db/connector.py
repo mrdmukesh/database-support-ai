@@ -249,6 +249,13 @@ class DatabaseConnector:
         except Exception as exc:
             raise DatabaseConnectionError(f"Query execution failed: {str(exc)}") from exc
 
+    def estimate_table_rows(self, table_name: str) -> int | None:
+        """Return a cheap metadata row estimate when the database engine exposes one."""
+        try:
+            return self.get_adapter().estimate_table_rows(table_name)
+        except Exception:
+            return None
+
     def _get_stored_procedures(self, inspector: Any, engine: Engine) -> list[str]:
         """Get stored procedures from the database (engine-specific)."""
         try:

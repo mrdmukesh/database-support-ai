@@ -113,6 +113,18 @@ def _sql_block(sql: str) -> str:
     return "```sql\n" + sql.strip() + "\n```"
 
 
+def _evidence_sql_block(item) -> str:
+    if not getattr(item, "safety_note", None):
+        return _sql_block(item.sql)
+    return (
+        "Original:\n"
+        + _sql_block(getattr(item, "original_sql", None) or item.sql)
+        + "\nModified for safety:\n"
+        + _sql_block(item.sql)
+        + f"\nReason: {item.safety_note}"
+    )
+
+
 
 def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> DatabaseConnectionModel | None:
     return (
@@ -1185,7 +1197,7 @@ def _run_dynamic_investigation(
         + "\n\n## Supporting Evidence\n"
         + "\n".join(f"- {item}" for item in reasoning.supporting_evidence)
         + "\n\n## Recommended Next SQL\n"
-        + "\n\n".join(_sql_block(item.sql) for item in evidence[:5])
+        + "\n\n".join(_evidence_sql_block(item) for item in evidence[:5])
         + "\n\n## Recommendation\n"
         + "\n".join(
             [

@@ -11,7 +11,7 @@ from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigatio
 from legacydb_copilot.agents.intent_agent import InvestigationIntent, IntentResult, detect_intent
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
 from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
-from legacydb_copilot.services.evidence_execution_service import EvidenceResult
+from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import (
@@ -29,7 +29,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     llm_reasoning_enabled,
 )
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.safe_sql_service import plan_safe_queries, validate_read_only_sql
+from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.config import Settings
@@ -202,6 +202,71 @@ def test_verification_agent_inspects_stored_procedure_text_safely() -> None:
 
     assert result.status == "Verified"
     assert "Unsafe SQL command rejected" not in result.actual_result_summary
+
+
+def test_production_read_safety_allows_filtered_business_key_query() -> None:
+    result = ProductionReadSafetyValidator().validate(
+        "SELECT * FROM appointments WHERE appointment_number = 'APT-2005'"
+    )
+
+    assert result.sql == "SELECT * FROM appointments WHERE appointment_number = 'APT-2005'"
+    assert result.changed is False
+
+
+def test_production_read_safety_allows_information_schema_routine_reads() -> None:
+    result = ProductionReadSafetyValidator().validate(
+        "SELECT routine_definition FROM information_schema.routines"
+    )
+
+    assert result.sql == "SELECT routine_definition FROM information_schema.routines"
+
+
+def test_production_read_safety_blocks_unrestricted_business_table_scans() -> None:
+    validator = ProductionReadSafetyValidator()
+
+    with pytest.raises(ValueError, match="Production scan protection"):
+        validator.validate("SELECT * FROM appointments")
+    with pytest.raises(ValueError, match="Production scan protection"):
+        validator.validate("SELECT * FROM lab_orders")
+
+
+def test_production_read_safety_allows_count_discovery() -> None:
+    result = ProductionReadSafetyValidator().validate("SELECT COUNT(*) FROM appointments")
+
+    assert result.sql == "SELECT COUNT(*) FROM appointments"
+
+
+def test_production_read_safety_auto_limits_small_lookup_tables() -> None:
+    result = ProductionReadSafetyValidator(max_rows=100).validate("SELECT * FROM small_lookup_table")
+
+    assert result.sql == "SELECT * FROM small_lookup_table LIMIT 100"
+    assert result.changed is True
+    assert "Production scan protection" in result.reason
+
+
+def test_production_read_safety_blocks_large_row_estimate_without_filter() -> None:
+    validator = ProductionReadSafetyValidator(row_estimates={"claims": 500000})
+
+    with pytest.raises(ValueError, match="Production scan protection"):
+        validator.validate("SELECT claim_id, claim_status FROM claims")
+
+
+def test_evidence_execution_reports_sql_modified_for_production_safety(monkeypatch) -> None:
+    class FakeConnector:
+        def execute_read_only_query(self, sql: str, limit: int = 100):
+            assert sql == "SELECT * FROM small_lookup_table LIMIT 100"
+            return [{"code": "ACTIVE"}]
+
+    monkeypatch.setenv("MAX_INVESTIGATION_ROWS", "100")
+    result = execute_evidence_plan(
+        FakeConnector(),
+        [PlannedQuery("Inspect lookup values", "SELECT * FROM small_lookup_table")],
+    )[0]
+
+    assert result.rows == [{"code": "ACTIVE"}]
+    assert result.original_sql == "SELECT * FROM small_lookup_table"
+    assert result.sql == "SELECT * FROM small_lookup_table LIMIT 100"
+    assert result.safety_note == "Production scan protection: added investigation row limit."
 
 
 def test_planner_skips_generated_queries_that_fail_safety_validation(monkeypatch) -> None:

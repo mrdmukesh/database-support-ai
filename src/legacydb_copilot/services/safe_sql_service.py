@@ -17,6 +17,64 @@ class PlannedQuery:
 
 
 @dataclass(frozen=True)
+class ProductionReadSafetyResult:
+    sql: str
+    changed: bool = False
+    reason: str = ""
+
+
+class ProductionReadSafetyValidator:
+    def __init__(
+        self,
+        *,
+        max_rows: int = 100,
+        allow_full_table_scan: bool = False,
+        row_estimates: dict[str, int] | None = None,
+        engine_type: str | None = None,
+    ) -> None:
+        self.max_rows = max_rows
+        self.allow_full_table_scan = allow_full_table_scan
+        self.row_estimates = {key.lower(): value for key, value in (row_estimates or {}).items()}
+        self.engine_type = (engine_type or "").lower()
+
+    def validate(self, sql: str) -> ProductionReadSafetyResult:
+        stripped = sql.strip().rstrip(";")
+        normalized = _sql_without_literals_and_comments(stripped)
+        command = _first_sql_word(normalized)
+        if command in {"show", "describe", "desc"}:
+            return ProductionReadSafetyResult(stripped)
+        if command == "explain":
+            return ProductionReadSafetyResult(stripped)
+        if command != "select":
+            return ProductionReadSafetyResult(stripped)
+        table_name = _first_from_table(normalized)
+        if table_name and _is_allowed_metadata_table(table_name):
+            return ProductionReadSafetyResult(stripped)
+        if _is_count_discovery(normalized):
+            return ProductionReadSafetyResult(stripped)
+        if _has_where_clause(normalized) or _has_limit_clause(normalized):
+            return ProductionReadSafetyResult(stripped)
+        if self.allow_full_table_scan:
+            return ProductionReadSafetyResult(stripped)
+        if not table_name:
+            return ProductionReadSafetyResult(stripped)
+        if self._can_auto_limit(table_name):
+            return ProductionReadSafetyResult(
+                _add_exploration_limit(stripped, self.max_rows, self.engine_type),
+                changed=True,
+                reason="Production scan protection: added investigation row limit.",
+            )
+        raise ValueError("Production scan protection rejected unrestricted table scan")
+
+    def _can_auto_limit(self, table_name: str) -> bool:
+        normalized_table = _unquote_identifier(table_name).lower().split(".")[-1]
+        estimate = self.row_estimates.get(normalized_table) or self.row_estimates.get(_unquote_identifier(table_name).lower())
+        if estimate is not None:
+            return estimate <= self.max_rows
+        return bool(re.search(r"(^|_)(lookup|reference|ref|status|type|category|code)(_|s?$)", normalized_table))
+
+
+@dataclass(frozen=True)
 class MissingChildFlow:
     parent_table: TableMetadata
     child_table: TableMetadata
@@ -72,6 +130,44 @@ def _sql_without_literals_and_comments(sql: str) -> str:
 def _first_sql_word(sql: str) -> str:
     match = re.match(r"\s*([a-zA-Z_][a-zA-Z0-9_]*)\b", sql)
     return match.group(1).lower() if match else ""
+
+
+def _unquote_identifier(value: str) -> str:
+    return value.strip().strip("`[]\"")
+
+
+def _first_from_table(sql: str) -> str | None:
+    match = re.search(r"\bfrom\s+([`\"\[\]\w.]+)", sql, re.I)
+    return match.group(1) if match else None
+
+
+def _is_allowed_metadata_table(table_name: str) -> bool:
+    normalized = _unquote_identifier(table_name).lower()
+    return normalized in {
+        "information_schema.tables",
+        "information_schema.columns",
+        "information_schema.routines",
+    }
+
+
+def _is_count_discovery(sql: str) -> bool:
+    return bool(re.match(r"\s*select\s+count\s*\(\s*\*\s*\)(\s+as\s+\w+)?\s+from\s+[`\"\[\]\w.]+\s*$", sql, re.I))
+
+
+def _has_where_clause(sql: str) -> bool:
+    return bool(re.search(r"\bwhere\b", sql, re.I))
+
+
+def _has_limit_clause(sql: str) -> bool:
+    return bool(re.search(r"\blimit\s+\d+\b", sql, re.I) or re.match(r"\s*select\s+top\s+\d+\b", sql, re.I))
+
+
+def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None) -> str:
+    if _has_limit_clause(sql):
+        return sql
+    if (engine_type or "").lower() == "sql_server":
+        return re.sub(r"^\s*select\b", f"SELECT TOP {limit}", sql, count=1, flags=re.I)
+    return f"{sql} LIMIT {limit}"
 
 
 def validate_read_only_sql(sql: str) -> None:

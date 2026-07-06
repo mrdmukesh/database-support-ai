@@ -25,6 +25,7 @@ from legacydb_copilot.services.rag_retrieval_service import (
     embed_text,
     keyword_fallback_retrieve,
 )
+from legacydb_copilot.services.storage_service import get_app_storage
 
 
 def test_upload_policy_allows_required_file_types() -> None:
@@ -135,6 +136,65 @@ def test_sqlite_knowledge_retriever_indexes_chunks_and_semantic_searches(tmp_pat
     assert results
     assert results[0].metadata["retriever"] == "sqlite-vector"
     assert "GATE_IN" in results[0].snippet
+
+
+def test_uploaded_markdown_body_is_extracted_chunked_and_retrieved(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("STORAGE_BACKEND", "local")
+    monkeypatch.setenv("LOCAL_STORAGE_ROOT", str(tmp_path))
+    db = _memory_session()
+    org = OrganizationModel(name="Upload Body Org", slug="upload-body-org")
+    db.add(org)
+    db.flush()
+    user = UserModel(organization_id=org.id, email="body@example.com", full_name="Body User", role="organization_admin")
+    workspace = WorkspaceModel(organization_id=org.id, name="Ops", slug="ops")
+    db.add_all([user, workspace])
+    db.flush()
+    body = (
+        "# Retry Runbook\n\n"
+        "Appointment APT-2005 can create duplicate lab orders when retry processing lacks an idempotency guard.\n"
+        "Procedure sp_retry_failed_lab_orders writes lab_orders after checking appointment_number."
+    )
+    storage_key = "documents/upload-body/runbook.md"
+    get_app_storage().save_bytes(storage_key, body.encode("utf-8"), "text/markdown")
+    document = DocumentModel(organization_id=org.id, workspace_id=workspace.id, owner_id=user.id, title="Retry Runbook")
+    db.add(document)
+    db.flush()
+    version = DocumentVersionModel(
+        document_id=document.id,
+        version=1,
+        filename="runbook.md",
+        mime_type="text/markdown",
+        size_bytes=len(body.encode("utf-8")),
+        sha256=content_sha256(body.encode("utf-8")),
+        storage_key=storage_key,
+    )
+    db.add(version)
+    db.flush()
+
+    retriever = SQLiteKnowledgeRetriever()
+    retriever.index_document(
+        db,
+        organization_id=org.id,
+        workspace_id=workspace.id,
+        document=document,
+        version=version,
+    )
+    db.commit()
+
+    chunk = db.query(KnowledgeChunkModel).one()
+    results = retriever.retrieve(
+        db,
+        KnowledgeQuery(
+            organization_id=org.id,
+            workspace_id=workspace.id,
+            question="Why does APT-2005 create duplicate lab orders?",
+        ),
+    )
+
+    assert "duplicate lab orders" in chunk.content
+    assert "Uploaded document text extraction unavailable" not in chunk.content
+    assert results
+    assert "duplicate lab orders" in results[0].snippet
 
 
 def test_workspace_isolation_for_retrieved_knowledge(tmp_path) -> None:

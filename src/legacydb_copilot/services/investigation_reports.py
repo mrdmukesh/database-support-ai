@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from legacydb_copilot.services.docx_generator import write_docx
 from legacydb_copilot.services.excel_generator import write_xlsx
@@ -22,6 +22,26 @@ _REPORT_CONTENT_TYPES = {
 
 
 def generate_investigation_report_files(report: InvestigationReport) -> GeneratedReport:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles generate investigation report files within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     output_dir = report_output_dir(report.cover.investigation_id)
     file_stem = report_file_stem(report)
     html_path = output_dir / f"{file_stem}.html"

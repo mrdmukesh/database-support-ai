@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
@@ -16,6 +16,26 @@ from legacydb_copilot.services.report_generator import (
 
 
 def _evidence_tables(bundle: DynamicInvestigationBundle) -> list[ReportTable]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for evidence tables within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     tables: list[ReportTable] = []
     for item in bundle.evidence:
         if item.safety_note:
@@ -47,6 +67,26 @@ def _evidence_tables(bundle: DynamicInvestigationBundle) -> list[ReportTable]:
 
 
 def _sql_blocks(bundle: DynamicInvestigationBundle) -> list[ReportSqlBlock]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for sql blocks within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return [
         ReportSqlBlock(
             purpose=item.purpose,
@@ -62,6 +102,26 @@ def _sql_blocks(bundle: DynamicInvestigationBundle) -> list[ReportSqlBlock]:
 
 
 def _missing_record_sections(bundle: DynamicInvestigationBundle) -> list[ReportSection]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for missing record sections within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     candidate = next((item for item in bundle.evidence if item.purpose == "Confirmed Missing Related Record Candidates"), None)
     summary = next((item for item in bundle.evidence if item.purpose == "Missing Related Record Summary by Issue Type"), None)
     if candidate is None:
@@ -91,6 +151,26 @@ def _missing_record_sections(bundle: DynamicInvestigationBundle) -> list[ReportS
 
 
 def _intent_sections(bundle: DynamicInvestigationBundle) -> list[ReportSection]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for intent sections within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     intent = bundle.intent.intent
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
         has_plan = any("EXPLAIN" in f"{item.purpose} {item.sql}".upper() and (item.rows or item.error is None) for item in bundle.evidence)
@@ -147,6 +227,26 @@ def _intent_sections(bundle: DynamicInvestigationBundle) -> list[ReportSection]:
 
 
 def _evidence_gate_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for evidence gate section within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     gate = bundle.evidence_gate
     if gate is None:
         return ReportSection(title="Evidence Gate", items=["Evidence gate was not available for this investigation."])
@@ -172,6 +272,26 @@ def _evidence_gate_section(bundle: DynamicInvestigationBundle) -> ReportSection:
 
 
 def _ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for ai reasoning section within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     status = bundle.ai_reasoning_status or {
         "ai_assisted_reasoning": "Disabled",
         "reason": "AI reasoning status was not recorded for this investigation.",
@@ -193,6 +313,26 @@ def _ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
 
 
 def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verification section within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     rows = [
         {
             "Claim": item.claim,
@@ -255,6 +395,26 @@ def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
 
 
 def _suggested_verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggested verification section within report_composer_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in report_composer_agent.py.
+    
+    Where it fits in the flow:
+        Evidence and reasoning bundle -> structured report -> HTML/PDF/DOCX/XLSX generators.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     rows = [
         {
             "Claim to verify": item.claim,

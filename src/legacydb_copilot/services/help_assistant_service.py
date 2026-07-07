@@ -35,6 +35,26 @@ _INVESTIGATION_TERMS = {
 
 
 def answer_help_question(question: str, current_page: str | None = None) -> HelpResponse:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles answer help question within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     normalized = question.strip()
     if _should_redirect_to_ai_chat(normalized):
         return HelpResponse(
@@ -72,6 +92,26 @@ def answer_help_question(question: str, current_page: str | None = None) -> Help
 
 
 def _should_redirect_to_ai_chat(question: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for should redirect to ai chat within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     lowered = question.lower()
     if lowered.startswith(("how do i", "how to", "where do i", "what is the page")):
         return False
@@ -79,6 +119,26 @@ def _should_redirect_to_ai_chat(question: str) -> bool:
 
 
 def _load_help_documents() -> list[HelpDocument]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for load help documents within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     root = _help_root()
     docs: list[HelpDocument] = []
     for path in sorted(root.glob("*.md")):
@@ -89,6 +149,26 @@ def _load_help_documents() -> list[HelpDocument]:
 
 
 def _help_root() -> Path:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for help root within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     candidates = [
         Path.cwd() / "docs" / "help",
         Path(__file__).resolve().parents[3] / "docs" / "help",
@@ -101,6 +181,26 @@ def _help_root() -> Path:
 
 
 def _rank_documents(question: str, docs: list[HelpDocument], current_page: str | None = None) -> list[HelpDocument]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for rank documents within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     query_terms = _terms(question)
     page_terms = _terms(current_page or "")
     scored = []
@@ -116,6 +216,26 @@ def _rank_documents(question: str, docs: list[HelpDocument], current_page: str |
 
 
 def _terms(value: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for terms within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {
         term
         for term in re.split(r"[^a-zA-Z0-9_-]+", value.lower())
@@ -124,6 +244,26 @@ def _terms(value: str) -> set[str]:
 
 
 def _title(content: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for title within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     for line in content.splitlines():
         if line.startswith("# "):
             return line[2:].strip()
@@ -131,6 +271,26 @@ def _title(content: str) -> str:
 
 
 def _summary(doc: HelpDocument) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for summary within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     lines = [
         line.strip()
         for line in doc.content.splitlines()
@@ -140,6 +300,26 @@ def _summary(doc: HelpDocument) -> str:
 
 
 def _section_lines(content: str, heading: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for section lines within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     lines = content.splitlines()
     capture = False
     values: list[str] = []
@@ -158,4 +338,24 @@ def _section_lines(content: str, heading: str) -> list[str]:
 
 
 def _dedupe(values: list[str]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for dedupe within help_assistant_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in help_assistant_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return list(dict.fromkeys(item for item in values if item))

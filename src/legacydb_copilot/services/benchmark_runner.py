@@ -56,6 +56,26 @@ class BenchmarkRunResult:
 
 
 def assert_demo_database(connection_string: str, *, allow_customer_db: bool = False) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles assert demo database within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if allow_customer_db:
         return
     parsed = urlparse(connection_string.replace("mysql+pymysql://", "mysql://", 1))
@@ -69,6 +89,26 @@ def assert_demo_database(connection_string: str, *, allow_customer_db: bool = Fa
 
 
 def load_expected_issues(connector) -> list[ExpectedIssue]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles load expected issues within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     rows = connector.execute_read_only_query(
         """
 SELECT
@@ -89,6 +129,26 @@ ORDER BY issue_id
 
 
 def run_benchmark(connector, *, connection_string: str = "", allow_customer_db: bool = False) -> BenchmarkRunResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles run benchmark within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if connection_string:
         assert_demo_database(connection_string, allow_customer_db=allow_customer_db)
     issues = load_expected_issues(connector)
@@ -97,6 +157,26 @@ def run_benchmark(connector, *, connection_string: str = "", allow_customer_db: 
 
 
 def _run_case(connector, issue: ExpectedIssue) -> BenchmarkCaseResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for run case within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     entities = extract_entities(issue.question)
     intent = detect_intent(issue.question)
     metadata = search_metadata(connector, issue.question, entities)
@@ -213,11 +293,51 @@ def _run_case(connector, issue: ExpectedIssue) -> BenchmarkCaseResult:
 
 
 def _validate_plan_read_only(plan) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for validate plan read only within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     for query in plan:
         validate_read_only_sql(query.sql)
 
 
 def _verification_score(results) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verification score within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if not results:
         return 0.0
     values = {
@@ -230,6 +350,26 @@ def _verification_score(results) -> float:
 
 
 def _text_overlap_score(actual: str, expected: str) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for text overlap score within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     actual_terms = _terms(actual)
     expected_terms = _terms(expected)
     if not expected_terms:
@@ -238,11 +378,51 @@ def _text_overlap_score(actual: str, expected: str) -> float:
 
 
 def _terms(text: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for terms within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     stop = {"the", "and", "for", "with", "from", "that", "this", "into", "because", "should"}
     return {term for term in "".join(ch.lower() if ch.isalnum() or ch == "_" else " " for ch in text).split() if len(term) > 3 and term not in stop}
 
 
 def _metrics(results: list[BenchmarkCaseResult]) -> dict[str, float]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for metrics within benchmark_runner.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in benchmark_runner.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not results:
         return {
             "case_count": 0.0,

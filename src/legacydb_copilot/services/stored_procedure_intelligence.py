@@ -33,14 +33,74 @@ class ProcedureAnalysis:
 
 
 def _read_definition(connector, procedure_name: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for read definition within stored_procedure_intelligence.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in stored_procedure_intelligence.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return connector.get_procedure_definition(procedure_name)
 
 
 def _identifiers(pattern: str, definition: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for identifiers within stored_procedure_intelligence.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in stored_procedure_intelligence.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return list(dict.fromkeys(match.group(1).strip("`[]\"") for match in re.finditer(pattern, definition, re.I)))
 
 
 def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[ProcedureAnalysis]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles analyze stored procedures within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     analyses: list[ProcedureAnalysis] = []
     for procedure_name in procedure_names[:8]:
         try:

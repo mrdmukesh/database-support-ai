@@ -90,11 +90,49 @@ class KnowledgeRetriever(ABC):
         document: DocumentModel,
         version: DocumentVersionModel,
     ) -> int:
-        """Extract, chunk, embed, and store knowledge for a document."""
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles index document within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+        """
 
     @abstractmethod
     def retrieve(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
-        """Return top ranked knowledge evidence for a question."""
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles retrieve within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
 
 
 class SQLiteKnowledgeRetriever(KnowledgeRetriever):
@@ -107,6 +145,26 @@ class SQLiteKnowledgeRetriever(KnowledgeRetriever):
         document: DocumentModel,
         version: DocumentVersionModel,
     ) -> int:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles index document within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+        """
         text = extract_version_text(version)
         if not text.strip():
             text = f"{document.title}\n{version.filename}\nUploaded document text extraction unavailable."
@@ -146,6 +204,26 @@ class SQLiteKnowledgeRetriever(KnowledgeRetriever):
         return len(chunks)
 
     def retrieve(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles retrieve within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         try:
             semantic = self._semantic_search(db, query)
         except Exception:
@@ -155,6 +233,26 @@ class SQLiteKnowledgeRetriever(KnowledgeRetriever):
         return keyword_fallback_retrieve(db, query)
 
     def _semantic_search(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for semantic search within rag_retrieval_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in rag_retrieval_service.py.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         vector = embed_text(query.question)
         db_query = db.query(KnowledgeChunkModel).filter(
             KnowledgeChunkModel.organization_id == query.organization_id,
@@ -203,22 +301,122 @@ class SQLiteKnowledgeRetriever(KnowledgeRetriever):
 
 class QdrantKnowledgeRetriever(KnowledgeRetriever):
     def __init__(self, fallback: KnowledgeRetriever | None = None):
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for init within rag_retrieval_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in rag_retrieval_service.py.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         self.fallback = fallback or SQLiteKnowledgeRetriever()
 
     def index_document(self, db: Session, **kwargs) -> int:
         # Qdrant client integration is intentionally isolated here. The app can swap
         # this implementation in later without touching the investigation engine.
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles index document within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+        """
         return self.fallback.index_document(db, **kwargs)
 
     def retrieve(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles retrieve within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         return self.fallback.retrieve(db, query)
 
 
 class PgVectorKnowledgeRetriever(KnowledgeRetriever):
     def __init__(self, fallback: KnowledgeRetriever | None = None):
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for init within rag_retrieval_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in rag_retrieval_service.py.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         self.fallback = fallback or SQLiteKnowledgeRetriever()
 
     def index_document(self, db: Session, **kwargs) -> int:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles index document within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+        """
         settings = Settings.from_env()
         if not _pgvector_ready(db) or _missing_required_embedding_key(settings):
             return self.fallback.index_document(db, **kwargs)
@@ -270,6 +468,26 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
         return len(chunks)
 
     def retrieve(self, db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles retrieve within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+        
+        Safety considerations:
+            Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+        """
         settings = Settings.from_env()
         if not _pgvector_ready(db) or _missing_required_embedding_key(settings):
             return self.fallback.retrieve(db, query)
@@ -338,6 +556,26 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
 
 
 def get_knowledge_retriever(settings: Settings | None = None) -> KnowledgeRetriever:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles get knowledge retriever within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     backend = (settings or Settings.from_env()).knowledge_retriever_backend
     if backend == "qdrant":
         return QdrantKnowledgeRetriever()
@@ -347,6 +585,26 @@ def get_knowledge_retriever(settings: Settings | None = None) -> KnowledgeRetrie
 
 
 def retrieve_documents(db: Session, organization_id: str, workspace_id: str, question: str) -> list[RetrievedDocument]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles retrieve documents within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     retriever = get_knowledge_retriever()
     return retriever.retrieve(
         db,
@@ -367,6 +625,26 @@ def index_document_knowledge(
     document: DocumentModel,
     version: DocumentVersionModel,
 ) -> int:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles index document knowledge within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     return get_knowledge_retriever().index_document(
         db,
         organization_id=organization_id,
@@ -377,6 +655,26 @@ def index_document_knowledge(
 
 
 def index_approved_knowledge_article(db: Session, article: KnowledgeArticleModel) -> int:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles index approved knowledge article within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     settings = Settings.from_env()
     use_pgvector = (
         settings.knowledge_retriever_backend == "pgvector"
@@ -442,6 +740,26 @@ def index_approved_knowledge_article(db: Session, article: KnowledgeArticleModel
 
 
 def keyword_fallback_retrieve(db: Session, query: KnowledgeQuery) -> list[RetrievedDocument]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles keyword fallback retrieve within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     documents = (
         db.query(DocumentModel, DocumentVersionModel)
         .join(DocumentVersionModel, DocumentVersionModel.document_id == DocumentModel.id)
@@ -477,12 +795,52 @@ def keyword_fallback_retrieve(db: Session, query: KnowledgeQuery) -> list[Retrie
 
 
 def extract_text(path: Path, mime_type: str = "") -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles extract text within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not path.exists():
         return ""
     return extract_text_from_bytes(path.read_bytes(), filename=path.name, mime_type=mime_type)
 
 
 def extract_version_text(version: DocumentVersionModel) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles extract version text within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     try:
         data = get_app_storage().read_bytes(version.storage_key)
         return extract_text_from_bytes(data, filename=version.filename, mime_type=version.mime_type)
@@ -491,6 +849,26 @@ def extract_version_text(version: DocumentVersionModel) -> str:
 
 
 def extract_text_from_bytes(data: bytes, *, filename: str = "", mime_type: str = "") -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles extract text from bytes within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not data:
         return ""
     path = Path(filename)
@@ -507,6 +885,26 @@ def extract_text_from_bytes(data: bytes, *, filename: str = "", mime_type: str =
 
 
 def _extract_docx_text_from_bytes(data: bytes) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for extract docx text from bytes within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     from io import BytesIO
 
     try:
@@ -519,6 +917,26 @@ def _extract_docx_text_from_bytes(data: bytes) -> str:
 
 
 def chunk_text(text: str, max_tokens: int = 180, overlap: int = 35) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles chunk text within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     words = re.findall(r"\S+", text)
     if not words:
         return []
@@ -537,6 +955,26 @@ def create_embedding(
     settings: Settings | None = None,
     dimensions: int = OPENAI_EMBEDDING_DIMENSIONS,
 ) -> EmbeddingResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles create embedding within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     resolved = settings or Settings.from_env()
     if resolved.embedding_provider == "openai":
         if not resolved.openai_api_key:
@@ -558,6 +996,26 @@ def create_embedding(
 
 
 def embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles embed text within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     vector = [0.0] * dimensions
     for token in tokenize(text):
         digest = hashlib.sha256(token.encode("utf-8")).digest()
@@ -568,6 +1026,26 @@ def embed_text(text: str, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles cosine similarity within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not left or not right:
         return 0.0
     size = min(len(left), len(right))
@@ -575,6 +1053,26 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
 
 
 def _call_openai_embedding(settings: Settings, text_value: str) -> list[float]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for call openai embedding within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     payload = json.dumps({"model": settings.embedding_model, "input": text_value[:12000]}).encode("utf-8")
     req = request.Request(
         f"{settings.openai_base_url}/embeddings",
@@ -594,10 +1092,50 @@ def _call_openai_embedding(settings: Settings, text_value: str) -> list[float]:
 
 
 def tokenize(text: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles tokenize within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return [token for token in re.findall(r"[a-z0-9_/-]{3,}", text.lower())]
 
 
 def infer_metadata(title: str, text: str) -> dict[str, Any]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles infer metadata within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     combined = f"{title}\n{text}"
     procedures = re.findall(r"\bsp_[a-zA-Z0-9_]+\b", combined)
     tables = re.findall(r"`([a-zA-Z][a-zA-Z0-9_]*)`", combined)
@@ -614,6 +1152,26 @@ def infer_metadata(title: str, text: str) -> dict[str, Any]:
 
 
 def _extract_docx_text(path: Path) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for extract docx text within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     try:
         with zipfile.ZipFile(path) as archive:
             xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
@@ -625,11 +1183,51 @@ def _extract_docx_text(path: Path) -> str:
 
 
 def _first_heading_value(text: str, label: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for first heading value within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     match = re.search(rf"{re.escape(label)}\s*[:=-]\s*([A-Za-z0-9_/-]+)", text, re.I)
     return match.group(1)[:120] if match else ""
 
 
 def _loads_vector(value: str) -> list[float]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for loads vector within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     try:
         parsed = json.loads(value or "[]")
         return [float(item) for item in parsed]
@@ -638,6 +1236,26 @@ def _loads_vector(value: str) -> list[float]:
 
 
 def _safe_json(value: str, default: Any) -> Any:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for safe json within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     try:
         return json.loads(value or "")
     except Exception:
@@ -645,6 +1263,26 @@ def _safe_json(value: str, default: Any) -> Any:
 
 
 def _filter_column(field_name: str):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for filter column within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {
         "workspace": KnowledgeChunkModel.workspace_id,
         "document": KnowledgeChunkModel.document_id,
@@ -659,6 +1297,26 @@ def _filter_column(field_name: str):
 
 
 def _filter_column_name(field_name: str) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for filter column name within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {
         "workspace": "workspace_id",
         "document": "document_id",
@@ -673,14 +1331,74 @@ def _filter_column_name(field_name: str) -> str | None:
 
 
 def _missing_required_embedding_key(settings: Settings) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for missing required embedding key within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return settings.embedding_provider == "openai" and not settings.openai_api_key
 
 
 def _pgvector_ready(db: Session) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for pgvector ready within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return db.bind is not None and db.bind.dialect.name == "postgresql"
 
 
 def _ensure_pgvector_schema(db: Session) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for ensure pgvector schema within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not _pgvector_ready(db):
         return
     db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
@@ -694,6 +1412,26 @@ def _ensure_pgvector_schema(db: Session) -> None:
 
 
 def _store_pgvector_embedding(db: Session, chunk_id: str, vector: list[float]) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for store pgvector embedding within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     db.execute(
         text("UPDATE knowledge_chunks SET embedding = CAST(:embedding AS vector) WHERE id = :chunk_id"),
         {"embedding": _pgvector_literal(vector), "chunk_id": chunk_id},
@@ -701,10 +1439,50 @@ def _store_pgvector_embedding(db: Session, chunk_id: str, vector: list[float]) -
 
 
 def _pgvector_literal(vector: list[float]) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for pgvector literal within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return "[" + ",".join(f"{value:.8f}" for value in vector) + "]"
 
 
 def _metadata_score(question_tokens: set[str], chunk: KnowledgeChunkModel) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for metadata score within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     metadata = " ".join(
         [
             chunk.module_name,
@@ -722,6 +1500,26 @@ def _metadata_score(question_tokens: set[str], chunk: KnowledgeChunkModel) -> fl
 
 
 def _utc_now():
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for utc now within rag_retrieval_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in rag_retrieval_service.py.
+    
+    Where it fits in the flow:
+        Upload/approval -> chunk/embed/store -> semantic or fallback retrieval -> reasoning evidence.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     from legacydb_copilot.common import utc_now
 
     return utc_now()

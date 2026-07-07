@@ -63,6 +63,26 @@ def understand_question(
     entities: EntityExtractionResult,
     ranked_objects: list[RankedObject],
 ) -> QuestionUnderstanding:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles understand question within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     business_process = entities.likely_module or "database process"
     object_names = [item.name for item in ranked_objects[:6]]
     entity_values = [entity.value for entity in entities.entities if entity.entity_type not in {"application_name"}]
@@ -97,6 +117,26 @@ def generate_hypotheses(
     entities: EntityExtractionResult,
     metadata: MetadataSearchResult,
 ) -> list[InvestigationHypothesis]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles generate hypotheses within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     tables = [table.name for table in metadata.tables[:5]]
     procedures = metadata.procedures[:5]
     logs = [table.name for table in metadata.tables if any(term in table.name.lower() for term in ("log", "audit", "history", "job", "batch"))][:5]
@@ -210,6 +250,26 @@ def evaluate_hypotheses(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None = None,
 ) -> list[HypothesisEvaluation]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles evaluate hypotheses within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     evaluations: list[HypothesisEvaluation] = []
     row_text = " ".join(str(row) for item in evidence for row in item.rows[:20])
     evidence_text = " ".join(
@@ -329,6 +389,26 @@ def build_event_chain(
     procedure_analysis: list[ProcedureAnalysis],
     correlated_evidence: list[CorrelatedEvidence],
 ) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles build event chain within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if top_hypothesis is None or not top_hypothesis.supporting_evidence:
         return ["Unable to confirm. Additional evidence required."]
     chain = ["User-reported condition was mapped to relevant database objects."]
@@ -348,6 +428,26 @@ def discover_process_graph(
     metadata: MetadataSearchResult,
     procedure_analysis: list[ProcedureAnalysis],
 ) -> list[tuple[str, str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles discover process graph within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     edges: list[tuple[str, str]] = []
     for proc in procedure_analysis:
         for table in proc.tables_read:
@@ -376,6 +476,26 @@ def run_hypothesis_investigation(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None = None,
 ) -> HypothesisReasoningResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles run hypothesis investigation within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     understanding = understand_question(
         question=question,
         intent=intent,

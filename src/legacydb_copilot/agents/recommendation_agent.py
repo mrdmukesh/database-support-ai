@@ -25,6 +25,26 @@ def recommend_actions(
     reasoning: ReasoningResult,
     correlated_evidence: list[CorrelatedEvidence],
 ) -> RecommendationResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles recommend actions within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     evidence_ref = _evidence_reference(correlated_evidence)
     has_write_proc = any("writes" in item.finding.lower() and "writes 0" not in item.finding.lower() for item in correlated_evidence)
     has_sql_errors = any(item.evidence_type == "SQL" and item.confidence == "Low" for item in correlated_evidence)
@@ -106,6 +126,26 @@ def recommend_actions(
 
 
 def _evidence_reference(correlated_evidence: list[CorrelatedEvidence]) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for evidence reference within recommendation_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in recommendation_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     for item in correlated_evidence:
         if item.confidence in {"High", "Medium"}:
             return f"{item.evidence_type} - {item.subject}"

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
@@ -53,12 +53,52 @@ class ProductionReadSafetyValidator:
         row_estimates: dict[str, int] | None = None,
         engine_type: str | None = None,
     ) -> None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for init within safe_sql_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in safe_sql_service.py.
+        
+        Where it fits in the flow:
+            Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+        
+        Safety considerations:
+            Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+        """
         self.max_rows = max_rows
         self.allow_full_table_scan = allow_full_table_scan
         self.row_estimates = {key.lower(): value for key, value in (row_estimates or {}).items()}
         self.engine_type = (engine_type or "").lower()
 
     def validate(self, sql: str) -> ProductionReadSafetyResult:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles validate within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+        
+        Safety considerations:
+            Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+        """
         stripped = sql.strip().rstrip(";")
         normalized = _sql_without_literals_and_comments(stripped)
         command = _first_sql_word(normalized)
@@ -88,6 +128,26 @@ class ProductionReadSafetyValidator:
         raise ValueError("Production scan protection rejected unrestricted table scan")
 
     def _can_auto_limit(self, table_name: str) -> bool:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for can auto limit within safe_sql_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in safe_sql_service.py.
+        
+        Where it fits in the flow:
+            Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+        
+        Safety considerations:
+            Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+        """
         normalized_table = _unquote_identifier(table_name).lower().split(".")[-1]
         estimate = self.row_estimates.get(normalized_table) or self.row_estimates.get(_unquote_identifier(table_name).lower())
         if estimate is not None:
@@ -140,6 +200,26 @@ _WRITE_LOCK_CLAUSES = re.compile(r"\b(for\s+update|lock\s+in\s+share\s+mode)\b",
 
 
 def _sql_without_literals_and_comments(sql: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for sql without literals and comments within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     without_block_comments = re.sub(r"/\*.*?\*/", " ", sql, flags=re.S)
     without_line_comments = re.sub(r"--[^\r\n]*", " ", without_block_comments)
     without_single_quotes = re.sub(r"'(?:''|[^'])*'", "''", without_line_comments)
@@ -149,20 +229,100 @@ def _sql_without_literals_and_comments(sql: str) -> str:
 
 
 def _first_sql_word(sql: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for first sql word within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     match = re.match(r"\s*([a-zA-Z_][a-zA-Z0-9_]*)\b", sql)
     return match.group(1).lower() if match else ""
 
 
 def _unquote_identifier(value: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for unquote identifier within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return value.strip().strip("`[]\"")
 
 
 def _first_from_table(sql: str) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for first from table within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     match = re.search(r"\bfrom\s+([`\"\[\]\w.]+)", sql, re.I)
     return match.group(1) if match else None
 
 
 def _is_allowed_metadata_table(table_name: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for is allowed metadata table within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     normalized = _unquote_identifier(table_name).lower()
     return normalized in {
         "information_schema.tables",
@@ -172,18 +332,98 @@ def _is_allowed_metadata_table(table_name: str) -> bool:
 
 
 def _is_count_discovery(sql: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for is count discovery within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return bool(re.match(r"\s*select\s+count\s*\(\s*\*\s*\)(\s+as\s+\w+)?\s+from\s+[`\"\[\]\w.]+\s*$", sql, re.I))
 
 
 def _has_where_clause(sql: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for has where clause within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return bool(re.search(r"\bwhere\b", sql, re.I))
 
 
 def _has_limit_clause(sql: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for has limit clause within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return bool(re.search(r"\blimit\s+\d+\b", sql, re.I) or re.match(r"\s*select\s+top\s+\d+\b", sql, re.I))
 
 
 def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for add exploration limit within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     if _has_limit_clause(sql):
         return sql
     if (engine_type or "").lower() == "sql_server":
@@ -232,11 +472,51 @@ def validate_read_only_sql(sql: str) -> None:
 
 
 def ensure_limit(sql: str, limit: int = 25) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles ensure limit within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     stripped = sql.strip().rstrip(";")
     return stripped
 
 
 def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, engine_type: str | None = None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for where for table within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     filters: list[str] = []
     business_values = [
         entity.value
@@ -256,6 +536,26 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
 
 
 def _find_column(table: TableMetadata, required_terms: tuple[str, ...], optional_terms: tuple[str, ...] = ()) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for find column within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     candidates = []
     for column in table.columns:
         lowered = column.lower()
@@ -269,6 +569,26 @@ def _find_column(table: TableMetadata, required_terms: tuple[str, ...], optional
 
 
 def _missing_target_terms(entities: EntityExtractionResult) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for missing target terms within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     stop = {"missing", "records", "record", "where", "with", "without", "find", "show", "group", "root", "cause", "caused"}
     terms = {term.lower() for term in (entities.business_keywords or []) if len(term) >= 3 and term.lower() not in stop}
     for entity in entities.entities:
@@ -277,12 +597,52 @@ def _missing_target_terms(entities: EntityExtractionResult) -> set[str]:
 
 
 def _duplicate_target_terms(entities: EntityExtractionResult) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate target terms within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     stop = {"duplicate", "duplicates", "multiple", "active", "open", "valid", "created", "create", "where", "with", "why", "did", "two"}
     terms = {term.lower() for term in (entities.business_keywords or []) if len(term) >= 3 and term.lower() not in stop}
     return terms
 
 
 def _status_literal_from_terms(terms: list[str], table: TableMetadata) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for status literal from terms within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     table_tokens = set(re.split(r"[_\-\s]+", table.name.lower()))
     for column in table.columns:
         table_tokens.update(part for part in re.split(r"[_\-\s]+", column.lower()) if part)
@@ -298,6 +658,26 @@ def _status_literal_from_terms(terms: list[str], table: TableMetadata) -> str | 
 
 
 def _performance_target_table(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> tuple[TableMetadata | None, list[str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for performance target table within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     question_text = " ".join(entities.business_keywords or [])
     problem = parse_problem_phrase(question_text)
     terms = problem.target_terms or [
@@ -314,6 +694,26 @@ def _performance_target_table(metadata: MetadataSearchResult, entities: EntityEx
 
 
 def _index_inspection_query(table: TableMetadata, engine_type: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for index inspection query within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     engine = (engine_type or "").lower()
     escaped = table.name.replace("'", "''")
     if engine == "mysql":
@@ -342,6 +742,26 @@ ORDER BY i.name, ic.key_ordinal
 
 
 def _performance_queries(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for performance queries within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     table, terms = _performance_target_table(metadata, entities)
     if table is None:
         return []
@@ -393,6 +813,26 @@ def _performance_queries(metadata: MetadataSearchResult, entities: EntityExtract
 
 
 def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> MissingChildFlow | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for infer missing child flow within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     question_text = " ".join(entities.business_keywords or [])
     problem = parse_problem_phrase(question_text)
     parsed_terms = set(problem.target_terms)
@@ -442,6 +882,26 @@ def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityEx
 
 
 def _infer_duplicate_child_flow(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> DuplicateChildFlow | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for infer duplicate child flow within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     question_text = " ".join(entities.business_keywords or [])
     problem = parse_problem_phrase(question_text)
     parsed_terms = set(problem.target_terms)
@@ -489,6 +949,26 @@ def _infer_duplicate_child_flow(metadata: MetadataSearchResult, entities: Entity
 
 
 def _missing_child_candidate_query(flow: MissingChildFlow) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for missing child candidate query within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     status_select = f"p.{flow.parent_status} AS parent_status," if flow.parent_status else "NULL AS parent_status,"
     child_label_select = f"c.{flow.child_label} AS child_reference," if flow.child_label else "NULL AS child_reference,"
     return f"""
@@ -508,6 +988,26 @@ ORDER BY p.{flow.parent_label}
 
 
 def _missing_child_summary_query(flow: MissingChildFlow) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for missing child summary query within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return f"""
 SELECT
     issue_type,
@@ -530,10 +1030,50 @@ ORDER BY issue_count DESC
 
 
 def _duplicate_child_query(flow: DuplicateChildFlow) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate child query within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return _duplicate_child_query_for_engine(flow, None)
 
 
 def _duplicate_parent_lookup_query(flow: DuplicateChildFlow) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate parent lookup query within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     escaped = (flow.parent_key_value or "").replace("'", "''")
     child_count_alias = f"{flow.child_table.name.rstrip('s')}_count"
     parent_filter = f"\nWHERE p.{flow.parent_label} = '{escaped}'" if flow.parent_key_value else ""
@@ -549,6 +1089,26 @@ GROUP BY p.{flow.parent_id}, p.{flow.parent_label}
 
 
 def _duplicate_child_detail_query_for_engine(flow: DuplicateChildFlow, engine_type: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate child detail query for engine within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     child_columns = [
         column
         for column in flow.child_table.columns
@@ -578,6 +1138,26 @@ ORDER BY p.{flow.parent_label}{', c.' + flow.child_label if flow.child_label els
 
 
 def _duplicate_child_query_for_engine(flow: DuplicateChildFlow, engine_type: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate child query for engine within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     child_name = flow.child_table.name.rstrip("s")
     count_alias = f"{child_name}_count" if flow.child_status else f"duplicate_{child_name}_count"
     records_alias = f"{child_name}_numbers" if flow.child_label and "number" in flow.child_label.lower() else f"{child_name}_records"
@@ -604,6 +1184,26 @@ HAVING COUNT(*) > 1
 
 
 def _duplicate_like_investigation(intent: InvestigationIntent, entities: EntityExtractionResult) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate like investigation within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     if intent == InvestigationIntent.DUPLICATE_DATA:
         return True
     if intent != InvestigationIntent.PRODUCTION_INVESTIGATION:
@@ -713,6 +1313,26 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
 
 
 def _cast_to_text(expression: str, engine_type: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for cast to text within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     engine = (engine_type or "").lower()
     if engine == "sql_server":
         return f"CAST({expression} AS NVARCHAR(MAX))"
@@ -726,6 +1346,26 @@ def _cast_to_text(expression: str, engine_type: str | None) -> str:
 
 
 def _string_aggregate(expression: str, engine_type: str | None, order_by: str | None = None, distinct: bool = False) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for string aggregate within safe_sql_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in safe_sql_service.py.
+    
+    Where it fits in the flow:
+        Intent and metadata -> safe SQL planner -> validator -> evidence collector.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     engine = (engine_type or "").lower()
     value = _cast_to_text(expression, engine_type)
     if distinct:

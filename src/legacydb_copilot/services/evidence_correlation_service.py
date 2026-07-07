@@ -23,6 +23,26 @@ def correlate_evidence(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
 ) -> list[CorrelatedEvidence]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles correlate evidence within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     correlated: list[CorrelatedEvidence] = []
     for item in evidence:
         if item.error:
@@ -64,6 +84,26 @@ def correlate_evidence(
 
 
 def _sample_row(rows: list[dict[str, Any]]) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for sample row within evidence_correlation_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_correlation_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     if not rows:
         return ""
     row = rows[0]

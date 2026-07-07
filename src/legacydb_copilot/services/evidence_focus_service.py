@@ -52,6 +52,26 @@ def build_evidence_focus(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
 ) -> EvidenceFocus:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles build evidence focus within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     affected_object, affected_reason = _identify_affected_object(question, metadata, evidence)
     business_key, business_key_reason = _infer_business_key(intent, affected_object, metadata, evidence)
     write_graph = _write_path_graph(affected_object, procedure_analysis)
@@ -82,6 +102,26 @@ def build_evidence_focus(
 
 
 def _identify_affected_object(question: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for identify affected object within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     table_scores: dict[str, float] = {table.name: 0.0 for table in metadata.tables}
     table_lookup = {table.name.lower(): table.name for table in metadata.tables}
     question_l = question.lower()
@@ -116,6 +156,26 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
 
 
 def _infer_business_key(intent: InvestigationIntent, affected_object: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str | None, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for infer business key within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     table = _table(metadata, affected_object)
     if table is None:
         return None, "No affected table metadata available."
@@ -140,6 +200,26 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, metad
 
 
 def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult]) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for parent business key from duplicate evidence within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     for item in evidence:
         purpose = item.purpose.lower()
         sql = item.sql
@@ -167,6 +247,26 @@ def _rank_procedures(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
 ) -> list[ProcedureRank]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for rank procedures within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     related = set(_related_tables(affected_object, metadata))
     evidence_text = " ".join([item.purpose + " " + item.sql for item in evidence] + [str(row) for item in evidence for row in item.rows[:5]]).lower()
     correlated_text = " ".join(item.subject + " " + item.finding + " " + item.support for item in correlated_evidence).lower()
@@ -229,6 +329,26 @@ def _rank_procedures(
 
 
 def _confirmed_facts(evidence: list[EvidenceResult], ranked_procedures: list[ProcedureRank], affected_object: str, business_key: str | None) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for confirmed facts within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     facts = [f"Affected object: {affected_object}."]
     if business_key:
         facts.append(f"Inferred business key: {business_key}.")
@@ -245,6 +365,26 @@ def _confirmed_facts(evidence: list[EvidenceResult], ranked_procedures: list[Pro
 
 
 def _duplicate_facts_from_rows(rows: list[dict], affected_object: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate facts from rows within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     facts: list[str] = []
     for row in rows[:3]:
         parent = row.get("parent_reference") or row.get("order_number") or row.get("business_key")
@@ -261,6 +401,26 @@ def _duplicate_facts_from_rows(rows: list[dict], affected_object: str) -> list[s
 
 
 def _inferred_findings(intent: InvestigationIntent, ranked_procedures: list[ProcedureRank], evidence: list[EvidenceResult], documents: list[RetrievedDocument]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for inferred findings within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     findings: list[str] = []
     if ranked_procedures and ranked_procedures[0].writes_affected_object:
         support = "error-log evidence" if ranked_procedures[0].error_log_support else "procedure metadata"
@@ -277,6 +437,26 @@ def _inferred_findings(intent: InvestigationIntent, ranked_procedures: list[Proc
 
 
 def _hypotheses(intent: InvestigationIntent, affected_object: str, business_key: str | None, ranked_procedures: list[ProcedureRank], evidence: list[EvidenceResult]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for hypotheses within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     hypotheses: list[str] = []
     if ranked_procedures and ranked_procedures[0].writes_affected_object:
         hypotheses.append(f"Direct write logic in {ranked_procedures[0].procedure} may explain the observed evidence for {affected_object}.")
@@ -292,6 +472,26 @@ def _hypotheses(intent: InvestigationIntent, affected_object: str, business_key:
 
 
 def _self_validation(affected_object: str, ranked_procedures: list[ProcedureRank], confirmed: list[str], hypotheses: list[str]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for self validation within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     top = ranked_procedures[0] if ranked_procedures else None
     graph_has_chosen = bool(top and (top.writes_affected_object or top.reads_affected_object))
     return [
@@ -310,6 +510,26 @@ def _self_validation(affected_object: str, ranked_procedures: list[ProcedureRank
 
 
 def _duplicate_target_table(question: str, metadata: MetadataSearchResult) -> TableMetadata | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate target table within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     lowered = question.lower()
     target_terms: list[str] = []
     for pattern in (
@@ -333,6 +553,26 @@ def _duplicate_target_table(question: str, metadata: MetadataSearchResult) -> Ta
 
 
 def _write_path_graph(affected_object: str, procedure_analysis: list[ProcedureAnalysis]) -> list[tuple[str, str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for write path graph within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     edges: list[tuple[str, str]] = []
     affected_l = affected_object.lower()
     for proc in procedure_analysis:
@@ -349,6 +589,26 @@ def _write_path_graph(affected_object: str, procedure_analysis: list[ProcedureAn
 
 
 def _related_tables(affected_object: str, metadata: MetadataSearchResult) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for related tables within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     related: set[str] = set()
     affected_l = affected_object.lower()
     for table in metadata.tables:
@@ -362,6 +622,26 @@ def _related_tables(affected_object: str, metadata: MetadataSearchResult) -> lis
 
 
 def _tables_in_sql(sql: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for tables in sql within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return list(
         dict.fromkeys(
             _clean_identifier(match.group(1))
@@ -371,6 +651,26 @@ def _tables_in_sql(sql: str) -> list[str]:
 
 
 def _duplicate_group_columns(evidence: list[EvidenceResult]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for duplicate group columns within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     columns: list[str] = []
     for item in evidence:
         if "duplicate" not in item.purpose.lower():
@@ -386,6 +686,26 @@ def _duplicate_group_columns(evidence: list[EvidenceResult]) -> list[str]:
 
 
 def _error_log_supports(procedure_name: str, affected_object: str, evidence: list[EvidenceResult]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for error log supports within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     proc_l = procedure_name.lower()
     affected_terms = _object_terms(affected_object)
     for item in evidence:
@@ -401,6 +721,26 @@ def _error_log_supports(procedure_name: str, affected_object: str, evidence: lis
 
 
 def _job_history_supports(procedure_name: str, evidence: list[EvidenceResult]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for job history supports within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     proc_l = procedure_name.lower()
     for item in evidence:
         source = f"{item.purpose} {item.sql}".lower()
@@ -412,18 +752,98 @@ def _job_history_supports(procedure_name: str, evidence: list[EvidenceResult]) -
 
 
 def _object_terms(affected_object: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for object terms within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     lowered = affected_object.lower()
     singular = lowered[:-1] if lowered.endswith("s") else lowered
     return {lowered, singular, singular.replace("_", " "), lowered.replace("_", " ")}
 
 
 def _table(metadata: MetadataSearchResult, name: str) -> TableMetadata | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for table within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return next((table for table in metadata.tables if table.name.lower() == name.lower()), None)
 
 
 def _is_primary_key(column: str, table: TableMetadata) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for is primary key within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return column in (table.primary_key or []) or column.lower() == "id" or column.lower().endswith("_id")
 
 
 def _clean_identifier(value: Any) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for clean identifier within evidence_focus_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_focus_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return str(value).strip("`[]\"").split(".")[-1]

@@ -122,6 +122,26 @@ def run_evidence_gate(
 
 
 def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles unreproduced reasoning within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return ReasoningResult(
         summary=UNREPRODUCED_MESSAGE,
         likely_root_causes=[UNREPRODUCED_MESSAGE],
@@ -148,6 +168,26 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
 
 
 def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus | None) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for affected rows exist within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     if not evidence_focus or evidence_focus.affected_object == "Not determined":
         return any(item.rows for item in evidence)
     affected = evidence_focus.affected_object.lower()
@@ -155,6 +195,26 @@ def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: Evidenc
 
 
 def _relationship_exists(metadata: MetadataSearchResult, evidence: list[EvidenceResult], evidence_focus: EvidenceFocus | None) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for relationship exists within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     if any(item.rows and " join " in f" {item.sql.lower()} " for item in evidence):
         return True
     affected = evidence_focus.affected_object.lower() if evidence_focus else ""
@@ -175,6 +235,26 @@ def _reported_condition_exists(
     documents: list[RetrievedDocument],
     status_notes: list[str],
 ) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for reported condition exists within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         rows = [row for item in evidence if "duplicate" in item.purpose.lower() for row in item.rows]
         if not rows:
@@ -190,6 +270,26 @@ def _reported_condition_exists(
 
 
 def _row_has_open_status(row: dict[str, Any], documents: list[RetrievedDocument], status_notes: list[str]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for row has open status within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     values: list[str] = []
     for key, value in row.items():
         if "status" in key.lower() or "state" in key.lower():
@@ -217,6 +317,26 @@ def _row_has_open_status(row: dict[str, Any], documents: list[RetrievedDocument]
 
 
 def _extract_documented_statuses(text: str, markers: tuple[str, ...]) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for extract documented statuses within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     statuses: set[str] = set()
     for marker in markers:
         for match in re.finditer(rf"{marker}[^.\n:]*[:=]\s*([a-zA-Z0-9_, /\-]+)", text):
@@ -225,6 +345,26 @@ def _extract_documented_statuses(text: str, markers: tuple[str, ...]) -> set[str
 
 
 def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for has explain or row estimate within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     for item in evidence:
         text = f"{item.purpose} {item.sql}".upper()
         if "EXPLAIN" in text and (item.rows or item.error is None):
@@ -235,11 +375,51 @@ def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
 
 
 def _row_contains(row: dict[str, Any], value: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for row contains within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     needle = value.lower()
     return any(needle == str(item).lower() or needle in str(item).lower() for item in row.values())
 
 
 def _condition_blocker(intent: InvestigationIntent) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for condition blocker within evidence_gate_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_gate_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     if intent == InvestigationIntent.DUPLICATE_DATA:
         return "Duplicate condition was not confirmed by returned rows."
     if intent == InvestigationIntent.PRODUCTION_INVESTIGATION:

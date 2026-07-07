@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from dataclasses import asdict, replace
@@ -83,11 +83,51 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 def _title_from_question(question: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for title from question within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     clean = " ".join(question.strip().split())
     return clean[:72] or "New conversation"
 
 
 def _build_placeholder_answer(question: str, findings: tuple[SafetyFinding, ...]) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for build placeholder answer within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if SafetyFinding.PROMPT_INJECTION in findings:
         return (
             "I detected prompt-injection language. I cannot follow instructions that try to "
@@ -110,10 +150,50 @@ def _build_placeholder_answer(question: str, findings: tuple[SafetyFinding, ...]
 
 
 def _sql_block(sql: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for sql block within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     return "```sql\n" + sql.strip() + "\n```"
 
 
 def _evidence_sql_block(item) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for evidence sql block within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     if not getattr(item, "safety_note", None):
         return _sql_block(item.sql)
     return (
@@ -127,6 +207,26 @@ def _evidence_sql_block(item) -> str:
 
 
 def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> DatabaseConnectionModel | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for find workspace connection within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return (
         db.query(DatabaseConnectionModel)
         .filter(
@@ -144,6 +244,26 @@ def _get_or_create_conversation(
     db: Session,
     payload: ChatAskRequest,
 ) -> ChatConversationModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for get or create conversation within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if payload.conversation_id:
         conversation = db.get(ChatConversationModel, payload.conversation_id)
         if conversation is None:
@@ -172,6 +292,26 @@ def _get_or_create_conversation(
 
 
 def _evidence_to_json(evidence) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for evidence to json within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return json.dumps(
         [
             {
@@ -188,6 +328,26 @@ def _evidence_to_json(evidence) -> str:
 
 
 def _empty_investigation_metadata() -> dict[str, Any]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for empty investigation metadata within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {
         "investigation_id": None,
         "detected_intent": "UNKNOWN",
@@ -201,6 +361,26 @@ def _empty_investigation_metadata() -> dict[str, Any]:
 
 
 def _approved_knowledge_context(db: Session, payload: ChatAskRequest) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for approved knowledge context within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     approved_matches = get_knowledge_retriever().retrieve(
         db,
         KnowledgeQuery(
@@ -227,10 +407,50 @@ def _approved_knowledge_context(db: Session, payload: ChatAskRequest) -> str:
 
 
 def _tokens(value: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for tokens within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {token.strip(".,:;()[]{}").lower() for token in value.split() if len(token.strip(".,:;()[]{}")) >= 3}
 
 
 def _format_retrieved_items(items, *, empty: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for format retrieved items within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not items:
         return f"- {empty}"
     return "\n".join(
@@ -240,6 +460,26 @@ def _format_retrieved_items(items, *, empty: str) -> str:
 
 
 def _previous_investigation_matches(db: Session, payload: ChatAskRequest, *, limit: int = 5) -> list[InvestigationModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for previous investigation matches within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     question_tokens = _tokens(payload.question)
     candidates = (
         db.query(InvestigationModel)
@@ -262,6 +502,26 @@ def _previous_investigation_matches(db: Session, payload: ChatAskRequest, *, lim
 
 
 def _workspace_name(db: Session, workspace_id: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for workspace name within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     workspace = db.get(WorkspaceModel, workspace_id)
     return workspace.name if workspace else workspace_id
 
@@ -278,6 +538,26 @@ def _generate_lightweight_report(
     summary: str,
     sections: list[ReportSection],
 ) -> tuple[dict[str, str], str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for generate lightweight report within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     report = InvestigationReport(
         cover=ReportCover(
             title="Enterprise Investigation Report",
@@ -322,6 +602,26 @@ def _run_knowledge_search(
     entities,
     mode: ModeClassification,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for run knowledge search within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     retriever = get_knowledge_retriever()
     semantic_matches = retriever.retrieve(
         db,
@@ -451,6 +751,26 @@ def _run_knowledge_search(
 
 
 def _target_object_not_found(question: str, metadata, intent=None) -> tuple[bool, str, list[str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for target object not found within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if intent and intent.intent == InvestigationIntent.STORED_PROCEDURE_ANALYSIS:
         return False, "", []
     problem = parse_problem_phrase(question)
@@ -478,6 +798,26 @@ def _object_not_found_answer(
     context,
     database_name: str,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for object not found answer within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     searched = [
         "database tables",
         "database views",
@@ -573,6 +913,26 @@ def _run_business_rule_discovery(
     entities,
     mode: ModeClassification,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for run business rule discovery within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     retriever = get_knowledge_retriever()
     documents = retriever.retrieve(
         db,
@@ -690,6 +1050,26 @@ def _run_business_rule_discovery(
 
 
 def _discovered_target_context(ranking, procedure_analysis) -> dict[str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for discovered target context within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     target = next((item.name for item in ranking.objects if item.object_type == "table"), "")
     if not target and ranking.metadata.tables:
         target = ranking.metadata.tables[0].name
@@ -729,6 +1109,26 @@ def _discovered_target_context(ranking, procedure_analysis) -> dict[str, str]:
 
 
 def _self_validation_lines(*, target_context: dict[str, str], evidence, hypothesis_reasoning) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for self validation lines within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     inspected_target = any(target_context["target"] in item.purpose or target_context["target"] in item.sql for item in evidence)
     conclusions_have_evidence = any(item.supporting_evidence for item in hypothesis_reasoning.ranked_root_causes)
     unrelated_ignored = len(hypothesis_reasoning.ranked_root_causes) > 0
@@ -743,6 +1143,26 @@ def _self_validation_lines(*, target_context: dict[str, str], evidence, hypothes
 
 
 def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for ai reasoning status within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     settings = Settings.from_env()
     if llm_used:
         return {
@@ -786,6 +1206,26 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
 
 
 def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> list[ReportSection]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verification sections from models within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     suggested_rows = [
         {
             "Claim to verify": item.claim,
@@ -894,6 +1334,26 @@ def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> 
 
 
 def _regenerate_report_with_verification(db: Session, investigation: InvestigationModel) -> dict[str, str] | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for regenerate report with verification within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if not investigation.report_snapshot_json:
         return None
     report = report_from_dict(json.loads(investigation.report_snapshot_json))
@@ -918,6 +1378,26 @@ def _run_dynamic_investigation(
     payload: ChatAskRequest,
     generated_by: str,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for run dynamic investigation within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     intent = detect_intent(payload.question)
     entities = extract_entities(payload.question)
     mode = classify_investigation_mode(payload.question, intent)
@@ -1291,6 +1771,26 @@ def _run_dynamic_investigation(
 
 
 def _expand_related_id_evidence(connector, metadata, evidence):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for expand related id evidence within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     related = []
     seen_sql = {item.sql for item in evidence}
     id_values: dict[str, set[Any]] = {}
@@ -1469,6 +1969,26 @@ def _get_verification_investigation(
     investigation_id: str,
     current_user,
 ) -> InvestigationModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for get verification investigation within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     investigation = db.get(InvestigationModel, investigation_id)
     if investigation is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -1477,6 +1997,26 @@ def _get_verification_investigation(
 
 
 def _active_connector_for_investigation(db: Session, investigation: InvestigationModel):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for active connector for investigation within chat.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in chat.py.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     connection = (
         db.query(DatabaseConnectionModel)
         .filter(
@@ -1507,6 +2047,26 @@ def list_verification_checks(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> list[VerificationCheckModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list verification checks within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     investigation = _get_verification_investigation(db, investigation_id, current_user)
     return list(
         db.query(VerificationCheckModel)
@@ -1523,6 +2083,26 @@ def run_verification_check(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> VerificationCheckModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles run verification check within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     check = db.get(VerificationCheckModel, check_id)
     if check is None:
         raise HTTPException(status_code=404, detail="Verification check not found")
@@ -1569,6 +2149,26 @@ def skip_verification_check(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> VerificationCheckModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles skip verification check within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     check = db.get(VerificationCheckModel, check_id)
     if check is None:
         raise HTTPException(status_code=404, detail="Verification check not found")
@@ -1602,6 +2202,26 @@ def run_all_verification_checks(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> dict[str, object]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles run all verification checks within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     investigation = _get_verification_investigation(db, investigation_id, current_user)
     connector = _active_connector_for_investigation(db, investigation)
     checks = list(
@@ -1663,6 +2283,26 @@ def list_chat_conversations(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> list[ChatConversationModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list chat conversations within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     assert_same_user(current_user, user_id)
     require_workspace_access(db, current_user, workspace_id, action="read")
@@ -1687,6 +2327,26 @@ def list_chat_messages(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> list[ChatMessageModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list chat messages within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Auth/RBAC -> intent/entities -> context -> safe SQL -> evidence -> reasoning -> verification suggestions -> report.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     assert_same_user(current_user, user_id)
     require_workspace_access(db, current_user, workspace_id, action="read")

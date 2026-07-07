@@ -29,6 +29,26 @@ def create_document(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("documents:manage")),
 ) -> DocumentModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles create document within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        HTTP request -> auth/RBAC -> service call -> persistence/audit -> response.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     assert_same_organization(current_user, payload.organization_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="upload")
     try:
@@ -189,6 +209,26 @@ def list_documents(
     current_user=Depends(require_permission("documents:read")),
     workspace_id: str | None = None,
 ) -> list[DocumentModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list documents within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        HTTP request -> auth/RBAC -> service call -> persistence/audit -> response.
+    
+    Safety considerations:
+        Document indexing must remain workspace-scoped and must not index unapproved live database rows.
+    """
     assert_same_organization(current_user, organization_id)
     query = db.query(DocumentModel).filter(
         DocumentModel.organization_id == organization_id,

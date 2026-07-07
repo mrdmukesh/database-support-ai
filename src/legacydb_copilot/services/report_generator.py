@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -75,6 +75,26 @@ class GeneratedReport:
     xlsx_path: Path
 
     def links(self) -> dict[str, str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles links within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Report generation must describe supplied evidence and must not execute SQL.
+        """
         base = f"/reports/{self.investigation_id}"
         return {
             "investigation_id": self.investigation_id,
@@ -91,20 +111,100 @@ REPORT_VERSION = "1.0"
 
 
 def now_label() -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles now label within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def new_investigation_id() -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles new investigation id within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     return f"INV-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:8].upper()}"
 
 
 def report_output_dir(investigation_id: str) -> Path:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles report output dir within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     path = REPORT_HISTORY_DIR / investigation_id
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def report_file_stem(report: InvestigationReport) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles report file stem within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     title = report.executive_summary.issue_title or report.cover.title
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", title).strip("_").lower()
     slug = re.sub(r"_+", "_", slug)[:70].strip("_") or "investigation_report"
@@ -112,6 +212,26 @@ def report_file_stem(report: InvestigationReport) -> str:
 
 
 def render_html(report: InvestigationReport) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles render html within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape=select_autoescape(["html", "xml"]),
@@ -121,10 +241,50 @@ def render_html(report: InvestigationReport) -> str:
 
 
 def write_html(report: InvestigationReport, output_path: Path) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles write html within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     output_path.write_text(render_html(report), encoding="utf-8")
 
 
 def rows_to_table(title: str, rows: list[dict[str, Any]], preferred_columns: list[str]) -> ReportTable:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles rows to table within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     columns = [column for column in preferred_columns if any(column in row for row in rows)]
     if not columns and rows:
         columns = list(rows[0].keys())

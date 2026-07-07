@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
@@ -20,6 +20,26 @@ class EntityExtractionResult:
 
 
 def _unique(entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for unique within entity_extraction_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in entity_extraction_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     seen: set[tuple[str, str]] = set()
     result: list[ExtractedEntity] = []
     for entity in entities:

@@ -37,51 +37,331 @@ class BaseDatabaseAdapter(ABC):
     engine_type: DatabaseEngine
 
     def __init__(self, engine: Engine):
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for init within adapters.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in adapters.py.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         self.engine = engine
 
     def list_tables(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list tables within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_table_names(schema=None)
 
     def list_views(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list views within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_view_names(schema=None)
 
     def list_columns(self, table_name: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list columns within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_columns(table_name)
 
     def list_indexes(self, table_name: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list indexes within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_indexes(table_name)
 
     def list_foreign_keys(self, table_name: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list foreign keys within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_foreign_keys(table_name)
 
     def get_primary_key(self, table_name: str) -> dict[str, Any]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get primary key within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return inspect(self.engine).get_pk_constraint(table_name)
 
     def list_procedures(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list procedures within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return []
 
     def get_procedure_definition(self, procedure_name: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get procedure definition within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return ""
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return "unknown"
 
     def estimate_table_rows(self, table_name: str) -> int | None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles estimate table rows within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         return None
 
     def explain_query(self, sql: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles explain query within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         explain_sql = sql if sql.strip().lower().startswith("explain") else f"EXPLAIN {sql}"
         with self.engine.connect() as conn:
             result = conn.execute(text(explain_sql))
             return [dict(row._mapping) for row in result.fetchall()]
 
     def execute_read_only_query(self, sql: str, limit: int = 1000) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles execute read only query within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         sql = self.apply_limit(sql, limit)
         with self.engine.connect() as conn:
             result = conn.execute(text(sql))
             return [dict(row._mapping) for row in result.fetchall()]
 
     def apply_limit(self, sql: str, limit: int) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles apply limit within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         stripped = sql.strip().rstrip(";")
         lowered = stripped.lower()
         if not lowered.startswith("select") or _has_limit_clause(lowered):
@@ -93,6 +373,26 @@ class MySQLAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.MYSQL
 
     def list_procedures(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list procedures within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             result = conn.execute(
                 text(
@@ -103,6 +403,26 @@ class MySQLAdapter(BaseDatabaseAdapter):
             return [row[0] for row in result.fetchall()]
 
     def get_procedure_definition(self, procedure_name: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get procedure definition within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             row = conn.execute(
                 text(
@@ -114,10 +434,50 @@ class MySQLAdapter(BaseDatabaseAdapter):
             return row[0] if row and row[0] else ""
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT VERSION()")).scalar() or "unknown"
 
     def estimate_table_rows(self, table_name: str) -> int | None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles estimate table rows within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             value = conn.execute(
                 text(
@@ -133,12 +493,52 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.POSTGRESQL
 
     def list_procedures(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list procedures within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         try:
             return inspect(self.engine).get_function_names() or []
         except Exception:
             return []
 
     def get_procedure_definition(self, procedure_name: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get procedure definition within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             row = conn.execute(
                 text(
@@ -151,10 +551,50 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
             return row[0] if row and row[0] else ""
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT version()")).scalar() or "unknown"
 
     def estimate_table_rows(self, table_name: str) -> int | None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles estimate table rows within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             value = conn.execute(
                 text(
@@ -173,20 +613,100 @@ class SQLServerAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.SQL_SERVER
 
     def list_procedures(self) -> list[str]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles list procedures within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             result = conn.execute(text("SELECT name FROM sys.objects WHERE type='P' AND schema_id=SCHEMA_ID('dbo')"))
             return [row[0] for row in result.fetchall()]
 
     def get_procedure_definition(self, procedure_name: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get procedure definition within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             row = conn.execute(text("SELECT OBJECT_DEFINITION(OBJECT_ID(:name))"), {"name": procedure_name}).first()
             return row[0] if row and row[0] else ""
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT @@VERSION")).scalar() or "unknown"
 
     def estimate_table_rows(self, table_name: str) -> int | None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles estimate table rows within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             value = conn.execute(
                 text(
@@ -199,6 +719,26 @@ class SQLServerAdapter(BaseDatabaseAdapter):
             return int(value) if value is not None else None
 
     def explain_query(self, sql: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles explain query within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         stripped = sql.strip().rstrip(";")
         if stripped.lower().startswith("explain"):
             stripped = re.sub(r"^\s*explain\s+", "", stripped, count=1, flags=re.I)
@@ -209,6 +749,26 @@ class SQLServerAdapter(BaseDatabaseAdapter):
             return [dict(row._mapping) for row in result.fetchall()]
 
     def apply_limit(self, sql: str, limit: int) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles apply limit within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         stripped = sql.strip().rstrip(";")
         lowered = stripped.lower()
         if not lowered.startswith("select") or _has_limit_clause(lowered):
@@ -220,10 +780,50 @@ class SQLiteAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.SQLITE
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT sqlite_version()")).scalar() or "unknown"
 
     def explain_query(self, sql: str) -> list[dict[str, Any]]:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles explain query within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         stripped = sql.strip().rstrip(";")
         if stripped.lower().startswith("explain"):
             stripped = re.sub(r"^\s*explain\s+", "", stripped, count=1, flags=re.I)
@@ -236,10 +836,50 @@ class OracleAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.ORACLE
 
     def get_version(self) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get version within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         with self.engine.connect() as conn:
             return conn.execute(text("SELECT * FROM v$version WHERE ROWNUM = 1")).scalar() or "unknown"
 
     def apply_limit(self, sql: str, limit: int) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles apply limit within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Application services that need this abstraction.
+        
+        Where it fits in the flow:
+            Caller -> function -> structured return value for the next application step.
+        
+        Safety considerations:
+            Must preserve read-only investigation behavior and avoid modifying customer databases.
+        """
         stripped = sql.strip().rstrip(";")
         lowered = stripped.lower()
         if not lowered.startswith("select") or _has_limit_clause(lowered):
@@ -248,6 +888,26 @@ class OracleAdapter(BaseDatabaseAdapter):
 
 
 def adapter_for(engine_type: DatabaseEngine, engine: Engine) -> BaseDatabaseAdapter:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles adapter for within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Application services that need this abstraction.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     if engine_type == DatabaseEngine.MYSQL:
         return MySQLAdapter(engine)
     if engine_type == DatabaseEngine.POSTGRESQL:
@@ -262,4 +922,24 @@ def adapter_for(engine_type: DatabaseEngine, engine: Engine) -> BaseDatabaseAdap
 
 
 def _has_limit_clause(lowered_sql: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for has limit clause within adapters.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in adapters.py.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     return any(token in lowered_sql for token in (" limit ", " top ", " fetch first ", " offset "))

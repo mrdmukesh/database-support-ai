@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
@@ -12,6 +12,26 @@ def score_confidence(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None = None,
 ) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles score confidence within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     score = 0.2
     row_results = [item for item in evidence if item.rows]
     empty_results = [item for item in evidence if not item.rows and not item.error]
@@ -45,6 +65,26 @@ def confidence_factors(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None = None,
 ) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles confidence factors within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     factors: list[str] = []
     row_results = [item for item in evidence if item.rows]
     empty_results = [item for item in evidence if not item.rows and not item.error]

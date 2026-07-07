@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -20,6 +20,26 @@ from legacydb_copilot.services.report_generator import InvestigationReport, Repo
 
 
 def _footer(canvas, doc, report: InvestigationReport) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for footer within pdf_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in pdf_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     canvas.saveState()
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#60707c"))
@@ -35,6 +55,26 @@ def _footer(canvas, doc, report: InvestigationReport) -> None:
 
 
 def _table(title: str, columns: list[str], rows: list[dict]) -> list:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for table within pdf_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in pdf_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     story = [Paragraph(title, ParagraphStyle("Sub", fontName="Helvetica-Bold", fontSize=11, textColor=colors.HexColor("#0f5f8f")))]
     data = [columns]
     data.extend([[str(row.get(column, "")) for column in columns] for row in rows])
@@ -56,6 +96,26 @@ def _table(title: str, columns: list[str], rows: list[dict]) -> list:
 
 
 def _section(section: ReportSection, styles) -> list:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for section within pdf_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in pdf_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     story = [Paragraph(section.title, styles["Heading2"])]
     for paragraph in section.paragraphs:
         story.append(Paragraph(str(paragraph), styles["BodyText"]))
@@ -73,6 +133,26 @@ def _section(section: ReportSection, styles) -> list:
 
 
 def write_pdf(report: InvestigationReport, output_path: Path) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles write pdf within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle("SqlCode", fontName="Courier", fontSize=7, leading=9, backColor=colors.HexColor("#f3f7f9"), borderColor=colors.HexColor("#0f8f86"), borderWidth=0.5, borderPadding=6))
     styles["Heading1"].textColor = colors.HexColor("#10324a")

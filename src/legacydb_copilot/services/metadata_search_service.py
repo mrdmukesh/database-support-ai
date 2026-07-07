@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +42,26 @@ class MetadataSearchResult:
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for tokens within metadata_search_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in metadata_search_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     raw = question.lower().replace("_", " ").replace("-", " ").split()
     tokens = {
         token.strip(".,:;()[]{}")
@@ -63,6 +83,26 @@ def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
 
 
 def search_metadata(connector, question: str, entities: EntityExtractionResult) -> MetadataSearchResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles search metadata within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     metadata = connector.get_schema_metadata()
     tokens = _tokens(question, entities)
     tables: list[TableMetadata] = []
@@ -102,6 +142,26 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
 
 
 def rows_as_text(rows: list[dict[str, Any]], limit: int = 5) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles rows as text within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not rows:
         return "No rows returned."
     return "\n".join("; ".join(f"{k}={v}" for k, v in row.items()) for row in rows[:limit])

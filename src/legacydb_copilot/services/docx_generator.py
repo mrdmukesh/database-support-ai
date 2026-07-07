@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -10,6 +10,26 @@ from legacydb_copilot.services.report_generator import InvestigationReport
 
 
 def _add_table(doc: Document, title: str, columns: list[str], rows: list[dict]) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for add table within docx_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in docx_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     doc.add_heading(title, level=3)
     table = doc.add_table(rows=1, cols=max(1, len(columns)))
     table.style = "Table Grid"
@@ -23,6 +43,26 @@ def _add_table(doc: Document, title: str, columns: list[str], rows: list[dict]) 
 
 
 def write_docx(report: InvestigationReport, output_path: Path) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles write docx within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     doc = Document()
     section = doc.sections[0]
     section.top_margin = Inches(0.7)

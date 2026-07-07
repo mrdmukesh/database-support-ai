@@ -35,6 +35,26 @@ router = APIRouter(prefix="/learning", tags=["learning"])
 
 
 def _get_investigation(db: Session, investigation_id: str) -> InvestigationModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for get investigation within learning.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in learning.py.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     investigation = db.get(InvestigationModel, investigation_id)
     if investigation is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -42,6 +62,26 @@ def _get_investigation(db: Session, investigation_id: str) -> InvestigationModel
 
 
 def _report_links_for_investigation(investigation: InvestigationModel) -> dict[str, str] | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for report links for investigation within learning.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in learning.py.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Report generation must describe supplied evidence and must not execute SQL.
+    """
     if not investigation.report_snapshot_json:
         report_dir = (REPORT_HISTORY_DIR / investigation.id).resolve()
         history_root = REPORT_HISTORY_DIR.resolve()
@@ -79,6 +119,26 @@ def learning_dashboard(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:read")),
 ) -> dict[str, object]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles learning dashboard within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     require_workspace_access(db, current_user, workspace_id, action="read")
     filters = (
@@ -136,6 +196,26 @@ def list_investigations(
     current_user=Depends(require_permission("learning:read")),
     status_filter: str | None = None,
 ) -> list[InvestigationModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list investigations within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     require_workspace_access(db, current_user, workspace_id, action="read")
     query = db.query(InvestigationModel).filter(
@@ -153,6 +233,26 @@ def get_investigation(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:read")),
 ) -> dict[str, object]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles get investigation within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     investigation = _get_investigation(db, investigation_id)
     require_resource_owner_workspace(db, current_user, investigation, action="read")
     return {
@@ -235,6 +335,26 @@ def list_feedback(
     current_user=Depends(require_permission("learning:read")),
     status_filter: str | None = None,
 ) -> list[InvestigationFeedbackModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list feedback within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     require_workspace_access(db, current_user, workspace_id, action="read")
     query = db.query(InvestigationFeedbackModel).filter(
@@ -357,6 +477,26 @@ def list_knowledge(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:read")),
 ) -> list[KnowledgeArticleModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles list knowledge within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     assert_same_organization(current_user, organization_id)
     require_workspace_access(db, current_user, workspace_id, action="read")
     return list(
@@ -380,6 +520,26 @@ def similar_issues(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:read")),
 ) -> list[KnowledgeArticleModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles similar issues within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        FastAPI routing layer and browser UI actions.
+    
+    Where it fits in the flow:
+        Investigation -> feedback -> pending approval -> approved knowledge -> indexing.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     from legacydb_copilot.services.approved_knowledge_service import search_approved_knowledge
 
     assert_same_organization(current_user, organization_id)

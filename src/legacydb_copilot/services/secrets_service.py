@@ -31,9 +31,49 @@ class SecretStore(Protocol):
     """
 
     def store_secret(self, *, name: str, value: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles store secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         ...
 
     def get_secret(self, reference: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         ...
 
 
@@ -48,16 +88,76 @@ class LocalSecretStore:
     allow_raw_storage: bool = True
 
     def store_secret(self, *, name: str, value: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles store secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         if not self.allow_raw_storage:
             raise RuntimeError("Production database secrets must be stored by reference")
         return value
 
     def get_secret(self, reference: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         return reference
 
 
 class AzureKeyVaultSecretStore:
     def __init__(self, vault_url: str) -> None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for init within secrets_service.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in secrets_service.py.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         try:
             from azure.identity import DefaultAzureCredential
             from azure.keyvault.secrets import SecretClient
@@ -68,11 +168,51 @@ class AzureKeyVaultSecretStore:
         self._client = SecretClient(vault_url=vault_url, credential=DefaultAzureCredential())
 
     def store_secret(self, *, name: str, value: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles store secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         secret_name = _safe_secret_name(name)
         self._client.set_secret(secret_name, value)
         return f"keyvault://{secret_name}"
 
     def get_secret(self, reference: str) -> str:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Handles get secret within the Database Support AI application flow.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Investigation, reporting, verification, or knowledge workflows as needed.
+        
+        Where it fits in the flow:
+            Application orchestration -> service function -> structured result for the next workflow step.
+        
+        Safety considerations:
+            Secrets must be resolved internally and never exposed in API responses.
+        """
         secret_name = reference.removeprefix("keyvault://")
         return self._client.get_secret(secret_name).value
 
@@ -108,6 +248,26 @@ def get_secret_store(settings: Settings | None = None) -> SecretStore:
 
 
 def _safe_secret_name(name: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for safe secret name within secrets_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in secrets_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Secrets must be resolved internally and never exposed in API responses.
+    """
     cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in name).strip("-")
     cleaned = "-".join(part for part in cleaned.split("-") if part)
     return f"{cleaned[:80]}-{uuid4().hex[:12]}" if cleaned else f"secret-{uuid4().hex[:12]}"

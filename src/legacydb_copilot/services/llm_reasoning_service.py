@@ -32,6 +32,26 @@ Rules:
 
 
 def llm_reasoning_enabled(settings: Settings | None = None) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles llm reasoning enabled within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     settings = settings or Settings.from_env()
     return bool(
         settings.ai_reasoning_enabled
@@ -107,6 +127,26 @@ def _build_llm_payload(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None,
 ) -> dict[str, Any]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for build llm payload within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     evidence_items = [
         {
             "ref": f"SQL-{index}",
@@ -201,6 +241,26 @@ def _build_llm_payload(
 
 
 def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for call openai responses within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     body = {
         "model": settings.llm_model,
         "input": [
@@ -227,6 +287,26 @@ def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any])
 
 
 def _extract_response_text(response_json: dict[str, Any]) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for extract response text within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     if isinstance(response_json.get("output_text"), str):
         return response_json["output_text"]
     chunks: list[str] = []
@@ -239,6 +319,26 @@ def _extract_response_text(response_json: dict[str, Any]) -> str:
 
 
 def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> ReasoningResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for merge llm reasoning within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion")
     fixes = _cited_items(llm_json.get("recommended_fix"), "step")
     proof = _cited_items(llm_json.get("proof_of_fix"), "step")
@@ -272,6 +372,26 @@ def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> Rea
 
 
 def _cited_items(value: Any, text_key: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for cited items within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     items: list[str] = []
     if not isinstance(value, list):
         return items
@@ -286,6 +406,26 @@ def _cited_items(value: Any, text_key: str) -> list[str]:
 
 
 def _cited_test_cases(value: Any) -> list[dict[str, str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for cited test cases within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     cases: list[dict[str, str]] = []
     if not isinstance(value, list):
         return cases
@@ -309,6 +449,26 @@ def _cited_test_cases(value: Any) -> list[dict[str, str]]:
 
 
 def _string_list(value: Any) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for string list within llm_reasoning_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in llm_reasoning_service.py.
+    
+    Where it fits in the flow:
+        Evidence package -> optional OpenAI reasoning -> citation-aware merge -> report.
+    
+    Safety considerations:
+        The LLM must reason only over collected evidence and must never connect to databases or run SQL.
+    """
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]

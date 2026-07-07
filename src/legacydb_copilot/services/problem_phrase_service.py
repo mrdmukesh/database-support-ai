@@ -71,6 +71,26 @@ _STOPWORDS = {
 
 
 def parse_problem_phrase(question: str) -> ProblemPhrase:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles parse problem phrase within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     lowered = question.lower()
     main_text, secondary_text = _split_secondary_causes(lowered)
     normalized = re.sub(r"[^a-z0-9_\-\s]", " ", main_text)
@@ -112,6 +132,26 @@ def parse_problem_phrase(question: str) -> ProblemPhrase:
 
 
 def resolve_table_from_terms(terms: list[str], metadata: MetadataSearchResult) -> TableMetadata | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles resolve table from terms within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not terms:
         return None
     scored: list[tuple[float, TableMetadata]] = []
@@ -140,6 +180,26 @@ def resolve_table_from_terms(terms: list[str], metadata: MetadataSearchResult) -
 
 
 def terms_match_table(terms: list[str], table: TableMetadata) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles terms match table within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if not terms:
         return True
     name = table.name.lower()
@@ -152,6 +212,26 @@ def terms_match_table(terms: list[str], table: TableMetadata) -> bool:
 
 
 def _split_secondary_causes(text: str) -> tuple[str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for split secondary causes within problem_phrase_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in problem_phrase_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     markers = (
         " caused by ",
         " whether caused by ",
@@ -170,12 +250,52 @@ def _split_secondary_causes(text: str) -> tuple[str, str]:
 
 
 def _parent_before_missing(text: str, target_terms: list[str]) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for parent before missing within problem_phrase_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in problem_phrase_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     before = text.split("missing", 1)[0]
     terms = _terms(before)
     return [term for term in terms[-3:] if term not in target_terms]
 
 
 def _terms(text: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for terms within problem_phrase_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in problem_phrase_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     terms: list[str] = []
     for raw in re.findall(r"\b[a-z][a-z0-9_]*\b", text.lower()):
         for part in _split_identifier(raw):
@@ -185,10 +305,50 @@ def _terms(text: str) -> list[str]:
 
 
 def _split_identifier(value: str) -> list[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for split identifier within problem_phrase_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in problem_phrase_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return [part for part in re.split(r"[_\-\s]+", value.lower()) if part]
 
 
 def _variants(term: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for variants within problem_phrase_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in problem_phrase_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     variants = {term}
     if term.endswith("ies") and len(term) > 3:
         variants.add(term[:-3] + "y")

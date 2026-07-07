@@ -9,6 +9,26 @@ from legacydb_copilot.db.models import KnowledgeArticleModel
 
 
 def _tokens(value: str) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for tokens within approved_knowledge_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in approved_knowledge_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return {token for token in re.findall(r"[a-z0-9_/-]{3,}", value.lower()) if token}
 
 
@@ -20,6 +40,26 @@ def search_approved_knowledge(
     question: str,
     limit: int = 3,
 ) -> list[KnowledgeArticleModel]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles search approved knowledge within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     question_tokens = _tokens(question)
     if not question_tokens:
         return []
@@ -55,6 +95,26 @@ def search_approved_knowledge(
 
 
 def knowledge_article_reference(article: KnowledgeArticleModel) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles knowledge article reference within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     confidence = (
         f"{round(float(article.confidence_after_approval) * 100)}%"
         if article.confidence_after_approval is not None

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import re
 from dataclasses import dataclass
@@ -68,6 +68,26 @@ def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceR
 
 
 def _row_estimates_for_plan(connector, plan: list[PlannedQuery]) -> dict[str, int]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for row estimates for plan within evidence_execution_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_execution_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     estimate = getattr(connector, "estimate_table_rows", None)
     if not callable(estimate):
         return {}

@@ -83,6 +83,26 @@ def require_resource_workspace_access(
     workspace_id: str,
     action: str = "read",
 ) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles require resource workspace access within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Application services that need this abstraction.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve tenant and workspace isolation.
+    """
     if current_user.organization_id != organization_id and current_user.role != Role.SUPER_ADMIN.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-tenant access denied")
     if not Settings.from_env().feature_enterprise_rbac_enabled:
@@ -105,6 +125,26 @@ def ensure_workspace_membership(
     user_id: str,
     role: WorkspaceRole = WorkspaceRole.OWNER,
 ) -> WorkspaceMembershipModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles ensure workspace membership within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Application services that need this abstraction.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve tenant and workspace isolation.
+    """
     existing = _membership(db, user_id, workspace_id)
     if existing is not None:
         return existing
@@ -126,6 +166,26 @@ def require_resource_owner_workspace(
     *,
     action: str = "read",
 ) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles require resource owner workspace within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Application services that need this abstraction.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve tenant and workspace isolation.
+    """
     require_resource_workspace_access(
         db,
         current_user,
@@ -136,6 +196,26 @@ def require_resource_owner_workspace(
 
 
 def _membership(db: Session, user_id: str, workspace_id: str) -> WorkspaceMembershipModel | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for membership within access_control.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in access_control.py.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve tenant and workspace isolation.
+    """
     return (
         db.query(WorkspaceMembershipModel)
         .filter(
@@ -148,6 +228,26 @@ def _membership(db: Session, user_id: str, workspace_id: str) -> WorkspaceMember
 
 
 def _role_allows(role: WorkspaceRole, action: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for role allows within access_control.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in access_control.py.
+    
+    Where it fits in the flow:
+        Caller -> function -> structured return value for the next application step.
+    
+    Safety considerations:
+        Must preserve tenant and workspace isolation.
+    """
     if action in {"manage", "admin"}:
         return role in _MANAGE_ROLES
     if action in {"database", "verify"}:

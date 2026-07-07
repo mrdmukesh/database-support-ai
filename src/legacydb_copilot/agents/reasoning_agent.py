@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -29,10 +29,50 @@ class ReasoningResult:
 
 
 def _rows_for_purpose(evidence: list[EvidenceResult], purpose: str) -> list[dict]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for rows for purpose within reasoning_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in reasoning_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     return next((item.rows for item in evidence if item.purpose == purpose), [])
 
 
 def _issue_counts(rows: list[dict]) -> dict[str, int]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for issue counts within reasoning_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in reasoning_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     counts: dict[str, int] = {}
     for row in rows:
         issue_type = str(row.get("issue_type") or "")
@@ -42,6 +82,26 @@ def _issue_counts(rows: list[dict]) -> dict[str, int]:
 
 
 def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for has explain or row estimate within reasoning_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in reasoning_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     for item in evidence:
         text = f"{item.purpose} {item.sql}".upper()
         if "EXPLAIN" in text and (item.rows or item.error is None):
@@ -62,6 +122,26 @@ def reason_about_evidence(
     procedure_analysis: list[ProcedureAnalysis] | None = None,
     evidence_focus: EvidenceFocus | None = None,
 ) -> ReasoningResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles reason about evidence within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Must preserve read-only investigation behavior and avoid modifying customer databases.
+    """
     correlated_evidence = correlated_evidence or []
     procedure_analysis = procedure_analysis or []
     non_empty = [item for item in evidence if item.rows]

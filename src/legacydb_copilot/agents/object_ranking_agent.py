@@ -39,6 +39,26 @@ class ObjectRankingResult:
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for tokens within object_ranking_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in object_ranking_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     tokens = {token.strip(".,:;()[]{}").lower() for token in question.replace("_", " ").replace("-", " ").split()}
     tokens = {token for token in tokens if len(token) >= 3 and token not in _NOISE_TOKENS}
     for entity in entities.entities:
@@ -55,6 +75,26 @@ def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
 
 
 def _intent_bonus(intent: InvestigationIntent, table: TableMetadata) -> float:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for intent bonus within object_ranking_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in object_ranking_agent.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     name = table.name.lower()
     columns = " ".join(table.columns).lower()
     text = f"{name} {columns}"
@@ -82,6 +122,26 @@ def rank_relevant_objects(
     metadata: MetadataSearchResult,
     max_tables: int = 6,
 ) -> ObjectRankingResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles rank relevant objects within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation orchestration in routers/chat.py.
+    
+    Where it fits in the flow:
+        Question/context -> agent reasoning step -> structured output for downstream services.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     tokens = _tokens(question, entities)
     problem = parse_problem_phrase(question)
     target_table = resolve_table_from_terms(problem.target_terms, metadata)

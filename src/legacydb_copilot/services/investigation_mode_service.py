@@ -77,6 +77,26 @@ _LIVE_INVESTIGATION_INTENTS = {
 
 
 def classify_investigation_mode(question: str, intent: IntentResult | None = None) -> ModeClassification:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles classify investigation mode within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     lowered = question.lower()
     if any(marker in lowered for marker in _KNOWLEDGE_SEARCH_MARKERS):
         return ModeClassification(
@@ -108,6 +128,26 @@ def classify_investigation_mode(question: str, intent: IntentResult | None = Non
 
 
 def _looks_like_live_failure(intent: IntentResult | None, lowered: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for looks like live failure within investigation_mode_service.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in investigation_mode_service.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     if intent and intent.intent in _LIVE_INVESTIGATION_INTENTS:
         return any(
             marker in lowered

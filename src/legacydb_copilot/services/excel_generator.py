@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -12,11 +12,51 @@ _INVALID_SHEET_CHARS = set("[]:*?/\\")
 
 
 def _safe_sheet_name(name: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for safe sheet name within excel_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in excel_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     safe = "".join("-" if char in _INVALID_SHEET_CHARS else char for char in str(name)).strip()
     return (safe or "Sheet")[:31]
 
 
 def _unique_sheet_name(wb: Workbook, name: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for unique sheet name within excel_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in excel_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     safe = _safe_sheet_name(name)
     if safe not in wb.sheetnames:
         return safe
@@ -29,6 +69,26 @@ def _unique_sheet_name(wb: Workbook, name: str) -> str:
 
 
 def _style_sheet(ws) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for style sheet within excel_generator.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in excel_generator.py.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     header_fill = PatternFill("solid", fgColor="E8F4F3")
     thin = Side(style="thin", color="CFDBE2")
     for row in ws.iter_rows():
@@ -44,6 +104,26 @@ def _style_sheet(ws) -> None:
 
 
 def write_xlsx(report: InvestigationReport, output_path: Path) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles write xlsx within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Application orchestration -> service function -> structured result for the next workflow step.
+    
+    Safety considerations:
+        Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
+    """
     wb = Workbook()
     ws = wb.active
     ws.title = "Executive Summary"

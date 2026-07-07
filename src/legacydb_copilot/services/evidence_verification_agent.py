@@ -55,6 +55,26 @@ class SuggestedVerificationCheck:
     conclusion_template: str = ""
 
     def __post_init__(self) -> None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for post init within evidence_verification_agent.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in evidence_verification_agent.py.
+        
+        Where it fits in the flow:
+            Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+        
+        Safety considerations:
+            Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+        """
         defaults = _default_check_explanations(self.claim, self.verification_sql, self.expected_result, self.source)
         for field_name, value in defaults.items():
             if not getattr(self, field_name):
@@ -101,6 +121,26 @@ class VerificationResult:
     conclusion_template: str = ""
 
     def __post_init__(self) -> None:
+        """
+        Owner: Mukesh Dabi
+        Purpose:
+            Internal helper for post init within evidence_verification_agent.py.
+        
+        Input:
+            Function parameters declared in the signature.
+        
+        Output:
+            Return value declared by the type hints or route response model.
+        
+        How it is called:
+            Internal callers in evidence_verification_agent.py.
+        
+        Where it fits in the flow:
+            Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+        
+        Safety considerations:
+            Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+        """
         defaults = _default_check_explanations(self.claim, self.verification_sql, self.expected_result, "verification result")
         for field_name, value in defaults.items():
             if not getattr(self, field_name):
@@ -234,6 +274,26 @@ def run_evidence_verification(
     documents: list[RetrievedDocument],
     reasoning: ReasoningResult,
 ) -> list[VerificationResult]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles run evidence verification within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     results: list[VerificationResult] = []
     for check in suggest_verification_checks(
         question=question,
@@ -260,6 +320,26 @@ def run_evidence_verification(
 
 
 def adjust_confidence_with_verification(confidence: float, results: list[VerificationResult]) -> tuple[float, list[str]]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Handles adjust confidence with verification within the Database Support AI application flow.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Investigation, reporting, verification, or knowledge workflows as needed.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     adjusted = confidence
     notes: list[str] = []
     for result in results:
@@ -279,6 +359,26 @@ def adjust_confidence_with_verification(confidence: float, results: list[Verific
 
 
 def _suggest_affected_object(metadata: MetadataSearchResult, evidence_focus: EvidenceFocus) -> SuggestedVerificationCheck:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest affected object within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     table = next((table for table in metadata.tables if table.name.lower() == evidence_focus.affected_object.lower()), None)
     sql = f"DESCRIBE {evidence_focus.affected_object}" if table else "SELECT 'affected object not present in metadata' AS verification_note"
     return SuggestedVerificationCheck(
@@ -292,6 +392,26 @@ def _suggest_affected_object(metadata: MetadataSearchResult, evidence_focus: Evi
 
 
 def _suggest_parent_object(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest parent object within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     parent_table = _parent_table_from_evidence(evidence)
     if not parent_table:
         return None
@@ -316,6 +436,26 @@ def _suggest_parent_object(evidence: list[EvidenceResult], evidence_focus: Evide
 
 
 def _suggest_gate(evidence: list[EvidenceResult], evidence_gate: EvidenceGateResult) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest gate within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     candidate = next((item for item in evidence if item.rows), None)
     if candidate is None:
         return None
@@ -334,6 +474,26 @@ def _suggest_reported_duplicate(
     intent: InvestigationIntent,
     evidence: list[EvidenceResult],
 ) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest reported duplicate within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if intent not in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         return None
     candidate = next((item for item in evidence if "duplicate" in item.purpose.lower() and "having count" in item.sql.lower()), None)
@@ -353,6 +513,26 @@ def _suggest_reported_duplicate(
 
 
 def _suggest_reported_missing(intent: InvestigationIntent, evidence: list[EvidenceResult]) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest reported missing within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if intent != InvestigationIntent.MISSING_DATA:
         return None
     candidate = next((item for item in evidence if item.purpose == "Confirmed Missing Related Record Candidates"), None)
@@ -372,6 +552,26 @@ def _suggest_direct_writer(
     evidence_focus: EvidenceFocus,
     procedure_analysis: list[ProcedureAnalysis],
 ) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest direct writer within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     top_writer = next((rank for rank in evidence_focus.ranked_procedures if rank.writes_affected_object), None)
     if not top_writer:
         return None
@@ -390,6 +590,26 @@ def _suggest_direct_writer(
 
 
 def _suggest_execution_path(evidence_focus: EvidenceFocus, evidence: list[EvidenceResult]) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest execution path within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if not evidence_focus.ranked_procedures:
         return None
     log_candidate = next(
@@ -418,6 +638,26 @@ def _suggest_recommended_fix(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
 ) -> SuggestedVerificationCheck | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest recommended fix within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     fix_text = " ".join(reasoning.recommended_fix + reasoning.likely_root_causes).lower()
     if not any(term in fix_text for term in ("exists", "idempot", "unique", "duplicate", "guard")):
         return None
@@ -440,6 +680,26 @@ def _suggest_recommended_fix(
 
 
 def _suggest_proof_sql_is_read_only(evidence: list[EvidenceResult]) -> SuggestedVerificationCheck:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for suggest proof sql is read only within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     sql_count = len(evidence)
     return SuggestedVerificationCheck(
         claim="Proof and investigation SQL are valid read-only statements.",
@@ -456,6 +716,26 @@ def _verify_affected_object(
     evidence: list[EvidenceResult],
     evidence_focus: EvidenceFocus,
 ) -> VerificationResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify affected object within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     affected = evidence_focus.affected_object
     table_exists = any(table.name.lower() == affected.lower() for table in metadata.tables)
     evidence_mentions = any(affected.lower() in f"{item.purpose} {item.sql}".lower() for item in evidence)
@@ -472,6 +752,26 @@ def _verify_affected_object(
 
 
 def _verify_parent_object(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify parent object within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     parent_table = _parent_table_from_evidence(evidence)
     if not parent_table:
         return None
@@ -489,6 +789,26 @@ def _verify_parent_object(evidence: list[EvidenceResult], evidence_focus: Eviden
 
 
 def _verify_gate(evidence_gate: EvidenceGateResult) -> VerificationResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify gate within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     status = "Verified" if evidence_gate.reproduced else "Not Verified"
     if evidence_gate.required and not evidence_gate.reproduced and evidence_gate.confirmed_facts:
         status = "Partially Verified"
@@ -512,6 +832,26 @@ def _verify_reported_duplicate(
     intent: InvestigationIntent,
     evidence: list[EvidenceResult],
 ) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify reported duplicate within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if intent not in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         return None
     candidate = next((item for item in evidence if "duplicate" in item.purpose.lower() and "having count" in item.sql.lower()), None)
@@ -534,6 +874,26 @@ def _verify_reported_duplicate(
 
 
 def _verify_reported_missing(connector, intent: InvestigationIntent, evidence: list[EvidenceResult]) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify reported missing within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if intent != InvestigationIntent.MISSING_DATA:
         return None
     candidate = next((item for item in evidence if item.purpose == "Confirmed Missing Related Record Candidates"), None)
@@ -556,6 +916,26 @@ def _verify_direct_writer(
     evidence_focus: EvidenceFocus,
     procedure_analysis: list[ProcedureAnalysis],
 ) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify direct writer within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     top_writer = next((rank for rank in evidence_focus.ranked_procedures if rank.writes_affected_object), None)
     if not top_writer:
         return VerificationResult(
@@ -582,6 +962,26 @@ def _verify_direct_writer(
 
 
 def _verify_execution_path(evidence_focus: EvidenceFocus) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify execution path within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if not evidence_focus.ranked_procedures:
         return None
     top = evidence_focus.ranked_procedures[0]
@@ -611,6 +1011,26 @@ def _verify_recommended_fix(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
 ) -> VerificationResult | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify recommended fix within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     fix_text = " ".join(reasoning.recommended_fix + reasoning.likely_root_causes).lower()
     if not any(term in fix_text for term in ("exists", "idempot", "unique", "duplicate", "guard")):
         return None
@@ -631,6 +1051,26 @@ def _verify_recommended_fix(
 
 
 def _verify_proof_sql_is_read_only(evidence: list[EvidenceResult]) -> VerificationResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for verify proof sql is read only within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     errors: list[str] = []
     for item in evidence:
         try:
@@ -650,6 +1090,26 @@ def _verify_proof_sql_is_read_only(evidence: list[EvidenceResult]) -> Verificati
 
 
 def _default_check_explanations(claim: str, sql: str, expected_result: str, source: str) -> dict[str, str]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for default check explanations within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     claim_l = claim.lower()
     sql_l = sql.lower()
     if "parent/supporting object" in claim_l or re.search(r"\bjoin\b", sql_l):
@@ -714,6 +1174,26 @@ def _default_check_explanations(claim: str, sql: str, expected_result: str, sour
 
 
 def _conclusion_for_status(status: str, claim: str, summary: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for conclusion for status within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if status == "Verified":
         return f"Verified because the approved read-only check returned evidence supporting the claim: {claim}. Result summary: {summary}"
     if status == "Partially Verified":
@@ -724,6 +1204,26 @@ def _conclusion_for_status(status: str, claim: str, summary: str) -> str:
 
 
 def _run_verification_sql(connector, sql: str) -> tuple[list[dict[str, Any]], str | None]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for run verification sql within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
+    """
     try:
         validate_read_only_sql(sql)
         return connector.execute_read_only_query(sql, limit=25), None
@@ -732,12 +1232,52 @@ def _run_verification_sql(connector, sql: str) -> tuple[list[dict[str, Any]], st
 
 
 def _row_status(rows: list[dict[str, Any]], error: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for row status within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if error:
         return "Not Enough Evidence"
     return "Verified" if rows else "Not Verified"
 
 
 def _status_from_expected(expected_result: str, rows: list[dict[str, Any]], error: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for status from expected within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if error:
         return "Not Enough Evidence"
     expected_l = expected_result.lower()
@@ -758,6 +1298,26 @@ def _status_from_expected(expected_result: str, rows: list[dict[str, Any]], erro
 
 
 def _summary(rows: list[dict[str, Any]], error: str | None) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for summary within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     if error:
         return f"Verification query failed: {error}"
     if not rows:
@@ -767,6 +1327,26 @@ def _summary(rows: list[dict[str, Any]], error: str | None) -> str:
 
 
 def _impact(status: str) -> str:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for impact within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     return {
         "Verified": "Increases confidence",
         "Partially Verified": "Slightly limits confidence",
@@ -776,6 +1356,26 @@ def _impact(status: str) -> str:
 
 
 def _parent_table_from_evidence(evidence: list[EvidenceResult]) -> str | None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for parent table from evidence within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     for item in evidence:
         if not re.search(r"\bjoin\b", item.sql, re.I):
             continue
@@ -786,9 +1386,49 @@ def _parent_table_from_evidence(evidence: list[EvidenceResult]) -> str | None:
 
 
 def _rows_have_status_values(rows: list[dict[str, Any]]) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for rows have status values within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     return any(any("status" in key.lower() or "state" in key.lower() for key in row) for row in rows)
 
 
 def _contains_table(tables: list[str], table: str) -> bool:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Internal helper for contains table within evidence_verification_agent.py.
+    
+    Input:
+        Function parameters declared in the signature.
+    
+    Output:
+        Return value declared by the type hints or route response model.
+    
+    How it is called:
+        Internal callers in evidence_verification_agent.py.
+    
+    Where it fits in the flow:
+        Investigation report -> suggested checks -> user approval -> safe execution -> verification result.
+    
+    Safety considerations:
+        Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
+    """
     target = table.lower().strip("`[]\"").split(".")[-1]
     return any(value.lower().strip("`[]\"").split(".")[-1] == target for value in tables)

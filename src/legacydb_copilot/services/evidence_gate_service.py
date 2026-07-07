@@ -40,6 +40,28 @@ def run_evidence_gate(
     evidence_focus: EvidenceFocus | None,
     documents: list[RetrievedDocument],
 ) -> EvidenceGateResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Determines whether the reported issue was reproduced from connected database evidence before root-cause
+        conclusions are trusted.
+
+    Input:
+        Question, intent, extracted entities, metadata, collected evidence, evidence focus, and retrieved documents.
+
+    Output:
+        EvidenceGateResult showing whether business key, affected rows, reported condition, and relationships exist.
+
+    Called by:
+        Main /chat/ask orchestration after evidence collection and before final root-cause reasoning.
+
+    Flow:
+        Evidence Collector -> Evidence Gate -> Reasoning Engine or unreproduced-issue response.
+
+    Safety:
+        Uses already-collected read-only evidence only. It does not execute SQL or apply fixes.
+    """
+
     required = intent in {
         InvestigationIntent.PRODUCTION_INVESTIGATION,
         InvestigationIntent.DUPLICATE_DATA,

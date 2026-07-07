@@ -52,6 +52,29 @@ def enhance_reasoning_with_llm(
     evidence_focus: EvidenceFocus | None = None,
     settings: Settings | None = None,
 ) -> ReasoningResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Optionally improves explanation quality by asking OpenAI to reason over an already-collected evidence package.
+
+    Input:
+        User question, deterministic reasoning, SQL evidence, correlated findings, procedure analysis, documents,
+        and evidence focus.
+
+    Output:
+        ReasoningResult enhanced with evidence-cited narrative, or the original deterministic result on failure.
+
+    Called by:
+        Main /chat/ask orchestration after SQL evidence collection and deterministic reasoning.
+
+    Flow:
+        Safe evidence package -> OpenAI reasoning request -> citation validation/merge -> report composer.
+
+    Safety:
+        The LLM never receives database credentials, never connects to the database, never executes SQL, and cannot
+        override collected SQL evidence. Failures fall back to deterministic reasoning.
+    """
+
     settings = settings or Settings.from_env()
     if not llm_reasoning_enabled(settings):
         return deterministic_reasoning

@@ -12,6 +12,28 @@ from legacydb_copilot.databases import DatabaseEngine
 
 
 class BaseDatabaseAdapter(ABC):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Provides the database-engine abstraction used by metadata discovery and safe read-only evidence collection.
+
+    Input:
+        SQLAlchemy engine for a target customer database.
+
+    Output:
+        Generic metadata, procedure definitions, EXPLAIN output, row estimates, and read-only query results.
+
+    Called by:
+        Database connector factory, metadata search, evidence collector, and verification agent.
+
+    Flow:
+        Database connection -> adapter_for(engine) -> metadata/procedure/read-only query APIs -> investigation engine.
+
+    Safety:
+        Adapters must not expose write helpers. Query execution paths are intended for SQL already approved by
+        SafeSQLValidator.
+    """
+
     engine_type: DatabaseEngine
 
     def __init__(self, engine: Engine):

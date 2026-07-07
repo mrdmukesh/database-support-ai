@@ -32,6 +32,27 @@ def download_report_file(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> Response:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Serves generated investigation report files after validating workspace ownership.
+
+    Input:
+        Investigation id, filename, authenticated user, and app database session.
+
+    Output:
+        HTML/PDF inline response or DOCX/XLSX attachment from local history or configured app storage.
+
+    Called by:
+        Report download buttons in AI Chat, verification results, and learning history pages.
+
+    Flow:
+        User click -> report access check -> audit event -> local/blob storage lookup -> file response.
+
+    Safety:
+        Denies cross-workspace report access and restricts downloads to known report extensions.
+    """
+
     extension = Path(filename).suffix.lower()
     if extension not in _ALLOWED_EXTENSIONS or "/" in filename or "\\" in filename:
         raise HTTPException(status_code=404, detail="Report file not found")

@@ -224,6 +224,12 @@ class VerificationCheckRead(BaseModel):
     id: str
     investigation_id: str
     claim: str
+    purpose: str = ""
+    claim_being_verified: str = ""
+    evidence_logic: str = ""
+    expected_result_explanation: str = ""
+    interpretation: str = ""
+    conclusion_template: str = ""
     verification_sql: str
     expected_result: str
     risk_level: str

@@ -646,6 +646,41 @@
         margin-bottom: 4px;
       }
 
+      .verification-explain {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .verification-explain-item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px;
+        background: #f9fbfc;
+        min-width: 0;
+      }
+
+      .verification-explain-item.full {
+        grid-column: 1 / -1;
+      }
+
+      .verification-explain-item span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      .verification-explain-item p {
+        margin: 0;
+        line-height: 1.45;
+        color: var(--ink);
+        overflow-wrap: anywhere;
+      }
+
       .verification-result {
         margin-top: 10px;
         color: var(--muted);
@@ -1987,6 +2022,14 @@
               <div class="verification-claim">${escapeHtml(check.claim)}</div>
               <div class="verification-status">${escapeHtml(check.status)}</div>
             </div>
+            <div class="verification-explain">
+              ${renderVerificationExplain("Purpose", check.purpose, true)}
+              ${renderVerificationExplain("Claim being verified", check.claim_being_verified || check.claim, true)}
+              ${renderVerificationExplain("Evidence logic", check.evidence_logic)}
+              ${renderVerificationExplain("Expected result meaning", check.expected_result_explanation)}
+              ${renderVerificationExplain("Interpretation", check.interpretation)}
+              ${renderVerificationExplain("After run conclusion", check.conclusion_template)}
+            </div>
             <div class="verification-sql-cell">
               <textarea class="sql-edit" rows="10">${escapeHtml(check.verification_sql)}</textarea>
             </div>
@@ -2005,6 +2048,16 @@
           </div>
         `).join("");
         bindVerificationCardButtons();
+      }
+
+      function renderVerificationExplain(label, value, full = false) {
+        if (!value) return "";
+        return `
+          <div class="verification-explain-item ${full ? "full" : ""}">
+            <span>${escapeHtml(label)}</span>
+            <p>${escapeHtml(value)}</p>
+          </div>
+        `;
       }
 
       function renderVerificationResult(summary) {

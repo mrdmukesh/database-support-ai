@@ -58,6 +58,28 @@ class EmbeddingResult:
 
 
 class KnowledgeRetriever(ABC):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Defines the retrieval boundary used by investigations so vector backend choices stay outside the engine.
+
+    Input:
+        Uploaded documents, approved knowledge articles, workspace metadata, and user questions.
+
+    Output:
+        RetrievedDocument evidence chunks ranked for the current workspace/question.
+
+    Called by:
+        Context Discovery during investigations and document/knowledge indexing flows.
+
+    Flow:
+        Upload/approval -> chunk/embed/store -> question embedding/search -> reasoning evidence.
+
+    Safety:
+        Implementations must preserve workspace isolation and index only uploaded documents or approved knowledge,
+        not arbitrary live customer database rows.
+    """
+
     @abstractmethod
     def index_document(
         self,

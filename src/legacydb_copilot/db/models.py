@@ -314,6 +314,22 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class VerificationCheckModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Stores human-approved verification checks suggested after an investigation.
+    Input:
+        Claims, read-only SQL, explanation text, and execution result metadata.
+    Output:
+        Persisted verification workflow records returned to the UI and reports.
+    Called by:
+        /chat/ask when creating suggested checks, and verification endpoints when users run/skip checks.
+    Flow:
+        Investigation report -> Suggested checks -> User approval -> Safe SQL execution -> Report regeneration.
+    Safety:
+        Records suggested SQL only; execution still goes through SafeSQLValidator and never runs writes or procedures.
+    """
+
     __tablename__ = "verification_checks"
 
     organization_id: Mapped[str] = mapped_column(
@@ -332,6 +348,12 @@ class VerificationCheckModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         index=True,
     )
     claim: Mapped[str] = mapped_column(Text, nullable=False)
+    purpose: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    claim_being_verified: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    evidence_logic: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    expected_result_explanation: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    interpretation: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    conclusion_template: Mapped[str] = mapped_column(Text, default="", nullable=False)
     verification_sql: Mapped[str] = mapped_column(Text, nullable=False)
     expected_result: Mapped[str] = mapped_column(Text, default="", nullable=False)
     risk_level: Mapped[str] = mapped_column(String(60), default="Read-only", nullable=False)

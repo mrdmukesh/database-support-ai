@@ -196,9 +196,13 @@ def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     rows = [
         {
             "Claim": item.claim,
+            "Purpose": item.purpose,
+            "Evidence logic": item.evidence_logic,
             "SQL executed": item.verification_sql,
             "Expected result": item.expected_result,
             "Actual result summary": item.actual_result_summary,
+            "Interpretation": item.interpretation,
+            "Conclusion": item.conclusion_template,
             "Status": item.status,
             "Confidence impact": item.confidence_impact,
             "Timestamp": item.timestamp,
@@ -214,8 +218,37 @@ def _verification_section(bundle: DynamicInvestigationBundle) -> ReportSection:
         tables=[
             ReportTable(
                 title="Evidence Verification Results",
-                columns=["Claim", "SQL executed", "Expected result", "Actual result summary", "Status", "Confidence impact", "Timestamp", "Verified by"],
-                rows=rows or [{"Claim": "No checks have been executed yet", "SQL executed": "", "Expected result": "", "Actual result summary": "", "Status": "Pending", "Confidence impact": "", "Timestamp": "", "Verified by": ""}],
+                columns=[
+                    "Claim",
+                    "Purpose",
+                    "Evidence logic",
+                    "SQL executed",
+                    "Expected result",
+                    "Actual result summary",
+                    "Interpretation",
+                    "Conclusion",
+                    "Status",
+                    "Confidence impact",
+                    "Timestamp",
+                    "Verified by",
+                ],
+                rows=rows
+                or [
+                    {
+                        "Claim": "No checks have been executed yet",
+                        "Purpose": "",
+                        "Evidence logic": "",
+                        "SQL executed": "",
+                        "Expected result": "",
+                        "Actual result summary": "",
+                        "Interpretation": "",
+                        "Conclusion": "",
+                        "Status": "Pending",
+                        "Confidence impact": "",
+                        "Timestamp": "",
+                        "Verified by": "",
+                    }
+                ],
             )
         ],
     )
@@ -225,8 +258,14 @@ def _suggested_verification_section(bundle: DynamicInvestigationBundle) -> Repor
     rows = [
         {
             "Claim to verify": item.claim,
+            "Purpose": item.purpose,
+            "Claim being verified": item.claim_being_verified,
+            "Evidence logic": item.evidence_logic,
             "Generated read-only SQL": item.verification_sql,
             "Expected result": item.expected_result,
+            "Expected result explanation": item.expected_result_explanation,
+            "Interpretation": item.interpretation,
+            "Conclusion template": item.conclusion_template,
             "Risk level": item.risk_level,
             "Source": item.source,
             "Status": item.status,
@@ -241,8 +280,37 @@ def _suggested_verification_section(bundle: DynamicInvestigationBundle) -> Repor
         tables=[
             ReportTable(
                 title="Suggested Verification Checks",
-                columns=["Claim to verify", "Generated read-only SQL", "Expected result", "Risk level", "Source", "Status"],
-                rows=rows or [{"Claim to verify": "Verification suggestions disabled", "Generated read-only SQL": "", "Expected result": "", "Risk level": "Read-only", "Source": "", "Status": "Pending"}],
+                columns=[
+                    "Claim to verify",
+                    "Purpose",
+                    "Claim being verified",
+                    "Evidence logic",
+                    "Generated read-only SQL",
+                    "Expected result",
+                    "Expected result explanation",
+                    "Interpretation",
+                    "Conclusion template",
+                    "Risk level",
+                    "Source",
+                    "Status",
+                ],
+                rows=rows
+                or [
+                    {
+                        "Claim to verify": "Verification suggestions disabled",
+                        "Purpose": "",
+                        "Claim being verified": "",
+                        "Evidence logic": "",
+                        "Generated read-only SQL": "",
+                        "Expected result": "",
+                        "Expected result explanation": "",
+                        "Interpretation": "",
+                        "Conclusion template": "",
+                        "Risk level": "Read-only",
+                        "Source": "",
+                        "Status": "Pending",
+                    }
+                ],
             )
         ],
     )
@@ -255,6 +323,29 @@ def compose_report(
     database_name: str,
     generated_by: str,
 ) -> InvestigationReport:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Converts the completed dynamic investigation bundle into the structured report object used for HTML, PDF,
+        Word, and Excel generation.
+
+    Input:
+        DynamicInvestigationBundle plus workspace/database/generator identity.
+
+    Output:
+        InvestigationReport with cover page, evidence sections, reasoning, recommendations, verification checks,
+        and appendices.
+
+    Called by:
+        Main /chat/ask orchestration after evidence collection, reasoning, and verification-check suggestion.
+
+    Flow:
+        Evidence + reasoning bundle -> Report Composer -> report generators -> downloadable files/history.
+
+    Safety:
+        The report is descriptive only. It must not execute SQL or invent evidence beyond the supplied bundle.
+    """
+
     document_titles = [doc.title for doc in bundle.documents]
     entity_rows = [{"Type": entity.entity_type, "Value": entity.value} for entity in bundle.entities]
     ranked_rows = [

@@ -40,6 +40,28 @@ def require_workspace_access(
     *,
     action: str = "read",
 ) -> WorkspaceModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Centralizes workspace membership and role validation for API requests.
+
+    Input:
+        Current authenticated user, workspace id, app database session, and requested action.
+
+    Output:
+        WorkspaceModel when access is allowed; raises HTTP 403/404 when denied.
+
+    Called by:
+        Workspace, database connection, document, investigation, report, verification, and learning-loop endpoints.
+
+    Flow:
+        Authenticated request -> Workspace Access Control -> route-specific business action.
+
+    Safety:
+        Enforces tenant/workspace isolation when enterprise RBAC is enabled while preserving legacy behavior when
+        the feature flag is disabled.
+    """
+
     workspace = db.get(WorkspaceModel, workspace_id)
     if workspace is None or not workspace.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")

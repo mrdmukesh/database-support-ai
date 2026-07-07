@@ -789,8 +789,14 @@ def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> 
     suggested_rows = [
         {
             "Claim to verify": item.claim,
+            "Purpose": item.purpose,
+            "Claim being verified": item.claim_being_verified,
+            "Evidence logic": item.evidence_logic,
             "Generated read-only SQL": item.verification_sql,
             "Expected result": item.expected_result,
+            "Expected result explanation": item.expected_result_explanation,
+            "Interpretation": item.interpretation,
+            "Conclusion template": item.conclusion_template,
             "Risk level": item.risk_level,
             "Source": item.source,
             "Status": item.status,
@@ -800,9 +806,13 @@ def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> 
     executed_rows = [
         {
             "Claim": item.claim,
+            "Purpose": item.purpose,
+            "Evidence logic": item.evidence_logic,
             "SQL executed": item.verification_sql,
             "Expected result": item.expected_result,
             "Actual result summary": item.actual_result_summary,
+            "Interpretation": item.interpretation,
+            "Conclusion": item.conclusion_template,
             "Status": item.status,
             "Confidence impact": item.confidence_impact,
             "Timestamp": item.verified_at.isoformat() if item.verified_at else "",
@@ -820,7 +830,20 @@ def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> 
             tables=[
                 ReportTable(
                     title="Suggested Verification Checks",
-                    columns=["Claim to verify", "Generated read-only SQL", "Expected result", "Risk level", "Source", "Status"],
+                    columns=[
+                        "Claim to verify",
+                        "Purpose",
+                        "Claim being verified",
+                        "Evidence logic",
+                        "Generated read-only SQL",
+                        "Expected result",
+                        "Expected result explanation",
+                        "Interpretation",
+                        "Conclusion template",
+                        "Risk level",
+                        "Source",
+                        "Status",
+                    ],
                     rows=suggested_rows,
                 )
             ],
@@ -833,9 +856,37 @@ def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> 
             tables=[
                 ReportTable(
                     title="Evidence Verification Results",
-                    columns=["Claim", "SQL executed", "Expected result", "Actual result summary", "Status", "Confidence impact", "Timestamp", "Verified by"],
+                    columns=[
+                        "Claim",
+                        "Purpose",
+                        "Evidence logic",
+                        "SQL executed",
+                        "Expected result",
+                        "Actual result summary",
+                        "Interpretation",
+                        "Conclusion",
+                        "Status",
+                        "Confidence impact",
+                        "Timestamp",
+                        "Verified by",
+                    ],
                     rows=executed_rows
-                    or [{"Claim": "No checks have been executed yet", "SQL executed": "", "Expected result": "", "Actual result summary": "", "Status": "Pending", "Confidence impact": "", "Timestamp": "", "Verified by": ""}],
+                    or [
+                        {
+                            "Claim": "No checks have been executed yet",
+                            "Purpose": "",
+                            "Evidence logic": "",
+                            "SQL executed": "",
+                            "Expected result": "",
+                            "Actual result summary": "",
+                            "Interpretation": "",
+                            "Conclusion": "",
+                            "Status": "Pending",
+                            "Confidence impact": "",
+                            "Timestamp": "",
+                            "Verified by": "",
+                        }
+                    ],
                 )
             ],
         ),
@@ -1277,6 +1328,29 @@ def ask_chat_question(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("chat:use")),
 ) -> dict[str, object]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Main AI Chat orchestration endpoint for database investigations.
+
+    Input:
+        ChatAskRequest containing organization, workspace, user, conversation, and natural-language question.
+
+    Output:
+        Chat response, investigation id, confidence, sources, and generated report links.
+
+    Called by:
+        Browser AI Chat page when the user clicks Ask AI.
+
+    Flow:
+        Auth/RBAC -> prompt safety -> intent/entity/context discovery -> safe SQL -> evidence -> reasoning ->
+        verification suggestions -> report generation -> history persistence.
+
+    Safety:
+        LLM reasoning is optional and evidence-grounded. SQL is generated/executed only through the safe read-only
+        planner and validators.
+    """
+
     assert_same_organization(current_user, payload.organization_id)
     assert_same_user(current_user, payload.user_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="investigate")
@@ -1357,6 +1431,12 @@ def ask_chat_question(
                 workspace_id=payload.workspace_id,
                 investigation_id=investigation_id,
                 claim=check.get("claim", ""),
+                purpose=check.get("purpose", ""),
+                claim_being_verified=check.get("claim_being_verified", check.get("claim", "")),
+                evidence_logic=check.get("evidence_logic", ""),
+                expected_result_explanation=check.get("expected_result_explanation", ""),
+                interpretation=check.get("interpretation", ""),
+                conclusion_template=check.get("conclusion_template", ""),
                 verification_sql=check.get("verification_sql", ""),
                 expected_result=check.get("expected_result", ""),
                 risk_level=check.get("risk_level", "Read-only"),
@@ -1462,6 +1542,7 @@ def run_verification_check(
     check.status = result.status
     check.confidence_impact = result.confidence_impact
     check.notes = result.notes
+    check.conclusion_template = result.conclusion_template
     check.verified_by_id = current_user.id
     check.verified_by = result.verified_by
     check.verified_at = datetime.utcnow()
@@ -1546,6 +1627,7 @@ def run_all_verification_checks(
         check.status = result.status
         check.confidence_impact = result.confidence_impact
         check.notes = result.notes
+        check.conclusion_template = result.conclusion_template
         check.verified_by_id = current_user.id
         check.verified_by = result.verified_by
         check.verified_at = datetime.utcnow()

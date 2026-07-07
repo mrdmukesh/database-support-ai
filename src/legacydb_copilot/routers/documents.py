@@ -93,6 +93,28 @@ async def upload_document(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("documents:manage")),
 ) -> DocumentModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Uploads a workspace document, stores the file, records document metadata, and indexes it for retrieval.
+
+    Input:
+        Organization/workspace/title form fields, uploaded file bytes, current user, and app database session.
+
+    Output:
+        DocumentModel with latest version metadata.
+
+    Called by:
+        Documents page when a user uploads runbooks, known issues, procedures, or business process notes.
+
+    Flow:
+        Upload -> MIME/size validation -> app storage -> document/version row -> RAG indexing -> audit log.
+
+    Safety:
+        Upload is workspace-scoped, validates allowed file types/sizes, and indexes documents only inside the same
+        workspace knowledge boundary.
+    """
+
     assert_same_organization(current_user, organization_id)
     require_workspace_access(db, current_user, workspace_id, action="upload")
     filename = Path(file.filename or "").name

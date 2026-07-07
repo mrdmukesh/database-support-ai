@@ -181,6 +181,27 @@ def submit_feedback(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:feedback")),
 ) -> InvestigationFeedbackModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Captures developer feedback after an investigation without directly teaching the knowledge base.
+
+    Input:
+        Investigation id, feedback details, actual root cause/fix/test evidence, current user, and app DB session.
+
+    Output:
+        InvestigationFeedbackModel with PENDING_APPROVAL status.
+
+    Called by:
+        Human-approved Learning Loop UI when a user reviews an AI answer later or immediately after an incident.
+
+    Flow:
+        Investigation -> developer feedback -> pending approval -> DBA/Admin review -> approved knowledge indexing.
+
+    Safety:
+        Feedback is not added to RAG until a human approver explicitly approves it.
+    """
+
     investigation = _get_investigation(db, investigation_id)
     require_resource_owner_workspace(db, current_user, investigation, action="write")
     feedback = InvestigationFeedbackModel(
@@ -232,6 +253,27 @@ def review_feedback(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(require_permission("learning:approve")),
 ) -> InvestigationFeedbackModel:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Approves or rejects submitted investigation feedback and creates reusable approved knowledge only on approval.
+
+    Input:
+        Feedback id, approval payload, current DBA/Admin user, and app DB session.
+
+    Output:
+        Updated InvestigationFeedbackModel and optional KnowledgeArticleModel.
+
+    Called by:
+        Learning review page for DBA/Lead/Admin approval.
+
+    Flow:
+        Pending feedback -> approval/rejection -> audit event -> approved knowledge article -> RAG indexing.
+
+    Safety:
+        The app never learns from unapproved feedback. Rejections are retained for audit but not indexed.
+    """
+
     feedback = db.get(InvestigationFeedbackModel, feedback_id)
     if feedback is None:
         raise HTTPException(status_code=404, detail="Feedback not found")

@@ -18,6 +18,28 @@ from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAna
 
 @dataclass(frozen=True)
 class SuggestedVerificationCheck:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Describes a human-approved read-only verification check suggested after an investigation.
+
+    Input:
+        A report claim, safe verification SQL, expected result, source, and optional explanatory text.
+
+    Output:
+        Structured check details shown in the UI and copied into generated reports.
+
+    Called by:
+        suggest_verification_checks() after evidence collection and reasoning complete.
+
+    Flow:
+        Investigation report -> Suggested verification checks -> User approval -> SafeSQLValidator -> evidence execution.
+
+    Safety:
+        This object only describes checks. SQL execution still goes through SafeSQLValidator and never runs write
+        statements or stored procedures.
+    """
+
     claim: str
     verification_sql: str
     expected_result: str
@@ -25,10 +47,43 @@ class SuggestedVerificationCheck:
     source: str
     status: str = "Pending"
     notes: str = ""
+    purpose: str = ""
+    claim_being_verified: str = ""
+    evidence_logic: str = ""
+    expected_result_explanation: str = ""
+    interpretation: str = ""
+    conclusion_template: str = ""
+
+    def __post_init__(self) -> None:
+        defaults = _default_check_explanations(self.claim, self.verification_sql, self.expected_result, self.source)
+        for field_name, value in defaults.items():
+            if not getattr(self, field_name):
+                object.__setattr__(self, field_name, value)
 
 
 @dataclass(frozen=True)
 class VerificationResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Captures the result of a user-approved verification check.
+
+    Input:
+        The approved SQL, expected result, actual result summary, status, and user who ran the check.
+
+    Output:
+        Auditable verification result shown in UI and appended to regenerated reports.
+
+    Called by:
+        execute_verification_check() from the /chat verification endpoints.
+
+    Flow:
+        User clicks Run -> SafeSQLValidator -> read-only query execution -> VerificationResult -> report regeneration.
+
+    Safety:
+        Results are produced only after validation allows SELECT, SHOW, DESCRIBE, DESC, or EXPLAIN.
+    """
+
     claim: str
     verification_sql: str
     expected_result: str
@@ -38,6 +93,18 @@ class VerificationResult:
     notes: str
     timestamp: str = ""
     verified_by: str = ""
+    purpose: str = ""
+    claim_being_verified: str = ""
+    evidence_logic: str = ""
+    expected_result_explanation: str = ""
+    interpretation: str = ""
+    conclusion_template: str = ""
+
+    def __post_init__(self) -> None:
+        defaults = _default_check_explanations(self.claim, self.verification_sql, self.expected_result, "verification result")
+        for field_name, value in defaults.items():
+            if not getattr(self, field_name):
+                object.__setattr__(self, field_name, value)
 
 
 def suggest_verification_checks(
@@ -52,6 +119,29 @@ def suggest_verification_checks(
     documents: list[RetrievedDocument],
     reasoning: ReasoningResult,
 ) -> list[SuggestedVerificationCheck]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Builds the checklist of read-only verification checks that a human can approve after an investigation.
+
+    Input:
+        User question, detected intent, metadata, collected SQL evidence, evidence gate, procedure analysis,
+        retrieved documents, and reasoning output.
+
+    Output:
+        SuggestedVerificationCheck items with safe SQL and plain-English explanation fields.
+
+    Called by:
+        The main /chat/ask orchestration flow after report reasoning has completed.
+
+    Flow:
+        Evidence package -> reasoning -> suggested verification checks -> UI approval workflow.
+
+    Safety:
+        This function suggests SQL only. The SQL is validated again before any execution and never bypasses the
+        SafeSQLValidator.
+    """
+
     checks: list[SuggestedVerificationCheck] = []
     if evidence_focus:
         checks.append(_suggest_affected_object(metadata, evidence_focus))
@@ -91,6 +181,28 @@ def execute_verification_check(
     source: str,
     verified_by: str,
 ) -> list[VerificationResult]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Executes one human-approved verification check through the read-only safety validator.
+
+    Input:
+        Database connector, claim, verification SQL, expected result, source, and verifier identity.
+
+    Output:
+        A VerificationResult containing status, actual result summary, confidence impact, and audit context.
+
+    Called by:
+        /chat/verification-checks/{check_id}/run and /chat/investigations/{id}/verification-checks/run-all.
+
+    Flow:
+        User approval -> SafeSQLValidator -> connector.execute_read_only_query -> result comparison.
+
+    Safety:
+        Only SELECT, SHOW, DESCRIBE, DESC, and EXPLAIN statements are allowed. Stored procedures and write
+        operations are rejected.
+    """
+
     rows, error = _run_verification_sql(connector, verification_sql)
     status = _status_from_expected(expected_result, rows, error)
     return [
@@ -104,6 +216,7 @@ def execute_verification_check(
             notes=f"Source: {source}. Executed only after human approval.",
             timestamp=datetime.now(UTC).isoformat(timespec="seconds"),
             verified_by=verified_by,
+            conclusion_template=_conclusion_for_status(status, claim, _summary(rows, error)),
         )
     ]
 
@@ -534,6 +647,80 @@ def _verify_proof_sql_is_read_only(evidence: list[EvidenceResult]) -> Verificati
         confidence_impact=_impact(status),
         notes="The verification agent did not execute writes or stored procedures.",
     )
+
+
+def _default_check_explanations(claim: str, sql: str, expected_result: str, source: str) -> dict[str, str]:
+    claim_l = claim.lower()
+    sql_l = sql.lower()
+    if "parent/supporting object" in claim_l or re.search(r"\bjoin\b", sql_l):
+        purpose = (
+            "Confirms that the supplied business key is being investigated through the discovered parent-child "
+            "relationship instead of by searching the child object with the parent key."
+        )
+        evidence_logic = (
+            "The read-only SQL follows the discovered relationship path, usually by joining the parent table to "
+            "the affected child table and counting or listing related child rows."
+        )
+        expected_explanation = (
+            "Rows returned support the relationship path. More than one related child row can also support a "
+            "duplicate condition when the claim is about duplicates."
+        )
+        interpretation = (
+            "Row returned with matching child rows means the relationship is supported. A single child row means "
+            "the parent exists but a duplicate is not proven. No rows means the parent key or relationship path "
+            "was not reproduced from the connected database."
+        )
+    elif "duplicate" in claim_l or "having count" in sql_l:
+        purpose = "Confirms that the reported duplicate condition can be reproduced from live read-only evidence."
+        evidence_logic = "The SQL groups candidate records by the inferred business key or relationship and returns rows only when duplicate counts are present."
+        expected_explanation = "Rows returned mean the duplicate condition is supported. No rows means the duplicate was not reproduced from current data."
+        interpretation = "Look for count columns greater than one and matching business keys. Status columns explain whether duplicates are active/open or historical."
+    elif "missing" in claim_l:
+        purpose = "Confirms that the reported missing-record condition can be reproduced from live read-only evidence."
+        evidence_logic = "The SQL uses discovered relationships, usually a parent-to-child left join, to find parent records where the expected child record is absent."
+        expected_explanation = "Rows returned mean missing candidates exist. No rows means the missing-record condition was not reproduced from current data."
+        interpretation = "Review the parent key, child key, status, and issue-type columns to decide whether the missing record is confirmed or needs more evidence."
+    elif "writes" in claim_l or "routine_definition" in sql_l or "procedure" in source.lower():
+        purpose = "Confirms whether the selected stored procedure is supported by procedure metadata for this claim."
+        evidence_logic = "The SQL reads metadata or procedure definitions and looks for evidence that the procedure references or writes the affected object."
+        expected_explanation = "Rows returned with the affected object or routine definition support the procedure claim. Missing rows limit or reject the claim."
+        interpretation = "A matching procedure definition supports the write-path hypothesis. No matching procedure metadata means the procedure claim needs more evidence."
+    elif "proof" in claim_l or "read-only" in claim_l:
+        purpose = "Confirms that generated proof and investigation SQL remains read-only."
+        evidence_logic = "The system validates generated SQL with SafeSQLValidator and summarizes the number of allowed statements."
+        expected_explanation = "Rows returned indicate the validation summary was produced. Validator errors mean unsafe SQL was blocked."
+        interpretation = "This check protects production systems; it does not prove the business root cause by itself."
+    elif "evidence gate" in claim_l or "reported condition" in claim_l:
+        purpose = "Confirms that root-cause analysis is based on a reported condition reproduced from live evidence."
+        evidence_logic = "The SQL reuses collected evidence that returned rows for the key, affected object, relationship, or reported condition."
+        expected_explanation = "Rows returned support continuing root-cause analysis. No rows means the issue was not reproduced and fixes should not be recommended."
+        interpretation = "Use this result to decide whether the investigation can make a supported conclusion or must remain low confidence."
+    else:
+        purpose = "Verifies an investigation claim with human-approved read-only SQL."
+        evidence_logic = "The SQL is executed against the connected database after validation and compared with the expected result."
+        expected_explanation = f"Expected result: {expected_result}."
+        interpretation = "Rows returned generally support the claim when the expected result asks for rows; no rows or errors reduce confidence."
+    return {
+        "purpose": purpose,
+        "claim_being_verified": claim,
+        "evidence_logic": evidence_logic,
+        "expected_result_explanation": expected_explanation,
+        "interpretation": interpretation,
+        "conclusion_template": (
+            "After execution, the app marks this claim Verified, Partially Verified, Not Verified, or Not Enough "
+            "Evidence based on the actual result and the expected result."
+        ),
+    }
+
+
+def _conclusion_for_status(status: str, claim: str, summary: str) -> str:
+    if status == "Verified":
+        return f"Verified because the approved read-only check returned evidence supporting the claim: {claim}. Result summary: {summary}"
+    if status == "Partially Verified":
+        return f"Partially verified because the check returned some supporting evidence, but not enough to prove the full claim: {claim}. Result summary: {summary}"
+    if status == "Not Verified":
+        return f"Not verified because the approved read-only check did not reproduce evidence for the claim: {claim}. Result summary: {summary}"
+    return f"Not enough evidence because the approved read-only check could not fully evaluate the claim: {claim}. Result summary: {summary}"
 
 
 def _run_verification_sql(connector, sql: str) -> tuple[list[dict[str, Any]], str | None]:

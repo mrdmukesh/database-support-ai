@@ -19,6 +19,27 @@ class EvidenceResult:
 
 
 def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceResult]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Executes the planned investigation SQL and converts returned rows/errors into structured evidence.
+
+    Input:
+        Database connector and safe SQL plan generated from intent, entities, and metadata.
+
+    Output:
+        EvidenceResult list containing purpose, executed SQL, returned rows, and any safety adjustments/errors.
+
+    Called by:
+        Main /chat/ask orchestration after Safe SQL Planner creates read-only candidate queries.
+
+    Flow:
+        Safe SQL Planner -> SafeSQLValidator -> ProductionReadSafetyValidator -> connector.execute_read_only_query.
+
+    Safety:
+        Every query is validated as read-only, optionally limited for production safety, and executed with row limits.
+    """
+
     evidence: list[EvidenceResult] = []
     settings = Settings.from_env()
     validator = ProductionReadSafetyValidator(

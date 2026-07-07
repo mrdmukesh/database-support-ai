@@ -653,6 +653,12 @@ HAVING COUNT(*) > 1
     assert suggestions
     assert all(item.status == "Pending" for item in suggestions)
     assert all(item.risk_level == "Read-only" for item in suggestions)
+    assert all(item.purpose for item in suggestions)
+    assert all(item.claim_being_verified for item in suggestions)
+    assert all(item.evidence_logic for item in suggestions)
+    assert all(item.expected_result_explanation for item in suggestions)
+    assert all(item.interpretation for item in suggestions)
+    assert all(item.conclusion_template for item in suggestions)
     assert any(item.claim == "Duplicate condition is reproduced by live database evidence." for item in suggestions)
 
     results = run_evidence_verification(
@@ -686,6 +692,7 @@ HAVING COUNT(*) > 1
     )[0]
     assert explicit_result.status == "Verified"
     assert explicit_result.verified_by == "tester@example.com"
+    assert explicit_result.conclusion_template.startswith("Verified because")
     adjusted, notes = adjust_confidence_with_verification(0.7, results)
     assert adjusted > 0.7
     assert any("Verification partial" in note for note in notes)

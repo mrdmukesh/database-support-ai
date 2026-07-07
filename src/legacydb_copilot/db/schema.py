@@ -38,6 +38,15 @@ _AUDIT_COLUMNS: dict[str, str] = {
     "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
 }
 
+_VERIFICATION_COLUMNS: dict[str, str] = {
+    "purpose": "TEXT NOT NULL DEFAULT ''",
+    "claim_being_verified": "TEXT NOT NULL DEFAULT ''",
+    "evidence_logic": "TEXT NOT NULL DEFAULT ''",
+    "expected_result_explanation": "TEXT NOT NULL DEFAULT ''",
+    "interpretation": "TEXT NOT NULL DEFAULT ''",
+    "conclusion_template": "TEXT NOT NULL DEFAULT ''",
+}
+
 
 def _try_enable_pgvector(connection) -> bool:
     try:
@@ -55,6 +64,22 @@ def _try_enable_pgvector(connection) -> bool:
 
 
 def initialize_application_schema(database_url: str) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Initializes and gently migrates the internal application metadata database.
+    Input:
+        SQLAlchemy database URL for the app database.
+    Output:
+        Tables and compatibility columns required by the API, including pgvector support when available.
+    Called by:
+        FastAPI startup in api.py.
+    Flow:
+        App startup -> schema initialization -> routers/services persist investigations and reports.
+    Safety:
+        Mutates only the internal app database; customer databases are never migrated here.
+    """
+
     engine = create_db_engine(database_url)
     Base.metadata.create_all(engine)
     inspector = inspect(engine)
@@ -70,6 +95,12 @@ def initialize_application_schema(database_url: str) -> None:
             for column_name, ddl in _AUDIT_COLUMNS.items():
                 if column_name not in existing_audit_columns:
                     connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
+    if "verification_checks" in inspector.get_table_names():
+        existing_verification_columns = {column["name"] for column in inspector.get_columns("verification_checks")}
+        with engine.begin() as connection:
+            for column_name, ddl in _VERIFICATION_COLUMNS.items():
+                if column_name not in existing_verification_columns:
+                    connection.execute(text(f"ALTER TABLE verification_checks ADD COLUMN {column_name} {ddl}"))
     if engine.dialect.name == "postgresql" and "knowledge_chunks" in inspector.get_table_names():
         with engine.begin() as connection:
             _try_enable_pgvector(connection)

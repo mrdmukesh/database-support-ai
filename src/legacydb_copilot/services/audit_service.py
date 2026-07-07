@@ -25,6 +25,27 @@ def record_audit_event(
     status: str = "success",
     metadata: dict[str, Any] | None = None,
 ) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Records auditable security and investigation events without interrupting the business flow.
+
+    Input:
+        Organization/workspace/user context, action, resource type/id, status, and metadata.
+
+    Output:
+        AuditLogModel row when audit logging is enabled.
+
+    Called by:
+        Login, database connection, document upload, investigation, verification, report download, and approval flows.
+
+    Flow:
+        User/API action -> Audit Service -> internal app database audit_logs table.
+
+    Safety:
+        Audit failures are logged as warnings and never break investigation, verification, or report download paths.
+    """
+
     if not Settings.from_env().feature_audit_logging_enabled:
         return
     try:

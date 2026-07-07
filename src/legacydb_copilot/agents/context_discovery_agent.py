@@ -16,6 +16,28 @@ class DiscoveredContext:
 
 
 def discover_context(connector, db: Session, organization_id: str, workspace_id: str, question: str, entities: EntityExtractionResult) -> DiscoveredContext:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Discovers database metadata and workspace knowledge relevant to the current question.
+
+    Input:
+        Active database connector, app database session, workspace identifiers, user question, and extracted entities.
+
+    Output:
+        DiscoveredContext containing ranked metadata and retrieved documents/knowledge chunks.
+
+    Called by:
+        Main /chat/ask investigation orchestration before object ranking and safe SQL planning.
+
+    Flow:
+        Entity Extraction -> Metadata Discovery + Knowledge Retrieval -> Investigation Planner.
+
+    Safety:
+        Metadata and knowledge retrieval are read-only. Customer database rows are not embedded or sent to the
+        knowledge retriever; live evidence collection happens later through validated SQL.
+    """
+
     metadata = search_metadata(connector, question, entities)
     documents = retrieve_documents(db, organization_id, workspace_id, question)
     return DiscoveredContext(metadata=metadata, documents=documents)

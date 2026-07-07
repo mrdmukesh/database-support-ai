@@ -31,6 +31,27 @@ def _unique(entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
 
 
 def extract_entities(question: str) -> EntityExtractionResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Extracts business keys, stored procedure names, status codes, modules, and searchable terms from a question.
+
+    Input:
+        Raw user question.
+
+    Output:
+        EntityExtractionResult used by metadata search, safe SQL planning, evidence focus, and RAG retrieval.
+
+    Called by:
+        Main /chat/ask orchestration immediately after intent detection.
+
+    Flow:
+        User question -> Intent Agent -> Entity Extraction -> Metadata Discovery -> Safe SQL Planner.
+
+    Safety:
+        Extraction is string analysis only. It must not assume domain-specific tables or execute SQL.
+    """
+
     entities: list[ExtractedEntity] = []
     application_name = None
     app_match = re.search(r"\b([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)\s+(System|Application|App|Database|DB)\b", question)

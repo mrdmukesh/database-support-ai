@@ -24,6 +24,27 @@ class ProductionReadSafetyResult:
 
 
 class ProductionReadSafetyValidator:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Applies production-read safeguards after SQL has passed the basic read-only validator.
+
+    Input:
+        Candidate read-only SQL, row estimates, engine type, max-row policy, and full-scan configuration.
+
+    Output:
+        ProductionReadSafetyResult with original or row-limited SQL plus a safety note.
+
+    Called by:
+        Evidence Collector before executing planned investigation SQL.
+
+    Flow:
+        Safe SQL Planner -> validate_read_only_sql -> ProductionReadSafetyValidator -> read-only connector.
+
+    Safety:
+        Rejects unrestricted scans unless explicitly allowed or safely limited; never permits write commands.
+    """
+
     def __init__(
         self,
         *,
@@ -171,6 +192,28 @@ def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None)
 
 
 def validate_read_only_sql(sql: str) -> None:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Enforces the core SQL safety boundary for investigations and verification checks.
+
+    Input:
+        Candidate SQL text.
+
+    Output:
+        None when SQL is safe; raises ValueError when unsafe.
+
+    Called by:
+        Safe SQL Planner, Evidence Collector, Evidence Verification Agent, and report/proof SQL validation paths.
+
+    Flow:
+        Generated SQL -> SafeSQLValidator -> optional production read validator -> connector execution.
+
+    Safety:
+        Allows only SELECT, SHOW, DESCRIBE, DESC, and EXPLAIN SELECT. Blocks INSERT, UPDATE, DELETE, ALTER,
+        DROP, TRUNCATE, EXEC, CALL, locks, and multi-statement SQL.
+    """
+
     stripped = sql.strip().rstrip(";")
     normalized = _sql_without_literals_and_comments(stripped)
     command = _first_sql_word(normalized)
@@ -570,6 +613,28 @@ def _duplicate_like_investigation(intent: InvestigationIntent, entities: EntityE
 
 
 def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Builds safe read-only SQL evidence queries for a database-generic investigation.
+
+    Input:
+        Investigation intent, extracted entities, discovered metadata, relationships, and engine type.
+
+    Output:
+        PlannedQuery list containing read-only SQL and evidence purpose labels.
+
+    Called by:
+        Main /chat/ask orchestration before evidence collection.
+
+    Flow:
+        User question -> Intent Agent -> Metadata Discovery -> Safe SQL Planner -> SQL Validator -> Evidence Collector.
+
+    Safety:
+        This planner must never emit INSERT, UPDATE, DELETE, ALTER, DROP, CALL, EXEC, or stored procedure execution.
+        Unsafe candidates are discarded before returning the plan.
+    """
+
     planned: list[PlannedQuery] = []
     missing_child_flow = _infer_missing_child_flow(metadata, entities) if intent == InvestigationIntent.MISSING_DATA else None
     duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if _duplicate_like_investigation(intent, entities) else None

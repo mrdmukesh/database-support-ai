@@ -45,6 +45,27 @@ _INTENT_SIGNALS: tuple[tuple[InvestigationIntent, tuple[str, ...]], ...] = (
 
 
 def detect_intent(question: str) -> IntentResult:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Classifies the user's natural-language question into the investigation goal used by the planner.
+
+    Input:
+        Raw user question from AI Chat.
+
+    Output:
+        IntentResult containing the selected intent, confidence, and rationale.
+
+    Called by:
+        Main /chat/ask orchestration before entity extraction, metadata discovery, and SQL planning.
+
+    Flow:
+        User question -> Intent Agent -> Investigation mode/plan selection -> evidence collection.
+
+    Safety:
+        This function never connects to databases or generates SQL. It only routes the investigation workflow.
+    """
+
     lowered = question.lower()
     if "change" in lowered and any(term in lowered for term in ("status", "state", "value", "code")) and any(term in lowered for term in ("break", "impact", "affected", "risk")):
         return IntentResult(

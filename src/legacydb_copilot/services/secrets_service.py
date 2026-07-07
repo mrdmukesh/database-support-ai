@@ -9,6 +9,27 @@ from legacydb_copilot.config import Settings
 
 
 class SecretStore(Protocol):
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Abstracts secret storage so production can store references instead of raw passwords/API keys.
+
+    Input:
+        Secret name/value on write, secret reference on read.
+
+    Output:
+        Stable secret reference or resolved secret value for internal connection use.
+
+    Called by:
+        Database connection create/update flows and connection-string builder.
+
+    Flow:
+        User enters secret -> SecretStore.store_secret -> app stores reference -> runtime resolves internally.
+
+    Safety:
+        API responses must expose only secret references/masked values, never raw database passwords or API keys.
+    """
+
     def store_secret(self, *, name: str, value: str) -> str:
         ...
 
@@ -57,6 +78,27 @@ class AzureKeyVaultSecretStore:
 
 
 def get_secret_store(settings: Settings | None = None) -> SecretStore:
+    """
+    Owner: Mukesh Dabi
+    Purpose:
+        Selects local or Azure Key Vault backed secret storage from feature flags and environment settings.
+
+    Input:
+        Optional Settings object.
+
+    Output:
+        SecretStore implementation.
+
+    Called by:
+        Database connection persistence and runtime connection-string assembly.
+
+    Flow:
+        Configuration -> SecretStore selection -> store/read secret references.
+
+    Safety:
+        Production should use Key Vault references. Local raw storage exists only for development/test compatibility.
+    """
+
     resolved = settings or Settings.from_env()
     if resolved.feature_keyvault_secrets_enabled:
         if not resolved.azure_key_vault_url:

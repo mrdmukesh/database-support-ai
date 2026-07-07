@@ -11,6 +11,7 @@ from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
+from legacydb_copilot.services.pii_masking_service import mask_llm_payload
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
@@ -191,7 +192,7 @@ def _build_llm_payload(
         }
         for index, item in enumerate(correlated_evidence[:20], start=1)
     ]
-    return {
+    payload = {
         "task": "Improve the database investigation reasoning using only this evidence. Do not create new SQL or facts.",
         "question": question,
         "detected_intent": intent.intent.value,
@@ -238,6 +239,7 @@ def _build_llm_payload(
             "risks": [{"risk": "string", "evidence_refs": ["SQL-1"]}],
         },
     }
+    return mask_llm_payload(payload)
 
 
 def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any]) -> dict[str, Any]:

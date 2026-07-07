@@ -732,6 +732,82 @@
         line-height: 1.6;
       }
 
+      .answer-summary {
+        display: grid;
+        gap: 14px;
+      }
+
+      .answer-card-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .answer-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        padding: 12px;
+        min-width: 0;
+      }
+
+      .answer-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+      }
+
+      .answer-card strong {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .answer-section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        padding: 14px;
+      }
+
+      .answer-section h4 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+
+      .answer-section ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      .answer-section li {
+        margin: 4px 0;
+      }
+
+      .answer-technical {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: white;
+        padding: 12px 14px;
+      }
+
+      .answer-technical summary {
+        cursor: pointer;
+        font-weight: 800;
+      }
+
+      .answer-technical pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 420px;
+        overflow: auto;
+        margin: 12px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
       .badge-row {
         display: flex;
         flex-wrap: wrap;
@@ -1580,6 +1656,81 @@
           .replace(/'/g, "&#039;");
       }
 
+      function firstLineValue(content, label) {
+        const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const match = String(content || "").match(new RegExp(`^${escaped}:\\s*(.+)$`, "mi"));
+        return match ? match[1].trim() : "";
+      }
+
+      function sectionBullets(content, title, limit = 4) {
+        const marker = `## ${title}`;
+        const text = String(content || "");
+        const start = text.indexOf(marker);
+        if (start < 0) return [];
+        const after = text.slice(start + marker.length);
+        const end = after.search(/\n##\s+/);
+        const section = end >= 0 ? after.slice(0, end) : after;
+        return section
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.startsWith("- "))
+          .map((line) => line.slice(2).trim())
+          .filter(Boolean)
+          .slice(0, limit);
+      }
+
+      function renderAnswerList(title, items, fallback) {
+        const rows = items.length ? items : [fallback];
+        return `
+          <div class="answer-section">
+            <h4>${escapeHtml(title)}</h4>
+            <ul>${rows.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </div>
+        `;
+      }
+
+      function renderInlineAnswer(content, response = {}) {
+        const answer = String(content || "").trim();
+        if (!answer) {
+          return `<div class="empty">Ask a question to generate an investigation summary and downloadable report.</div>`;
+        }
+        const investigationId = firstLineValue(answer, "Investigation ID");
+        const mode = firstLineValue(answer, "Investigation Mode");
+        const intent = firstLineValue(answer, "Detected Intent");
+        const aiReasoning = firstLineValue(answer, "AI-assisted reasoning");
+        const aiReason = firstLineValue(answer, "Reason");
+        const rootCauses = sectionBullets(answer, "Root Cause Analysis", 3);
+        const facts = sectionBullets(answer, "Confirmed Facts", 3);
+        const recommendations = sectionBullets(answer, "Recommendation", 4);
+        const confidence = response.confidence !== undefined
+          ? `${Math.round((response.confidence || 0) * 100)}%`
+          : `${Math.round((response.confidence_score || 0) * 100)}%`;
+        return `
+          <div class="answer-summary">
+            <div class="answer-card-grid">
+              <div class="answer-card"><span>Status</span><strong>Investigation complete</strong></div>
+              <div class="answer-card"><span>Confidence</span><strong>${escapeHtml(confidence)}</strong></div>
+              <div class="answer-card"><span>AI reasoning</span><strong>${escapeHtml(aiReasoning || "Disabled/Not used")}</strong></div>
+              <div class="answer-card"><span>Investigation ID</span><strong>${escapeHtml(investigationId || "Saved in history")}</strong></div>
+              <div class="answer-card"><span>Mode</span><strong>${escapeHtml(mode || "Investigation")}</strong></div>
+              <div class="answer-card"><span>Intent</span><strong>${escapeHtml(intent || "Database support question")}</strong></div>
+            </div>
+            ${renderAnswerList("Most Likely Root Cause", rootCauses, "Open the report for full evidence-backed root-cause analysis.")}
+            ${renderAnswerList("Confirmed Evidence", facts, "Open the report for the evidence table and SQL results.")}
+            ${renderAnswerList("Recommended Next Step", recommendations, "Download the report and run suggested verification checks before applying changes.")}
+            <div class="answer-section">
+              <h4>Report</h4>
+              <p class="muted-note">The full technical detail, SQL evidence, test cases, proof of fix, rollback, and appendices remain in the downloadable report.</p>
+            </div>
+            <details class="answer-technical">
+              <summary>Show technical details captured in chat history</summary>
+              <pre>${escapeHtml(answer)}</pre>
+            </details>
+            ${aiReason ? `<p class="muted-note">${escapeHtml(aiReason)}</p>` : ""}
+          </div>
+        `;
+      }
+
       async function api(path, options = {}) {
         const session = getSession();
         const authHeaders = session?.access_token
@@ -2192,8 +2343,10 @@
           const investigation = await api(`/learning/investigations/${investigationId}`);
           currentInvestigationId = investigation.id;
           setView("chat");
-          document.getElementById("chatAnswer").textContent =
-            investigation.ai_answer || "Saved investigation opened. Review the report and provide feedback.";
+          document.getElementById("chatAnswer").innerHTML = renderInlineAnswer(
+            investigation.ai_answer || "Saved investigation opened. Review the report and provide feedback.",
+            investigation,
+          );
           document.getElementById("chatBadges").innerHTML = `
             <span class="badge">Status ${escapeHtml(investigation.status)}</span>
             <span class="badge">Confidence ${Math.round((investigation.confidence_score || 0) * 100)}%</span>
@@ -2379,7 +2532,11 @@
           ? messages
               .map(
                 (message) =>
-                  `<div class="chat-message"><strong>${message.role}</strong>${message.content}</div>`,
+                  `<div class="chat-message"><strong>${escapeHtml(message.role)}</strong>${
+                    message.role === "assistant"
+                      ? renderInlineAnswer(message.content, { confidence: message.confidence || 0 })
+                      : escapeHtml(message.content)
+                  }</div>`,
               )
               .join("")
           : "";
@@ -2395,7 +2552,12 @@
           );
           renderMessages(messages);
           const lastAssistant = [...messages].reverse().find((message) => message.role === "assistant");
-          if (lastAssistant) document.getElementById("chatAnswer").textContent = lastAssistant.content;
+          if (lastAssistant) {
+            document.getElementById("chatAnswer").innerHTML = renderInlineAnswer(
+              lastAssistant.content,
+              { confidence: lastAssistant.confidence || 0 },
+            );
+          }
         } catch (error) {
           setMessage("chatMessage", error.message, "error");
         }
@@ -2699,7 +2861,7 @@
 
       document.getElementById("chatWorkspace").addEventListener("change", () => {
         renderMessages([]);
-        document.getElementById("chatAnswer").textContent = "Ask a question to see the MVP answer and safety report.";
+        document.getElementById("chatAnswer").innerHTML = renderInlineAnswer("");
         document.getElementById("chatBadges").innerHTML = "";
         document.getElementById("reportDownloads").innerHTML = "";
         document.getElementById("verificationReportDownloads").innerHTML = "";
@@ -2728,7 +2890,10 @@
               question: form.get("question").trim(),
             }),
           });
-          document.getElementById("chatAnswer").textContent = response.assistant_message.content;
+          document.getElementById("chatAnswer").innerHTML = renderInlineAnswer(
+            response.assistant_message.content,
+            response,
+          );
           renderChatBadges(response);
           renderReportDownloads(response.report);
           renderReportDownloads(null, "verificationReportDownloads");

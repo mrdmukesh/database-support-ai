@@ -25,6 +25,7 @@ from legacydb_copilot.services.investigation_mode_service import (
     classify_investigation_mode,
 )
 from legacydb_copilot.services.llm_reasoning_service import (
+    _build_llm_payload,
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
@@ -1412,3 +1413,46 @@ def test_ai_reasoning_requires_explicit_switch_and_openai_key() -> None:
     assert llm_reasoning_enabled(disabled) is False
     assert llm_reasoning_enabled(missing_key) is False
     assert llm_reasoning_enabled(enabled) is True
+
+
+def test_llm_payload_masks_pii_before_openai_reasoning() -> None:
+    reasoning = ReasoningResult(
+        summary="Patient John Smith has claim issue.",
+        likely_root_causes=[],
+        supporting_evidence=[],
+        missing_evidence=[],
+        recommended_fix=[],
+        test_cases=[],
+        proof_of_fix=[],
+        rollback_plan=[],
+        risks=[],
+    )
+    payload = _build_llm_payload(
+        question="Why did patient john.smith@example.com claim fail?",
+        intent=IntentResult(InvestigationIntent.PRODUCTION_INVESTIGATION, 0.9, "test"),
+        deterministic_reasoning=reasoning,
+        evidence=[
+            EvidenceResult(
+                "PII sample",
+                "SELECT patient_name, email, phone, insurance_number FROM patients",
+                [
+                    {
+                        "patient_name": "John Smith",
+                        "email": "john.smith@example.com",
+                        "phone": "+1 555-123-9876",
+                        "insurance_number": "INS-ABC12345",
+                    }
+                ],
+            )
+        ],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+        evidence_focus=None,
+    )
+    payload_text = str(payload)
+    assert "john.smith@example.com" not in payload_text
+    assert "John Smith" not in payload_text
+    assert "555-123-9876" not in payload_text
+    assert "INS-ABC12345" not in payload_text
+    assert "[MASKED_EMAIL]" in payload_text

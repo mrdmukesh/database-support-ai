@@ -305,6 +305,8 @@ def _ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
         {"Item": "Evidence package sent", "Value": status.get("evidence_package_sent", "No")},
         {"Item": "LLM evidence validation", "Value": status.get("llm_evidence_validation", "Not applicable")},
         {"Item": "Evidence citations", "Value": status.get("evidence_citations", "Not applicable")},
+        {"Item": "PII masking", "Value": status.get("pii_masking", "Ready")},
+        {"Item": "PII masking scope", "Value": status.get("pii_masking_scope", "Names, emails, phone numbers, insurance/account identifiers are masked before any LLM evidence package is sent.")},
     ]
     return ReportSection(
         title="AI Reasoning Status",

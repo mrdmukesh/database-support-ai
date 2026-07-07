@@ -1171,6 +1171,8 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
             "evidence_package_sent": "Yes",
             "llm_evidence_validation": "Passed",
             "evidence_citations": "Passed",
+            "pii_masking": "Applied",
+            "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers were masked in the LLM evidence package.",
         }
     if not settings.openai_api_key:
         return {
@@ -1179,6 +1181,8 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
             "evidence_package_sent": "No",
             "llm_evidence_validation": "Not applicable",
             "evidence_citations": "Not applicable",
+            "pii_masking": "Ready",
+            "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers are masked before any LLM evidence package is sent.",
         }
     if not settings.ai_reasoning_enabled:
         return {
@@ -1187,6 +1191,8 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
             "evidence_package_sent": "No",
             "llm_evidence_validation": "Not applicable",
             "evidence_citations": "Not applicable",
+            "pii_masking": "Ready",
+            "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers are masked before any LLM evidence package is sent.",
         }
     if not llm_configured:
         return {
@@ -1195,6 +1201,8 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
             "evidence_package_sent": "No",
             "llm_evidence_validation": "Not applicable",
             "evidence_citations": "Not applicable",
+            "pii_masking": "Ready",
+            "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers are masked before any LLM evidence package is sent.",
         }
     return {
         "ai_assisted_reasoning": "Enabled",
@@ -1202,6 +1210,8 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
         "evidence_package_sent": "Yes",
         "llm_evidence_validation": "Failed",
         "evidence_citations": "Failed",
+        "pii_masking": "Applied",
+        "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers were masked in the LLM evidence package.",
     }
 
 

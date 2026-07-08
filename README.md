@@ -88,9 +88,9 @@ as `openai-api-key` and sets these Container App values:
 - `LLM_MODEL=gpt-4.1-mini`
 - `OPENAI_API_KEY=secretref:openai-api-key`
 
-If `OPENAI_API_KEY` is not configured, deployment keeps
-`AI_REASONING_ENABLED=false` and `LLM_ENABLED=false` so Ask AI continues to use
-the deterministic evidence engine.
+If `OPENAI_API_KEY` is not configured, deployment still sets
+`AI_REASONING_ENABLED=true` and `LLM_ENABLED=true`, but the application safely
+falls back to deterministic mode because no OpenAI key is available.
 
 The LLM is not autonomous. The required flow is:
 

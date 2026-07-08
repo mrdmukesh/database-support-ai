@@ -30,6 +30,7 @@ _KNOWLEDGE_COLUMNS: dict[str, str] = {
 
 _INVESTIGATION_COLUMNS: dict[str, str] = {
     "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
+    "ai_debug_trace_json": "TEXT NOT NULL DEFAULT ''",
 }
 
 _AUDIT_COLUMNS: dict[str, str] = {

@@ -52,6 +52,46 @@ from legacydb_copilot.databases import (
 )
 
 
+def _procedure(
+    name: str,
+    *,
+    reads: list[str] | None = None,
+    writes: list[str] | None = None,
+    inserts: int = 0,
+    updates: int = 0,
+    dynamic_sql: bool = False,
+    transactions: int = 0,
+    exists_guard: bool = True,
+    unique_guard: bool = True,
+) -> ProcedureAnalysis:
+    return ProcedureAnalysis(
+        name=name,
+        definition_available=True,
+        tables_read=reads or [],
+        tables_written=writes or [],
+        joins=1 if reads and writes else 0,
+        insert_statements=inserts,
+        update_statements=updates,
+        delete_statements=0,
+        merge_statements=0,
+        loops=0,
+        transactions=transactions,
+        try_catch=transactions > 0,
+        rollback_statements=0,
+        cursors=0,
+        temp_tables=0,
+        dynamic_sql=dynamic_sql,
+        missing_exists_checks=bool(writes) and not exists_guard,
+        missing_uniqueness_checks=bool(writes) and not unique_guard,
+        deadlock_risk="Low",
+        locking_risk="Medium" if writes else "Low",
+        complexity_score=3 if writes else 1,
+        complexity="Medium" if writes else "Low",
+        business_rules=[],
+        definition_excerpt="",
+    )
+
+
 def test_ai_disclaimer_contains_all_required_points() -> None:
     text = disclaimer_text()
     for point in AI_DISCLAIMER_POINTS:
@@ -874,8 +914,8 @@ def test_duplicate_root_cause_uses_evidence_first_write_path() -> None:
         focus,
     )
 
-    assert "retry_failed_activity_entries write path likely lacks idempotency" in reasoning.likely_root_causes[1]
-    assert "Procedure Analysis confirms it writes activity_entries" in reasoning.likely_root_causes[1]
+    assert "retry_failed_activity_entries may lack idempotency" in reasoning.likely_root_causes[1]
+    assert "Procedure writes affected object activity_entries" in reasoning.likely_root_causes[1]
     assert "No uniqueness protection" in reasoning.likely_root_causes[2]
     assert "Retry, job, or audit evidence" in reasoning.likely_root_causes[3]
 
@@ -956,6 +996,147 @@ def test_read_only_procedure_is_not_reported_as_writer() -> None:
     assert not focus.ranked_procedures[0].writes_affected_object
     assert any("No stored procedure was confirmed to write activity_entries" in item for item in reasoning.likely_root_causes)
     assert all("read_activity_entries write path likely lacks" not in item for item in reasoning.likely_root_causes)
+
+
+def test_direct_writer_ranks_above_related_writer_generically() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("tickets", ["ticket_id", "ticket_number"], 5),
+            TableMetadata(
+                "activity_entries",
+                ["activity_id", "ticket_id", "activity_status"],
+                5,
+                foreign_keys=[{"columns": ["ticket_id"], "referred_table": "tickets", "referred_columns": ["ticket_id"]}],
+            ),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    focus = build_evidence_focus(
+        question="ticket TCK-1005 has duplicate activity entries",
+        intent=InvestigationIntent.DUPLICATE_DATA,
+        entities=extract_entities("ticket TCK-1005 has duplicate activity entries"),
+        metadata=metadata,
+        evidence=[EvidenceResult("Find duplicate activity_entries per tickets", "SELECT ...", [{"parent_reference": "TCK-1005", "duplicate_count": 2}])],
+        correlated_evidence=[],
+        procedure_analysis=[
+            _procedure("update_ticket_status", reads=["activity_entries"], writes=["tickets"], updates=1),
+            _procedure("retry_activity_entries", reads=["tickets"], writes=["activity_entries"], inserts=1, exists_guard=False, unique_guard=False),
+        ],
+        documents=[],
+    )
+
+    assert focus.ranked_procedures[0].procedure == "retry_activity_entries"
+    assert focus.ranked_procedures[0].writes_affected_object
+    assert any("INSERT logic" in item for item in focus.ranked_procedures[0].evidence_found)
+
+
+def test_multiple_direct_writers_rank_by_live_and_error_evidence() -> None:
+    metadata = MetadataSearchResult(
+        tables=[TableMetadata("activity_entries", ["activity_id", "activity_code"], 5)],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    focus = build_evidence_focus(
+        question="duplicate activity entries were created",
+        intent=InvestigationIntent.DUPLICATE_DATA,
+        entities=extract_entities("duplicate activity entries were created"),
+        metadata=metadata,
+        evidence=[
+            EvidenceResult("Inspect error_log", "SELECT * FROM error_log", [{"procedure_name": "retry_activity_entries", "module_name": "activity_entries"}])
+        ],
+        correlated_evidence=[],
+        procedure_analysis=[
+            _procedure("bulk_import_activity_entries", writes=["activity_entries"], inserts=1),
+            _procedure("retry_activity_entries", writes=["activity_entries"], inserts=1),
+        ],
+        documents=[],
+    )
+
+    assert focus.ranked_procedures[0].procedure == "retry_activity_entries"
+    assert focus.ranked_procedures[0].error_log_support
+
+
+def test_metadata_only_case_keeps_root_cause_unconfirmed() -> None:
+    metadata = MetadataSearchResult(
+        tables=[TableMetadata("activity_entries", ["activity_id", "activity_code"], 5)],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    focus = build_evidence_focus(
+        question="duplicate activity entries were created",
+        intent=InvestigationIntent.DUPLICATE_DATA,
+        entities=extract_entities("duplicate activity entries were created"),
+        metadata=metadata,
+        evidence=[],
+        correlated_evidence=[],
+        procedure_analysis=[_procedure("read_activity_entries", reads=["activity_entries"])],
+        documents=[],
+    )
+    reasoning = reason_about_evidence(
+        "duplicate activity entries were created",
+        IntentResult(InvestigationIntent.DUPLICATE_DATA, 0.9, "test"),
+        extract_entities("duplicate activity entries were created"),
+        metadata,
+        [],
+        [],
+        [],
+        [_procedure("read_activity_entries", reads=["activity_entries"])],
+        focus,
+    )
+
+    assert not focus.ranked_procedures[0].writes_affected_object
+    assert reasoning.likely_root_causes == ["Could not confirm from available database metadata or documents."]
+
+
+def test_missing_child_and_failed_status_transition_are_generic() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("documents", ["document_id", "document_number", "document_status"], 5),
+            TableMetadata(
+                "approvals",
+                ["approval_id", "document_id", "approval_status"],
+                5,
+                foreign_keys=[{"columns": ["document_id"], "referred_table": "documents", "referred_columns": ["document_id"]}],
+            ),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    evidence = [
+        EvidenceResult(
+            "Confirmed Missing Related Record Candidates",
+            "SELECT ...",
+            [{"parent_reference": "DOC-10", "document_status": "SUBMITTED", "issue_type": "MISSING_RELATED_RECORD"}],
+        )
+    ]
+    reasoning = reason_about_evidence(
+        "documents are missing approvals after submitted status",
+        IntentResult(InvestigationIntent.MISSING_DATA, 0.9, "test"),
+        extract_entities("documents are missing approvals after submitted status"),
+        metadata,
+        evidence,
+        [],
+        [],
+        [_procedure("create_approvals", reads=["documents"], writes=["approvals"], inserts=1)],
+        build_evidence_focus(
+            question="documents are missing approvals after submitted status",
+            intent=InvestigationIntent.MISSING_DATA,
+            entities=extract_entities("documents are missing approvals after submitted status"),
+            metadata=metadata,
+            evidence=evidence,
+            correlated_evidence=[],
+            procedure_analysis=[_procedure("create_approvals", reads=["documents"], writes=["approvals"], inserts=1)],
+            documents=[],
+        ),
+    )
+
+    assert any("MISSING_RELATED_RECORD" in item for item in reasoning.likely_root_causes)
+    assert any("parent_status_not_ready" in item for item in reasoning.likely_root_causes)
 
 
 def test_error_log_support_boosts_confirmed_direct_writer() -> None:
@@ -1456,3 +1637,49 @@ def test_llm_payload_masks_pii_before_openai_reasoning() -> None:
     assert "555-123-9876" not in payload_text
     assert "INS-ABC12345" not in payload_text
     assert "[MASKED_EMAIL]" in payload_text
+
+
+def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch) -> None:
+    def fake_call(settings, payload):
+        return {
+            "summary": "Masked reasoning",
+            "likely_root_causes": [
+                {"conclusion": "Supported claim", "evidence_refs": ["SQL-1"]},
+                {"conclusion": "Unsupported claim", "evidence_refs": []},
+            ],
+            "recommended_fix": [],
+            "proof_of_fix": [],
+            "risks": [],
+            "test_cases": [],
+        }
+
+    import legacydb_copilot.services.llm_reasoning_service as llm_service
+
+    monkeypatch.setattr(llm_service, "_call_openai_responses", fake_call)
+    trace: dict = {}
+    result = enhance_reasoning_with_llm(
+        question="Why did jane@example.com duplicate?",
+        intent=IntentResult(InvestigationIntent.DUPLICATE_DATA, 0.9, "test"),
+        deterministic_reasoning=ReasoningResult(
+            summary="base",
+            likely_root_causes=["base cause"],
+            supporting_evidence=[],
+            missing_evidence=[],
+            recommended_fix=[],
+            test_cases=[],
+            proof_of_fix=[],
+            rollback_plan=[],
+            risks=[],
+        ),
+        evidence=[EvidenceResult("Find duplicate rows", "SELECT email FROM users", [{"email": "jane@example.com"}])],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+        settings=Settings(environment=Environment.DEVELOPMENT, ai_reasoning_enabled=True, llm_enabled=True, openai_api_key="sk-test"),
+        debug_trace=trace,
+    )
+
+    assert result.likely_root_causes == ["Supported claim Evidence: SQL-1."]
+    assert "jane@example.com" not in trace["user_prompt"]
+    assert trace["validated_citations"][0]["claim"] == "Supported claim"
+    assert trace["rejected_or_unsupported_claims"][0]["claim"] == "Unsupported claim"

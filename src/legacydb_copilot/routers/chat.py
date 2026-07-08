@@ -357,6 +357,7 @@ def _empty_investigation_metadata() -> dict[str, Any]:
         "report_path": "",
         "report_snapshot": "",
         "verification_checks": "[]",
+        "ai_debug_trace": "",
     }
 
 
@@ -1514,6 +1515,7 @@ def _run_dynamic_investigation(
         correlated_evidence=correlated_evidence,
         procedure_analysis=procedure_analysis,
         documents=context.documents,
+        evidence_focus=evidence_focus,
     )
     if evidence_gate.required and not evidence_gate.reproduced:
         reasoning = unreproduced_reasoning(evidence_gate)
@@ -1531,7 +1533,9 @@ def _run_dynamic_investigation(
             procedure_analysis,
             evidence_focus,
         )
-        llm_configured = llm_reasoning_enabled()
+        settings = Settings.from_env()
+        llm_configured = llm_reasoning_enabled(settings)
+        ai_debug_trace = {} if settings.ai_debug_trace_enabled else None
         enhanced_reasoning = enhance_reasoning_with_llm(
             question=payload.question,
             intent=intent,
@@ -1541,9 +1545,13 @@ def _run_dynamic_investigation(
             procedure_analysis=procedure_analysis,
             documents=context.documents,
             evidence_focus=evidence_focus,
+            settings=settings,
+            debug_trace=ai_debug_trace,
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
+    if evidence_gate.required and not evidence_gate.reproduced:
+        ai_debug_trace = None
     recommendation = recommend_actions(
         intent=intent.intent,
         reasoning=reasoning,
@@ -1776,6 +1784,7 @@ def _run_dynamic_investigation(
         "report_path": str(generated_report.directory),
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
+        "ai_debug_trace": json.dumps(ai_debug_trace or {}, default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata
 
@@ -1919,6 +1928,7 @@ def ask_chat_question(
         confidence_score=confidence,
         report_path=investigation_metadata["report_path"],
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
+        ai_debug_trace_json=investigation_metadata.get("ai_debug_trace", ""),
         status="AI_ANSWERED",
     )
     db.add(investigation)

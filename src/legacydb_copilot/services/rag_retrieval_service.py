@@ -12,6 +12,7 @@ from typing import Any
 from urllib import request
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.config import Settings
@@ -1401,14 +1402,18 @@ def _ensure_pgvector_schema(db: Session) -> None:
     """
     if not _pgvector_ready(db):
         return
-    db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    db.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
-    db.execute(
-        text(
-            "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
-            "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+    try:
+        db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        db.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+                "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+            )
         )
-    )
+    except SQLAlchemyError:
+        db.rollback()
+        return
 
 
 def _store_pgvector_embedding(db: Session, chunk_id: str, vector: list[float]) -> None:

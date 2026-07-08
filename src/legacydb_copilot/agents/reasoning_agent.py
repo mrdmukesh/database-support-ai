@@ -170,7 +170,15 @@ def reason_about_evidence(
         if write_procs:
             writer = write_procs[0]
             object_name = evidence_focus.affected_object if evidence_focus else "the affected object"
-            root_causes.append(f"{writer.name} write path likely lacks idempotency / existing active {object_name} check because Procedure Analysis confirms it writes {object_name}. Evidence: Procedure Analysis tables_written.")
+            writer_rank = next(
+                (rank for rank in evidence_focus.ranked_procedures if rank.procedure == writer.name),
+                None,
+            ) if evidence_focus else None
+            support = "; ".join((writer_rank.evidence_found if writer_rank else [])[:4]) or "Procedure Analysis tables_written"
+            certainty = "Most likely" if writer_rank and (writer_rank.error_log_support or non_empty) else "Likely"
+            root_causes.append(
+                f"{certainty} write-path cause: {writer.name} may lack idempotency, uniqueness, retry, or transaction guards for {object_name}. Evidence: {support}."
+            )
         elif evidence_focus:
             root_causes.append(f"No stored procedure was confirmed to write {evidence_focus.affected_object}; procedure-write root causes must remain unconfirmed until procedure metadata or logs prove a direct writer.")
         key_text = f" around business key {evidence_focus.inferred_business_key}" if evidence_focus and evidence_focus.inferred_business_key else ""

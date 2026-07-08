@@ -302,6 +302,7 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     confidence_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
     report_path: Mapped[str] = mapped_column(String(700), default="", nullable=False)
     report_snapshot_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    ai_debug_trace_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="AI_ANSWERED", nullable=False, index=True)
 
     workspace: Mapped["WorkspaceModel"] = relationship(back_populates="investigations")

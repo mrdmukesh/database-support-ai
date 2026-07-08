@@ -72,6 +72,7 @@ def enhance_reasoning_with_llm(
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None = None,
     settings: Settings | None = None,
+    debug_trace: dict[str, Any] | None = None,
 ) -> ReasoningResult:
     """
     Owner: Mukesh Dabi
@@ -100,7 +101,7 @@ def enhance_reasoning_with_llm(
     if not llm_reasoning_enabled(settings):
         return deterministic_reasoning
 
-    payload = _build_llm_payload(
+    raw_payload = _build_llm_payload_unmasked(
         question=question,
         intent=intent,
         deterministic_reasoning=deterministic_reasoning,
@@ -110,9 +111,28 @@ def enhance_reasoning_with_llm(
         documents=documents,
         evidence_focus=evidence_focus,
     )
+    payload = mask_llm_payload(raw_payload)
+    if debug_trace is not None:
+        debug_trace.update(
+            {
+                "system_prompt": SYSTEM_PROMPT,
+                "user_prompt": json.dumps(payload, default=str),
+                "evidence_package_before_masking_summary": _payload_summary(raw_payload),
+                "evidence_package_after_masking": payload,
+                "llm_model_name": settings.llm_model,
+                "llm_response_raw": None,
+                "validated_citations": [],
+                "rejected_or_unsupported_claims": [],
+                "final_report_claims": deterministic_reasoning.likely_root_causes,
+            }
+        )
     try:
         llm_json = _call_openai_responses(settings, payload)
-        return _merge_llm_reasoning(deterministic_reasoning, llm_json)
+        enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, debug_trace=debug_trace)
+        if debug_trace is not None:
+            debug_trace["llm_response_raw"] = mask_llm_payload(llm_json)
+            debug_trace["final_report_claims"] = enhanced.likely_root_causes
+        return enhanced
     except Exception:
         return deterministic_reasoning
 
@@ -148,6 +168,31 @@ def _build_llm_payload(
     Safety considerations:
         The LLM must reason only over collected evidence and must never connect to databases or run SQL.
     """
+    return mask_llm_payload(
+        _build_llm_payload_unmasked(
+            question=question,
+            intent=intent,
+            deterministic_reasoning=deterministic_reasoning,
+            evidence=evidence,
+            correlated_evidence=correlated_evidence,
+            procedure_analysis=procedure_analysis,
+            documents=documents,
+            evidence_focus=evidence_focus,
+        )
+    )
+
+
+def _build_llm_payload_unmasked(
+    *,
+    question: str,
+    intent: IntentResult,
+    deterministic_reasoning: ReasoningResult,
+    evidence: list[EvidenceResult],
+    correlated_evidence: list[CorrelatedEvidence],
+    procedure_analysis: list[ProcedureAnalysis],
+    documents: list[RetrievedDocument],
+    evidence_focus: EvidenceFocus | None,
+) -> dict[str, Any]:
     evidence_items = [
         {
             "ref": f"SQL-{index}",
@@ -239,7 +284,7 @@ def _build_llm_payload(
             "risks": [{"risk": "string", "evidence_refs": ["SQL-1"]}],
         },
     }
-    return mask_llm_payload(payload)
+    return payload
 
 
 def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any]) -> dict[str, Any]:
@@ -320,7 +365,12 @@ def _extract_response_text(response_json: dict[str, Any]) -> str:
     return "\n".join(chunks)
 
 
-def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> ReasoningResult:
+def _merge_llm_reasoning(
+    base: ReasoningResult,
+    llm_json: dict[str, Any],
+    *,
+    debug_trace: dict[str, Any] | None = None,
+) -> ReasoningResult:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -341,12 +391,16 @@ def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> Rea
     Safety considerations:
         The LLM must reason only over collected evidence and must never connect to databases or run SQL.
     """
-    root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion")
-    fixes = _cited_items(llm_json.get("recommended_fix"), "step")
-    proof = _cited_items(llm_json.get("proof_of_fix"), "step")
-    risks = _cited_items(llm_json.get("risks"), "risk")
-    next_questions = _cited_items(llm_json.get("recommended_next_questions"), "question")
-    test_cases = _cited_test_cases(llm_json.get("test_cases"))
+    validation: dict[str, list[Any]] = {"accepted": [], "rejected": []}
+    root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion", validation=validation)
+    fixes = _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
+    proof = _cited_items(llm_json.get("proof_of_fix"), "step", validation=validation)
+    risks = _cited_items(llm_json.get("risks"), "risk", validation=validation)
+    next_questions = _cited_items(llm_json.get("recommended_next_questions"), "question", validation=validation)
+    test_cases = _cited_test_cases(llm_json.get("test_cases"), validation=validation)
+    if debug_trace is not None:
+        debug_trace["validated_citations"] = validation["accepted"]
+        debug_trace["rejected_or_unsupported_claims"] = validation["rejected"]
     if not root_causes:
         return base
     summary_parts = [str(llm_json.get("summary") or base.summary)]
@@ -373,7 +427,12 @@ def _merge_llm_reasoning(base: ReasoningResult, llm_json: dict[str, Any]) -> Rea
     )
 
 
-def _cited_items(value: Any, text_key: str) -> list[str]:
+def _cited_items(
+    value: Any,
+    text_key: str,
+    *,
+    validation: dict[str, list[Any]] | None = None,
+) -> list[str]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -404,10 +463,18 @@ def _cited_items(value: Any, text_key: str) -> list[str]:
         refs = [str(ref) for ref in item.get("evidence_refs") or [] if ref]
         if text and refs:
             items.append(f"{text} Evidence: {', '.join(refs)}.")
+            if validation is not None:
+                validation["accepted"].append({"claim": text, "evidence_refs": refs})
+        elif text and validation is not None:
+            validation["rejected"].append({"claim": text, "reason": "Missing evidence_refs"})
     return items
 
 
-def _cited_test_cases(value: Any) -> list[dict[str, str]]:
+def _cited_test_cases(
+    value: Any,
+    *,
+    validation: dict[str, list[Any]] | None = None,
+) -> list[dict[str, str]]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -436,7 +503,13 @@ def _cited_test_cases(value: Any) -> list[dict[str, str]]:
             continue
         refs = [str(ref) for ref in item.get("evidence_refs") or [] if ref]
         if not refs:
+            if validation is not None:
+                validation["rejected"].append(
+                    {"claim": str(item.get("scenario") or item.get("test_id") or "test case"), "reason": "Missing evidence_refs"}
+                )
             continue
+        if validation is not None:
+            validation["accepted"].append({"claim": str(item.get("scenario") or item.get("test_id") or "test case"), "evidence_refs": refs})
         cases.append(
             {
                 "Test ID": str(item.get("test_id") or f"TC-{index:03d}"),
@@ -448,6 +521,21 @@ def _cited_test_cases(value: Any) -> list[dict[str, str]]:
             }
         )
     return cases
+
+
+def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    evidence_refs = payload.get("evidence_refs") if isinstance(payload, dict) else {}
+    evidence_refs = evidence_refs if isinstance(evidence_refs, dict) else {}
+    return {
+        "question_present": bool(payload.get("question")),
+        "detected_intent": payload.get("detected_intent"),
+        "sql_evidence_count": len(evidence_refs.get("sql") or []),
+        "procedure_evidence_count": len(evidence_refs.get("procedures") or []),
+        "document_evidence_count": len(evidence_refs.get("documents") or []),
+        "correlated_evidence_count": len(evidence_refs.get("correlated") or []),
+        "contains_raw_rows": bool(evidence_refs.get("sql")),
+        "note": "Summary only; unmasked rows and PII are not persisted in AI debug trace.",
+    }
 
 
 def _string_list(value: Any) -> list[str]:

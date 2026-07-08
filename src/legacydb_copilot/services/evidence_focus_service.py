@@ -308,10 +308,20 @@ def _rank_procedures(
             historical.append("Procedure appears in retrieved documents or approved knowledge.")
         if proc.missing_exists_checks and writes_affected:
             score += 1.5
-            evidence_found.append("Direct write path lacks an EXISTS check in parsed procedure text.")
+            evidence_found.append("Direct write path lacks an EXISTS / NOT EXISTS idempotency check in parsed procedure text.")
         if proc.missing_uniqueness_checks and writes_affected:
             score += 1.5
             evidence_found.append("Direct write path lacks uniqueness/duplicate check in parsed procedure text.")
+        if writes_affected and proc.insert_statements and (proc.missing_exists_checks or proc.missing_uniqueness_checks):
+            score += 1.0
+            evidence_found.append("INSERT logic writes the affected object without confirmed duplicate-prevention guards.")
+        if writes_affected and proc.dynamic_sql:
+            score += 1.0
+            evidence_found.append("Dynamic SQL touches the affected object; review generated statements and bind predicates.")
+        if writes_affected and not proc.transactions:
+            evidence_found.append("No explicit transaction handling was detected around the affected-object write path.")
+        if writes_affected and not proc.try_catch:
+            evidence_found.append("No explicit exception/retry guard was detected in parsed procedure text.")
         ranks.append(
             ProcedureRank(
                 procedure=proc.name,
@@ -325,7 +335,17 @@ def _rank_procedures(
                 job_history_support=job_support,
             )
         )
-    return sorted(ranks, key=lambda item: (item.writes_affected_object, item.score), reverse=True)
+    return sorted(
+        ranks,
+        key=lambda item: (
+            item.writes_affected_object,
+            item.error_log_support,
+            item.job_history_support,
+            item.reads_affected_object,
+            item.score,
+        ),
+        reverse=True,
+    )
 
 
 def _confirmed_facts(evidence: list[EvidenceResult], ranked_procedures: list[ProcedureRank], affected_object: str, business_key: str | None) -> list[str]:
@@ -459,11 +479,12 @@ def _hypotheses(intent: InvestigationIntent, affected_object: str, business_key:
     """
     hypotheses: list[str] = []
     if ranked_procedures and ranked_procedures[0].writes_affected_object:
-        hypotheses.append(f"Direct write logic in {ranked_procedures[0].procedure} may explain the observed evidence for {affected_object}.")
+        support = "; ".join(ranked_procedures[0].evidence_found[:4])
+        hypotheses.append(f"Direct write logic in {ranked_procedures[0].procedure} may explain the observed evidence for {affected_object}. Evidence: {support}.")
     if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and business_key:
         hypotheses.append(f"Duplicate records may be caused by missing idempotency or uniqueness around business key {business_key}.")
         if ranked_procedures and ranked_procedures[0].writes_affected_object:
-            hypotheses.append(f"The likely write path is {ranked_procedures[0].procedure} because it writes {affected_object}; it may lack existing-active-record validation. Retry, job, or audit evidence is still needed to fully prove the exact execution path.")
+            hypotheses.append(f"The likely write path is {ranked_procedures[0].procedure} because it writes {affected_object}; it may lack idempotency, uniqueness, retry, or transaction guards. Retry, job, or audit evidence is still needed to fully prove the exact execution path.")
     if any(item.error for item in evidence):
         hypotheses.append("Some evidence queries failed, so missing privileges or metadata gaps may hide a stronger explanation.")
     if not hypotheses:

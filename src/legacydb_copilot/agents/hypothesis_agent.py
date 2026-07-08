@@ -388,6 +388,7 @@ def build_event_chain(
     top_hypothesis: HypothesisEvaluation | None,
     procedure_analysis: list[ProcedureAnalysis],
     correlated_evidence: list[CorrelatedEvidence],
+    evidence_focus: EvidenceFocus | None = None,
 ) -> list[str]:
     """
     Owner: Mukesh Dabi
@@ -414,10 +415,27 @@ def build_event_chain(
     chain = ["User-reported condition was mapped to relevant database objects."]
     if correlated_evidence:
         chain.append("Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.")
-    write_procs = [proc for proc in procedure_analysis if proc.tables_written]
-    if write_procs:
-        chain.append(f"Stored procedure analysis found write path(s): {', '.join(proc.name for proc in write_procs[:3])}.")
-        chain.append("Those write paths must be checked for idempotency, EXISTS checks, uniqueness checks, and transaction safety.")
+    if evidence_focus:
+        direct_writers = [rank for rank in evidence_focus.ranked_procedures if rank.writes_affected_object]
+        if direct_writers:
+            top_writer = direct_writers[0]
+            chain.append(
+                f"Likely write path is {top_writer.procedure} because procedure analysis confirms it writes "
+                f"{evidence_focus.affected_object}."
+            )
+            chain.append(
+                "That direct write path must be checked for idempotency, EXISTS/NOT EXISTS checks, uniqueness checks, "
+                "retry guards, transaction handling, and duplicate-prone INSERT logic."
+            )
+        else:
+            chain.append(
+                f"No procedure was confirmed to write {evidence_focus.affected_object}; root-cause wording must stay at likely/unknown confidence."
+            )
+    else:
+        write_procs = [proc for proc in procedure_analysis if proc.tables_written]
+        if write_procs:
+            chain.append(f"Stored procedure analysis found write path(s): {', '.join(proc.name for proc in write_procs[:3])}.")
+            chain.append("Those write paths must be checked for idempotency, EXISTS checks, uniqueness checks, and transaction safety.")
     chain.append(f"Most likely explanation: {top_hypothesis.description}")
     chain.append("Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.")
     return chain
@@ -525,6 +543,7 @@ def run_hypothesis_investigation(
             top_hypothesis=ranked[0] if ranked else None,
             procedure_analysis=procedure_analysis,
             correlated_evidence=correlated_evidence,
+            evidence_focus=evidence_focus,
         ),
-        process_graph=discover_process_graph(metadata=metadata, procedure_analysis=procedure_analysis),
+        process_graph=evidence_focus.write_path_graph if evidence_focus and evidence_focus.write_path_graph else discover_process_graph(metadata=metadata, procedure_analysis=procedure_analysis),
     )

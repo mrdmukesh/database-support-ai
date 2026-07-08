@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import uuid4
@@ -133,6 +134,18 @@ class LocalSecretStore:
         Safety considerations:
             Secrets must be resolved internally and never exposed in API responses.
         """
+        if reference.startswith("env://"):
+            env_name = reference.removeprefix("env://")
+            value = os.getenv(env_name)
+            if not value:
+                raise RuntimeError(f"Environment secret reference {env_name} is not configured")
+            return value
+        if reference.startswith("env:"):
+            env_name = reference.removeprefix("env:")
+            value = os.getenv(env_name)
+            if not value:
+                raise RuntimeError(f"Environment secret reference {env_name} is not configured")
+            return value
         return reference
 
 

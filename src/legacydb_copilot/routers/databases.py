@@ -69,6 +69,29 @@ def _build_connection_string(connection: DatabaseConnectionModel) -> str:
         raise ValueError(f"Unsupported database engine: {engine}")
 
 
+def _store_or_keep_secret_reference(
+    *,
+    secret_ref: str,
+    connection_string: str | None,
+    name: str,
+) -> str:
+    reference = secret_ref.strip()
+    if reference:
+        return reference
+    if connection_string and connection_string.strip():
+        try:
+            return get_secret_store().store_secret(name=name, value=connection_string.strip())
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{exc}. Use a configured reference such as keyvault://secret-name "
+                    "or env://TARGET_DATABASE_URL."
+                ),
+            ) from exc
+    raise HTTPException(status_code=422, detail="Secret reference or connection string is required")
+
+
 @router.get("/engines")
 def list_database_engines() -> dict[str, list[str]]:
     registry = default_connector_registry()
@@ -84,16 +107,11 @@ def create_database_connection(
     assert_same_organization(current_user, payload.organization_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="database")
     data = payload.model_dump(exclude={"connection_string"})
-    if payload.connection_string:
-        try:
-            data["secret_ref"] = get_secret_store().store_secret(
-                name=f"{payload.organization_id}-{payload.workspace_id}-{payload.name}",
-                value=payload.connection_string,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if not data["secret_ref"]:
-        raise HTTPException(status_code=422, detail="Secret reference or connection string is required")
+    data["secret_ref"] = _store_or_keep_secret_reference(
+        secret_ref=payload.secret_ref,
+        connection_string=payload.connection_string,
+        name=f"{payload.organization_id}-{payload.workspace_id}-{payload.name}",
+    )
     connection = DatabaseConnectionModel(**data)
     db.add(connection)
     try:
@@ -158,13 +176,11 @@ def update_database_connection(
     data = payload.model_dump(exclude_unset=True)
     connection_string = data.pop("connection_string", None)
     if connection_string:
-        try:
-            connection.secret_ref = get_secret_store().store_secret(
-                name=f"{connection.organization_id}-{connection.workspace_id}-{connection.name}",
-                value=connection_string,
-            )
-        except RuntimeError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        connection.secret_ref = _store_or_keep_secret_reference(
+            secret_ref="",
+            connection_string=connection_string,
+            name=f"{connection.organization_id}-{connection.workspace_id}-{connection.name}",
+        )
     for field, value in data.items():
         setattr(connection, field, value)
     try:

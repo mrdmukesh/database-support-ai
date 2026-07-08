@@ -1338,9 +1338,9 @@
                   </label>
                   <label>
                     Secret reference
-                    <input name="secretRef" value="secret-manager://legacy-erp/prod" />
+                    <input name="secretRef" value="env://TARGET_DATABASE_URL" />
                   </label>
-                  <p class="muted-note">Use a MySQL connection string for local testing, or store a secret reference for production.</p>
+                  <p class="muted-note">Use a connection string for local testing. In production, use a reference such as env://TARGET_DATABASE_URL and configure that environment variable from an Azure secret.</p>
                   <button class="button" type="submit">Add connection</button>
                   <div id="connectionMessage" class="message"></div>
                 </form>

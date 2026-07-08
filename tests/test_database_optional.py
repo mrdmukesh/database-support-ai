@@ -11,7 +11,8 @@ from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.connector import DatabaseConnector
 from legacydb_copilot.db.models import OrganizationModel, WorkspaceModel
 from legacydb_copilot.databases import DatabaseEngine
-from legacydb_copilot.routers.databases import _looks_like_connection_string
+from legacydb_copilot.routers.databases import _looks_like_connection_string, _store_or_keep_secret_reference
+from legacydb_copilot.services.secrets_service import LocalSecretStore
 
 
 def test_sqlalchemy_models_create_tenant_tables_in_sqlite() -> None:
@@ -68,3 +69,21 @@ def test_mysql_ssl_query_parameter_becomes_pymysql_connect_args() -> None:
 
 def test_secret_manager_reference_is_not_treated_as_connection_string() -> None:
     assert not _looks_like_connection_string("secret-manager://legacy-erp/prod")
+
+
+def test_environment_secret_reference_resolves_without_raw_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TARGET_DATABASE_URL", "mysql+pymysql://appadmin:secret@mysql.example.com:3306/app")
+
+    store = LocalSecretStore(allow_raw_storage=False)
+
+    assert store.get_secret("env://TARGET_DATABASE_URL").startswith("mysql+pymysql://appadmin:")
+
+
+def test_secret_reference_takes_precedence_over_connection_string_in_production() -> None:
+    secret_ref = _store_or_keep_secret_reference(
+        secret_ref="env://TARGET_DATABASE_URL",
+        connection_string="mysql://appadmin:secret@mysql.example.com:3306/app",
+        name="production-target-db",
+    )
+
+    assert secret_ref == "env://TARGET_DATABASE_URL"

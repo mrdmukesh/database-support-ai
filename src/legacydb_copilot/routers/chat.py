@@ -774,6 +774,8 @@ def _target_object_not_found(question: str, metadata, intent=None) -> tuple[bool
     """
     if intent and intent.intent == InvestigationIntent.STORED_PROCEDURE_ANALYSIS:
         return False, "", []
+    if intent and intent.intent in {InvestigationIntent.HEALTH_ASSESSMENT, InvestigationIntent.GENERAL_DATABASE_QUESTION}:
+        return False, "", []
     problem = parse_problem_phrase(question)
     if not problem.issue_kind or not problem.target_terms:
         return False, "", []
@@ -829,20 +831,24 @@ def _object_not_found_answer(
     semantic_matches = context.documents[:6]
     confidence = 0.25 if not semantic_matches else min(0.45, max(item.score for item in semantic_matches))
     answer = (
-        "Object Not Found In Connected Database.\n\n"
-        "The app stopped before generating root-cause hypotheses because the primary business object from the question was not found in the connected database metadata.\n\n"
+        "Insufficient Database Evidence.\n\n"
+        "The app stopped before generating root-cause hypotheses because the requested business term could not be resolved to connected database evidence.\n\n"
         "## Stage 1 - Understand the Question\n"
         f"- Investigation Mode: {mode.mode.value}\n"
         f"- Detected Intent: {intent.intent.value}\n"
-        f"- Target Object Searched: {missing_target}\n\n"
-        "## Searched Sources\n"
+        f"- Requested Business Term: {missing_target}\n\n"
+        "## Searched Metadata\n"
         + "\n".join(f"- {item}" for item in searched)
+        + "\n\n## Closest Matching Objects\n"
+        + "\n".join(f"- {table.name}" for table in context.metadata.tables[:5])
         + "\n\n## Semantic Matches\n"
         f"{_format_retrieved_items(semantic_matches, empty='No semantic document matches found.')}\n\n"
         "## Confidence\n"
         f"- {int(confidence * 100)}%\n"
-        "- Confidence is low because the target object could not be resolved from connected schema evidence.\n\n"
-        "## Recommendation\n"
+        "- Confidence is low because the requested term could not be resolved from connected schema evidence.\n\n"
+        "## Why RCA Was Not Generated\n"
+        "- No safe RCA was generated because the affected object could not be mapped to a table, view, procedure, or approved document.\n\n"
+        "## Evidence Needed Next\n"
         "- Confirm that this workspace is connected to the correct customer database.\n"
         "- Check whether the object uses a different name in this database.\n"
         "- Upload or approve business process documents that map business terms to physical table/procedure names.\n"
@@ -852,21 +858,22 @@ def _object_not_found_answer(
         db=db,
         payload=payload,
         generated_by=generated_by,
-        title=f"Object Not Found - {payload.question}",
+        title=f"Insufficient Database Evidence - {payload.question}",
         mode=mode.mode.value,
         database_name=database_name,
         confidence=confidence,
-        summary="Reported issue could not be investigated because the target object was not found in connected database evidence.",
+        summary="Reported issue could not be investigated because the requested business term was not found in connected database evidence.",
         sections=[
             ReportSection(
-                title="Object Not Found",
+                title="Insufficient Database Evidence",
                 items=[
-                    f"Target Object Searched: {missing_target}",
+                    f"Requested Business Term: {missing_target}",
                     "Root-cause hypotheses were not generated.",
                     "Live SQL evidence queries were not planned for an unresolved target object.",
                 ],
             ),
-            ReportSection(title="Searched Sources", items=searched),
+            ReportSection(title="Searched Metadata", items=searched),
+            ReportSection(title="Closest Matching Objects", items=[table.name for table in context.metadata.tables[:5]] or ["No table metadata was available."]),
             ReportSection(
                 title="Semantic Matches",
                 tables=[
@@ -882,7 +889,7 @@ def _object_not_found_answer(
                 ],
             ),
             ReportSection(
-                title="Recommendation",
+                title="Evidence Needed Next",
                 items=[
                     "Confirm that this workspace is connected to the correct customer database.",
                     "Check whether the object uses a different physical table/procedure name.",
@@ -893,7 +900,7 @@ def _object_not_found_answer(
     )
     metadata = _empty_investigation_metadata()
     metadata["investigation_id"] = investigation_id
-    metadata["detected_intent"] = f"OBJECT_NOT_FOUND:{intent.intent.value}"
+    metadata["detected_intent"] = f"INSUFFICIENT_DATABASE_EVIDENCE:{intent.intent.value}"
     metadata["evidence"] = json.dumps(
         {
             "missing_target": missing_target,

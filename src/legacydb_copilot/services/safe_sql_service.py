@@ -617,9 +617,135 @@ def _duplicate_target_terms(entities: EntityExtractionResult) -> set[str]:
     Safety considerations:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
-    stop = {"duplicate", "duplicates", "multiple", "active", "open", "valid", "created", "create", "where", "with", "why", "did", "two"}
+    stop = {"duplicate", "duplicates", "multiple", "active", "open", "valid", "created", "create", "where", "with", "why", "did", "two", "processed", "twice"}
     terms = {term.lower() for term in (entities.business_keywords or []) if len(term) >= 3 and term.lower() not in stop}
     return terms
+
+
+def _business_key_values(entities: EntityExtractionResult) -> list[str]:
+    return [
+        entity.value
+        for entity in entities.entities
+        if entity.entity_type in {"business_key", "exact_id_or_code"}
+    ]
+
+
+def _natural_key_columns(table: TableMetadata) -> list[str]:
+    priority = []
+    for column in table.columns:
+        lowered = column.lower()
+        if lowered.endswith("_id") or lowered == "id" or column in (table.primary_key or []):
+            continue
+        if lowered == "reference_key":
+            priority.append((0, column))
+        elif lowered.endswith("_number"):
+            priority.append((1, column))
+        elif lowered.endswith("_code"):
+            priority.append((2, column))
+        elif lowered.endswith("_key") or lowered.endswith("_ref") or "reference" in lowered:
+            priority.append((3, column))
+    return [column for _, column in sorted(priority, key=lambda item: (item[0], item[1]))]
+
+
+def _header_rank(table: TableMetadata) -> int:
+    lowered = table.name.lower()
+    if re.search(r"(^|_)(lines?|details?|history|audit|logs?|items?)$", lowered):
+        return -5
+    if any(token in lowered for token in ("_line", "_detail", "_history", "_audit", "_log")):
+        return -4
+    return 3
+
+
+def _status_columns(table: TableMetadata) -> list[str]:
+    return [column for column in table.columns if any(term in column.lower() for term in ("status", "state"))]
+
+
+def _reported_stuck_status(entities: EntityExtractionResult) -> str | None:
+    status_values = [
+        entity.value
+        for entity in entities.entities
+        if entity.entity_type == "status_or_code"
+    ]
+    key_prefixes = {value.split("-", 1)[0] for value in _business_key_values(entities) if "-" in value}
+    for value in status_values:
+        if value not in key_prefixes:
+            return value
+    keywords = entities.business_keywords or []
+    for index, token in enumerate(keywords):
+        if token.lower() == "in" and index + 1 < len(keywords):
+            candidate = keywords[index + 1]
+            if candidate.isupper():
+                return candidate
+    return None
+
+
+def _status_investigation_queries(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    key_values = _business_key_values(entities)
+    stuck_status = _reported_stuck_status(entities)
+    candidates = [
+        table
+        for table in metadata.tables
+        if _status_columns(table)
+    ]
+    if not candidates:
+        return []
+    table = sorted(candidates, key=lambda item: (item.score, _header_rank(item), len(item.name)), reverse=True)[0]
+    status_col = _status_columns(table)[0]
+    label = _natural_key_columns(table)[0] if _natural_key_columns(table) else table.columns[0]
+    columns = [label, status_col]
+    select_cols = ", ".join(dict.fromkeys([*columns, *table.columns[:4]]))
+    filters = []
+    for value in key_values:
+        escaped = value.replace("'", "''")
+        filters.append(f"{_cast_to_text(label, metadata.engine_type)} = '{escaped}'")
+    where = f" WHERE {' OR '.join(filters)}" if filters else ""
+    reported = f", '{stuck_status}' AS reported_stuck_status" if stuck_status else ""
+    return [
+        PlannedQuery(
+            purpose=f"Confirm current status in {table.name}",
+            sql=f"SELECT {select_cols}, {status_col} AS current_status{reported} FROM {table.name}{where}",
+        )
+    ]
+
+
+def _analytical_summary_queries(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    terms = set(entities.business_keywords or [])
+    quality_terms = {"data", "quality", "rule", "rules", "result", "results", "failure", "failed", "failures"}
+    terms.update(quality_terms if {"quality", "rules"} & terms else set())
+    candidates = []
+    for table in metadata.tables:
+        haystack = " ".join([table.name, *table.columns]).lower()
+        score = sum(1 for term in terms if term.lower() in haystack)
+        if score:
+            candidates.append((score + table.score, table))
+    candidates.sort(key=lambda item: (item[0], item[1].name), reverse=True)
+    planned = []
+    for _, table in candidates[:3]:
+        status_col = _find_column(table, ("status",)) or _find_column(table, ("result",)) or _find_column(table, ("state",))
+        rule_col = _find_column(table, ("rule", "code")) or _find_column(table, ("rule", "name")) or _find_column(table, ("name",)) or _find_column(table, ("code",))
+        date_col = _find_column(table, ("date",)) or _find_column(table, ("created",)) or _find_column(table, ("run",))
+        if status_col:
+            group_cols = ", ".join(col for col in [rule_col, status_col] if col)
+            where_parts = []
+            if date_col:
+                where_parts.append(f"{date_col} IS NOT NULL")
+            if any(term in terms for term in ("failed", "failure", "failures")):
+                where_parts.append(f"LOWER({_cast_to_text(status_col, metadata.engine_type)}) LIKE '%fail%'")
+            where = f" WHERE {' AND '.join(where_parts)}" if where_parts else ""
+            planned.append(
+                PlannedQuery(
+                    purpose=f"Summarize analytical results in {table.name}",
+                    sql=f"SELECT {group_cols}, COUNT(*) AS result_count FROM {table.name}{where} GROUP BY {group_cols} ORDER BY result_count DESC",
+                )
+            )
+        else:
+            planned.append(
+                PlannedQuery(
+                    purpose=f"Count matching analytical rows in {table.name}",
+                    sql=f"SELECT COUNT(*) AS result_count FROM {table.name}",
+                )
+            )
+    return planned
 
 
 def _status_literal_from_terms(terms: list[str], table: TableMetadata) -> str | None:
@@ -844,6 +970,7 @@ def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityEx
         metadata.tables,
         key=lambda table: (
             10 if resolved_child and table.name == resolved_child.name else 0,
+            _header_rank(table),
             sum(1 for term in terms if term in table.name.lower() or any(term in col.lower() for col in table.columns)),
         ),
         reverse=True,
@@ -1238,6 +1365,10 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
     planned: list[PlannedQuery] = []
     missing_child_flow = _infer_missing_child_flow(metadata, entities) if intent == InvestigationIntent.MISSING_DATA else None
     duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if _duplicate_like_investigation(intent, entities) else None
+    if intent in {InvestigationIntent.PROCESS_FLOW_BREAK, InvestigationIntent.PRODUCTION_INVESTIGATION}:
+        planned.extend(_status_investigation_queries(metadata, entities))
+    if intent in {InvestigationIntent.HEALTH_ASSESSMENT, InvestigationIntent.GENERAL_DATABASE_QUESTION}:
+        planned.extend(_analytical_summary_queries(metadata, entities))
     if duplicate_child_flow:
         planned.extend(
             [
@@ -1282,7 +1413,9 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         columns = ", ".join(table.columns[:8]) if table.columns else "*"
         planned.append(PlannedQuery(purpose=f"Inspect relevant rows in {table.name}", sql=f"SELECT {columns} FROM {table.name}{where_clause}"))
     if _duplicate_like_investigation(intent, entities):
-        for table in metadata.tables[:3]:
+        key_values = _business_key_values(entities)
+        duplicate_tables = sorted(metadata.tables[:5], key=lambda table: (table.score, _header_rank(table), len(table.name)), reverse=True)
+        for table in duplicate_tables:
             if table.name.lower() in targeted_duplicate_tables:
                 continue
             unique_cols = [
@@ -1292,15 +1425,29 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
                 for column in index.get("columns", [])
                 if column in table.columns
             ]
-            natural_key_cols = [
-                col
-                for col in table.columns
-                if re.search(r"(_number|_code|_ref|_key)$", col.lower())
-            ]
+            natural_key_cols = _natural_key_columns(table)
             candidate_cols = list(dict.fromkeys([*unique_cols, *natural_key_cols]))
             if candidate_cols:
                 col = candidate_cols[0]
-                planned.append(PlannedQuery(purpose=f"Find duplicate business keys in {table.name}", sql=f"SELECT {col}, COUNT(*) AS duplicate_count FROM {table.name} GROUP BY {col} HAVING COUNT(*) > 1"))
+                where = ""
+                if key_values:
+                    value_filters = []
+                    for value in key_values:
+                        escaped = value.replace("'", "''")
+                        value_filters.append(f"{_cast_to_text(col, metadata.engine_type)} = '{escaped}'")
+                    where = f" WHERE {' OR '.join(value_filters)}"
+                planned.append(
+                    PlannedQuery(
+                        purpose=f"Find duplicate business keys in {table.name}",
+                        sql=f"SELECT {col}, COUNT(*) AS duplicate_count FROM {table.name}{where} GROUP BY {col} HAVING COUNT(*) > 1",
+                    )
+                )
+                planned.append(
+                    PlannedQuery(
+                        purpose=f"Inspect duplicate rows in {table.name}",
+                        sql=f"SELECT {', '.join(table.columns[:8])} FROM {table.name}{where}",
+                    )
+                )
     safe: list[PlannedQuery] = []
     for query in planned:
         sql = ensure_limit(query.sql)

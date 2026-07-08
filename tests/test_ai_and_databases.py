@@ -561,6 +561,174 @@ def test_duplicate_business_key_prefers_parent_reference_column() -> None:
     assert "parent object" in focus.business_key_reason
 
 
+def test_same_table_duplicate_key_reproduces_without_parent_child_relationship() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("payments", ["payment_id", "payment_number", "reference_key", "payment_status"], 8),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    entities = extract_entities("PAY-9001 processed twice")
+
+    queries = plan_safe_queries(InvestigationIntent.DUPLICATE_DATA, metadata, entities)
+
+    duplicate_query = next(query for query in queries if query.purpose == "Find duplicate business keys in payments")
+    assert "reference_key" in duplicate_query.sql or "payment_number" in duplicate_query.sql
+    assert "HAVING COUNT(*) > 1" in duplicate_query.sql
+
+    evidence = [
+        EvidenceResult(
+            duplicate_query.purpose,
+            duplicate_query.sql,
+            [{"payment_number": "PAY-9001", "duplicate_count": 2}],
+        )
+    ]
+    focus = build_evidence_focus(
+        question="PAY-9001 processed twice",
+        intent=InvestigationIntent.DUPLICATE_DATA,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+    )
+    gate = run_evidence_gate(
+        question="PAY-9001 processed twice",
+        intent=InvestigationIntent.DUPLICATE_DATA,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        documents=[],
+    )
+
+    assert focus.affected_object == "payments"
+    assert gate.reproduced
+    assert gate.reported_condition_exists
+
+
+def test_missing_record_phrase_targets_header_table_not_line_table() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("orders", ["order_id", "order_number", "order_status"], 8),
+            TableMetadata(
+                "shipments",
+                ["shipment_id", "order_id", "shipment_number", "shipment_status"],
+                8,
+                foreign_keys=[{"columns": ["order_id"], "referred_table": "orders", "referred_columns": ["order_id"]}],
+            ),
+            TableMetadata(
+                "shipment_lines",
+                ["shipment_line_id", "shipment_id", "item_code"],
+                6,
+                foreign_keys=[{"columns": ["shipment_id"], "referred_table": "shipments", "referred_columns": ["shipment_id"]}],
+            ),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    entities = extract_entities("Order ORD-1001 exists but shipment record was never created")
+    queries = plan_safe_queries(InvestigationIntent.MISSING_DATA, metadata, entities)
+
+    candidate = next(query for query in queries if query.purpose == "Confirmed Missing Related Record Candidates")
+    assert "FROM orders p" in candidate.sql
+    assert "LEFT JOIN shipments c" in candidate.sql
+    assert "shipment_lines" not in candidate.sql
+
+
+def test_status_transition_query_and_gate_reproduce_stuck_status() -> None:
+    metadata = MetadataSearchResult(
+        tables=[TableMetadata("claims", ["claim_id", "claim_number", "claim_status"], 8)],
+        views=[],
+        procedures=["approve_claim"],
+        version="test",
+    )
+    entities = extract_entities("CLM-5001 stuck in PENDING and not moving to APPROVED")
+
+    queries = plan_safe_queries(InvestigationIntent.PROCESS_FLOW_BREAK, metadata, entities)
+    status_query = next(query for query in queries if query.purpose == "Confirm current status in claims")
+
+    assert "claim_status" in status_query.sql
+    assert "CLM-5001" in status_query.sql
+
+    evidence = [
+        EvidenceResult(
+            status_query.purpose,
+            status_query.sql,
+            [{"claim_number": "CLM-5001", "current_status": "PENDING", "reported_stuck_status": "PENDING"}],
+        )
+    ]
+    focus = build_evidence_focus(
+        question="CLM-5001 stuck in PENDING and not moving to APPROVED",
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[_procedure("approve_claim", writes=["claims"], updates=1)],
+        documents=[],
+    )
+    gate = run_evidence_gate(
+        question="CLM-5001 stuck in PENDING and not moving to APPROVED",
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        documents=[],
+    )
+
+    assert gate.reproduced
+    assert any("current status" in item.lower() for item in gate.status_interpretation)
+
+
+def test_analytical_data_quality_question_does_not_require_business_key() -> None:
+    result = detect_intent("Which data quality rules failed today?")
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("data_quality_results", ["rule_code", "run_date", "status", "failed_count"], 5),
+            TableMetadata("data_quality_rules", ["rule_code", "rule_name"], 4),
+        ],
+        views=[],
+        procedures=["run_data_quality_checks"],
+        version="test",
+    )
+    queries = plan_safe_queries(result.intent, metadata, extract_entities("Which data quality rules failed today?"))
+
+    assert result.intent == InvestigationIntent.HEALTH_ASSESSMENT
+    assert any("data_quality_results" in query.sql for query in queries)
+    assert any("COUNT(*)" in query.sql for query in queries)
+
+
+def test_explicit_write_target_locks_procedure_analysis_object() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("inventory_items", ["item_id", "item_code"], 4),
+            TableMetadata("payments", ["payment_id", "payment_number"], 8),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    focus = build_evidence_focus(
+        question="Find all procedures that update or insert into payments",
+        intent=InvestigationIntent.STORED_PROCEDURE_ANALYSIS,
+        entities=extract_entities("Find all procedures that update or insert into payments"),
+        metadata=metadata,
+        evidence=[EvidenceResult("Inspect relevant rows in inventory_items", "SELECT item_id FROM inventory_items", [{"item_id": 1}])],
+        correlated_evidence=[],
+        procedure_analysis=[_procedure("post_payment", writes=["payments"], inserts=1)],
+        documents=[],
+    )
+
+    assert focus.affected_object == "payments"
+    assert focus.ranked_procedures[0].procedure == "post_payment"
+
+
 def test_evidence_verification_agent_checks_duplicate_incident_claims() -> None:
     class FakeConnector:
         def execute_read_only_query(self, sql: str, limit: int = 25):

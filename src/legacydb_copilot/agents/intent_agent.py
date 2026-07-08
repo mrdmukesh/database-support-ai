@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -35,12 +36,12 @@ _INTENT_SIGNALS: tuple[tuple[InvestigationIntent, tuple[str, ...]], ...] = (
     (InvestigationIntent.MISSING_DATA, ("missing", "not generated", "not created", "does not exist", "no row")),
     (InvestigationIntent.FAILED_BATCH_JOB, ("batch", "job failed", "failed step", "nightly", "scheduler")),
     (InvestigationIntent.RECONCILIATION_OR_MISMATCH, ("recon", "reconciliation", "mismatch", "out of balance", "does not match")),
-    (InvestigationIntent.STORED_PROCEDURE_ANALYSIS, ("procedure", "stored proc", "sp_", "function")),
+    (InvestigationIntent.STORED_PROCEDURE_ANALYSIS, ("procedure", "procedures", "stored proc", "sp_", "function")),
     (InvestigationIntent.IMPACT_ANALYSIS, ("impact", "affected", "blast radius", "after deployment", "what will break", "change status", "change values")),
     (InvestigationIntent.HEALTH_ASSESSMENT, ("health", "assessment", "score", "quality review", "database review")),
     (InvestigationIntent.TEST_CASE_GENERATION, ("test case", "test cases", "qa", "validate")),
     (InvestigationIntent.PROOF_OF_FIX, ("proof of fix", "prove fix", "acceptance", "verification")),
-    (InvestigationIntent.PROCESS_FLOW_BREAK, ("flow", "process", "where broke", "trace", "lifecycle", "status")),
+    (InvestigationIntent.PROCESS_FLOW_BREAK, ("flow", "process", "where broke", "trace", "lifecycle", "status", "stuck in", "not moving to", "not transitioning", "transitioning")),
 )
 
 
@@ -67,6 +68,26 @@ def detect_intent(question: str) -> IntentResult:
     """
 
     lowered = question.lower()
+    if any(term in lowered for term in ("which ", "list ", "show all", "how many", "report", "summary")) and any(
+        term in lowered for term in ("data quality", "quality rule", "rules failed", "failed today", "failed rules")
+    ):
+        return IntentResult(
+            intent=InvestigationIntent.HEALTH_ASSESSMENT,
+            confidence=0.82,
+            rationale="Analytical/reporting question detected; no single business key is required.",
+        )
+    if re.search(r"\b(procedures?|stored proc(?:edure)?s?)\b", lowered) and re.search(r"\b(update|insert(?:\s+into)?|write|writes|modify|modifies)\b", lowered):
+        return IntentResult(
+            intent=InvestigationIntent.STORED_PROCEDURE_ANALYSIS,
+            confidence=0.9,
+            rationale="Explicit stored-procedure write-target analysis requested.",
+        )
+    if any(term in lowered for term in ("stuck in", "not moving to", "not transitioning")):
+        return IntentResult(
+            intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+            confidence=0.88,
+            rationale="Status transition wording detected.",
+        )
     if "change" in lowered and any(term in lowered for term in ("status", "state", "value", "code")) and any(term in lowered for term in ("break", "impact", "affected", "risk")):
         return IntentResult(
             intent=InvestigationIntent.IMPACT_ANALYSIS,

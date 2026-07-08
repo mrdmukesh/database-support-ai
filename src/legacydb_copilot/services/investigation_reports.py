@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from legacydb_copilot.services.docx_generator import write_docx
 from legacydb_copilot.services.excel_generator import write_xlsx
 from legacydb_copilot.services.pdf_generator import write_pdf
@@ -44,18 +46,27 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
     """
     output_dir = report_output_dir(report.cover.investigation_id)
     file_stem = report_file_stem(report)
-    html_path = output_dir / f"{file_stem}.html"
-    pdf_path = output_dir / f"{file_stem}.pdf"
-    docx_path = output_dir / f"{file_stem}.docx"
-    xlsx_path = output_dir / f"{file_stem}.xlsx"
+    executive_report = _executive_report(report)
+    html_path = output_dir / f"{file_stem}_executive_rca.html"
+    pdf_path = output_dir / f"{file_stem}_executive_rca.pdf"
+    docx_path = output_dir / f"{file_stem}_executive_rca.docx"
+    xlsx_path = output_dir / f"{file_stem}_executive_rca.xlsx"
+    audit_html_path = output_dir / f"{file_stem}_full_audit.html"
+    audit_pdf_path = output_dir / f"{file_stem}_full_audit.pdf"
+    audit_docx_path = output_dir / f"{file_stem}_full_audit.docx"
+    audit_xlsx_path = output_dir / f"{file_stem}_full_audit.xlsx"
 
-    write_html(report, html_path)
-    write_pdf(report, pdf_path)
-    write_docx(report, docx_path)
-    write_xlsx(report, xlsx_path)
+    write_html(executive_report, html_path)
+    write_pdf(executive_report, pdf_path)
+    write_docx(executive_report, docx_path)
+    write_xlsx(executive_report, xlsx_path)
+    write_html(report, audit_html_path)
+    write_pdf(report, audit_pdf_path)
+    write_docx(report, audit_docx_path)
+    write_xlsx(report, audit_xlsx_path)
 
     storage = get_app_storage()
-    for path in (html_path, pdf_path, docx_path, xlsx_path):
+    for path in (html_path, pdf_path, docx_path, xlsx_path, audit_html_path, audit_pdf_path, audit_docx_path, audit_xlsx_path):
         storage.save_bytes(
             path.as_posix(),
             path.read_bytes(),
@@ -69,4 +80,31 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
         pdf_path=pdf_path,
         docx_path=docx_path,
         xlsx_path=xlsx_path,
+        audit_html_path=audit_html_path,
+        audit_pdf_path=audit_pdf_path,
+        audit_docx_path=audit_docx_path,
+        audit_xlsx_path=audit_xlsx_path,
+    )
+
+
+def _executive_report(report: InvestigationReport) -> InvestigationReport:
+    priority_titles = {
+        "Evidence Gate",
+        "Root Cause Analysis",
+        "Confirmed Facts",
+        "Recommendation",
+        "Suggested Verification Checks",
+        "Confidence Explanation",
+        "Insufficient Database Evidence",
+        "Evidence Needed Next",
+    }
+    selected = [section for section in report.sections if section.title in priority_titles]
+    if not selected:
+        selected = report.sections[:6]
+    else:
+        selected = selected[:6]
+    return replace(
+        report,
+        cover=replace(report.cover, title=f"Executive RCA Report - {report.cover.title}"),
+        sections=selected,
     )

@@ -105,7 +105,11 @@ def run_evidence_gate(
         blockers.append("Performance investigation lacks EXPLAIN or row-estimate evidence.")
     if not required:
         return EvidenceGateResult(False, True, business_key_exists, True, affected_rows_exist, relationship_exists, facts, [], [], status_notes)
-    relationship_ok = relationship_exists or intent == InvestigationIntent.PERFORMANCE_INVESTIGATION
+    relationship_ok = relationship_exists or intent in {
+        InvestigationIntent.PERFORMANCE_INVESTIGATION,
+        InvestigationIntent.DUPLICATE_DATA,
+        InvestigationIntent.PROCESS_FLOW_BREAK,
+    }
     reproduced = business_key_exists and affected_rows_exist and condition_exists and relationship_ok
     return EvidenceGateResult(
         required=required,
@@ -261,12 +265,45 @@ def _reported_condition_exists(
             return False
         if re.search(r"\b(active|open)\b", question, re.I):
             return any(_row_has_open_status(row, documents, status_notes) for row in rows)
+        if any(_duplicate_count(row) > 1 for row in rows):
+            return True
         return True
     if intent == InvestigationIntent.MISSING_DATA:
         return any(item.purpose == "Confirmed Missing Related Record Candidates" and item.rows for item in evidence)
+    if intent == InvestigationIntent.PROCESS_FLOW_BREAK:
+        return _status_transition_reproduced(evidence, status_notes)
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
         return _has_explain_or_row_estimate(evidence)
     return any(item.rows for item in evidence)
+
+
+def _duplicate_count(row: dict[str, Any]) -> int:
+    for key, value in row.items():
+        lowered = key.lower()
+        if lowered == "duplicate_count" or lowered.endswith("_count"):
+            try:
+                return int(value)
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _status_transition_reproduced(evidence: list[EvidenceResult], status_notes: list[str]) -> bool:
+    status_rows = [
+        row
+        for item in evidence
+        if "current status" in item.purpose.lower() or "status" in item.purpose.lower()
+        for row in item.rows
+    ]
+    for row in status_rows:
+        current = str(row.get("current_status") or row.get("status") or row.get("state") or "").strip().upper()
+        reported = str(row.get("reported_stuck_status") or "").strip().upper()
+        if current and reported and current == reported:
+            status_notes.append(f"Confirmed current status remains {current}, matching the reported stuck status.")
+            return True
+        if current:
+            status_notes.append(f"Confirmed current status from returned evidence: {current}.")
+    return bool(status_rows)
 
 
 def _row_has_open_status(row: dict[str, Any], documents: list[RetrievedDocument], status_notes: list[str]) -> bool:

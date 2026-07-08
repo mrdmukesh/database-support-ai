@@ -73,6 +73,10 @@ class GeneratedReport:
     pdf_path: Path
     docx_path: Path
     xlsx_path: Path
+    audit_html_path: Path | None = None
+    audit_pdf_path: Path | None = None
+    audit_docx_path: Path | None = None
+    audit_xlsx_path: Path | None = None
 
     def links(self) -> dict[str, str]:
         """
@@ -98,10 +102,15 @@ class GeneratedReport:
         base = f"/reports/{self.investigation_id}"
         return {
             "investigation_id": self.investigation_id,
+            "mode": "executive_rca",
             "html": f"{base}/{self.html_path.name}",
             "pdf": f"{base}/{self.pdf_path.name}",
             "docx": f"{base}/{self.docx_path.name}",
             "xlsx": f"{base}/{self.xlsx_path.name}",
+            "audit_html": f"{base}/{self.audit_html_path.name}" if self.audit_html_path else f"{base}/{self.html_path.name}",
+            "audit_pdf": f"{base}/{self.audit_pdf_path.name}" if self.audit_pdf_path else f"{base}/{self.pdf_path.name}",
+            "audit_docx": f"{base}/{self.audit_docx_path.name}" if self.audit_docx_path else f"{base}/{self.docx_path.name}",
+            "audit_xlsx": f"{base}/{self.audit_xlsx_path.name}" if self.audit_xlsx_path else f"{base}/{self.xlsx_path.name}",
         }
 
 

@@ -125,6 +125,9 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     table_scores: dict[str, float] = {table.name: 0.0 for table in metadata.tables}
     table_lookup = {table.name.lower(): table.name for table in metadata.tables}
     question_l = question.lower()
+    explicit_write_target = _explicit_write_target(question, metadata)
+    if explicit_write_target:
+        return explicit_write_target.name, "Locked from explicit procedure write-target phrase such as update/insert into <object>; unrelated evidence rows cannot override it."
     problem = parse_problem_phrase(question)
     phrase_target = resolve_table_from_terms(problem.target_terms, metadata)
     if phrase_target:
@@ -153,6 +156,23 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     if score <= 0:
         return selected, "Selected first available table because no stronger evidence identified a target."
     return selected, "Selected from question/table token matches and SQL evidence that returned or checked rows."
+
+
+def _explicit_write_target(question: str, metadata: MetadataSearchResult) -> TableMetadata | None:
+    lowered = question.lower()
+    if "procedure" not in lowered and "procedures" not in lowered and "stored proc" not in lowered:
+        return None
+    target_terms: list[str] = []
+    for pattern in (
+        r"\b(?:insert\s+into|update|write\s+to|writes\s+to|modify|modifies)\s+(?!or\b)([a-zA-Z_][a-zA-Z0-9_]*)\b",
+        r"\b(?:into|in)\s+([a-zA-Z_][a-zA-Z0-9_]*)\b",
+    ):
+        target_terms.extend(match.group(1).lower() for match in re.finditer(pattern, lowered))
+    for term in target_terms:
+        resolved = resolve_table_from_terms([term], metadata)
+        if resolved:
+            return resolved
+    return None
 
 
 def _infer_business_key(intent: InvestigationIntent, affected_object: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str | None, str]:

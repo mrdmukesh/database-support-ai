@@ -1731,6 +1731,28 @@
         `;
       }
 
+      function formatApiErrorDetail(detail) {
+        if (Array.isArray(detail)) {
+          return detail
+            .map((item) => {
+              if (typeof item === "string") return item;
+              if (item && typeof item === "object") {
+                const location = Array.isArray(item.loc) ? item.loc.join(".") : item.loc;
+                return [location, item.msg || item.message]
+                  .filter(Boolean)
+                  .join(": ");
+              }
+              return String(item);
+            })
+            .filter(Boolean)
+            .join(", ");
+        }
+        if (detail && typeof detail === "object") {
+          return detail.message || detail.msg || JSON.stringify(detail);
+        }
+        return detail || "Request failed";
+      }
+
       async function api(path, options = {}) {
         const session = getSession();
         const authHeaders = session?.access_token
@@ -1759,7 +1781,7 @@
             localStorage.removeItem(sessionKey);
             updateSessionLabel();
           }
-          throw new Error(Array.isArray(detail) ? detail.join(", ") : detail || "Request failed");
+          throw new Error(formatApiErrorDetail(detail));
         }
         return data;
       }
@@ -2711,6 +2733,8 @@
         const session = requireSession("workspaceMessage");
         if (!session) return;
         const form = new FormData(event.currentTarget);
+        const workspaceName = form.get("workspaceName").trim();
+        const workspaceSlug = slugify(form.get("workspaceSlug").trim() || workspaceName);
         const submit = event.currentTarget.querySelector("button[type='submit']");
         submit.disabled = true;
         setMessage("workspaceMessage", "Creating workspace...");
@@ -2719,8 +2743,8 @@
             method: "POST",
             body: JSON.stringify({
               organization_id: session.user.organization_id,
-              name: form.get("workspaceName").trim(),
-              slug: form.get("workspaceSlug").trim() || slugify(form.get("workspaceName")),
+              name: workspaceName,
+              slug: workspaceSlug,
             }),
           });
           setMessage("workspaceMessage", "Workspace created.", "success");

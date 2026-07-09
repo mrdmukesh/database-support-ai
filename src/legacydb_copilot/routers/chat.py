@@ -1612,6 +1612,7 @@ def _run_dynamic_investigation(
         investigation_mode=mode.mode.value,
         mode_rationale=mode.rationale,
         ai_reasoning_status=ai_status,
+        ai_debug_trace=ai_debug_trace,
         verification_checks=verification_checks,
         verification_results=[],
     )

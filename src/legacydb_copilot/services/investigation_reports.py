@@ -88,21 +88,30 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
 
 
 def _executive_report(report: InvestigationReport) -> InvestigationReport:
-    priority_titles = {
-        "Evidence Gate",
+    priority_titles = [
+        "Executive Summary",
+        "User Question",
+        "AI Reasoning Status",
+        "Key Findings",
+        "Evidence Summary",
+        "Write Path / Likely Procedure",
         "Root Cause Analysis",
-        "Confirmed Facts",
-        "Recommendation",
-        "Suggested Verification Checks",
-        "Confidence Explanation",
-        "Insufficient Database Evidence",
-        "Evidence Needed Next",
-    }
-    selected = [section for section in report.sections if section.title in priority_titles]
+        "Confidence Score",
+        "Recommended Fix",
+        "Test Cases",
+        "Proof of Fix",
+        "Rollback Plan",
+        "Missing Evidence",
+    ]
+    selected = []
+    seen_titles: set[str] = set()
+    for title in priority_titles:
+        section = next((item for item in report.sections if item.title == title and item.title not in seen_titles), None)
+        if section is not None:
+            selected.append(section)
+            seen_titles.add(section.title)
     if not selected:
         selected = report.sections[:6]
-    else:
-        selected = selected[:6]
     return replace(
         report,
         cover=replace(report.cover, title=f"Executive RCA Report - {report.cover.title}"),

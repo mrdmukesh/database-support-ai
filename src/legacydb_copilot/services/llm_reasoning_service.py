@@ -526,6 +526,43 @@ def _cited_test_cases(
 def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
     evidence_refs = payload.get("evidence_refs") if isinstance(payload, dict) else {}
     evidence_refs = evidence_refs if isinstance(evidence_refs, dict) else {}
+    sql_summary = [
+        {
+            "evidence_id": item.get("ref"),
+            "evidence_type": "SQL",
+            "source_object": item.get("purpose"),
+            "sql_result_summary": item.get("error") or f"{item.get('row_count', 0)} row(s) returned",
+        }
+        for item in (evidence_refs.get("sql") or [])
+        if isinstance(item, dict)
+    ]
+    procedure_summary = [
+        {
+            "evidence_id": item.get("ref"),
+            "evidence_type": "Procedure",
+            "source_object": item.get("name"),
+            "procedure_evidence": {
+                "definition_available": item.get("definition_available"),
+                "tables_read": item.get("tables_read") or [],
+                "tables_written": item.get("tables_written") or [],
+                "complexity": item.get("complexity"),
+                "locking_risk": item.get("locking_risk"),
+            },
+        }
+        for item in (evidence_refs.get("procedures") or [])
+        if isinstance(item, dict)
+    ]
+    relationship_summary = [
+        {
+            "evidence_id": item.get("ref"),
+            "evidence_type": item.get("type"),
+            "source_object": item.get("subject"),
+            "relationship_evidence": item.get("finding"),
+            "support": item.get("support"),
+        }
+        for item in (evidence_refs.get("correlated") or [])
+        if isinstance(item, dict)
+    ]
     return {
         "question_present": bool(payload.get("question")),
         "detected_intent": payload.get("detected_intent"),
@@ -533,7 +570,10 @@ def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
         "procedure_evidence_count": len(evidence_refs.get("procedures") or []),
         "document_evidence_count": len(evidence_refs.get("documents") or []),
         "correlated_evidence_count": len(evidence_refs.get("correlated") or []),
-        "contains_raw_rows": bool(evidence_refs.get("sql")),
+        "sql_evidence": sql_summary[:20],
+        "procedure_evidence": procedure_summary[:20],
+        "relationship_evidence": relationship_summary[:20],
+        "contains_raw_rows": False,
         "note": "Summary only; unmasked rows and PII are not persisted in AI debug trace.",
     }
 

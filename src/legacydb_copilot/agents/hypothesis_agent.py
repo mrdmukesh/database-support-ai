@@ -183,7 +183,7 @@ def generate_hypotheses(
     if procedures:
         templates.append(
             (
-                f"Procedure write/read path may explain the behavior; inspect {', '.join(procedures[:3])}.",
+                "Procedure write/read path may explain the behavior; investigate procedures that directly modify the affected object based on write-path ranking.",
                 0.5,
                 ["Stored procedure read/write behavior", "Procedure branch or WHERE condition", "Transaction or error handling evidence"],
                 ["procedure analysis", "write path", "read path"],
@@ -232,7 +232,7 @@ def generate_hypotheses(
             initial_confidence=confidence,
             required_evidence=required,
             tables_to_inspect=tables,
-            procedures_to_inspect=procedures,
+            procedures_to_inspect=[],
             logs_to_inspect=logs,
             documents_to_inspect=docs,
             sql_focus=focus,

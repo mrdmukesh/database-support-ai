@@ -39,5 +39,6 @@ class DynamicInvestigationBundle:
     investigation_mode: str = "INVESTIGATION"
     mode_rationale: str = ""
     ai_reasoning_status: dict[str, str] | None = None
+    ai_debug_trace: dict | None = None
     verification_checks: list[SuggestedVerificationCheck] | None = None
     verification_results: list[VerificationResult] | None = None

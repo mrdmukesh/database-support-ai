@@ -2151,12 +2151,16 @@
         }
         currentReportLinks = report;
         const filenameFromPath = (path) => decodeURIComponent(path.split("/").pop() || "investigation_report");
+        const session = getSession();
+        const role = session?.user?.role || "";
+        const canViewTrace = report.ai_trace && ["super_admin", "organization_admin", "dba"].includes(role);
         container.innerHTML = `
           ${label ? `<span class="muted-note">${escapeHtml(label)}</span>` : ""}
           <button class="button secondary" type="button" data-view-report="${report.html}">View HTML Report</button>
           <button class="button secondary" type="button" data-download-report="${report.pdf}" data-filename="${filenameFromPath(report.pdf)}">${label ? "Download Verified PDF" : "Download PDF"}</button>
           <button class="button secondary" type="button" data-download-report="${report.docx}" data-filename="${filenameFromPath(report.docx)}">${label ? "Download Verified Word" : "Download Word"}</button>
           <button class="button secondary" type="button" data-download-report="${report.xlsx}" data-filename="${filenameFromPath(report.xlsx)}">${label ? "Download Verified Excel" : "Download Excel"}</button>
+          ${canViewTrace ? `<button class="button secondary" type="button" data-download-report="${report.ai_trace}" data-filename="${report.investigation_id || "investigation"}-ai-debug-trace.json">Download AI Trace</button>` : ""}
         `;
         container.querySelector("[data-view-report]").addEventListener("click", (event) =>
           viewHtmlReport(event.currentTarget.dataset.viewReport),

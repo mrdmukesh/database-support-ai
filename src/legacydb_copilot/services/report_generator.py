@@ -9,6 +9,9 @@ from uuid import uuid4
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from legacydb_copilot.common import Environment as AppEnvironment
+from legacydb_copilot.config import Settings
+
 
 @dataclass(frozen=True)
 class ReportTable:
@@ -100,7 +103,7 @@ class GeneratedReport:
             Report generation must describe supplied evidence and must not execute SQL.
         """
         base = f"/reports/{self.investigation_id}"
-        return {
+        links = {
             "investigation_id": self.investigation_id,
             "mode": "executive_rca",
             "html": f"{base}/{self.html_path.name}",
@@ -112,6 +115,10 @@ class GeneratedReport:
             "audit_docx": f"{base}/{self.audit_docx_path.name}" if self.audit_docx_path else f"{base}/{self.docx_path.name}",
             "audit_xlsx": f"{base}/{self.audit_xlsx_path.name}" if self.audit_xlsx_path else f"{base}/{self.xlsx_path.name}",
         }
+        settings = Settings.from_env()
+        if settings.ai_debug_trace_enabled and settings.environment != AppEnvironment.PRODUCTION:
+            links["ai_trace"] = f"{base}/ai-debug-trace"
+        return links
 
 
 TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "reports" / "templates"

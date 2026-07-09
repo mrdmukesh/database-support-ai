@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from legacydb_copilot.ai import (
@@ -35,6 +37,7 @@ from legacydb_copilot.services.problem_phrase_service import parse_problem_phras
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.report_generator import (
+    GeneratedReport,
     ExecutiveSummary,
     InvestigationReport,
     ReportCover,
@@ -42,6 +45,7 @@ from legacydb_copilot.services.report_generator import (
     render_html,
     report_file_stem,
 )
+from legacydb_copilot.services.investigation_reports import _executive_report
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 from legacydb_copilot.common import DomainError
 from legacydb_copilot.common import Environment
@@ -1382,6 +1386,115 @@ def test_report_file_stem_uses_question_title_and_investigation_id() -> None:
     )
 
     assert report_file_stem(report) == "ticket_tck_1004_activity_note_is_not_generated_INV-20260630-ABC123"
+
+
+def test_initial_hypothesis_generation_does_not_prefill_procedure_names() -> None:
+    metadata = MetadataSearchResult(
+        tables=[TableMetadata("activity_entries", ["activity_id", "activity_code"], 5)],
+        views=[],
+        procedures=["proc_a", "proc_b", "proc_c"],
+        version="test",
+    )
+    result = run_hypothesis_investigation(
+        question="duplicate activity entries were created",
+        intent=IntentResult(InvestigationIntent.DUPLICATE_DATA, 0.9, "test"),
+        entities=extract_entities("duplicate activity entries were created"),
+        ranked_objects=[],
+        metadata=metadata,
+        evidence=[],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+    )
+    descriptions = " ".join(item.description for item in result.hypotheses)
+
+    assert "proc_a" not in descriptions
+    assert "proc_b" not in descriptions
+    assert "directly modify the affected object" in descriptions
+    assert all(not item.procedures_to_inspect for item in result.hypotheses)
+
+
+def test_executive_report_keeps_requested_sections_and_excludes_verification_appendix() -> None:
+    report = InvestigationReport(
+        cover=ReportCover(
+            title="Enterprise Investigation Report",
+            workspace="Ops",
+            database="db",
+            generated_by="tester",
+            generated_on="2026-07-09",
+            investigation_id="INV-1",
+            report_version="1.0",
+        ),
+        executive_summary=ExecutiveSummary(
+            issue_title="Issue",
+            issue_description="Question",
+            severity="Medium",
+            business_impact="Impact",
+            confidence_score=80,
+            estimated_root_cause="Root",
+            recommendation_summary="Fix",
+            status="Complete",
+        ),
+        sections=[
+            ReportSection(title="Executive Summary"),
+            ReportSection(title="User Question"),
+            ReportSection(title="AI Reasoning Status"),
+            ReportSection(title="Key Findings"),
+            ReportSection(title="Evidence Summary"),
+            ReportSection(title="Write Path / Likely Procedure"),
+            ReportSection(title="Root Cause Analysis"),
+            ReportSection(title="Confidence Score"),
+            ReportSection(title="Recommended Fix"),
+            ReportSection(title="Test Cases"),
+            ReportSection(title="Proof of Fix"),
+            ReportSection(title="Rollback Plan"),
+            ReportSection(title="Missing Evidence"),
+            ReportSection(title="Suggested Verification Checks"),
+            ReportSection(title="AI Reasoning Trace"),
+        ],
+    )
+
+    executive = _executive_report(report)
+    titles = [section.title for section in executive.sections]
+
+    assert titles == [
+        "Executive Summary",
+        "User Question",
+        "AI Reasoning Status",
+        "Key Findings",
+        "Evidence Summary",
+        "Write Path / Likely Procedure",
+        "Root Cause Analysis",
+        "Confidence Score",
+        "Recommended Fix",
+        "Test Cases",
+        "Proof of Fix",
+        "Rollback Plan",
+        "Missing Evidence",
+    ]
+    assert "Suggested Verification Checks" not in titles
+    assert "AI Reasoning Trace" not in titles
+
+
+def test_ai_trace_link_is_visible_only_when_debug_trace_enabled(monkeypatch) -> None:
+    report = GeneratedReport(
+        investigation_id="INV-TRACE",
+        directory=Path("reports/history/INV-TRACE"),
+        html_path=Path("report.html"),
+        pdf_path=Path("report.pdf"),
+        docx_path=Path("report.docx"),
+        xlsx_path=Path("report.xlsx"),
+    )
+
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("AI_DEBUG_TRACE_ENABLED", "false")
+    assert "ai_trace" not in report.links()
+
+    monkeypatch.setenv("AI_DEBUG_TRACE_ENABLED", "true")
+    assert report.links()["ai_trace"] == "/reports/INV-TRACE/ai-debug-trace"
+
+    monkeypatch.setenv("APP_ENV", "production")
+    assert "ai_trace" not in report.links()
 
 
 def test_report_html_template_is_packaged_and_renderable() -> None:

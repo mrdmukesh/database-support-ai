@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
+from legacydb_copilot.agents.recommendation_agent import Recommendation, RecommendationStatus
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult, RootCauseSupportStatus
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
 from legacydb_copilot.services.report_generator import (
@@ -594,12 +595,30 @@ def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> Repor
     )
 
 
-def _executive_fix_section(bundle: DynamicInvestigationBundle) -> ReportSection:
-    items = []
-    items.extend(bundle.reasoning.recommended_fix[:3])
+def _executive_recommendation_items(recommendations: list[str | Recommendation]) -> list[str]:
+    """Render recommendations for executives without mutating the audit/debug source."""
+    items: list[str] = []
+    for recommendation in recommendations:
+        if isinstance(recommendation, str):
+            items.append(recommendation)
+        elif recommendation.recommendation_status == RecommendationStatus.EVIDENCE_GROUNDED:
+            items.append(recommendation.text)
+        elif recommendation.recommendation_status == RecommendationStatus.GENERAL_BEST_PRACTICE:
+            items.append(f"General best practice: {recommendation.text}")
+    return items
+
+
+def _executive_fix_items(bundle: DynamicInvestigationBundle) -> list[str]:
+    items = _executive_recommendation_items(bundle.reasoning.recommended_fix[:3])
     if not items:
-        items.extend(bundle.recommendation.immediate_fix[:2])
-        items.extend(bundle.recommendation.permanent_fix[:2])
+        items = _executive_recommendation_items(
+            bundle.recommendation.immediate_fix[:2] + bundle.recommendation.permanent_fix[:2]
+        )
+    return items
+
+
+def _executive_fix_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    items = _executive_fix_items(bundle)
     return ReportSection(title="Fix", items=items or ["No fix recommended until evidence supports the reported condition."])
 
 
@@ -921,7 +940,9 @@ def compose_report(
             business_impact="Based on available evidence, business impact should be confirmed against affected process owners and returned database rows.",
             confidence_score=int(bundle.confidence * 100),
             estimated_root_cause=final_root_cause_items[0],
-            recommendation_summary=bundle.reasoning.recommended_fix[0],
+            recommendation_summary=(
+                _executive_fix_items(bundle) or ["No recommendation is supported for executive display."]
+            )[0],
             status="Investigation Complete",
         ),
         sections=sections,

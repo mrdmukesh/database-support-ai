@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from itertools import count
 from typing import Any
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, validate_read_only_sql
+
+
+_evidence_id_sequence = count(1)
+
+
+def _next_evidence_id() -> str:
+    return f"SQL-{next(_evidence_id_sequence)}"
 
 
 @dataclass(frozen=True)
@@ -16,6 +24,7 @@ class EvidenceResult:
     error: str | None = None
     original_sql: str | None = None
     safety_note: str | None = None
+    evidence_id: str = field(default_factory=_next_evidence_id)
 
 
 def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceResult]:
@@ -48,7 +57,7 @@ def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceR
         row_estimates=_row_estimates_for_plan(connector, plan),
         engine_type=str(getattr(connector, "engine_type", "") or getattr(connector, "engine", "") or ""),
     )
-    for query in plan:
+    for index, query in enumerate(plan, start=1):
         try:
             validate_read_only_sql(query.sql)
             safe_read = validator.validate(query.sql)
@@ -60,10 +69,11 @@ def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceR
                     rows,
                     original_sql=query.sql if safe_read.changed else None,
                     safety_note=safe_read.reason or None,
+                    evidence_id=f"SQL-{index}",
                 )
             )
         except Exception as exc:
-            evidence.append(EvidenceResult(query.purpose, query.sql, [], str(exc)))
+            evidence.append(EvidenceResult(query.purpose, query.sql, [], str(exc), evidence_id=f"SQL-{index}"))
     return evidence
 
 

@@ -13,6 +13,12 @@ from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAna
 
 
 @dataclass(frozen=True)
+class RootCauseClaim:
+    conclusion: str
+    evidence_refs: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class ReasoningResult:
     summary: str
     likely_root_causes: list[str]

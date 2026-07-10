@@ -517,6 +517,7 @@ def _evidence_to_json(evidence) -> str:
     return json.dumps(
         [
             {
+                "evidence_id": item.evidence_id,
                 "purpose": getattr(item, "purpose", getattr(item, "title", "Evidence query")),
                 "sql": item.sql,
                 "row_count": len(item.rows),
@@ -2099,7 +2100,14 @@ def _expand_related_id_evidence(connector, metadata, evidence):
                 if rows:
                     from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 
-                    related.append(EvidenceResult(f"Inspect rows related by {column} in {table.name}", sql, rows))
+                    related.append(
+                        EvidenceResult(
+                            f"Inspect rows related by {column} in {table.name}",
+                            sql,
+                            rows,
+                            evidence_id=f"SQL-{len(evidence) + len(related) + 1}",
+                        )
+                    )
             except Exception:
                 continue
     return related[:8]

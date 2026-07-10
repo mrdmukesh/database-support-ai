@@ -1729,6 +1729,121 @@ def test_question_understanding_classifies_investigation_modes() -> None:
     assert "root-cause" in investigation.rationale
 
 
+def test_metadata_validation_intent_overrides_knowledge_search_markers() -> None:
+    question = "Verify whether table employees and procedure sp_calculate_employee_age exist in active database, not previous investigations"
+    intent = detect_intent(question)
+    mode = classify_investigation_mode(question, intent)
+
+    assert intent.intent == InvestigationIntent.METADATA_VALIDATION
+    assert mode.mode == InvestigationMode.INVESTIGATION
+    assert "live active-database metadata validation" in mode.rationale
+
+
+def test_metadata_validation_flow_uses_active_metadata_only(monkeypatch) -> None:
+    from legacydb_copilot.routers import chat as chat_router
+
+    connection = SimpleNamespace(id="conn-b", engine=DatabaseEngine.MYSQL.value, name="EmployeePayroll", database_name="EmployeePayrollRcaDemo")
+    payload = SimpleNamespace(
+        organization_id="org-b",
+        workspace_id="workspace-b",
+        user_id="user-b",
+        question="Verify whether table employees and procedure sp_calculate_employee_age exist in active database",
+    )
+
+    class FakeConnector:
+        def connect(self):
+            return None
+
+        def execute_read_only_query(self, sql: str, limit: int = 1000):
+            return [{"active_database": "EmployeePayrollRcaDemo"}]
+
+        def get_schema_metadata(self):
+            return SimpleNamespace(
+                tables=["employees"],
+                views=[],
+                procedures=["sp_calculate_employee_age"],
+                version="test",
+                engine_type="mysql",
+            )
+
+    class FakePool:
+        def connector_cache_key(self, engine, connection_string):
+            return "mysql|localhost|3306|EmployeePayrollRcaDemo|user|masked"
+
+        def get_or_create(self, connection_id, engine, connection_string):
+            return FakeConnector()
+
+    monkeypatch.setattr(chat_router, "_find_workspace_connection", lambda db, request: connection)
+    monkeypatch.setattr(chat_router, "_build_connection_string", lambda model: "mysql+pymysql://user:pw@localhost:3306/EmployeePayrollRcaDemo")
+    monkeypatch.setattr(chat_router, "get_connection_pool", lambda: FakePool())
+
+    answer, sources, confidence, report_links, metadata = chat_router._run_metadata_validation(
+        None,
+        payload,
+        IntentResult(InvestigationIntent.METADATA_VALIDATION, 0.94, "test"),
+    )
+
+    assert "METADATA_VALIDATION_OK" in answer
+    assert "discovered_table_result: {'employees': 'employees'}" in answer
+    assert "discovered_procedure_result: {'sp_calculate_employee_age': 'sp_calculate_employee_age'}" in answer
+    assert "previous investigations" not in sources
+    assert report_links is None
+    assert confidence == 0.95
+    assert metadata["evidence"] == "[]"
+
+
+def test_metadata_validation_flow_returns_target_object_not_found(monkeypatch) -> None:
+    from legacydb_copilot.routers import chat as chat_router
+
+    connection = SimpleNamespace(id="conn-a", engine=DatabaseEngine.MYSQL.value, name="Shipping", database_name="ShippingDemo")
+    payload = SimpleNamespace(
+        organization_id="org-a",
+        workspace_id="workspace-a",
+        user_id="user-a",
+        question="Verify whether table employees and procedure sp_calculate_employee_age exist in active database",
+    )
+
+    class FakeConnector:
+        def connect(self):
+            return None
+
+        def execute_read_only_query(self, sql: str, limit: int = 1000):
+            return [{"active_database": "ShippingDemo"}]
+
+        def get_schema_metadata(self):
+            return SimpleNamespace(
+                tables=["shipments"],
+                views=[],
+                procedures=["sp_create_shipment_for_order"],
+                version="test",
+                engine_type="mysql",
+            )
+
+    class FakePool:
+        def connector_cache_key(self, engine, connection_string):
+            return "mysql|localhost|3306|ShippingDemo|user|masked"
+
+        def get_or_create(self, connection_id, engine, connection_string):
+            return FakeConnector()
+
+    monkeypatch.setattr(chat_router, "_find_workspace_connection", lambda db, request: connection)
+    monkeypatch.setattr(chat_router, "_build_connection_string", lambda model: "mysql+pymysql://user:pw@localhost:3306/ShippingDemo")
+    monkeypatch.setattr(chat_router, "get_connection_pool", lambda: FakePool())
+
+    answer, _sources, confidence, _report_links, metadata = chat_router._run_metadata_validation(
+        None,
+        payload,
+        IntentResult(InvestigationIntent.METADATA_VALIDATION, 0.94, "test"),
+    )
+
+    assert "TARGET_OBJECT_NOT_FOUND" in answer
+    assert "table employees not found" in answer
+    assert "procedure sp_calculate_employee_age not found" in answer
+    assert "shipments" in answer
+    assert confidence == 0.1
+    assert metadata["evidence"] == "[]"
+
+
 def test_live_failure_wording_keeps_business_rule_question_in_investigation_mode() -> None:
     mode = classify_investigation_mode(
         "Why did the status business rule block duplicate comments for TCK-1005?",

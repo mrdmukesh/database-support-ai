@@ -64,6 +64,7 @@ _BUSINESS_RULE_MARKERS = (
 )
 
 _LIVE_INVESTIGATION_INTENTS = {
+    InvestigationIntent.METADATA_VALIDATION,
     InvestigationIntent.PRODUCTION_INVESTIGATION,
     InvestigationIntent.PERFORMANCE_INVESTIGATION,
     InvestigationIntent.PROCESS_FLOW_BREAK,
@@ -98,6 +99,13 @@ def classify_investigation_mode(question: str, intent: IntentResult | None = Non
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
     lowered = question.lower()
+    if intent and intent.intent == InvestigationIntent.METADATA_VALIDATION:
+        return ModeClassification(
+            mode=InvestigationMode.INVESTIGATION,
+            confidence=0.94,
+            rationale="Question asks for live active-database metadata validation, not knowledge search.",
+            required_stages=["active_connection", "metadata_discovery", "object_existence_validation", "answer"],
+        )
     if any(marker in lowered for marker in _KNOWLEDGE_SEARCH_MARKERS):
         return ModeClassification(
             mode=InvestigationMode.KNOWLEDGE_SEARCH,

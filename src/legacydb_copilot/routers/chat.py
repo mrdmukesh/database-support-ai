@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import asdict, replace
 from datetime import datetime
 from typing import Annotated, Any
@@ -358,6 +359,86 @@ def _target_object_not_found_metadata_answer(
     investigation_metadata["sql_queries"] = "[]"
     investigation_metadata["report_snapshot"] = ""
     return answer, [connection.name, "active metadata validation"], 0.1, None, investigation_metadata
+
+
+def _run_metadata_validation(
+    db: Session,
+    payload: ChatAskRequest,
+    intent,
+) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    connection = _find_workspace_connection(db, payload)
+    if connection is None:
+        return (
+            "TARGET_OBJECT_NOT_FOUND\n\nNo active database connection is configured for this workspace.",
+            [],
+            0.1,
+            None,
+            _empty_investigation_metadata(),
+        )
+    try:
+        connection_string = _build_connection_string(connection)
+        engine = DatabaseEngine(connection.engine)
+        pool = get_connection_pool()
+        connector_cache_key = pool.connector_cache_key(engine, connection_string)
+        connector = pool.get_or_create(connection.id, engine, connection_string)
+        connector.connect()
+        metadata_context = _metadata_context_for_connection(
+            payload,
+            connection,
+            connection_string,
+            connector_cache_key=connector_cache_key,
+        )
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
+    except (DatabaseConnectionError, ValueError) as exc:
+        return (
+            "TARGET_OBJECT_NOT_FOUND\n\n"
+            f"Active database validation failed before metadata lookup: {exc}",
+            [connection.name],
+            0.1,
+            None,
+            _empty_investigation_metadata(),
+        )
+    exact_tables = _explicit_metadata_names(payload.question, "table")
+    exact_procedures = _explicit_metadata_names(payload.question, "procedure")
+    table_lookup = {table.lower(): table for table in active_schema_metadata.tables}
+    procedure_lookup = {proc.lower(): proc for proc in active_schema_metadata.procedures}
+    table_results = {name: table_lookup.get(name.lower()) for name in exact_tables}
+    procedure_results = {name: procedure_lookup.get(name.lower()) for name in exact_procedures}
+    missing_tables = [name for name, found in table_results.items() if not found]
+    missing_procedures = [name for name, found in procedure_results.items() if not found]
+    status_label = "TARGET_OBJECT_NOT_FOUND" if missing_tables or missing_procedures else "METADATA_VALIDATION_OK"
+    answer = (
+        f"{status_label}\n\n"
+        "Live database metadata validation only. Uploaded documents, previous investigations, approved knowledge, ranking, LLM reasoning, and evidence gate were not used.\n\n"
+        f"- active_database: {metadata_context.actual_database or metadata_context.connection_string_database or metadata_context.database_name}\n"
+        f"- expected_database: {metadata_context.connection_string_database or metadata_context.database_name}\n"
+        f"- connection_id: {connection.id}\n"
+        f"- database_engine: {active_schema_metadata.engine_type}\n"
+        f"- connector_cache_key: {metadata_context.connector_cache_key}\n"
+        f"- metadata_cache_key: {metadata_context.cache_key}\n"
+        f"- discovered_table_result: {table_results if table_results else 'No table requested'}\n"
+        f"- discovered_procedure_result: {procedure_results if procedure_results else 'No procedure requested'}\n"
+        f"- discovered_tables: {active_schema_metadata.tables}\n"
+        f"- discovered_procedures: {active_schema_metadata.procedures}\n"
+        f"- failure_reason: {'; '.join([*(f'table {name} not found' for name in missing_tables), *(f'procedure {name} not found' for name in missing_procedures)]) or 'none'}"
+    )
+    metadata = _empty_investigation_metadata()
+    metadata["detected_intent"] = intent.intent.value
+    metadata["evidence"] = "[]"
+    metadata["sql_queries"] = "[]"
+    return answer, [connection.name, "active database metadata"], 0.95 if status_label == "METADATA_VALIDATION_OK" else 0.1, None, metadata
+
+
+def _explicit_metadata_names(question: str, label: str) -> list[str]:
+    pattern = rf"\b{label}\s*:\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"
+    names = [match.group(1) for match in re.finditer(pattern, question, re.I)]
+    if names:
+        return list(dict.fromkeys(names))
+    if label == "table":
+        match = re.search(r"\btable\s+([a-zA-Z_][a-zA-Z0-9_]*)\b", question, re.I)
+    else:
+        match = re.search(r"\bprocedure\s+([a-zA-Z_][a-zA-Z0-9_]*)\b", question, re.I)
+    return [match.group(1)] if match else []
 
 
 
@@ -1540,6 +1621,8 @@ def _run_dynamic_investigation(
     intent = detect_intent(payload.question)
     entities = extract_entities(payload.question)
     mode = classify_investigation_mode(payload.question, intent)
+    if intent.intent == InvestigationIntent.METADATA_VALIDATION:
+        return _run_metadata_validation(db, payload, intent)
     if mode.mode == InvestigationMode.KNOWLEDGE_SEARCH:
         return _run_knowledge_search(db, payload, generated_by, intent, entities, mode)
     if mode.mode == InvestigationMode.BUSINESS_RULE_DISCOVERY:

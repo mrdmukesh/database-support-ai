@@ -6,6 +6,7 @@ from enum import StrEnum
 
 
 class InvestigationIntent(StrEnum):
+    METADATA_VALIDATION = "METADATA_VALIDATION"
     PRODUCTION_INVESTIGATION = "PRODUCTION_INVESTIGATION"
     PERFORMANCE_INVESTIGATION = "PERFORMANCE_INVESTIGATION"
     PROCESS_FLOW_BREAK = "PROCESS_FLOW_BREAK"
@@ -30,6 +31,7 @@ class IntentResult:
 
 
 _INTENT_SIGNALS: tuple[tuple[InvestigationIntent, tuple[str, ...]], ...] = (
+    (InvestigationIntent.METADATA_VALIDATION, ("verify table", "verify procedure", "table exists", "procedure exists", "list database objects", "validate active database", "show schema metadata", "schema metadata")),
     (InvestigationIntent.PRODUCTION_INVESTIGATION, ("production incident", "production issue", "prod incident", "live database evidence", "production support")),
     (InvestigationIntent.PERFORMANCE_INVESTIGATION, ("slow", "timeout", "performance", "full scan", "index", "explain", "long running")),
     (InvestigationIntent.DUPLICATE_DATA, ("duplicate", "double", "created twice", "two records", "two ", "multiple ", "idempot")),
@@ -68,6 +70,26 @@ def detect_intent(question: str) -> IntentResult:
     """
 
     lowered = question.lower()
+    if any(
+        marker in lowered
+        for marker in (
+            "verify table",
+            "verify whether table",
+            "verify procedure",
+            "verify whether procedure",
+            "table exists",
+            "procedure exists",
+            "list database objects",
+            "validate active database",
+            "show schema metadata",
+            "schema metadata",
+        )
+    ):
+        return IntentResult(
+            intent=InvestigationIntent.METADATA_VALIDATION,
+            confidence=0.94,
+            rationale="Question asks to validate live database metadata objects.",
+        )
     if any(term in lowered for term in ("which ", "list ", "show all", "how many", "report", "summary")) and any(
         term in lowered for term in ("data quality", "quality rule", "rules failed", "failed today", "failed rules")
     ):

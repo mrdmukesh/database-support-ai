@@ -1,0 +1,22 @@
+{
+  "_ownership": "HUMAN_OWNED_GOLDEN_EXPECTATION",
+  "scenario_id": "DUPLICATE-PAYMENT-PAY-9001",
+  "question": "Payment PAY-9001 was processed twice after retry execution.",
+  "expected_primary_entity": "PAY-9001",
+  "expected_duplicate_payment_symptom": {
+    "object": "payments",
+    "duplicate_count": 2
+  },
+  "expected_relevant_database_objects": [
+    "payments"
+  ],
+  "minimum_evidence_references": 1,
+  "expected_root_cause_category": "RETRY_EXECUTION",
+  "forbidden_unsupported_claims": [
+    "A specific payment stored procedure caused the duplicate."
+  ],
+  "acceptable_recommendation_categories": [
+    "EVIDENCE_GROUNDED",
+    "GENERAL_BEST_PRACTICE"
+  ]
+}

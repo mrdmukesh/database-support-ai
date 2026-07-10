@@ -658,7 +658,7 @@ def _suggest_recommended_fix(
     Safety considerations:
         Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
     """
-    fix_text = " ".join(reasoning.recommended_fix + reasoning.likely_root_causes).lower()
+    fix_text = " ".join(reasoning.recommended_fix + [claim.conclusion for claim in reasoning.likely_root_causes]).lower()
     if not any(term in fix_text for term in ("exists", "idempot", "unique", "duplicate", "guard")):
         return None
     writer_name = evidence_focus.ranked_procedures[0].procedure if evidence_focus and evidence_focus.ranked_procedures else ""
@@ -1031,7 +1031,7 @@ def _verify_recommended_fix(
     Safety considerations:
         Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
     """
-    fix_text = " ".join(reasoning.recommended_fix + reasoning.likely_root_causes).lower()
+    fix_text = " ".join(reasoning.recommended_fix + [claim.conclusion for claim in reasoning.likely_root_causes]).lower()
     if not any(term in fix_text for term in ("exists", "idempot", "unique", "duplicate", "guard")):
         return None
     writer_name = evidence_focus.ranked_procedures[0].procedure if evidence_focus and evidence_focus.ranked_procedures else ""

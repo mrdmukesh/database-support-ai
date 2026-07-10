@@ -63,7 +63,7 @@ def recommend_actions(
         future.append(f"Archive or partition historical rows only if volume is a confirmed contributor. Evidence: {evidence_ref}.")
         monitoring.append(f"Track query duration, rows scanned, and plan changes for the affected statement. Evidence: {evidence_ref}.")
         impact = "Slow processing can delay downstream business operations and batch completion."
-    elif intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and any("duplicate" in cause.lower() for cause in reasoning.likely_root_causes):
+    elif intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION} and any("duplicate" in cause.conclusion.lower() for cause in reasoning.likely_root_causes):
         immediate = [f"Stop repeat processing for the affected key until duplicate evidence and insert source are confirmed. Evidence: {evidence_ref}."]
         permanent = [f"Make the write path idempotent and add uniqueness protection where business rules allow it. Evidence: {evidence_ref}."]
         monitoring.append(f"Alert when duplicate business keys or repeated retry attempts appear. Evidence: {evidence_ref}.")
@@ -104,8 +104,8 @@ def recommend_actions(
     if has_sql_errors:
         future.append("Grant metadata/read privileges needed for complete investigation evidence.")
     if reasoning.likely_root_causes and (
-        reasoning.likely_root_causes[0].startswith("Could not confirm")
-        or reasoning.likely_root_causes[0].startswith("Reported issue could not be reproduced")
+        reasoning.likely_root_causes[0].conclusion.startswith("Could not confirm")
+        or reasoning.likely_root_causes[0].conclusion.startswith("Reported issue could not be reproduced")
     ):
         immediate = ["No fix recommended until read-only evidence reproduces the reported condition."]
         permanent = ["Collect the missing key, relationship, affected-row, and condition evidence before changing schema, data, procedures, or jobs."]

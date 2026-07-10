@@ -149,7 +149,7 @@ def enhance_reasoning_with_llm(
         )
     try:
         llm_json = _call_openai_responses(settings, payload)
-        enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, debug_trace=debug_trace)
+        enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
         if debug_trace is not None:
             debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
             debug_trace["final_report_claims"] = enhanced.likely_root_causes
@@ -265,7 +265,7 @@ def _build_llm_payload_unmasked(
         "intent_confidence": intent.confidence,
         "deterministic_reasoning": {
             "summary": deterministic_reasoning.summary,
-            "likely_root_causes": deterministic_reasoning.likely_root_causes,
+            "likely_root_causes": [claim.conclusion for claim in deterministic_reasoning.likely_root_causes],
             "supporting_evidence": deterministic_reasoning.supporting_evidence,
             "missing_evidence": deterministic_reasoning.missing_evidence,
             "recommended_fix": deterministic_reasoning.recommended_fix,
@@ -390,6 +390,7 @@ def _merge_llm_reasoning(
     base: ReasoningResult,
     llm_json: dict[str, Any],
     *,
+    evidence_records: list[EvidenceResult] | None = None,
     debug_trace: dict[str, Any] | None = None,
 ) -> ReasoningResult:
     """
@@ -413,7 +414,15 @@ def _merge_llm_reasoning(
         The LLM must reason only over collected evidence and must never connect to databases or run SQL.
     """
     validation: dict[str, list[Any]] = {"accepted": [], "rejected": []}
-    root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion", validation=validation)
+    cited_root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion", validation=validation)
+    raw_root_causes = llm_json.get("likely_root_causes")
+    root_causes = [
+        claim
+        for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else [])
+        if isinstance(raw_claim, dict) and raw_claim.get("evidence_refs")
+        for claim in [convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])]
+        if claim is not None
+    ]
     fixes = _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
     proof = _cited_items(llm_json.get("proof_of_fix"), "step", validation=validation)
     risks = _cited_items(llm_json.get("risks"), "risk", validation=validation)
@@ -422,7 +431,7 @@ def _merge_llm_reasoning(
     if debug_trace is not None:
         debug_trace["validated_citations"] = validation["accepted"]
         debug_trace["rejected_or_unsupported_claims"] = validation["rejected"]
-    if not root_causes:
+    if not cited_root_causes or not root_causes:
         return base
     summary_parts = [str(llm_json.get("summary") or base.summary)]
     senior_explanation = str(llm_json.get("senior_engineer_explanation") or "").strip()

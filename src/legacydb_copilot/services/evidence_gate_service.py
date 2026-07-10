@@ -6,7 +6,7 @@ from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
-from legacydb_copilot.agents.reasoning_agent import ReasoningResult
+from legacydb_copilot.agents.reasoning_agent import ReasoningResult, build_deterministic_root_cause_claim
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
@@ -148,7 +148,7 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
     """
     return ReasoningResult(
         summary=UNREPRODUCED_MESSAGE,
-        likely_root_causes=[UNREPRODUCED_MESSAGE],
+        likely_root_causes=[build_deterministic_root_cause_claim(UNREPRODUCED_MESSAGE)],
         supporting_evidence=gate.confirmed_facts or ["No confirming rows were returned for the reported issue."],
         missing_evidence=gate.missing_evidence or gate.blocking_reasons,
         recommended_fix=["No fix recommended until the reported condition is reproduced from connected database evidence."],

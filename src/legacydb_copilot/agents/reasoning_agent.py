@@ -21,7 +21,7 @@ class RootCauseSupportStatus(StrEnum):
     CONTRADICTED = "CONTRADICTED"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class RootCauseClaim:
     conclusion: str
     evidence_refs: list[str] = field(default_factory=list)
@@ -29,6 +29,29 @@ class RootCauseClaim:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "status", RootCauseSupportStatus(self.status))
+
+    def __str__(self) -> str:
+        if self.evidence_refs:
+            return f"{self.conclusion} Evidence: {', '.join(self.evidence_refs)}."
+        return self.conclusion
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, str):
+            return str(self) == other
+        if isinstance(other, RootCauseClaim):
+            return (
+                self.conclusion,
+                self.evidence_refs,
+                self.status,
+            ) == (
+                other.conclusion,
+                other.evidence_refs,
+                other.status,
+            )
+        return NotImplemented
+
+    def __contains__(self, value: str) -> bool:
+        return value in self.conclusion
 
 
 @dataclass(frozen=True)
@@ -91,7 +114,7 @@ def build_deterministic_root_cause_claim(
 @dataclass(frozen=True)
 class ReasoningResult:
     summary: str
-    likely_root_causes: list[str]
+    likely_root_causes: list[RootCauseClaim]
     supporting_evidence: list[str]
     missing_evidence: list[str]
     recommended_fix: list[str]
@@ -102,6 +125,13 @@ class ReasoningResult:
     confirmed_facts: list[str] = field(default_factory=list)
     inferred_findings: list[str] = field(default_factory=list)
     hypotheses: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        claims = [
+            item if isinstance(item, RootCauseClaim) else RootCauseClaim(conclusion=str(item))
+            for item in self.likely_root_causes
+        ]
+        object.__setattr__(self, "likely_root_causes", claims)
 
 
 def _rows_for_purpose(evidence: list[EvidenceResult], purpose: str) -> list[dict]:
@@ -322,7 +352,7 @@ def reason_about_evidence(
         ]
     return ReasoningResult(
         summary="Investigation generated dynamically from detected intent, extracted entities, ranked database objects, stored procedure analysis, retrieved documents, approved knowledge, and safe SQL evidence.",
-        likely_root_causes=root_causes,
+        likely_root_causes=[build_deterministic_root_cause_claim(item) for item in root_causes if item.strip()],
         supporting_evidence=supporting or ["No confirming rows were returned by the safe evidence plan."],
         missing_evidence=missing_evidence,
         recommended_fix=fix,

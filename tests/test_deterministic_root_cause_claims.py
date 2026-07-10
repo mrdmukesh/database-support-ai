@@ -109,7 +109,7 @@ def test_metadata_descriptions_are_not_automatically_treated_as_evidence_ids() -
     assert claim.status is RootCauseSupportStatus.UNSUPPORTED
 
 
-def test_existing_deterministic_reasoning_result_output_remains_plain_strings() -> None:
+def test_existing_deterministic_reasoning_result_output_remains_display_compatible() -> None:
     result = ReasoningResult(
         summary="Summary",
         likely_root_causes=["Existing deterministic cause"],
@@ -123,4 +123,5 @@ def test_existing_deterministic_reasoning_result_output_remains_plain_strings() 
     )
 
     assert result.likely_root_causes == ["Existing deterministic cause"]
-    assert all(isinstance(item, str) for item in result.likely_root_causes)
+    assert all(isinstance(item, RootCauseClaim) for item in result.likely_root_causes)
+    assert [str(item) for item in result.likely_root_causes] == ["Existing deterministic cause"]

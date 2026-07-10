@@ -263,7 +263,7 @@ def _run_case(connector, issue: ExpectedIssue) -> BenchmarkCaseResult:
     )
     verification_score = _verification_score(verification_results)
     root_cause_score = _text_overlap_score(
-        " ".join(reasoning.likely_root_causes + hypothesis.event_chain),
+        " ".join([claim.conclusion for claim in reasoning.likely_root_causes] + hypothesis.event_chain),
         f"{issue.expected_root_cause} {issue.expected_evidence}",
     )
     evidence_verified = any(result.status == "Verified" for result in verification_results)

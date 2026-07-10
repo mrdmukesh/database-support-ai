@@ -793,6 +793,16 @@ def compose_report(
         }
         for index, item in enumerate((focus.ranked_procedures if focus else []), start=1)
     ]
+    candidate_trace_rows = [
+        {
+            "Object Type": item.get("object_type", ""),
+            "Name": item.get("name", ""),
+            "Score": item.get("score", ""),
+            "Decision": item.get("decision", ""),
+            "Reason": item.get("reason", ""),
+        }
+        for item in (bundle.metadata.candidate_trace or [])[:30]
+    ]
     fact_rows = [{"Type": "Confirmed Fact", "Finding": item} for item in (bundle.reasoning.confirmed_facts or [])]
     fact_rows.extend({"Type": "Inferred Finding", "Finding": item} for item in (bundle.reasoning.inferred_findings or []))
     fact_rows.extend({"Type": "Hypothesis", "Finding": item} for item in (bundle.reasoning.hypotheses or []))
@@ -844,6 +854,7 @@ def compose_report(
             f"Inferred Business Key: {(focus.inferred_business_key if focus and focus.inferred_business_key else 'Not determined')}",
             f"Business Key Reason: {focus.business_key_reason if focus else 'No evidence focus available'}",
         ]),
+        ReportSection(title="Candidate Scoring Trace", tables=[ReportTable(title="Selected and Rejected Candidates", columns=["Object Type", "Name", "Score", "Decision", "Reason"], rows=candidate_trace_rows or [{"Object Type": "table", "Name": "No candidate trace available", "Score": "", "Decision": "", "Reason": ""}])]),
         ReportSection(title="Write Path Ranking", tables=[ReportTable(title="Ranked Procedures", columns=["Rank", "Procedure", "Score", "Writes Affected Object", "Reads Affected Object", "Relationship", "Evidence", "Historical Incidents"], rows=procedure_rank_rows or [{"Rank": "", "Procedure": "No write path confirmed", "Score": "", "Writes Affected Object": "", "Reads Affected Object": "", "Relationship": "", "Evidence": "", "Historical Incidents": ""}])]),
         ReportSection(title="Facts, Inferences, and Hypotheses", tables=[ReportTable(title="Reasoning Separation", columns=["Type", "Finding"], rows=fact_rows or [{"Type": "None", "Finding": "No evidence-backed facts or hypotheses were generated"}])]),
         ReportSection(title="Stage 3 - Generate Investigation Hypotheses", tables=[ReportTable(title="Hypotheses", columns=["Hypothesis", "Description", "Initial Confidence", "Required Evidence", "Tables", "Procedures", "Logs"], rows=hypothesis_rows)]),

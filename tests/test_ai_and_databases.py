@@ -33,7 +33,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     llm_reasoning_enabled,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
+from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata, search_metadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
@@ -1805,6 +1805,125 @@ def test_duplicate_target_uses_child_object_not_retry_or_import_cause_terms() ->
     assert "FROM customers p" in duplicate_query.sql
     assert "JOIN addresses c ON c.customer_id = p.customer_id" in duplicate_query.sql
     assert "JOIN imports" not in duplicate_query.sql
+
+
+class _SchemaConnector:
+    def __init__(self, schemas: dict[str, dict], procedures: list[str] | None = None) -> None:
+        self._schemas = schemas
+        self._procedures = procedures or []
+
+    def get_schema_metadata(self):
+        return SimpleNamespace(
+            tables=list(self._schemas),
+            views=[],
+            procedures=self._procedures,
+            version="test",
+            engine_type="sqlite",
+        )
+
+    def get_table_schema(self, table_name: str) -> dict:
+        return self._schemas[table_name]
+
+
+def test_metadata_discovery_prefers_explicit_identifier_and_column_matches_generically() -> None:
+    connector = _SchemaConnector(
+        {
+            "audit_events": {"columns": [{"name": "event_id"}, {"name": "message"}], "primary_key": ["event_id"]},
+            "employees": {"columns": [{"name": "employee_code"}, {"name": "dob"}, {"name": "manager_id"}], "primary_key": ["employee_code"]},
+            "payroll_runs": {"columns": [{"name": "run_id"}, {"name": "status"}], "primary_key": ["run_id"]},
+        },
+        procedures=["sp_calculate_employee_age", "sp_archive_audit_events"],
+    )
+    question = "RCA for Employee E001 DOB NULL"
+    entities = extract_entities(question)
+    result = search_metadata(connector, question, entities)
+
+    assert result.tables[0].name == "employees"
+    assert any(entity.entity_type == "business_identifier" and entity.value == "E001" for entity in entities.entities)
+    assert any(entity.entity_type == "possible_column" and entity.value == "DOB" for entity in entities.entities)
+    selected = next(item for item in result.candidate_trace if item["name"] == "employees")
+    rejected = next(item for item in result.candidate_trace if item["name"] == "audit_events")
+    assert selected["decision"] == "selected"
+    assert rejected["decision"] == "rejected"
+    assert selected["components"]["column_name_relevance"] > 0
+
+
+def test_safe_sql_proves_requested_entity_and_reported_condition_on_best_candidate() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("employees", ["employee_code", "dob", "manager_id"], 10, primary_key=["employee_code"]),
+            TableMetadata("audit_events", ["event_id", "message"], 0, primary_key=["event_id"]),
+        ],
+        views=[],
+        procedures=["sp_calculate_employee_age"],
+        version="test",
+        engine_type="sqlite",
+    )
+    entities = extract_entities("RCA for Employee E001 DOB NULL")
+    queries = plan_safe_queries(InvestigationIntent.PRODUCTION_INVESTIGATION, metadata, entities)
+
+    assert any(query.purpose == "Prove requested entity exists in employees" for query in queries)
+    condition = next(query for query in queries if query.purpose == "Prove reported condition on employees.dob")
+    assert "FROM employees" in condition.sql
+    assert "dob IS NULL" in condition.sql
+    assert "employee_code" in condition.sql
+    assert all("FROM audit_events" not in query.sql for query in queries if "Prove reported condition" in query.purpose)
+
+
+def test_evidence_focus_rejects_unrelated_row_evidence_and_unrelated_procedure() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("employees", ["employee_code", "dob", "manager_id"], 10, primary_key=["employee_code"]),
+            TableMetadata("audit_events", ["event_id", "message"], 0, primary_key=["event_id"]),
+        ],
+        views=[],
+        procedures=["sp_calculate_employee_age", "sp_archive_audit_events"],
+        version="test",
+    )
+    entities = extract_entities("RCA for Employee E001 DOB NULL")
+    focus = build_evidence_focus(
+        question="RCA for Employee E001 DOB NULL",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=entities,
+        metadata=metadata,
+        evidence=[
+            EvidenceResult("Inspect audit_events", "SELECT event_id, message FROM audit_events", [{"event_id": 1, "message": "noise"}]),
+            EvidenceResult(
+                "Prove reported condition on employees.dob",
+                "SELECT employee_code, dob FROM employees WHERE employee_code = 'E001' AND dob IS NULL",
+                [{"employee_code": "E001", "dob": None}],
+            ),
+        ],
+        correlated_evidence=[],
+        procedure_analysis=[
+            _procedure("sp_calculate_employee_age", reads=["employees"], writes=["employees"], updates=1),
+            _procedure("sp_archive_audit_events", reads=["audit_events"], writes=["audit_events"], updates=1),
+        ],
+        documents=[],
+    )
+
+    assert focus.affected_object == "employees"
+    assert focus.ranked_procedures[0].procedure == "sp_calculate_employee_age"
+    assert all(item.procedure != "sp_archive_audit_events" for item in focus.ranked_procedures)
+
+
+def test_relationship_column_concept_is_detected_without_domain_specific_mapping() -> None:
+    connector = _SchemaConnector(
+        {
+            "employees": {
+                "columns": [{"name": "employee_code"}, {"name": "manager_id"}, {"name": "department_id"}],
+                "primary_key": ["employee_code"],
+                "foreign_keys": [{"columns": ["manager_id"], "referred_table": "employees", "referred_columns": ["employee_code"]}],
+            },
+            "departments": {"columns": [{"name": "department_id"}, {"name": "department_name"}], "primary_key": ["department_id"]},
+        }
+    )
+    result = search_metadata(connector, "RCA for E017 manager issue", extract_entities("RCA for E017 manager issue"))
+
+    assert result.tables[0].name == "employees"
+    employee_trace = next(item for item in result.candidate_trace if item["name"] == "employees")
+    assert employee_trace["components"]["column_name_relevance"] > 0
+    assert employee_trace["components"]["relationship_relevance"] > 0
 
 
 def test_acceptance_examples_resolve_generic_missing_and_duplicate_targets() -> None:

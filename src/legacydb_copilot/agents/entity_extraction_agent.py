@@ -50,6 +50,53 @@ def _unique(entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
     return result
 
 
+_CONCEPT_STOP_WORDS = {
+    "about",
+    "access",
+    "affected",
+    "against",
+    "analyze",
+    "because",
+    "below",
+    "cause",
+    "check",
+    "created",
+    "database",
+    "explain",
+    "failed",
+    "find",
+    "from",
+    "generated",
+    "issue",
+    "missing",
+    "null",
+    "only",
+    "problem",
+    "question",
+    "record",
+    "records",
+    "root",
+    "show",
+    "table",
+    "tables",
+    "where",
+    "with",
+    "without",
+}
+
+
+def _concept_tokens(question: str) -> list[str]:
+    tokens: list[str] = []
+    for token in re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{1,}\b", question):
+        lowered = token.lower()
+        if lowered in _CONCEPT_STOP_WORDS:
+            continue
+        if token.upper() in {"SQL", "DB", "AI", "MVP", "RCA"}:
+            continue
+        tokens.append(token)
+    return tokens
+
+
 def extract_entities(question: str) -> EntityExtractionResult:
     """
     Owner: Mukesh Dabi
@@ -78,11 +125,21 @@ def extract_entities(question: str) -> EntityExtractionResult:
     if app_match:
         application_name = f"{app_match.group(1)} {app_match.group(2)}"
         entities.append(ExtractedEntity("application_name", application_name))
-    business_keys = set(re.findall(r"\b[A-Z]{2,10}-\d+[A-Z]?\b", question))
-    for value in re.findall(r"\b[A-Z]{2,10}-\d+[A-Z]?\b", question):
+    business_key_pattern = r"\b(?:[A-Z]{1,12}-\d+[A-Z0-9]*|[A-Z]{1,8}\d{2,}[A-Z0-9]*|\d{2,}[A-Z]{1,8})\b"
+    business_keys = set(re.findall(business_key_pattern, question))
+    for value in re.findall(business_key_pattern, question):
         entities.append(ExtractedEntity("exact_id_or_code", value))
+        entities.append(ExtractedEntity("business_identifier", value))
     for value in re.findall(r"\bsp_[a-zA-Z0-9_]+\b", question):
         entities.append(ExtractedEntity("stored_procedure", value))
+    for value in re.findall(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b", question):
+        entities.append(ExtractedEntity("possible_table", value[0]))
+        entities.append(ExtractedEntity("possible_column", value[1]))
+    for token in _concept_tokens(question):
+        if token.isupper() and 2 <= len(token) <= 12:
+            entities.append(ExtractedEntity("possible_column", token))
+        else:
+            entities.append(ExtractedEntity("possible_table_or_column", token))
     ignored_codes = {"SQL", "DB", "AI", "MVP"}
     for value in re.findall(r"\b[A-Z_]{3,}\b", question):
         if value in ignored_codes or (application_name and value in application_name.upper().split()):

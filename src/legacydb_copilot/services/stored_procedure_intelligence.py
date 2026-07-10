@@ -102,7 +102,7 @@ def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[Pro
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
     analyses: list[ProcedureAnalysis] = []
-    for procedure_name in procedure_names[:8]:
+    for procedure_name in procedure_names[:20]:
         try:
             definition = _read_definition(connector, procedure_name)
         except Exception:

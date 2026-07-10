@@ -77,6 +77,7 @@ def build_evidence_focus(
     write_graph = _write_path_graph(affected_object, procedure_analysis)
     ranked_procedures = _rank_procedures(
         affected_object=affected_object,
+        entities=entities,
         metadata=metadata,
         evidence=evidence,
         correlated_evidence=correlated_evidence,
@@ -147,6 +148,9 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
         for sql_table in sql_tables:
             table = table_lookup.get(sql_table.lower().split(".")[-1], sql_table)
             if table in table_scores:
+                metadata_relevance = table_scores[table] > 0 or table.lower() in question_l
+                if not metadata_relevance:
+                    continue
                 table_scores[table] += row_weight
                 if any(term in purpose_l for term in ("duplicate", "missing", "inspect", "confirm", "related")):
                     table_scores[table] += 1.0
@@ -155,7 +159,7 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     selected, score = max(table_scores.items(), key=lambda item: (item[1], item[0]))
     if score <= 0:
         return selected, "Selected first available table because no stronger evidence identified a target."
-    return selected, "Selected from question/table token matches and SQL evidence that returned or checked rows."
+    return selected, "Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object."
 
 
 def _explicit_write_target(question: str, metadata: MetadataSearchResult) -> TableMetadata | None:
@@ -261,6 +265,7 @@ def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult])
 def _rank_procedures(
     *,
     affected_object: str,
+    entities: EntityExtractionResult,
     metadata: MetadataSearchResult,
     evidence: list[EvidenceResult],
     correlated_evidence: list[CorrelatedEvidence],
@@ -288,6 +293,13 @@ def _rank_procedures(
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
     related = set(_related_tables(affected_object, metadata))
+    table = _table(metadata, affected_object)
+    requested_columns = _requested_columns(table, entities) if table else set()
+    business_ids = {
+        entity.value.lower()
+        for entity in entities.entities
+        if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    }
     evidence_text = " ".join([item.purpose + " " + item.sql for item in evidence] + [str(row) for item in evidence for row in item.rows[:5]]).lower()
     correlated_text = " ".join(item.subject + " " + item.finding + " " + item.support for item in correlated_evidence).lower()
     document_text = " ".join(doc.title + " " + doc.snippet for doc in documents).lower()
@@ -296,6 +308,7 @@ def _rank_procedures(
     for proc in procedure_analysis:
         written = {_clean_identifier(table).lower() for table in proc.tables_written}
         read = {_clean_identifier(table).lower() for table in proc.tables_read}
+        proc_text = " ".join([proc.definition_excerpt or "", *proc.business_rules]).lower()
         writes_affected = affected_l in written
         reads_affected = affected_l in read
         relationship = "direct write" if writes_affected else "direct read" if reads_affected else "related object" if (written | read) & related else "none confirmed"
@@ -319,6 +332,14 @@ def _rank_procedures(
         if (written | read) & related:
             score += 2.0
             evidence_found.append("Procedure touches an upstream/downstream related object.")
+        column_hits = {column for column in requested_columns if column.lower() in proc_text}
+        if column_hits and (writes_affected or reads_affected or (written | read) & related):
+            score += 3.0 + len(column_hits)
+            evidence_found.append("Procedure text references requested column(s): " + ", ".join(sorted(column_hits)) + ".")
+        id_hits = {value for value in business_ids if value and value in proc_text}
+        if id_hits and (writes_affected or reads_affected):
+            score += 2.0
+            evidence_found.append("Procedure text references requested business identifier(s).")
         proc_l = proc.name.lower()
         if proc_l in evidence_text or proc_l in correlated_text:
             score += 3.0
@@ -342,6 +363,8 @@ def _rank_procedures(
             evidence_found.append("No explicit transaction handling was detected around the affected-object write path.")
         if writes_affected and not proc.try_catch:
             evidence_found.append("No explicit exception/retry guard was detected in parsed procedure text.")
+        if score <= 0:
+            continue
         ranks.append(
             ProcedureRank(
                 procedure=proc.name,
@@ -366,6 +389,22 @@ def _rank_procedures(
         ),
         reverse=True,
     )
+
+
+def _requested_columns(table: TableMetadata, entities: EntityExtractionResult) -> set[str]:
+    if table is None:
+        return set()
+    concepts: set[str] = set()
+    for entity in entities.entities:
+        if entity.entity_type in {"possible_column", "possible_table_or_column"}:
+            concepts.update(_object_terms(entity.value))
+    for keyword in entities.business_keywords or []:
+        concepts.update(_object_terms(keyword))
+    result = set()
+    for column in table.columns:
+        if _object_terms(column) & concepts:
+            result.add(column)
+    return result
 
 
 def _confirmed_facts(evidence: list[EvidenceResult], ranked_procedures: list[ProcedureRank], affected_object: str, business_key: str | None) -> list[str]:

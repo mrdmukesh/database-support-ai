@@ -626,8 +626,79 @@ def _business_key_values(entities: EntityExtractionResult) -> list[str]:
     return [
         entity.value
         for entity in entities.entities
-        if entity.entity_type in {"business_key", "exact_id_or_code"}
+        if entity.entity_type in {"business_key", "exact_id_or_code", "business_identifier"}
     ]
+
+
+def _identifier_parts(value: str) -> set[str]:
+    raw = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value).lower()
+    parts = {part for part in re.split(r"[^a-z0-9]+", raw) if len(part) >= 2}
+    expanded = set(parts)
+    for part in parts:
+        if part.endswith("ies") and len(part) > 4:
+            expanded.add(part[:-3] + "y")
+        if part.endswith("s") and len(part) > 3:
+            expanded.add(part[:-1])
+    return expanded
+
+
+def _requested_column_concepts(entities: EntityExtractionResult) -> set[str]:
+    stop = {"why", "root", "cause", "record", "records", "missing", "null", "issue", "failed", "generated"}
+    concepts: set[str] = set()
+    for entity in entities.entities:
+        if entity.entity_type in {"possible_column", "possible_table_or_column"}:
+            concepts.update(_identifier_parts(entity.value))
+    for token in entities.business_keywords or []:
+        concepts.update(_identifier_parts(token))
+    return {concept for concept in concepts if concept not in stop}
+
+
+def _reported_null_condition(entities: EntityExtractionResult) -> bool:
+    text = " ".join([entities.suspected_issue or "", *(entities.business_keywords or [])]).lower()
+    return any(term in text for term in ("null", "blank", "empty", "missing"))
+
+
+def _condition_columns(table: TableMetadata, entities: EntityExtractionResult) -> list[str]:
+    concepts = _requested_column_concepts(entities)
+    matches: list[tuple[int, str]] = []
+    for column in table.columns:
+        parts = _identifier_parts(column)
+        hits = parts & concepts
+        if hits:
+            matches.append((len(hits), column))
+    matches.sort(key=lambda item: (-item[0], len(item[1]), item[1]))
+    return [column for _, column in matches[:3]]
+
+
+def _entity_and_condition_queries(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+    key_values = _business_key_values(entities)
+    if not key_values:
+        return []
+    planned: list[PlannedQuery] = []
+    for table in metadata.tables[:3]:
+        where_clause = _where_for_table(table, entities, metadata.engine_type)
+        if where_clause:
+            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            planned.append(
+                PlannedQuery(
+                    purpose=f"Prove requested entity exists in {table.name}",
+                    sql=f"SELECT {columns} FROM {table.name}{where_clause}",
+                )
+            )
+        if not _reported_null_condition(entities):
+            continue
+        for column in _condition_columns(table, entities):
+            filters = []
+            if where_clause:
+                filters.append(f"({where_clause.removeprefix(' WHERE ')})")
+            filters.append(f"{column} IS NULL")
+            planned.append(
+                PlannedQuery(
+                    purpose=f"Prove reported condition on {table.name}.{column}",
+                    sql=f"SELECT {', '.join(dict.fromkeys([column, *table.columns[:7]]))} FROM {table.name} WHERE {' AND '.join(filters)}",
+                )
+            )
+    return planned
 
 
 def _natural_key_columns(table: TableMetadata) -> list[str]:
@@ -1369,6 +1440,7 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         planned.extend(_status_investigation_queries(metadata, entities))
     if intent in {InvestigationIntent.HEALTH_ASSESSMENT, InvestigationIntent.GENERAL_DATABASE_QUESTION}:
         planned.extend(_analytical_summary_queries(metadata, entities))
+    planned.extend(_entity_and_condition_queries(metadata, entities))
     if duplicate_child_flow:
         planned.extend(
             [
@@ -1406,7 +1478,7 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         if duplicate_child_flow
         else set()
     )
-    for table in metadata.tables[:5]:
+    for table in metadata.tables[:3]:
         if table.name.lower() in targeted_duplicate_tables:
             continue
         where_clause = _where_for_table(table, entities, metadata.engine_type)

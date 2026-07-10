@@ -179,8 +179,6 @@ def rank_relevant_objects(
 
     proc_tokens = tokens | {table.name.lower() for table in selected_tables}
     procedures = [proc for proc in metadata.procedures if any(token in proc.lower() for token in proc_tokens)]
-    if not procedures:
-        procedures = metadata.procedures[:5]
     views = [view for view in metadata.views if any(token in view.lower() for token in proc_tokens)]
     if not views:
         views = metadata.views[:5]
@@ -190,8 +188,19 @@ def rank_relevant_objects(
         for score, table, reason in ranked_tables
         if table.name in selected_names
     ]
-    objects.extend(RankedObject("procedure", proc, 1.0, "Procedure name matched relevant tokens or retained for procedure discovery") for proc in procedures)
+    objects.extend(RankedObject("procedure", proc, 1.0, "Procedure name matched selected object or question tokens") for proc in procedures)
     objects.extend(RankedObject("view", view, 0.8, "View name matched relevant tokens or retained for context") for view in views)
+    selected_for_trace = {table.name for table in selected_tables}
+    selected_for_trace.update(procedures)
+    candidate_trace = [
+        {
+            **item,
+            "decision": "selected" if item.get("name") in selected_for_trace else "rejected",
+        }
+        if item.get("object_type") == "table"
+        else item
+        for item in metadata.candidate_trace
+    ]
     return ObjectRankingResult(
         objects=objects,
         metadata=MetadataSearchResult(
@@ -200,5 +209,6 @@ def rank_relevant_objects(
             procedures=procedures,
             version=metadata.version,
             engine_type=metadata.engine_type,
+            candidate_trace=candidate_trace,
         ),
     )

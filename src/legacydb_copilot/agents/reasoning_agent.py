@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
@@ -51,6 +51,22 @@ def validate_claim_evidence_references(
         missing_evidence_refs=missing_refs,
         valid_evidence_refs=valid_refs,
     )
+
+
+def evaluate_claim_support_status(
+    claim: RootCauseClaim,
+    evidence_records: list[EvidenceResult],
+) -> RootCauseClaim:
+    validation = validate_claim_evidence_references(claim, evidence_records)
+    if not validation.valid_evidence_refs and not validation.missing_evidence_refs:
+        status = RootCauseSupportStatus.NOT_EVALUATED
+    elif validation.valid_evidence_refs and not validation.missing_evidence_refs:
+        status = RootCauseSupportStatus.VERIFIED
+    elif validation.valid_evidence_refs:
+        status = RootCauseSupportStatus.PARTIALLY_SUPPORTED
+    else:
+        status = RootCauseSupportStatus.UNSUPPORTED
+    return replace(claim, status=status)
 
 
 @dataclass(frozen=True)

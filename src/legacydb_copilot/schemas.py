@@ -80,6 +80,22 @@ class WorkspaceRead(BaseModel):
     is_active: bool
 
 
+class WorkspaceMembershipUpsert(BaseModel):
+    user_id: str
+    role: str = Field(pattern=r"^(OWNER|ADMIN|DBA|DEVELOPER|VIEWER|AUDITOR)$")
+
+
+class WorkspaceMembershipRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    organization_id: str
+    workspace_id: str
+    user_id: str
+    role: str
+    is_active: bool
+
+
 class DatabaseConnectionCreate(BaseModel):
     organization_id: str
     workspace_id: str

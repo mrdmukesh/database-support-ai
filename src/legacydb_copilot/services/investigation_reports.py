@@ -90,18 +90,15 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
 def _executive_report(report: InvestigationReport) -> InvestigationReport:
     priority_titles = [
         "Executive Summary",
-        "User Question",
-        "AI Reasoning Status",
+        "Question",
+        "AI Status",
         "Key Findings",
-        "Evidence Summary",
-        "Write Path / Likely Procedure",
-        "Root Cause Analysis",
-        "Confidence Score",
-        "Recommended Fix",
-        "Test Cases",
-        "Proof of Fix",
-        "Rollback Plan",
-        "Missing Evidence",
+        "Top Evidence",
+        "Procedure Path",
+        "Root Cause",
+        "Fix",
+        "Tests",
+        "Rollback",
     ]
     selected = []
     seen_titles: set[str] = set()

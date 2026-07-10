@@ -109,10 +109,15 @@ def require_resource_workspace_access(
         return
     if current_user.role == Role.SUPER_ADMIN.value:
         return
+    if current_user.role == Role.ORG_ADMIN.value:
+        return
     membership = _membership(db, current_user.id, workspace_id)
     if membership is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace access denied")
-    role = WorkspaceRole(membership.role)
+    try:
+        role = WorkspaceRole(membership.role)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace role denied") from exc
     if not _role_allows(role, action):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace action denied")
 

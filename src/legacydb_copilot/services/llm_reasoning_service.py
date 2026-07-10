@@ -11,7 +11,7 @@ from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
-from legacydb_copilot.services.pii_masking_service import mask_llm_payload
+from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
@@ -116,9 +116,9 @@ def enhance_reasoning_with_llm(
         debug_trace.update(
             {
                 "system_prompt": SYSTEM_PROMPT,
-                "user_prompt": json.dumps(payload, default=str),
+                "user_prompt": json.dumps(sanitize_ai_trace(payload), default=str),
                 "evidence_package_before_masking_summary": _payload_summary(raw_payload),
-                "evidence_package_after_masking": payload,
+                "evidence_package_after_masking": sanitize_ai_trace(payload),
                 "llm_model_name": settings.llm_model,
                 "llm_response_raw": None,
                 "validated_citations": [],
@@ -130,7 +130,7 @@ def enhance_reasoning_with_llm(
         llm_json = _call_openai_responses(settings, payload)
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, debug_trace=debug_trace)
         if debug_trace is not None:
-            debug_trace["llm_response_raw"] = mask_llm_payload(llm_json)
+            debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
             debug_trace["final_report_claims"] = enhanced.likely_root_causes
         return enhanced
     except Exception:

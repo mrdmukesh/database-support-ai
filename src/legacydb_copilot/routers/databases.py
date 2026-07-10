@@ -6,13 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from legacydb_copilot.auth import Role
 from legacydb_copilot.databases import DatabaseEngine, default_connector_registry
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.connector import (
     DatabaseConnectionError,
     get_connection_pool,
 )
-from legacydb_copilot.dependencies import assert_same_organization, require_permission
+from legacydb_copilot.dependencies import assert_same_organization, get_current_user, require_permission
 from legacydb_copilot.db.models import DatabaseConnectionModel, WorkspaceMembershipModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.schemas import (
@@ -102,7 +103,7 @@ def list_database_engines() -> dict[str, list[str]]:
 def create_database_connection(
     payload: DatabaseConnectionCreate,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:manage")),
+    current_user=Depends(get_current_user),
 ) -> DatabaseConnectionModel:
     assert_same_organization(current_user, payload.organization_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="database")
@@ -138,7 +139,7 @@ def create_database_connection(
 def list_database_connections(
     organization_id: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:read")),
+    current_user=Depends(get_current_user),
     workspace_id: str | None = None,
 ) -> list[DatabaseConnectionModel]:
     assert_same_organization(current_user, organization_id)
@@ -148,7 +149,10 @@ def list_database_connections(
     if workspace_id:
         require_workspace_access(db, current_user, workspace_id, action="read")
         query = query.filter(DatabaseConnectionModel.workspace_id == workspace_id)
-    elif Settings.from_env().feature_enterprise_rbac_enabled:
+    elif (
+        Settings.from_env().feature_enterprise_rbac_enabled
+        and current_user.role not in {Role.SUPER_ADMIN.value, Role.ORG_ADMIN.value}
+    ):
         workspace_ids = [
             item.workspace_id
             for item in db.query(WorkspaceMembershipModel.workspace_id)
@@ -167,7 +171,7 @@ def update_database_connection(
     connection_id: str,
     payload: DatabaseConnectionUpdate,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:manage")),
+    current_user=Depends(get_current_user),
 ) -> DatabaseConnectionModel:
     connection = db.get(DatabaseConnectionModel, connection_id)
     if connection is None:
@@ -207,7 +211,7 @@ def update_database_connection(
 def delete_database_connection(
     connection_id: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:manage")),
+    current_user=Depends(get_current_user),
 ) -> None:
     connection = db.get(DatabaseConnectionModel, connection_id)
     if connection is None:
@@ -231,7 +235,7 @@ def delete_database_connection(
 def test_database_connection(
     connection_id: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:read")),
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     """Test if a database connection is valid."""
     connection_model = db.get(DatabaseConnectionModel, connection_id)
@@ -263,7 +267,7 @@ def test_database_connection(
 def get_database_schema(
     connection_id: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:read")),
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     """Get schema metadata from the database."""
     connection_model = db.get(DatabaseConnectionModel, connection_id)
@@ -288,7 +292,7 @@ def get_table_schema(
     connection_id: str,
     table_name: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:read")),
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     """Get detailed schema for a specific table."""
     connection_model = db.get(DatabaseConnectionModel, connection_id)
@@ -313,7 +317,7 @@ def execute_query(
     connection_id: str,
     payload: dict[str, Any],
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("database:read")),
+    current_user=Depends(get_current_user),
 ) -> dict[str, Any]:
     """Execute a SELECT query against the database."""
     connection_model = db.get(DatabaseConnectionModel, connection_id)

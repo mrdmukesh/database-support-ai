@@ -64,6 +64,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
+from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
 from legacydb_copilot.services.report_generator import (
@@ -1792,7 +1793,7 @@ def _run_dynamic_investigation(
         "report_path": str(generated_report.directory),
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
-        "ai_debug_trace": json.dumps(ai_debug_trace or {}, default=str),
+        "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata
 

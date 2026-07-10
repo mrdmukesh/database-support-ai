@@ -483,19 +483,19 @@ def _suggested_verification_section(bundle: DynamicInvestigationBundle) -> Repor
 def _strongest_evidence_rows(bundle: DynamicInvestigationBundle) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for item in bundle.evidence:
-        if len(rows) >= 5:
+        if len(rows) >= 4:
             break
         if item.rows or item.safety_note or item.error:
             rows.append(
                 {
                     "Evidence": item.purpose,
                     "Type": "SQL",
-                    "Source": item.sql[:180],
+                    "Source": "Read-only evidence query",
                     "Summary": item.error or f"{len(item.rows)} row(s) returned",
                 }
             )
     for proc in bundle.procedure_analysis:
-        if len(rows) >= 5:
+        if len(rows) >= 4:
             break
         if proc.tables_written or proc.tables_read:
             rows.append(
@@ -506,7 +506,7 @@ def _strongest_evidence_rows(bundle: DynamicInvestigationBundle) -> list[dict[st
                     "Summary": f"Writes: {', '.join(proc.tables_written) or 'none'}; Reads: {', '.join(proc.tables_read) or 'none'}",
                 }
             )
-    return rows[:5]
+    return rows[:4]
 
 
 def _executive_key_findings_section(bundle: DynamicInvestigationBundle) -> ReportSection:
@@ -535,8 +535,8 @@ def _executive_key_findings_section(bundle: DynamicInvestigationBundle) -> Repor
 def _executive_evidence_summary_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     rows = _strongest_evidence_rows(bundle)
     return ReportSection(
-        title="Evidence Summary",
-        paragraphs=["Strongest evidence items only. Full SQL output and verification checks are available in the full audit report."],
+        title="Top Evidence",
+        paragraphs=["Strongest evidence items only. Detailed SQL checks, result samples, and verification SQL are in the full audit report."],
         tables=[
             ReportTable(
                 title="Strongest Evidence",
@@ -551,10 +551,10 @@ def _write_path_likely_procedure_section(bundle: DynamicInvestigationBundle) -> 
     ranked = bundle.evidence_focus.ranked_procedures if bundle.evidence_focus else []
     top = next((item for item in ranked if item.writes_affected_object), ranked[0] if ranked else None)
     if top is None:
-        return ReportSection(title="Write Path / Likely Procedure", items=["No direct write procedure was confirmed from procedure metadata."])
+        return ReportSection(title="Procedure Path", items=["No direct write procedure was confirmed from procedure metadata."])
     certainty = "Likely procedure" if top.writes_affected_object else "Related procedure only"
     return ReportSection(
-        title="Write Path / Likely Procedure",
+        title="Procedure Path",
         items=[
             f"{certainty}: {top.procedure}",
             f"Writes affected object: {'Yes' if top.writes_affected_object else 'No'}",
@@ -576,8 +576,41 @@ def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> Repor
         {"Item": "Trace", "Value": "Full prompt available in Audit Trace." if trace else "Trace disabled or not available."},
     ]
     return ReportSection(
-        title="AI Reasoning Status",
+        title="AI Status",
         tables=[ReportTable(title="AI Reasoning Summary", columns=["Item", "Value"], rows=rows)],
+    )
+
+
+def _executive_fix_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    items = []
+    items.extend(bundle.reasoning.recommended_fix[:3])
+    if not items:
+        items.extend(bundle.recommendation.immediate_fix[:2])
+        items.extend(bundle.recommendation.permanent_fix[:2])
+    return ReportSection(title="Fix", items=items or ["No fix recommended until evidence supports the reported condition."])
+
+
+def _executive_tests_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    rows = bundle.reasoning.test_cases[:5]
+    return ReportSection(
+        title="Tests",
+        tables=[
+            ReportTable(
+                title="Recommended Tests",
+                columns=["Test ID", "Scenario", "Steps", "Expected Result", "Actual Result", "Status"],
+                rows=rows
+                or [
+                    {
+                        "Test ID": "TC-001",
+                        "Scenario": "Evidence validation",
+                        "Steps": "Review the full audit report and execute approved read-only verification checks.",
+                        "Expected Result": "Evidence supports the RCA before any fix is applied.",
+                        "Actual Result": "Pending",
+                        "Status": "Pending",
+                    }
+                ],
+            )
+        ],
     )
 
 
@@ -779,20 +812,19 @@ def compose_report(
         "Monitoring: " + " ".join(bundle.recommendation.monitoring),
         "Modernization: " + " ".join(bundle.recommendation.modernization),
     ])
-    ai_trace_section = _ai_reasoning_trace_section(bundle)
     sections = [
         ReportSection(title="Executive Summary", paragraphs=[bundle.reasoning.summary]),
-        ReportSection(title="User Question", paragraphs=[bundle.question]),
+        ReportSection(title="Question", paragraphs=[bundle.question]),
         _executive_ai_reasoning_section(bundle),
         _executive_key_findings_section(bundle),
         _executive_evidence_summary_section(bundle),
         _write_path_likely_procedure_section(bundle),
-        ReportSection(title="Root Cause Analysis", items=final_root_cause_items),
+        ReportSection(title="Root Cause", items=final_root_cause_items[:3]),
         ReportSection(title="Confidence Score", items=confidence_items),
-        recommended_fix_section,
-        ReportSection(title="Test Cases", tables=[ReportTable(title="Generated Test Cases", columns=["Test ID", "Scenario", "Steps", "Expected Result", "Actual Result", "Status"], rows=bundle.reasoning.test_cases)]),
+        _executive_fix_section(bundle),
+        _executive_tests_section(bundle),
         ReportSection(title="Proof of Fix", items=bundle.reasoning.proof_of_fix),
-        ReportSection(title="Rollback Plan", items=bundle.reasoning.rollback_plan),
+        ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4]),
         ReportSection(title="Missing Evidence", items=bundle.reasoning.missing_evidence),
         ReportSection(title="Stage 1 - Understand the Question", items=[
             f"Investigation Mode: {bundle.investigation_mode}",
@@ -848,8 +880,6 @@ def compose_report(
         ReportSection(title="References Used", items=["Tables: " + ", ".join(table.name for table in bundle.metadata.tables[:8]), "Procedures: " + (", ".join(bundle.metadata.procedures) or "None discovered"), "Views: " + (", ".join(bundle.metadata.views) or "None discovered"), "Documents: " + (", ".join(document_titles) or "No uploaded documents found")]),
         ReportSection(title="Missing Information / Clarifying Questions", items=bundle.reasoning.missing_evidence),
     ]
-    if ai_trace_section:
-        sections.append(ai_trace_section)
     return InvestigationReport(
         cover=ReportCover(
             title="Enterprise Investigation Report",

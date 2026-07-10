@@ -8,8 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.common import DomainError
+from legacydb_copilot.auth import Role
 from legacydb_copilot.config import Settings
-from legacydb_copilot.dependencies import assert_same_organization, require_permission
+from legacydb_copilot.dependencies import assert_same_organization, get_current_user, require_permission
 from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, WorkspaceMembershipModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.documents import UploadPolicy, content_sha256, detect_mime_type
@@ -27,7 +28,7 @@ LOCAL_DOCUMENT_ROOT = Path("storage/documents")
 def create_document(
     payload: DocumentCreate,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("documents:manage")),
+    current_user=Depends(get_current_user),
 ) -> DocumentModel:
     """
     Owner: Mukesh Dabi
@@ -111,7 +112,7 @@ async def upload_document(
     title: Annotated[str, Form()],
     file: Annotated[UploadFile, File()],
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("documents:manage")),
+    current_user=Depends(get_current_user),
 ) -> DocumentModel:
     """
     Owner: Mukesh Dabi
@@ -206,7 +207,7 @@ async def upload_document(
 def list_documents(
     organization_id: str,
     db: Annotated[Session, Depends(get_db_session)],
-    current_user=Depends(require_permission("documents:read")),
+    current_user=Depends(get_current_user),
     workspace_id: str | None = None,
 ) -> list[DocumentModel]:
     """
@@ -237,7 +238,10 @@ def list_documents(
     if workspace_id:
         require_workspace_access(db, current_user, workspace_id, action="read")
         query = query.filter(DocumentModel.workspace_id == workspace_id)
-    elif Settings.from_env().feature_enterprise_rbac_enabled:
+    elif (
+        Settings.from_env().feature_enterprise_rbac_enabled
+        and current_user.role not in {Role.SUPER_ADMIN.value, Role.ORG_ADMIN.value}
+    ):
         workspace_ids = [
             item.workspace_id
             for item in db.query(WorkspaceMembershipModel.workspace_id)

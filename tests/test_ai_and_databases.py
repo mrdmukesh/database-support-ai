@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -31,6 +32,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
+from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
@@ -1437,18 +1439,15 @@ def test_executive_report_keeps_requested_sections_and_excludes_verification_app
         ),
         sections=[
             ReportSection(title="Executive Summary"),
-            ReportSection(title="User Question"),
-            ReportSection(title="AI Reasoning Status"),
+            ReportSection(title="Question"),
+            ReportSection(title="AI Status"),
             ReportSection(title="Key Findings"),
-            ReportSection(title="Evidence Summary"),
-            ReportSection(title="Write Path / Likely Procedure"),
-            ReportSection(title="Root Cause Analysis"),
-            ReportSection(title="Confidence Score"),
-            ReportSection(title="Recommended Fix"),
-            ReportSection(title="Test Cases"),
-            ReportSection(title="Proof of Fix"),
-            ReportSection(title="Rollback Plan"),
-            ReportSection(title="Missing Evidence"),
+            ReportSection(title="Top Evidence"),
+            ReportSection(title="Procedure Path"),
+            ReportSection(title="Root Cause"),
+            ReportSection(title="Fix"),
+            ReportSection(title="Tests"),
+            ReportSection(title="Rollback"),
             ReportSection(title="Suggested Verification Checks"),
             ReportSection(title="AI Reasoning Trace"),
         ],
@@ -1459,18 +1458,15 @@ def test_executive_report_keeps_requested_sections_and_excludes_verification_app
 
     assert titles == [
         "Executive Summary",
-        "User Question",
-        "AI Reasoning Status",
+        "Question",
+        "AI Status",
         "Key Findings",
-        "Evidence Summary",
-        "Write Path / Likely Procedure",
-        "Root Cause Analysis",
-        "Confidence Score",
-        "Recommended Fix",
-        "Test Cases",
-        "Proof of Fix",
-        "Rollback Plan",
-        "Missing Evidence",
+        "Top Evidence",
+        "Procedure Path",
+        "Root Cause",
+        "Fix",
+        "Tests",
+        "Rollback",
     ]
     assert "Suggested Verification Checks" not in titles
     assert "AI Reasoning Trace" not in titles
@@ -1495,6 +1491,60 @@ def test_ai_trace_link_is_visible_only_when_debug_trace_enabled(monkeypatch) -> 
 
     monkeypatch.setenv("APP_ENV", "production")
     assert "ai_trace" not in report.links()
+
+
+def test_secure_ai_trace_masks_secrets_connection_strings_and_pii() -> None:
+    trace = {
+        "system_prompt": "Use password=super-secret and Authorization: Bearer abcdefghijklmnop",
+        "user_prompt": "Connect to mysql+pymysql://appadmin:secret@mysql.example.com:3306/app for john@example.com",
+        "evidence_package_after_masking": {
+            "rows": [
+                {
+                    "patient_name": "John Smith",
+                    "email": "john@example.com",
+                    "api_key": "sk-live-secret",
+                    "connection_string": "postgresql://user:pass@host:5432/db",
+                }
+            ]
+        },
+        "llm_response_raw": "Account ACCT-123456 should be checked.",
+        "validated_citations": [{"claim": "Supported", "evidence_refs": ["SQL-1"]}],
+        "rejected_or_unsupported_claims": [{"claim": "Unsupported", "reason": "Missing evidence_refs"}],
+    }
+
+    masked = sanitize_ai_trace(trace)
+    text = str(masked)
+
+    assert "super-secret" not in text
+    assert "abcdefghijklmnop" not in text
+    assert "appadmin:secret" not in text
+    assert "john@example.com" not in text
+    assert "sk-live-secret" not in text
+    assert "user:pass" not in text
+    assert "ACCT-123456" not in text
+    assert "[MASKED_CONNECTION_STRING]" in text
+    assert "[MASKED_EMAIL]" in text
+    assert "[MASKED_SECRET]" in text
+    assert "[MASKED_IDENTIFIER]" in text
+
+
+def test_ai_debug_trace_download_is_admin_only(monkeypatch) -> None:
+    from fastapi import HTTPException
+
+    from legacydb_copilot.routers.reports import download_ai_debug_trace
+
+    monkeypatch.setenv("APP_ENV", "development")
+    monkeypatch.setenv("AI_DEBUG_TRACE_ENABLED", "true")
+
+    with pytest.raises(HTTPException) as exc:
+        download_ai_debug_trace(
+            investigation_id="INV-TRACE",
+            db=SimpleNamespace(),
+            current_user=SimpleNamespace(role="dba"),
+        )
+
+    assert exc.value.status_code == 403
+    assert "admin access" in exc.value.detail
 
 
 def test_report_html_template_is_packaged_and_renderable() -> None:

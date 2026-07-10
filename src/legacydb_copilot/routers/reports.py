@@ -16,6 +16,7 @@ from legacydb_copilot.db.models import InvestigationModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.security.access_control import require_resource_owner_workspace
 from legacydb_copilot.services.audit_service import record_audit_event
+from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.report_generator import REPORT_HISTORY_DIR
 from legacydb_copilot.services.storage_service import get_app_storage, normalize_storage_key
 
@@ -60,8 +61,8 @@ def download_ai_debug_trace(
     settings = Settings.from_env()
     if not settings.ai_debug_trace_enabled or settings.environment == Environment.PRODUCTION:
         raise HTTPException(status_code=404, detail="AI debug trace is not enabled")
-    if current_user.role not in {Role.SUPER_ADMIN.value, Role.ORG_ADMIN.value, Role.DBA.value}:
-        raise HTTPException(status_code=403, detail="AI debug trace requires admin/DBA access")
+    if current_user.role not in {Role.SUPER_ADMIN.value, Role.ORG_ADMIN.value}:
+        raise HTTPException(status_code=403, detail="AI debug trace requires admin access")
     investigation = db.get(InvestigationModel, investigation_id)
     if investigation is None:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -72,6 +73,18 @@ def download_ai_debug_trace(
         trace = json.loads(investigation.ai_debug_trace_json)
     except json.JSONDecodeError:
         trace = {"raw_trace": investigation.ai_debug_trace_json}
+    trace = sanitize_ai_trace(trace)
+    record_audit_event(
+        db,
+        organization_id=investigation.organization_id,
+        workspace_id=investigation.workspace_id,
+        user_id=current_user.id,
+        action="AI_DEBUG_TRACE_DOWNLOADED",
+        resource_type="investigation",
+        resource_id=investigation_id,
+        metadata={"masked": True},
+    )
+    db.commit()
     return JSONResponse(
         content={
             "investigation_id": investigation_id,

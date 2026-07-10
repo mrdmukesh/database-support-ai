@@ -19,6 +19,28 @@ class RootCauseClaim:
 
 
 @dataclass(frozen=True)
+class ClaimEvidenceValidationResult:
+    is_valid: bool
+    missing_evidence_refs: list[str]
+    valid_evidence_refs: list[str]
+
+
+def validate_claim_evidence_references(
+    claim: RootCauseClaim,
+    evidence_records: list[EvidenceResult],
+) -> ClaimEvidenceValidationResult:
+    available_ids = {record.evidence_id for record in evidence_records}
+    unique_refs = list(dict.fromkeys(ref for ref in claim.evidence_refs if ref))
+    valid_refs = [ref for ref in unique_refs if ref in available_ids]
+    missing_refs = [ref for ref in unique_refs if ref not in available_ids]
+    return ClaimEvidenceValidationResult(
+        is_valid=not missing_refs,
+        missing_evidence_refs=missing_refs,
+        valid_evidence_refs=valid_refs,
+    )
+
+
+@dataclass(frozen=True)
 class ReasoningResult:
     summary: str
     likely_root_causes: list[str]

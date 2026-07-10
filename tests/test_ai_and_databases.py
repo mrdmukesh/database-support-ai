@@ -1926,6 +1926,68 @@ def test_relationship_column_concept_is_detected_without_domain_specific_mapping
     assert employee_trace["components"]["relationship_relevance"] > 0
 
 
+def test_missing_child_relationship_discovery_uses_fk_without_exact_table_name() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("employee_master", ["employee_id", "employee_number", "status"], 4, primary_key=["employee_id"]),
+            TableMetadata(
+                "payroll_profiles",
+                ["payroll_profile_id", "employee_id", "profile_status"],
+                4,
+                primary_key=["payroll_profile_id"],
+                foreign_keys=[{"columns": ["employee_id"], "referred_table": "employee_master", "referred_columns": ["employee_id"]}],
+            ),
+            TableMetadata("audit_events", ["event_id", "message"], 0),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    question = "Employee has no payroll profile"
+    entities = extract_entities(question)
+    ranking = rank_relevant_objects(
+        question=question,
+        intent=IntentResult(InvestigationIntent.MISSING_DATA, 0.9, "test"),
+        entities=entities,
+        metadata=metadata,
+    )
+    queries = plan_safe_queries(InvestigationIntent.MISSING_DATA, ranking.metadata, entities)
+    sql = next(query.sql for query in queries if query.purpose == "Confirmed Missing Related Record Candidates")
+
+    assert "FROM employee_master p" in sql
+    assert "LEFT JOIN payroll_profiles c ON c.employee_id = p.employee_id" in sql
+    assert "WHERE c.payroll_profile_id IS NULL" in sql
+    assert "audit_events" not in sql
+
+
+def test_missing_child_relationship_discovery_uses_common_key_when_fk_missing() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata("employees", ["employee_id", "employee_number"], 4, primary_key=["employee_id"]),
+            TableMetadata("payroll_profiles", ["payroll_profile_id", "employee_id", "profile_status"], 4, primary_key=["payroll_profile_id"]),
+            TableMetadata("payroll_runs", ["payroll_run_id", "run_status"], 1),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    question = "Employee has no payroll profile"
+    entities = extract_entities(question)
+    ranking = rank_relevant_objects(
+        question=question,
+        intent=IntentResult(InvestigationIntent.MISSING_DATA, 0.9, "test"),
+        entities=entities,
+        metadata=metadata,
+    )
+    queries = plan_safe_queries(InvestigationIntent.MISSING_DATA, ranking.metadata, entities)
+    sql = next(query.sql for query in queries if query.purpose == "Confirmed Missing Related Record Candidates")
+
+    assert "FROM employees p" in sql
+    assert "LEFT JOIN payroll_profiles c ON c.employee_id = p.employee_id" in sql
+    assert "WHERE c.payroll_profile_id IS NULL" in sql
+    assert "payroll_runs" not in sql
+
+
 def test_acceptance_examples_resolve_generic_missing_and_duplicate_targets() -> None:
     scenarios = [
         (

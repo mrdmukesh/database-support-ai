@@ -97,9 +97,10 @@ def parse_problem_phrase(question: str) -> ProblemPhrase:
     normalized = re.sub(r"\s+", " ", normalized).strip()
     patterns = [
         ("missing", r"\b(?:(?P<parent1>[a-z][a-z0-9_]*)(?:\s+[a-z][a-z0-9_]*){0,2}\s+)?(?:are\s+)?missing\s+(?P<target1>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\b"),
+        ("missing", r"\b(?P<parent9>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*){0,2})\s+(?:has|have|with)\s+no\s+(?P<target9>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*){0,2})\b"),
         ("missing", r"\b(?P<target7>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\s+(?:is\s+|are\s+)?missing\b"),
         ("missing", r"\bno\s+(?P<target2>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\s+(?:generated|created|exists?)\b"),
-        ("missing", r"\b(?P<target3>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\s+(?:not\s+generated|not\s+created|does\s+not\s+exist)\b"),
+        ("missing", r"\b(?P<target3>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\s+(?:not\s+generated|not\s+created|never\s+created|was\s+never\s+created|does\s+not\s+exist)\b"),
         ("duplicate", r"\b(?:(?P<parent3>[a-z][a-z0-9_]*)(?:\s+[a-z][a-z0-9_]*){0,2}\s+(?:has|have|with|created)\s+)?(?:duplicate|duplicated|two|multiple)\s+(?:active\s+|open\s+|valid\s+)?(?P<target4>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\b"),
         ("performance", r"\b(?:why\s+)?(?:is|are|was|were)?\s*(?P<target8>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*){0,5})\s+(?:slow|long\s+running|timing\s+out|timeout)\b"),
         ("performance", r"\b(?:slow|long running|timeout)\s+(?P<target5>[a-z][a-z0-9_]*(?:\s+[a-z][a-z0-9_]*)?)\b"),

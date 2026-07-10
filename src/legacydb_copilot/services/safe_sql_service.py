@@ -1037,45 +1037,132 @@ def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityEx
     if not terms:
         return None
     resolved_child = resolve_table_from_terms(list(terms), metadata)
-    child_candidates = sorted(
-        metadata.tables,
-        key=lambda table: (
-            10 if resolved_child and table.name == resolved_child.name else 0,
-            _header_rank(table),
-            sum(1 for term in terms if term in table.name.lower() or any(term in col.lower() for col in table.columns)),
-        ),
-        reverse=True,
-    )
-    for child in child_candidates:
-        if not terms_match_table(list(terms), child) and not any(term in child.name.lower() or any(term in col.lower() for col in child.columns) for term in terms):
-            continue
-        child_id = _find_column(child, ("id",))
+    relationships = _missing_relationship_candidates(metadata, problem.parent_terms, list(terms), resolved_child)
+    for _, parent, child, parent_id, child_fk in relationships:
+        child_id = _identity_column(child, avoid={child_fk})
         child_label = _find_column(child, ("number",)) or _find_column(child, ("name",)) or _find_column(child, ("code",))
         if not child_id:
             continue
+        parent_label = _find_column(parent, ("number",)) or _find_column(parent, ("name",)) or _find_column(parent, ("code",)) or parent_id
+        parent_status = _find_column(parent, ("status",))
+        return MissingChildFlow(
+            parent_table=parent,
+            child_table=child,
+            parent_id=parent_id,
+            parent_label=parent_label,
+            parent_status=parent_status,
+            child_id=child_id,
+            child_fk_to_parent=child_fk,
+            child_label=child_label,
+        )
+    return None
+
+
+def _missing_relationship_candidates(
+    metadata: MetadataSearchResult,
+    parent_terms: list[str],
+    child_terms: list[str],
+    resolved_child: TableMetadata | None,
+) -> list[tuple[float, TableMetadata, TableMetadata, str, str]]:
+    candidates: list[tuple[float, TableMetadata, TableMetadata, str, str]] = []
+    table_lookup = {table.name.lower(): table for table in metadata.tables}
+    for child in metadata.tables:
         for fk in child.foreign_keys or []:
             parent_name = str(fk.get("referred_table") or "")
             parent_cols = fk.get("referred_columns") or []
             child_cols = fk.get("columns") or fk.get("constrained_columns") or []
-            parent = next((table for table in metadata.tables if table.name.lower() == parent_name.lower()), None)
+            parent = table_lookup.get(parent_name.lower())
             if not parent or not parent_cols or not child_cols:
                 continue
-            if problem.parent_terms and not terms_match_table(problem.parent_terms, parent):
+            phrase_score = _relationship_phrase_score(parent, child, parent_terms, child_terms, resolved_child)
+            if phrase_score > 0:
+                candidates.append((phrase_score + 5.0, parent, child, str(parent_cols[0]), str(child_cols[0])))
+    for parent in metadata.tables:
+        for child in metadata.tables:
+            if parent.name == child.name:
                 continue
-            parent_id = str(parent_cols[0])
-            child_fk = str(child_cols[0])
-            parent_label = _find_column(parent, ("number",)) or _find_column(parent, ("name",)) or _find_column(parent, ("code",)) or parent_id
-            parent_status = _find_column(parent, ("status",))
-            return MissingChildFlow(
-                parent_table=parent,
-                child_table=child,
-                parent_id=parent_id,
-                parent_label=parent_label,
-                parent_status=parent_status,
-                child_id=child_id,
-                child_fk_to_parent=child_fk,
-                child_label=child_label,
-            )
+            for parent_col, child_col in _shared_relationship_columns(parent, child):
+                phrase_score = _relationship_phrase_score(parent, child, parent_terms, child_terms, resolved_child)
+                if phrase_score > 0:
+                    candidates.append((phrase_score + 2.0, parent, child, parent_col, child_col))
+    candidates.sort(key=lambda item: (item[0], item[2].score, item[1].score, item[2].name), reverse=True)
+    return candidates
+
+
+def _relationship_phrase_score(
+    parent: TableMetadata,
+    child: TableMetadata,
+    parent_terms: list[str],
+    child_terms: list[str],
+    resolved_child: TableMetadata | None,
+) -> float:
+    score = 0.0
+    child_match = False
+    if resolved_child and child.name == resolved_child.name:
+        score += 8.0
+        child_match = True
+    if child_terms and terms_match_table(child_terms, child):
+        score += 6.0
+        child_match = True
+    if parent_terms and terms_match_table(parent_terms, parent):
+        score += 6.0
+    if not parent_terms and not child_terms:
+        return 0.0
+    if child_terms and any(_term_matches_columns(term, child) for term in child_terms):
+        score += 2.0
+        child_match = True
+    if parent_terms and any(_term_matches_columns(term, parent) for term in parent_terms):
+        score += 2.0
+    return score if child_match else 0.0
+
+
+def _term_matches_columns(term: str, table: TableMetadata) -> bool:
+    variants = {term.lower(), term.lower().rstrip("s")}
+    return any(any(variant and variant in column.lower() for variant in variants) for column in table.columns)
+
+
+def _shared_relationship_columns(parent: TableMetadata, child: TableMetadata) -> list[tuple[str, str]]:
+    parent_columns = {column.lower(): column for column in parent.columns}
+    child_columns = {column.lower(): column for column in child.columns}
+    shared: list[tuple[str, str]] = []
+    for lowered, parent_col in parent_columns.items():
+        child_col = child_columns.get(lowered)
+        if child_col and _looks_like_relationship_key(lowered):
+            shared.append((parent_col, child_col))
+    parent_name_tokens = _identifier_parts(parent.name)
+    for child_lower, child_col in child_columns.items():
+        if not _looks_like_relationship_key(child_lower):
+            continue
+        child_tokens = _identifier_parts(child_lower)
+        if child_tokens & parent_name_tokens:
+            parent_id = _find_column(parent, ("id",)) or next((column for column in parent.columns if column.lower() == child_lower), None)
+            if parent_id:
+                shared.append((parent_id, child_col))
+    return list(dict.fromkeys(shared))
+
+
+def _looks_like_relationship_key(column: str) -> bool:
+    return column == "id" or column.endswith("_id") or column.endswith("_key") or column.endswith("_ref")
+
+
+def _identity_column(table: TableMetadata, avoid: set[str] | None = None) -> str | None:
+    avoid_l = {column.lower() for column in avoid or set()}
+    for column in table.primary_key or []:
+        if column in table.columns and column.lower() not in avoid_l:
+            return column
+    table_parts = _identifier_parts(table.name)
+    named_ids = [
+        column
+        for column in table.columns
+        if column.lower().endswith("_id")
+        and column.lower() not in avoid_l
+        and _identifier_parts(column) & table_parts
+    ]
+    if named_ids:
+        return sorted(named_ids, key=lambda column: (len(column), column))[0]
+    generic = _find_column(table, ("id",))
+    if generic and generic.lower() not in avoid_l:
+        return generic
     return None
 
 

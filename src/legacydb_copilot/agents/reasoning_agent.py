@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
@@ -12,10 +13,22 @@ from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
 
+class RootCauseSupportStatus(StrEnum):
+    NOT_EVALUATED = "NOT_EVALUATED"
+    VERIFIED = "VERIFIED"
+    PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+    UNSUPPORTED = "UNSUPPORTED"
+    CONTRADICTED = "CONTRADICTED"
+
+
 @dataclass(frozen=True)
 class RootCauseClaim:
     conclusion: str
     evidence_refs: list[str] = field(default_factory=list)
+    status: RootCauseSupportStatus = RootCauseSupportStatus.NOT_EVALUATED
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "status", RootCauseSupportStatus(self.status))
 
 
 @dataclass(frozen=True)

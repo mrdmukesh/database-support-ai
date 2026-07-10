@@ -42,6 +42,12 @@ class MetadataSearchResult:
     engine_type: str | None = None
     candidate_trace: list[dict[str, Any]] = field(default_factory=list)
     metadata_cache_key: str = ""
+    target_object_not_found: bool = False
+    failure_reason: str = ""
+    exact_tables_requested: list[str] = field(default_factory=list)
+    exact_tables_found: list[str] = field(default_factory=list)
+    exact_procedures_requested: list[str] = field(default_factory=list)
+    exact_procedures_found: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -52,6 +58,8 @@ class MetadataSearchContext:
     database_name: str
     schema_name: str = ""
     connection_string_database: str = ""
+    actual_database: str = ""
+    connector_cache_key: str = ""
 
     @property
     def cache_key(self) -> str:
@@ -235,6 +243,16 @@ def search_metadata(
     }
     exact_table_names = {table.lower(): table for table in metadata.tables}
     exact_table_matches = {exact_table_names[name].lower() for name in explicit_tables if name in exact_table_names}
+    exact_proc_names = {proc.lower(): proc for proc in metadata.procedures}
+    exact_proc_matches = {exact_proc_names[name].lower() for name in explicit_procedures if name in exact_proc_names}
+    missing_tables = sorted(explicit_tables - set(exact_table_matches))
+    missing_procedures = sorted(explicit_procedures - set(exact_proc_matches))
+    target_object_not_found = bool(missing_tables or missing_procedures)
+    failure_reason = ""
+    if missing_tables:
+        failure_reason += "TARGET_OBJECT_NOT_FOUND: explicit table(s) not found in active metadata: " + ", ".join(missing_tables)
+    if missing_procedures:
+        failure_reason += ("; " if failure_reason else "TARGET_OBJECT_NOT_FOUND: ") + "explicit procedure(s) not found in active metadata: " + ", ".join(missing_procedures)
     tables: list[TableMetadata] = []
     trace: list[dict[str, Any]] = []
     if context:
@@ -248,9 +266,50 @@ def search_metadata(
                     f"workspace_id={context.workspace_id}; connection_id={context.connection_id}; "
                     f"database={context.database_name}; schema={context.schema_name or 'default'}; "
                     f"connection_string_database={context.connection_string_database or 'unknown'}; "
-                    f"metadata_cache_key={context.cache_key}"
+                    f"metadata_cache_key={context.cache_key}; "
+                    f"expected_database={context.database_name}; actual_database={context.actual_database or 'unknown'}; "
+                    f"connector_cache_key={context.connector_cache_key}; "
+                    f"exact_tables_requested={sorted(explicit_tables)}; exact_tables_found={sorted(exact_table_matches)}; "
+                    f"exact_procedures_requested={sorted(explicit_procedures)}; exact_procedures_found={sorted(exact_proc_matches)}; "
+                    f"failure_reason={failure_reason or 'none'}"
                 ),
             }
+        )
+    if target_object_not_found:
+        for name in missing_tables:
+            trace.append(
+                {
+                    "object_type": "table",
+                    "name": name,
+                    "score": 0,
+                    "decision": "rejected",
+                    "reason": "TARGET_OBJECT_NOT_FOUND: explicit table is absent from active database metadata",
+                }
+            )
+        for name in missing_procedures:
+            trace.append(
+                {
+                    "object_type": "procedure",
+                    "name": name,
+                    "score": 0,
+                    "decision": "rejected",
+                    "reason": "TARGET_OBJECT_NOT_FOUND: explicit procedure is absent from active database metadata",
+                }
+            )
+        return MetadataSearchResult(
+            tables=[],
+            views=[],
+            procedures=[],
+            version=metadata.version,
+            engine_type=metadata.engine_type,
+            candidate_trace=trace,
+            metadata_cache_key=context.cache_key if context else "",
+            target_object_not_found=True,
+            failure_reason=failure_reason,
+            exact_tables_requested=sorted(explicit_tables),
+            exact_tables_found=sorted(exact_table_matches),
+            exact_procedures_requested=sorted(explicit_procedures),
+            exact_procedures_found=sorted(exact_proc_matches),
         )
     for table_name in metadata.tables:
         try:
@@ -370,7 +429,7 @@ def search_metadata(
         if explicit_procedures:
             procedures = [proc for proc in metadata.procedures if proc.lower() in explicit_procedures]
     if not procedures:
-        procedures = metadata.procedures[:20]
+        procedures = [] if explicit_procedures or exact_procs else metadata.procedures[:20]
     views = [view for view in metadata.views if any(token in view.lower() for token in tokens)]
     if not views:
         views = metadata.views[:10]
@@ -387,6 +446,12 @@ def search_metadata(
         engine_type=metadata.engine_type,
         candidate_trace=trace,
         metadata_cache_key=context.cache_key if context else "",
+        target_object_not_found=False,
+        failure_reason="",
+        exact_tables_requested=sorted(explicit_tables),
+        exact_tables_found=sorted(exact_table_matches),
+        exact_procedures_requested=sorted(explicit_procedures),
+        exact_procedures_found=sorted(exact_proc_matches),
     )
 
 

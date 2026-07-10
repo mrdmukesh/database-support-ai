@@ -294,32 +294,52 @@ class ConnectionPool:
 
     def __init__(self):
         self._connections: dict[str, DatabaseConnector] = {}
+        self._cache_keys: dict[str, str] = {}
 
     def get_or_create(self, connection_id: str, database_engine: DatabaseEngine, connection_string: str) -> DatabaseConnector:
         """Get or create a connection."""
+        cache_key = self.connector_cache_key(database_engine, connection_string)
         existing = self._connections.get(connection_id)
         if existing and (
             existing.database_engine != database_engine
             or existing.connection_string != connection_string
+            or self._cache_keys.get(connection_id) != cache_key
         ):
             existing.disconnect()
             del self._connections[connection_id]
+            self._cache_keys.pop(connection_id, None)
 
         if connection_id not in self._connections:
             self._connections[connection_id] = DatabaseConnector(database_engine, connection_string)
+            self._cache_keys[connection_id] = cache_key
         return self._connections[connection_id]
+
+    def connector_cache_key(self, database_engine: DatabaseEngine, connection_string: str) -> str:
+        url = make_url(connection_string)
+        return "|".join(
+            [
+                database_engine.value,
+                url.host or "",
+                str(url.port or ""),
+                url.database or "",
+                url.username or "",
+                connection_string,
+            ]
+        )
 
     def close(self, connection_id: str) -> None:
         """Close a specific connection."""
         if connection_id in self._connections:
             self._connections[connection_id].disconnect()
             del self._connections[connection_id]
+            self._cache_keys.pop(connection_id, None)
 
     def close_all(self) -> None:
         """Close all connections."""
         for connector in self._connections.values():
             connector.disconnect()
         self._connections.clear()
+        self._cache_keys.clear()
 
 
 # Global connection pool

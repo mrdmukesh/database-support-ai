@@ -38,6 +38,7 @@ from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionR
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.config import Settings
+from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
 from legacydb_copilot.services.report_generator import (
     GeneratedReport,
     ExecutiveSummary,
@@ -1882,7 +1883,69 @@ def test_metadata_search_isolates_active_database_and_exact_user_objects() -> No
     assert "sp_create_shipment_for_order" not in active.procedures
     assert active.metadata_cache_key == "org-b|workspace-b|connection-b|employeepayrollrcademo"
     assert any(item["object_type"] == "metadata_context" and "metadata_cache_key=org-b|workspace-b|connection-b|employeepayrollrcademo" in item["reason"] for item in active.candidate_trace)
-    assert [table.name for table in stale.tables] != ["shipments"]
+    assert stale.target_object_not_found
+    assert stale.tables == []
+    assert stale.procedures == []
+    assert "employees" in stale.failure_reason
+
+
+def test_explicit_missing_table_does_not_fallback_to_semantic_alternatives() -> None:
+    connector = _SchemaConnector(
+        {
+            "shipments": {"columns": [{"name": "shipment_id"}, {"name": "order_id"}], "primary_key": ["shipment_id"]},
+            "claims": {"columns": [{"name": "claim_id"}, {"name": "shipment_id"}], "primary_key": ["claim_id"]},
+        },
+        procedures=["sp_create_shipment_for_order"],
+    )
+    result = search_metadata(
+        connector,
+        "Database: ShippingDemo Table: employees Procedure: sp_calculate_employee_age RCA",
+        extract_entities("Database: ShippingDemo Table: employees Procedure: sp_calculate_employee_age RCA"),
+        context=MetadataSearchContext("org-a", "workspace-a", "connection-a", "ShippingDemo"),
+    )
+
+    assert result.target_object_not_found
+    assert result.tables == []
+    assert result.procedures == []
+    assert result.exact_tables_requested == ["employees"]
+    assert result.exact_tables_found == []
+    assert result.exact_procedures_requested == ["sp_calculate_employee_age"]
+    assert result.exact_procedures_found == []
+
+
+def test_connection_pool_recreates_when_database_changes_for_same_connection_id() -> None:
+    pool = ConnectionPool()
+    first = pool.get_or_create("conn-1", DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_a")
+    second = pool.get_or_create("conn-1", DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_b")
+
+    assert second is not first
+    assert "db_b" in pool.connector_cache_key(DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_b")
+
+
+class _DatabaseIdentityConnector:
+    def __init__(self, database_name: str) -> None:
+        self.database_name = database_name
+
+    def execute_read_only_query(self, sql: str, limit: int = 1000):
+        return [{"active_database": self.database_name}]
+
+    def get_schema_metadata(self):
+        return SimpleNamespace(tables=["employees"], views=[], procedures=["sp_calculate_employee_age"], version="test", engine_type="mysql")
+
+
+def test_mysql_active_database_mismatch_fails_safely() -> None:
+    from legacydb_copilot.routers.chat import _load_and_validate_active_schema
+
+    context = MetadataSearchContext(
+        organization_id="org-b",
+        workspace_id="workspace-b",
+        connection_id="connection-b",
+        database_name="EmployeePayrollRcaDemo",
+        connection_string_database="EmployeePayrollRcaDemo",
+    )
+
+    with pytest.raises(DatabaseConnectionError, match="expected_database=EmployeePayrollRcaDemo; actual_database=ShippingDemo"):
+        _load_and_validate_active_schema(_DatabaseIdentityConnector("ShippingDemo"), context, DatabaseEngine.MYSQL)
 
 
 def test_safe_sql_proves_requested_entity_and_reported_condition_on_best_candidate() -> None:

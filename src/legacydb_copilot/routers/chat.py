@@ -255,6 +255,9 @@ def _metadata_context_for_connection(
     payload: ChatAskRequest,
     connection: DatabaseConnectionModel,
     connection_string: str,
+    *,
+    actual_database: str = "",
+    connector_cache_key: str = "",
 ) -> MetadataSearchContext:
     database_name = connection.database_name or _connection_string_database(connection_string) or connection.name
     return MetadataSearchContext(
@@ -264,10 +267,39 @@ def _metadata_context_for_connection(
         database_name=database_name,
         schema_name="",
         connection_string_database=_connection_string_database(connection_string),
+        actual_database=actual_database,
+        connector_cache_key=connector_cache_key,
     )
 
 
-def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext):
+def _active_database_name(connector, expected_engine: DatabaseEngine) -> str:
+    if expected_engine != DatabaseEngine.MYSQL:
+        return ""
+    rows = connector.execute_read_only_query("SELECT DATABASE() AS active_database", limit=1)
+    if not rows:
+        return ""
+    row = rows[0]
+    return str(row.get("active_database") or row.get("DATABASE()") or next(iter(row.values()), "") or "")
+
+
+def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine):
+    actual_database = _active_database_name(connector, expected_engine)
+    if actual_database and metadata_context.connection_string_database and actual_database.lower() != metadata_context.connection_string_database.lower():
+        raise DatabaseConnectionError(
+            "Active database validation failed: "
+            f"expected_database={metadata_context.connection_string_database}; actual_database={actual_database}"
+        )
+    if actual_database:
+        metadata_context = MetadataSearchContext(
+            organization_id=metadata_context.organization_id,
+            workspace_id=metadata_context.workspace_id,
+            connection_id=metadata_context.connection_id,
+            database_name=metadata_context.database_name,
+            schema_name=metadata_context.schema_name,
+            connection_string_database=metadata_context.connection_string_database,
+            actual_database=actual_database,
+            connector_cache_key=metadata_context.connector_cache_key,
+        )
     metadata = connector.get_schema_metadata()
     logger.info(
         "RCA metadata context workspace_id=%s connection_id=%s database=%s schema=%s engine=%s "
@@ -286,7 +318,46 @@ def _load_and_validate_active_schema(connector, metadata_context: MetadataSearch
         raise DatabaseConnectionError(
             "Active database metadata validation failed: no tables were discovered for the selected connection."
         )
-    return metadata
+    return metadata, metadata_context
+
+
+def _target_object_not_found_metadata_answer(
+    *,
+    payload: ChatAskRequest,
+    connection: DatabaseConnectionModel,
+    metadata,
+    metadata_context: MetadataSearchContext,
+    active_schema_metadata,
+) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
+    trace_lines = [
+        "TARGET_OBJECT_NOT_FOUND",
+        f"workspace_id={payload.workspace_id}",
+        f"connection_id={connection.id}",
+        f"expected_database={metadata_context.connection_string_database or metadata_context.database_name}",
+        f"actual_database={metadata_context.actual_database or 'unknown'}",
+        f"database_engine={metadata.engine_type or connection.engine}",
+        f"connector_cache_key={metadata_context.connector_cache_key}",
+        f"metadata_cache_key={metadata.metadata_cache_key or metadata_context.cache_key}",
+        f"exact_tables_requested={metadata.exact_tables_requested}",
+        f"exact_tables_found={metadata.exact_tables_found}",
+        f"exact_procedures_requested={metadata.exact_procedures_requested}",
+        f"exact_procedures_found={metadata.exact_procedures_found}",
+        f"failure_reason={metadata.failure_reason}",
+        f"Discovered tables={active_schema_metadata.tables}",
+        f"Discovered procedures={active_schema_metadata.procedures}",
+    ]
+    answer = (
+        "TARGET_OBJECT_NOT_FOUND\n\n"
+        "The investigation was stopped because an explicitly requested table or procedure was not found "
+        "in the active database metadata. I did not fall back to semantic alternatives or stale metadata.\n\n"
+        + "\n".join(f"- {line}" for line in trace_lines)
+    )
+    investigation_metadata = _empty_investigation_metadata()
+    investigation_metadata["detected_intent"] = "TARGET_OBJECT_NOT_FOUND"
+    investigation_metadata["evidence"] = "[]"
+    investigation_metadata["sql_queries"] = "[]"
+    investigation_metadata["report_snapshot"] = ""
+    return answer, [connection.name, "active metadata validation"], 0.1, None, investigation_metadata
 
 
 
@@ -1488,14 +1559,22 @@ def _run_dynamic_investigation(
         )
     try:
         connection_string = _build_connection_string(connection)
+        engine = DatabaseEngine(connection.engine)
+        pool = get_connection_pool()
+        connector_cache_key = pool.connector_cache_key(engine, connection_string)
         connector = get_connection_pool().get_or_create(
             connection.id,
-            DatabaseEngine(connection.engine),
+            engine,
             connection_string,
         )
         connector.connect()
-        metadata_context = _metadata_context_for_connection(payload, connection, connection_string)
-        active_schema_metadata = _load_and_validate_active_schema(connector, metadata_context)
+        metadata_context = _metadata_context_for_connection(
+            payload,
+            connection,
+            connection_string,
+            connector_cache_key=connector_cache_key,
+        )
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "I could not investigate the live database because the saved connection failed: "
@@ -1516,6 +1595,14 @@ def _run_dynamic_investigation(
         metadata_context=metadata_context,
         schema_metadata=active_schema_metadata,
     )
+    if context.metadata.target_object_not_found:
+        return _target_object_not_found_metadata_answer(
+            payload=payload,
+            connection=connection,
+            metadata=context.metadata,
+            metadata_context=metadata_context,
+            active_schema_metadata=active_schema_metadata,
+        )
     target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata, intent)
     if target_missing:
         return _object_not_found_answer(

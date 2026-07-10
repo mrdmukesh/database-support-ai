@@ -69,6 +69,25 @@ def evaluate_claim_support_status(
     return replace(claim, status=status)
 
 
+def build_deterministic_root_cause_claim(
+    conclusion: str,
+    evidence_refs: object = None,
+    evidence_records: list[EvidenceResult] | None = None,
+) -> RootCauseClaim | None:
+    normalized_conclusion = str(conclusion or "").strip()
+    if not normalized_conclusion:
+        return None
+    if isinstance(evidence_refs, str):
+        candidates = [evidence_refs]
+    elif isinstance(evidence_refs, (list, tuple)):
+        candidates = evidence_refs
+    else:
+        candidates = []
+    normalized_refs = [ref.strip() for ref in candidates if isinstance(ref, str) and ref.strip()]
+    claim = RootCauseClaim(conclusion=normalized_conclusion, evidence_refs=normalized_refs)
+    return evaluate_claim_support_status(claim, evidence_records or [])
+
+
 @dataclass(frozen=True)
 class ReasoningResult:
     summary: str

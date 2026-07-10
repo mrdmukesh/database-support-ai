@@ -6,7 +6,7 @@ from typing import Any
 from urllib import request
 
 from legacydb_copilot.agents.intent_agent import IntentResult
-from legacydb_copilot.agents.reasoning_agent import ReasoningResult
+from legacydb_copilot.agents.reasoning_agent import RootCauseClaim, ReasoningResult, evaluate_claim_support_status
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
@@ -30,6 +30,27 @@ Rules:
 - You may improve wording, summarization, senior-engineer explanation, confidence explanation, and next investigative questions.
 - Return only valid JSON matching the requested schema.
 """
+
+
+def convert_llm_claim_to_root_cause_claim(
+    raw_claim: Any,
+    evidence_records: list[EvidenceResult],
+) -> RootCauseClaim | None:
+    if not isinstance(raw_claim, dict):
+        return None
+    conclusion = str(raw_claim.get("conclusion") or "").strip()
+    if not conclusion:
+        return None
+    raw_refs = raw_claim.get("evidence_refs")
+    if isinstance(raw_refs, str):
+        candidates = [raw_refs]
+    elif isinstance(raw_refs, (list, tuple)):
+        candidates = raw_refs
+    else:
+        candidates = []
+    evidence_refs = [ref.strip() for ref in candidates if isinstance(ref, str) and ref.strip()]
+    claim = RootCauseClaim(conclusion=conclusion, evidence_refs=evidence_refs)
+    return evaluate_claim_support_status(claim, evidence_records)
 
 
 def llm_reasoning_enabled(settings: Settings | None = None) -> bool:

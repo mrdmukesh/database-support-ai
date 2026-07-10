@@ -939,7 +939,7 @@ def compose_report(
             severity="Medium",
             business_impact="Based on available evidence, business impact should be confirmed against affected process owners and returned database rows.",
             confidence_score=int(bundle.confidence * 100),
-            estimated_root_cause=final_root_cause_items[0],
+            estimated_root_cause=str(final_root_cause_items[0]),
             recommendation_summary=(
                 _executive_fix_items(bundle) or ["No recommendation is supported for executive display."]
             )[0],

@@ -11,6 +11,13 @@ from legacydb_copilot.services.report_generator import InvestigationReport
 _INVALID_SHEET_CHARS = set("[]:*?/\\")
 
 
+def _excel_value(value):
+    """Return an openpyxl-compatible scalar while preserving structured text."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    return str(value)
+
+
 def _safe_sheet_name(name: str) -> str:
     """
     Owner: Mukesh Dabi
@@ -144,7 +151,7 @@ def write_xlsx(report: InvestigationReport, output_path: Path) -> None:
     ]
     ws.append(["Field", "Value"])
     for row in rows:
-        ws.append(row)
+        ws.append([_excel_value(value) for value in row])
     _style_sheet(ws)
 
     for section in report.sections:
@@ -152,7 +159,7 @@ def write_xlsx(report: InvestigationReport, output_path: Path) -> None:
             sheet = wb.create_sheet(_unique_sheet_name(wb, table.title))
             sheet.append(table.columns)
             for row in table.rows:
-                sheet.append([row.get(column, "") for column in table.columns])
+                sheet.append([_excel_value(row.get(column, "")) for column in table.columns])
             _style_sheet(sheet)
         if section.sql_blocks:
             sheet = wb.create_sheet(_unique_sheet_name(wb, section.title))

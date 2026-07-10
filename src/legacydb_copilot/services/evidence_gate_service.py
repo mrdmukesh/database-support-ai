@@ -17,6 +17,52 @@ UNREPRODUCED_MESSAGE = "Reported issue could not be reproduced from connected da
 
 
 @dataclass(frozen=True)
+class EvidenceGateCheckResult:
+    check: str
+    status: str
+    reason: str
+
+
+def primary_entity_found(
+    requested_entity: str | None,
+    evidence_package: list[EvidenceResult] | None,
+) -> EvidenceGateCheckResult:
+    """Check whether the requested primary entity occurs in collected evidence."""
+    entity = str(requested_entity or "").strip()
+    if not entity:
+        return EvidenceGateCheckResult(
+            check="primary_entity_found",
+            status="FAIL",
+            reason="The requested primary entity is empty.",
+        )
+    if evidence_package is None:
+        return EvidenceGateCheckResult(
+            check="primary_entity_found",
+            status="FAIL",
+            reason="The evidence package is missing.",
+        )
+
+    matches = sum(
+        1
+        for evidence_item in evidence_package
+        for row in evidence_item.rows
+        for value in row.values()
+        if str(value).strip().casefold() == entity.casefold()
+    )
+    if matches:
+        return EvidenceGateCheckResult(
+            check="primary_entity_found",
+            status="PASS",
+            reason=f"Requested primary entity '{entity}' was found in collected evidence ({matches} match(es)).",
+        )
+    return EvidenceGateCheckResult(
+        check="primary_entity_found",
+        status="FAIL",
+        reason=f"Requested primary entity '{entity}' was not found in collected evidence.",
+    )
+
+
+@dataclass(frozen=True)
 class EvidenceGateResult:
     required: bool
     reproduced: bool

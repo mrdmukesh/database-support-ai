@@ -1,0 +1,13 @@
+# Duplicate-payment golden benchmark
+
+Single deterministic golden-scenario result. This is not a production-accuracy claim.
+
+| Metric | Result |
+|---|---:|
+| entity_correct | true |
+| relevant_object_found | true |
+| evidence_linked | true |
+| root_cause_supported | true |
+| unsupported_claim_count | 1 |
+| unsupported_recommendation_count | 1 |
+| test_passed | true |

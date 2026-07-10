@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 from urllib.parse import urlparse
 
@@ -53,6 +53,40 @@ class BenchmarkCaseResult:
 class BenchmarkRunResult:
     case_results: list[BenchmarkCaseResult]
     metrics: dict[str, float]
+
+
+@dataclass(frozen=True)
+class GoldenScenarioBenchmarkResult:
+    entity_correct: bool
+    relevant_object_found: bool
+    evidence_linked: bool
+    root_cause_supported: bool
+    unsupported_claim_count: int
+    unsupported_recommendation_count: int
+    test_passed: bool
+
+    def __post_init__(self) -> None:
+        if self.unsupported_claim_count < 0 or self.unsupported_recommendation_count < 0:
+            raise ValueError("Unsupported item counts cannot be negative.")
+
+    def to_dict(self) -> dict[str, bool | int]:
+        return asdict(self)
+
+    def to_markdown(self) -> str:
+        values = self.to_dict()
+        rows = [f"| {name} | {str(value).lower() if isinstance(value, bool) else value} |" for name, value in values.items()]
+        return "\n".join(
+            [
+                "# Duplicate-payment golden benchmark",
+                "",
+                "Single deterministic golden-scenario result. This is not a production-accuracy claim.",
+                "",
+                "| Metric | Result |",
+                "|---|---:|",
+                *rows,
+                "",
+            ]
+        )
 
 
 def assert_demo_database(connection_string: str, *, allow_customer_db: bool = False) -> None:

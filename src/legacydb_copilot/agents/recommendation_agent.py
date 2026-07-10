@@ -1,10 +1,28 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from enum import StrEnum
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
+
+
+class RecommendationStatus(StrEnum):
+    EVIDENCE_GROUNDED = "EVIDENCE_GROUNDED"
+    GENERAL_BEST_PRACTICE = "GENERAL_BEST_PRACTICE"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+@dataclass(frozen=True)
+class Recommendation:
+    text: str
+    related_claim_id: str | None = None
+    evidence_ids: list[str] = field(default_factory=list)
+    recommendation_status: RecommendationStatus = RecommendationStatus.GENERAL_BEST_PRACTICE
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "recommendation_status", RecommendationStatus(self.recommendation_status))
 
 
 @dataclass(frozen=True)

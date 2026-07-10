@@ -33,7 +33,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     llm_reasoning_enabled,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata, search_metadata
+from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
@@ -1846,6 +1846,43 @@ def test_metadata_discovery_prefers_explicit_identifier_and_column_matches_gener
     assert selected["decision"] == "selected"
     assert rejected["decision"] == "rejected"
     assert selected["components"]["column_name_relevance"] > 0
+
+
+def test_metadata_search_isolates_active_database_and_exact_user_objects() -> None:
+    stale_database_a = _SchemaConnector(
+        {
+            "shipments": {"columns": [{"name": "shipment_id"}, {"name": "order_id"}], "primary_key": ["shipment_id"]},
+            "inventory_reservations": {"columns": [{"name": "reservation_id"}, {"name": "shipment_id"}], "primary_key": ["reservation_id"]},
+        },
+        procedures=["sp_create_shipment_for_order"],
+    )
+    active_database_b = _SchemaConnector(
+        {
+            "employees": {"columns": [{"name": "employee_id"}, {"name": "employee_code"}, {"name": "dob"}], "primary_key": ["employee_id"]},
+            "employee_age_audit": {"columns": [{"name": "audit_id"}, {"name": "employee_id"}], "primary_key": ["audit_id"]},
+        },
+        procedures=["sp_calculate_employee_age"],
+    )
+    question = "Database: EmployeePayrollRcaDemo Table: employees Procedure: sp_calculate_employee_age RCA for E001 DOB NULL"
+    entities = extract_entities(question)
+    context = MetadataSearchContext(
+        organization_id="org-b",
+        workspace_id="workspace-b",
+        connection_id="connection-b",
+        database_name="EmployeePayrollRcaDemo",
+        connection_string_database="EmployeePayrollRcaDemo",
+    )
+
+    stale = search_metadata(stale_database_a, question, entities, context=context)
+    active = search_metadata(active_database_b, question, entities, context=context)
+
+    assert [table.name for table in active.tables] == ["employees"]
+    assert active.procedures == ["sp_calculate_employee_age"]
+    assert "shipments" not in {table.name for table in active.tables}
+    assert "sp_create_shipment_for_order" not in active.procedures
+    assert active.metadata_cache_key == "org-b|workspace-b|connection-b|employeepayrollrcademo"
+    assert any(item["object_type"] == "metadata_context" and "metadata_cache_key=org-b|workspace-b|connection-b|employeepayrollrcademo" in item["reason"] for item in active.candidate_trace)
+    assert [table.name for table in stale.tables] != ["shipments"]
 
 
 def test_safe_sql_proves_requested_entity_and_reported_condition_on_best_candidate() -> None:

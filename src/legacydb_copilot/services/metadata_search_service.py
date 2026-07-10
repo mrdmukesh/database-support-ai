@@ -41,6 +41,28 @@ class MetadataSearchResult:
     version: str
     engine_type: str | None = None
     candidate_trace: list[dict[str, Any]] = field(default_factory=list)
+    metadata_cache_key: str = ""
+
+
+@dataclass(frozen=True)
+class MetadataSearchContext:
+    organization_id: str
+    workspace_id: str
+    connection_id: str
+    database_name: str
+    schema_name: str = ""
+    connection_string_database: str = ""
+
+    @property
+    def cache_key(self) -> str:
+        return "|".join(
+            [
+                self.organization_id,
+                self.workspace_id,
+                self.connection_id,
+                self.database_name.lower(),
+            ]
+        )
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
@@ -118,6 +140,13 @@ def _business_identifiers(entities: EntityExtractionResult) -> list[str]:
     ]
 
 
+def _explicit_names(question: str, label: str) -> set[str]:
+    names: set[str] = set()
+    pattern = rf"\b{label}\s*:\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"
+    names.update(match.group(1).lower() for match in re.finditer(pattern, question, re.I))
+    return names
+
+
 def _key_columns(table_name: str, columns: list[str], primary_key: list[str] | None, foreign_keys: list[dict[str, Any]] | None) -> set[str]:
     keys = {column.lower() for column in primary_key or []}
     for fk in foreign_keys or []:
@@ -167,7 +196,13 @@ def _table_score_components(
     }
 
 
-def search_metadata(connector, question: str, entities: EntityExtractionResult) -> MetadataSearchResult:
+def search_metadata(
+    connector,
+    question: str,
+    entities: EntityExtractionResult,
+    context: MetadataSearchContext | None = None,
+    schema_metadata: Any | None = None,
+) -> MetadataSearchResult:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -188,12 +223,35 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    metadata = connector.get_schema_metadata()
+    metadata = schema_metadata or connector.get_schema_metadata()
     tokens = _tokens(question, entities)
     concepts = _concept_tokens(entities)
     business_ids = _business_identifiers(entities)
+    explicit_tables = _explicit_names(question, "table")
+    explicit_procedures = _explicit_names(question, "procedure") | {
+        entity.value.lower()
+        for entity in entities.entities
+        if entity.entity_type == "stored_procedure"
+    }
+    exact_table_names = {table.lower(): table for table in metadata.tables}
+    exact_table_matches = {exact_table_names[name].lower() for name in explicit_tables if name in exact_table_names}
     tables: list[TableMetadata] = []
     trace: list[dict[str, Any]] = []
+    if context:
+        trace.append(
+            {
+                "object_type": "metadata_context",
+                "name": context.connection_id,
+                "score": "",
+                "decision": "active",
+                "reason": (
+                    f"workspace_id={context.workspace_id}; connection_id={context.connection_id}; "
+                    f"database={context.database_name}; schema={context.schema_name or 'default'}; "
+                    f"connection_string_database={context.connection_string_database or 'unknown'}; "
+                    f"metadata_cache_key={context.cache_key}"
+                ),
+            }
+        )
     for table_name in metadata.tables:
         try:
             schema = connector.get_table_schema(table_name)
@@ -234,6 +292,16 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
                 "components": components,
             }
         )
+        if table_name.lower() in exact_table_matches:
+            score += 100.0
+            decision = "selected"
+            trace[-1]["score"] = score
+            trace[-1]["decision"] = decision
+            trace[-1]["reason"] = "explicit table name exists in active database metadata; semantic alternatives deferred"
+        if exact_table_matches and table_name.lower() not in exact_table_matches:
+            trace[-1]["decision"] = "rejected"
+            trace[-1]["reason"] += "; exact user table match exists, so semantic alternative was not selected"
+            continue
         if score > 0:
             tables.append(
                 TableMetadata(
@@ -247,7 +315,8 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
             )
     tables.sort(key=lambda item: (item.score, item.name), reverse=True)
     if not tables and metadata.tables:
-        fallback_names = {item["name"] for item in sorted(trace, key=lambda item: (item["score"], item["name"]), reverse=True)[:5]}
+        table_trace = [item for item in trace if item.get("object_type") == "table"]
+        fallback_names = {item["name"] for item in sorted(table_trace, key=lambda item: (item["score"], item["name"]), reverse=True)[:5]}
         for table_name in metadata.tables:
             if table_name not in fallback_names:
                 continue
@@ -277,11 +346,29 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
     procedures = [
         proc
         for proc in metadata.procedures
-        if proc.lower() in exact_procs
+        if proc.lower() in explicit_procedures
+        or proc.lower() in exact_procs
         or any(token in proc.lower() for token in proc_tokens | selected_table_tokens)
     ]
-    if exact_procs:
+    if explicit_procedures or exact_procs:
+        exact_requested = explicit_procedures | exact_procs
+        for proc in metadata.procedures:
+            trace.append(
+                {
+                    "object_type": "procedure",
+                    "name": proc,
+                    "score": 100 if proc.lower() in exact_requested else 0,
+                    "decision": "selected" if proc.lower() in exact_requested else "rejected",
+                    "reason": (
+                        "explicit procedure exists in active database metadata"
+                        if proc.lower() in exact_requested
+                        else "exact user procedure match exists, so semantic alternative was not selected"
+                    ),
+                }
+            )
         procedures = [proc for proc in metadata.procedures if proc.lower() in exact_procs]
+        if explicit_procedures:
+            procedures = [proc for proc in metadata.procedures if proc.lower() in explicit_procedures]
     if not procedures:
         procedures = metadata.procedures[:20]
     views = [view for view in metadata.views if any(token in view.lower() for token in tokens)]
@@ -292,7 +379,15 @@ def search_metadata(connector, question: str, entities: EntityExtractionResult) 
         if item["object_type"] == "table" and item["name"] not in selected_names and item["decision"] == "selected":
             item["decision"] = "rejected"
             item["reason"] += "; outside top scored metadata candidates"
-    return MetadataSearchResult(tables=tables[:8], views=views[:10], procedures=procedures[:20], version=metadata.version, engine_type=metadata.engine_type, candidate_trace=trace)
+    return MetadataSearchResult(
+        tables=tables[:8],
+        views=views[:10],
+        procedures=procedures[:20],
+        version=metadata.version,
+        engine_type=metadata.engine_type,
+        candidate_trace=trace,
+        metadata_cache_key=context.cache_key if context else "",
+    )
 
 
 def rows_as_text(rows: list[dict[str, Any]], limit: int = 5) -> str:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
-from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, search_metadata
+from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, search_metadata
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument, retrieve_documents
 
 
@@ -15,7 +15,16 @@ class DiscoveredContext:
     documents: list[RetrievedDocument]
 
 
-def discover_context(connector, db: Session, organization_id: str, workspace_id: str, question: str, entities: EntityExtractionResult) -> DiscoveredContext:
+def discover_context(
+    connector,
+    db: Session,
+    organization_id: str,
+    workspace_id: str,
+    question: str,
+    entities: EntityExtractionResult,
+    metadata_context: MetadataSearchContext | None = None,
+    schema_metadata=None,
+) -> DiscoveredContext:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -38,6 +47,6 @@ def discover_context(connector, db: Session, organization_id: str, workspace_id:
         knowledge retriever; live evidence collection happens later through validated SQL.
     """
 
-    metadata = search_metadata(connector, question, entities)
+    metadata = search_metadata(connector, question, entities, context=metadata_context, schema_metadata=schema_metadata)
     documents = retrieve_documents(db, organization_id, workspace_id, question)
     return DiscoveredContext(metadata=metadata, documents=documents)

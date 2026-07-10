@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import asdict, replace
 from datetime import datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.ai import SafetyFinding, analyze_prompt
@@ -64,6 +66,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
+from legacydb_copilot.services.metadata_search_service import MetadataSearchContext
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
@@ -81,6 +84,7 @@ from legacydb_copilot.services.report_snapshot_service import report_from_dict, 
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+logger = logging.getLogger(__name__)
 
 
 def _title_from_question(question: str) -> str:
@@ -238,6 +242,51 @@ def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> Database
         .order_by(DatabaseConnectionModel.created_at.desc())
         .first()
     )
+
+
+def _connection_string_database(connection_string: str) -> str:
+    try:
+        return make_url(connection_string).database or ""
+    except Exception:
+        return ""
+
+
+def _metadata_context_for_connection(
+    payload: ChatAskRequest,
+    connection: DatabaseConnectionModel,
+    connection_string: str,
+) -> MetadataSearchContext:
+    database_name = connection.database_name or _connection_string_database(connection_string) or connection.name
+    return MetadataSearchContext(
+        organization_id=payload.organization_id,
+        workspace_id=payload.workspace_id,
+        connection_id=connection.id,
+        database_name=database_name,
+        schema_name="",
+        connection_string_database=_connection_string_database(connection_string),
+    )
+
+
+def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext):
+    metadata = connector.get_schema_metadata()
+    logger.info(
+        "RCA metadata context workspace_id=%s connection_id=%s database=%s schema=%s engine=%s "
+        "connection_string_database=%s metadata_cache_key=%s tables=%s procedures=%s",
+        metadata_context.workspace_id,
+        metadata_context.connection_id,
+        metadata_context.database_name,
+        metadata_context.schema_name or "default",
+        metadata.engine_type,
+        metadata_context.connection_string_database or "unknown",
+        metadata_context.cache_key,
+        metadata.tables,
+        metadata.procedures,
+    )
+    if not metadata.tables:
+        raise DatabaseConnectionError(
+            "Active database metadata validation failed: no tables were discovered for the selected connection."
+        )
+    return metadata
 
 
 
@@ -1438,12 +1487,15 @@ def _run_dynamic_investigation(
             _empty_investigation_metadata(),
         )
     try:
+        connection_string = _build_connection_string(connection)
         connector = get_connection_pool().get_or_create(
             connection.id,
             DatabaseEngine(connection.engine),
-            _build_connection_string(connection),
+            connection_string,
         )
         connector.connect()
+        metadata_context = _metadata_context_for_connection(payload, connection, connection_string)
+        active_schema_metadata = _load_and_validate_active_schema(connector, metadata_context)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "I could not investigate the live database because the saved connection failed: "
@@ -1461,6 +1513,8 @@ def _run_dynamic_investigation(
         payload.workspace_id,
         payload.question,
         entities,
+        metadata_context=metadata_context,
+        schema_metadata=active_schema_metadata,
     )
     target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata, intent)
     if target_missing:
@@ -1637,6 +1691,35 @@ def _run_dynamic_investigation(
     )
     ranked_text = "\n".join(f"- {item.object_type}: {item.name} ({item.score}) - {item.reason}" for item in ranking.objects[:8]) or "- No ranked objects"
     correlated_text = "\n".join(f"- {item.evidence_type} {item.subject}: {item.finding}" for item in correlated_evidence[:8]) or "- No correlated evidence"
+    selected_candidates = [
+        item for item in ranking.metadata.candidate_trace if item.get("decision") == "selected"
+    ][:10]
+    rejected_candidates = [
+        item for item in ranking.metadata.candidate_trace if item.get("decision") == "rejected"
+    ][:10]
+    metadata_debug_text = "\n".join(
+        [
+            f"- workspace_id: {payload.workspace_id}",
+            f"- connection_id: {connection.id}",
+            f"- database_name: {metadata_context.database_name}",
+            f"- schema_name: {metadata_context.schema_name or 'default'}",
+            f"- database_engine: {ranking.metadata.engine_type or connection.engine}",
+            f"- connection_string_database: {metadata_context.connection_string_database or 'unknown'}",
+            f"- metadata_cache_key: {ranking.metadata.metadata_cache_key or metadata_context.cache_key}",
+            f"- Discovered tables: {', '.join(active_schema_metadata.tables[:30]) or 'None'}",
+            f"- Discovered procedures: {', '.join(active_schema_metadata.procedures[:30]) or 'None'}",
+            "- Selected candidates: "
+            + (
+                "; ".join(f"{item.get('object_type')}:{item.get('name')} ({item.get('reason')})" for item in selected_candidates)
+                or "None"
+            ),
+            "- Rejected candidates: "
+            + (
+                "; ".join(f"{item.get('object_type')}:{item.get('name')} ({item.get('reason')})" for item in rejected_candidates)
+                or "None"
+            ),
+        ]
+    )
     gate_text = "\n".join(
         [
             f"- Gate Required: {'Yes' if evidence_gate.required else 'No'}",
@@ -1703,6 +1786,8 @@ def _run_dynamic_investigation(
         f"- Write Path: {target_context['write_path']}\n"
         f"- Read Path: {target_context['read_path']}\n"
         f"- Documents Used: {', '.join(document.title for document in context.documents[:5]) or 'No matching uploaded documents found'}\n\n"
+        "## Metadata Debug\n"
+        f"{metadata_debug_text}\n\n"
         f"{missing_related_conclusion}"
         "## Stage 3 - Generate Investigation Hypotheses\n"
         f"{hypothesis_text}\n\n"

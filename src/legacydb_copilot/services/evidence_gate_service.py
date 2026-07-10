@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
@@ -21,6 +21,54 @@ class EvidenceGateCheckResult:
     check: str
     status: str
     reason: str
+    inspected_objects: list[str] = field(default_factory=list)
+
+
+def relevant_object_inspected(
+    object_references: list[dict[str, Any]] | None,
+) -> EvidenceGateCheckResult:
+    """Check whether at least one valid, relevant database object was inspected."""
+    valid_types = {
+        "table",
+        "view",
+        "stored_procedure",
+        "procedure",
+        "job",
+        "log",
+        "log_source",
+    }
+    valid_name = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)*$")
+    inspected_objects: list[str] = []
+    invalid_references = 0
+
+    for reference in object_references or []:
+        if not isinstance(reference, dict):
+            invalid_references += 1
+            continue
+        object_type = str(reference.get("object_type") or "").strip().casefold().replace(" ", "_")
+        name = str(reference.get("name") or "").strip()
+        if object_type not in valid_types or not valid_name.fullmatch(name):
+            invalid_references += 1
+            continue
+        if name.casefold() not in {item.casefold() for item in inspected_objects}:
+            inspected_objects.append(name)
+
+    if inspected_objects:
+        return EvidenceGateCheckResult(
+            check="relevant_object_inspected",
+            status="PASS",
+            reason="At least one relevant object was inspected.",
+            inspected_objects=inspected_objects,
+        )
+    reason = "No relevant object was inspected."
+    if invalid_references:
+        reason = "No relevant object was inspected because all supplied object references were invalid."
+    return EvidenceGateCheckResult(
+        check="relevant_object_inspected",
+        status="FAIL",
+        reason=reason,
+        inspected_objects=[],
+    )
 
 
 def primary_entity_found(

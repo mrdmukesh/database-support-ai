@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
+from legacydb_copilot.agents.reasoning_agent import ReasoningResult, RootCauseSupportStatus
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
 from legacydb_copilot.services.report_generator import (
     ExecutiveSummary,
@@ -509,6 +510,18 @@ def _strongest_evidence_rows(bundle: DynamicInvestigationBundle) -> list[dict[st
     return rows[:4]
 
 
+def _missing_evidence_items(reasoning: ReasoningResult) -> list[str]:
+    items = list(reasoning.missing_evidence)
+    for claim in reasoning.likely_root_causes:
+        if claim.status is RootCauseSupportStatus.VERIFIED:
+            continue
+        items.extend(
+            f"{gap.evidence_type}: {gap.description} (Related entity: {gap.related_entity}; Required because: {gap.reason_required})"
+            for gap in claim.missing_evidence
+        )
+    return items
+
+
 def _executive_key_findings_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     focus = bundle.evidence_focus
     current_condition = next((fact for fact in bundle.reasoning.confirmed_facts if " row(s) returned" in fact or " has " in fact), "")
@@ -835,7 +848,7 @@ def compose_report(
         _executive_tests_section(bundle),
         ReportSection(title="Proof of Fix", items=bundle.reasoning.proof_of_fix),
         ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4]),
-        ReportSection(title="Missing Evidence", items=bundle.reasoning.missing_evidence),
+        ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
         ReportSection(title="Stage 1 - Understand the Question", items=[
             f"Investigation Mode: {bundle.investigation_mode}",
             f"Mode Rationale: {bundle.mode_rationale or 'Default full investigation path selected.'}",
@@ -889,7 +902,7 @@ def compose_report(
         ReportSection(title="Recommended Investigation SQL", sql_blocks=_sql_blocks(bundle)),
         ReportSection(title="Risks", items=bundle.reasoning.risks),
         ReportSection(title="References Used", items=["Tables: " + ", ".join(table.name for table in bundle.metadata.tables[:8]), "Procedures: " + (", ".join(bundle.metadata.procedures) or "None discovered"), "Views: " + (", ".join(bundle.metadata.views) or "None discovered"), "Documents: " + (", ".join(document_titles) or "No uploaded documents found")]),
-        ReportSection(title="Missing Information / Clarifying Questions", items=bundle.reasoning.missing_evidence),
+        ReportSection(title="Missing Information / Clarifying Questions", items=_missing_evidence_items(bundle.reasoning)),
     ]
     return InvestigationReport(
         cover=ReportCover(

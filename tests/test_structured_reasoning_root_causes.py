@@ -39,6 +39,7 @@ def test_structured_reasoning_result_serialization_works() -> None:
         "conclusion": "Cause",
         "evidence_refs": ["SQL-1"],
         "status": "VERIFIED",
+        "missing_evidence": [],
     }
 
 

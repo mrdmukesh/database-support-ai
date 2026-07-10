@@ -21,11 +21,20 @@ class RootCauseSupportStatus(StrEnum):
     CONTRADICTED = "CONTRADICTED"
 
 
+@dataclass(frozen=True)
+class MissingEvidence:
+    evidence_type: str
+    description: str
+    related_entity: str
+    reason_required: str
+
+
 @dataclass(frozen=True, eq=False)
 class RootCauseClaim:
     conclusion: str
     evidence_refs: list[str] = field(default_factory=list)
     status: RootCauseSupportStatus = RootCauseSupportStatus.NOT_EVALUATED
+    missing_evidence: list[MissingEvidence] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "status", RootCauseSupportStatus(self.status))
@@ -43,10 +52,12 @@ class RootCauseClaim:
                 self.conclusion,
                 self.evidence_refs,
                 self.status,
+                self.missing_evidence,
             ) == (
                 other.conclusion,
                 other.evidence_refs,
                 other.status,
+                other.missing_evidence,
             )
         return NotImplemented
 

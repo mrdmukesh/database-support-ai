@@ -24,6 +24,35 @@ class EvidenceGateCheckResult:
     inspected_objects: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class CombinedEvidenceGateResult:
+    status: str
+    passed_checks: list[str]
+    failed_checks: list[str]
+    reasons: list[str]
+
+
+def combine_evidence_gate_checks(
+    primary_entity_result: EvidenceGateCheckResult,
+    relevant_object_result: EvidenceGateCheckResult,
+) -> CombinedEvidenceGateResult:
+    """Combine only the primary-entity and relevant-object evidence checks."""
+    results = (primary_entity_result, relevant_object_result)
+    expected_checks = {"primary_entity_found", "relevant_object_inspected"}
+    if {result.check for result in results} != expected_checks:
+        raise ValueError("Exactly primary_entity_found and relevant_object_inspected results are required.")
+
+    passed_checks = [result.check for result in results if result.status == "PASS"]
+    failed_checks = [result.check for result in results if result.status != "PASS"]
+    status = "PASS" if len(passed_checks) == 2 else "PARTIAL" if len(passed_checks) == 1 else "FAIL"
+    return CombinedEvidenceGateResult(
+        status=status,
+        passed_checks=passed_checks,
+        failed_checks=failed_checks,
+        reasons=[result.reason for result in results],
+    )
+
+
 def relevant_object_inspected(
     object_references: list[dict[str, Any]] | None,
 ) -> EvidenceGateCheckResult:

@@ -7,6 +7,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tmp/
+pytest_*_tmp/
+tmp_*/
+**/node_modules/
+frontend-react/dist/
+frontend-react/vitest-summary.json
 *.py[cod]
 *.db
 *.sqlite

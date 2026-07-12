@@ -23,6 +23,15 @@ _NOISE_TOKENS = {
     "procedure",
 }
 
+_KNOWLEDGE_OBJECT_MARKERS = {
+    "approved_knowledge",
+    "document_chunk",
+    "embedding",
+    "incident_knowledge",
+    "knowledge_base",
+    "rag_document",
+}
+
 
 @dataclass(frozen=True)
 class RankedObject:
@@ -36,6 +45,12 @@ class RankedObject:
 class ObjectRankingResult:
     objects: list[RankedObject]
     metadata: MetadataSearchResult
+
+
+def _is_knowledge_object(name: str) -> bool:
+    """Keep retrieval infrastructure out of live affected-object ranking."""
+    normalized = name.lower().replace("-", "_").replace(".", "_")
+    return any(marker in normalized for marker in _KNOWLEDGE_OBJECT_MARKERS)
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
@@ -147,7 +162,8 @@ def rank_relevant_objects(
     target_table = resolve_table_from_terms(problem.target_terms, metadata)
     parent_table = resolve_table_from_terms(problem.parent_terms, metadata)
     ranked_tables: list[tuple[float, TableMetadata, str]] = []
-    for table in metadata.tables:
+    eligible_tables = [table for table in metadata.tables if not _is_knowledge_object(table.name)]
+    for table in eligible_tables:
         haystack_items = [table.name, *table.columns]
         haystack = " ".join(haystack_items).lower()
         token_hits = sum(1 for token in tokens if token in haystack)
@@ -174,14 +190,19 @@ def rank_relevant_objects(
             selected_tables = [required, *selected_tables[: max_tables - 1]]
     selected_names = {table.name for table in selected_tables}
     if not selected_tables:
-        selected_tables = metadata.tables[:max_tables]
+        selected_tables = eligible_tables[:max_tables]
         selected_names = {table.name for table in selected_tables}
 
     proc_tokens = tokens | {table.name.lower() for table in selected_tables}
-    procedures = [proc for proc in metadata.procedures if any(token in proc.lower() for token in proc_tokens)]
-    views = [view for view in metadata.views if any(token in view.lower() for token in proc_tokens)]
+    procedures = [
+        proc
+        for proc in metadata.procedures
+        if not _is_knowledge_object(proc) and any(token in proc.lower() for token in proc_tokens)
+    ]
+    eligible_views = [view for view in metadata.views if not _is_knowledge_object(view)]
+    views = [view for view in eligible_views if any(token in view.lower() for token in proc_tokens)]
     if not views:
-        views = metadata.views[:5]
+        views = eligible_views[:5]
 
     objects = [
         RankedObject("table", table.name, score, reason)
@@ -196,6 +217,11 @@ def rank_relevant_objects(
         {
             **item,
             "decision": "selected" if item.get("name") in selected_for_trace else "rejected",
+            **(
+                {"rejection_reason": "knowledge objects cannot be affected business objects"}
+                if item.get("object_type") == "table" and _is_knowledge_object(str(item.get("name", "")))
+                else {}
+            ),
         }
         if item.get("object_type") == "table"
         else item

@@ -46,6 +46,7 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
 
     setValidationError(null);
     investigation.startSubmission(trimmedQuestion);
+
     try {
       const response = await submitInvestigation({
         organization_id: organizationId,
@@ -55,9 +56,9 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
       });
       investigation.completeSubmission(response);
     } catch (error) {
-      investigation.failSubmission(
-        error instanceof Error ? error.message : "Investigation submission failed.",
-      );
+      const message = error instanceof Error ? error.message : "Investigation submission failed.";
+      investigation.failSubmission(message);
+      setValidationError(message);
     }
   }
 

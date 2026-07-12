@@ -1,11 +1,28 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { MemoryRouter, useLocation, useParams } from "react-router-dom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session } from "../models/auth";
 import { SESSION_STORAGE_KEY } from "../api/client";
 import { AuthProvider } from "../stores/auth-store";
 import { AppRoutes } from "./app-routes";
+
+const listWorkspaces = vi.fn();
+
+vi.mock("../pages/investigations/InvestigationPage", () => ({
+  InvestigationPage: () => <div>Investigation page base route</div>,
+}));
+
+vi.mock("../pages/investigations/InvestigationResultPage", () => ({
+  InvestigationResultPage: () => {
+    const { investigationId } = useParams();
+    return <div>Investigation detail: {investigationId}</div>;
+  },
+}));
+
+vi.mock("../api/workspace-api", () => ({
+  listWorkspaces: (...args: unknown[]) => listWorkspaces(...args),
+}));
 
 const session: Session = {
   access_token: "token-1",
@@ -37,7 +54,10 @@ function renderRoutes(path: string, children?: ReactNode) {
 }
 
 describe("application routes", () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => {
+    localStorage.clear();
+    listWorkspaces.mockReset().mockResolvedValue([]);
+  });
 
   it("redirects unauthenticated protected routes to login and preserves the destination", async () => {
     renderRoutes("/app/investigations/INV-7?tab=evidence", <LocationProbe />);
@@ -52,16 +72,33 @@ describe("application routes", () => {
 
     renderRoutes("/app/workspaces");
 
-    expect(await screen.findAllByRole("heading", { name: "Workspaces" })).toHaveLength(2);
-    expect(screen.getByText("React migration placeholder")).toBeInTheDocument();
+    const headings = await screen.findAllByRole("heading", { name: "Workspaces" });
+    expect(headings).toHaveLength(2);
+    expect(screen.getByRole("status")).toHaveTextContent("No workspaces yet.");
   });
 
-  it("renders the investigation route parameter without adding feature behavior", async () => {
+  it("renders a valid investigation route ID to the result page", () => {
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
 
     renderRoutes("/app/investigations/INV-7");
 
-    expect(await screen.findByRole("heading", { name: "Investigation INV-7" })).toBeInTheDocument();
+    expect(screen.getByText("Investigation detail: INV-7")).toBeInTheDocument();
+  });
+
+  it("decodes encoded investigation route IDs", () => {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+
+    renderRoutes("/app/investigations/INV%207");
+
+    expect(screen.getByText("Investigation detail: INV 7")).toBeInTheDocument();
+  });
+
+  it("renders the base investigation route without an ID", () => {
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+
+    renderRoutes("/app/investigations");
+
+    expect(screen.getByText("Investigation page base route")).toBeInTheDocument();
   });
 
   it("renders a clear placeholder for unknown routes", () => {

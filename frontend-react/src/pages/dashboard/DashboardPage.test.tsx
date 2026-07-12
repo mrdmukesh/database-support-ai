@@ -12,7 +12,7 @@ vi.mock("../../hooks/use-auth", () => ({ useAuth: vi.fn() }));
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useAuth).mockReturnValue({ session: null, user: null, organizationId: "ORG-1", isAuthenticated: true, login: vi.fn(), logout: vi.fn() });
+    vi.mocked(useAuth).mockReturnValue({ session: null, user: null, organizationId: "ORG-1", isAuthenticated: true, isInitializing: false, login: vi.fn(), logout: vi.fn() });
     vi.mocked(getDashboardSummary).mockResolvedValue({ organizations: 1, users: 2, active_subscriptions: 9, documents: 3, incidents: 4 });
     vi.mocked(getApiHealth).mockResolvedValue({ status: "healthy", components: [] });
     vi.mocked(getDisclaimer).mockResolvedValue(["Verify AI output"]);

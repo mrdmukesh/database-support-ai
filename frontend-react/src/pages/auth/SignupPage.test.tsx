@@ -81,6 +81,7 @@ describe("SignupPage", () => {
       user: null,
       organizationId: null,
       isAuthenticated: false,
+      isInitializing: false,
       login,
       logout: vi.fn(),
     });

@@ -36,7 +36,7 @@ const baseResponse: InvestigationSubmitResponse = {
 const auth: AuthState = {
   session: null,
   user: { id: "user-1", organization_id: "org-1", email: "dba@example.com", full_name: "DBA", role: "dba", is_active: true },
-  organizationId: "org-1", isAuthenticated: true, login: vi.fn(), logout: vi.fn(),
+  organizationId: "org-1", isAuthenticated: true, isInitializing: false, login: vi.fn(), logout: vi.fn(),
 };
 
 function renderPage() {

@@ -21,4 +21,22 @@ describe("report API", () => {
     expect(filenameFromDisposition("attachment; filename*=UTF-8''audit%20report.pdf", "fallback")).toBe("audit report.pdf");
     expect(filenameFromDisposition(null, "fallback.pdf")).toBe("fallback.pdf");
   });
+
+  it("sanitizes filenames with invalid control characters", () => {
+    const badName = `attachment; filename="bad${String.fromCharCode(0)}name.pdf"`;
+    expect(filenameFromDisposition(badName, "fallback.pdf")).toBe("bad_name.pdf");
+  });
+
+  it("returns a fallback-safe name for empty quoted filenames", () => {
+    expect(filenameFromDisposition('attachment; filename=""', "fallback.pdf")).toBe("investigation_report");
+  });
+
+  it("parses quoted Content-Disposition filenames", () => {
+    expect(filenameFromDisposition('attachment; filename="report.pdf"', "fallback.pdf")).toBe("report.pdf");
+  });
+
+  it("strips path traversal characters from filenames", () => {
+    expect(filenameFromDisposition('attachment; filename="..\\secret.pdf"', "fallback.pdf")).toBe("secret.pdf");
+    expect(filenameFromDisposition('attachment; filename="../secret.pdf"', "fallback.pdf")).toBe("secret.pdf");
+  });
 });

@@ -19,16 +19,43 @@ function fallbackFilename(path: string): string {
 }
 
 export function safeFilename(value: string): string {
-  const basename=value.replace(/\\/g,"/").split("/").pop() ?? "";
-  const cleaned=basename.replace(/[\u0000-\u001f\u007f<>:"|?*]/g,"_").replace(/^\.+/,"").trim();
+  const basename = value.replace(/\\/g, "/").split("/").pop() ?? "";
+  const invalidFilenameCharacter = /[<>:"|?*]/;
+  const cleaned = basename
+    .split("")
+    .map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0x1f || code === 0x7f || invalidFilenameCharacter.test(char) ? "_" : char;
+    })
+    .join("")
+    .replace(/^\.+/, "")
+    .trim();
   return cleaned || "investigation_report";
 }
 
 export function filenameFromDisposition(disposition: string | null, fallback: string): string {
   if (!disposition) return fallback;
   const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8) { try { return safeFilename(decodeURIComponent(utf8[1])); } catch { return safeFilename(utf8[1]); } }
-  return safeFilename(disposition.match(/filename="([^"]+)"/i)?.[1] ?? disposition.match(/filename=([^;]+)/i)?.[1]?.trim() ?? fallback);
+  if (utf8) {
+    try {
+      return safeFilename(decodeURIComponent(utf8[1]));
+    } catch {
+      return safeFilename(utf8[1]);
+    }
+  }
+
+  const quoted = disposition.match(/filename="([^"]*)"/i)?.[1];
+  if (quoted !== undefined) {
+    return safeFilename(quoted);
+  }
+
+  const unquoted = disposition.match(/filename=([^;]+)/i)?.[1]?.trim();
+  if (unquoted !== undefined) {
+    const stripped = unquoted.replace(/^"(.*)"$/s, "$1");
+    return safeFilename(stripped);
+  }
+
+  return safeFilename(fallback);
 }
 
 export function resolveReportUrl(path: string): string {

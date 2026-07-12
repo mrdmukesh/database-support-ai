@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { loadSavedInvestigation } from "../../api/investigation-api";
@@ -23,23 +23,34 @@ type LoadState =
 export function InvestigationResultPage() {
   const { user } = useAuth();
   const { investigationId } = useParams<{ investigationId: string }>();
-  const [state, setState] = useState<LoadState>({ status: "loading" });
+  const normalizedInvestigationId = investigationId?.trim() ?? "";
+  const [state, setState] = useState<LoadState>(() => (
+    normalizedInvestigationId ? { status: "loading" } : { status: "not-found" }
+  ));
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
-    const id = investigationId?.trim();
+    const id = normalizedInvestigationId;
     if (!id) {
+      requestIdRef.current += 1;
       setState({ status: "not-found" });
       return;
     }
+
     const requestedId = id;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
     const controller = new AbortController();
     setState({ status: "loading" });
     async function load() {
       try {
         const investigation = await loadSavedInvestigation(requestedId, controller.signal);
+        if (requestIdRef.current !== requestId) return;
         setState({ status: "loaded", investigation });
       } catch (cause: unknown) {
+        if (controller.signal.aborted) return;
+        if (requestIdRef.current !== requestId) return;
         const error = cause as { name?: unknown; status?: unknown; message?: unknown } | null;
         if (error?.name === "AbortError") return;
         if (error?.status === 404) {
@@ -55,8 +66,10 @@ export function InvestigationResultPage() {
       }
     }
     void load();
-    return () => controller.abort();
-  }, [investigationId]);
+    return () => {
+      controller.abort();
+    };
+  }, [normalizedInvestigationId]);
 
   if (state.status === "loading") {
     return <p role="status">Loading investigation...</p>;
@@ -84,7 +97,7 @@ export function InvestigationResultPage() {
   const parsed = parseLegacyAssistantMessage(result.ai_answer);
   return (
     <article className="management-page" aria-labelledby="investigation-result-title">
-      <InvestigationHeader investigationId={result.id || investigationId} question={result.user_question}
+      <InvestigationHeader investigationId={result.id || normalizedInvestigationId} question={result.user_question}
         intent={result.detected_intent} status={result.status} createdAt={result.created_at} />
       <InvestigationBadges confidence={result.confidence_score} />
       <ExecutiveSummarySection summary={parsed.raw} />

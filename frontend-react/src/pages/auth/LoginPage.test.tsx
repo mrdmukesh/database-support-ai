@@ -39,6 +39,7 @@ describe("LoginPage", () => {
       user: null,
       organizationId: null,
       isAuthenticated: false,
+      isInitializing: false,
       login,
       logout: vi.fn(),
     });

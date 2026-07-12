@@ -18,6 +18,7 @@ export interface AuthState {
   user: User | null;
   organizationId: string | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   login: (credentials: LoginRequest, signal?: AbortSignal) => Promise<Session>;
   logout: () => void;
 }
@@ -41,7 +42,13 @@ function restoreSession(): Session | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(restoreSession);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    setSession(restoreSession());
+    setIsInitializing(false);
+  }, []);
 
   const logout = useCallback(() => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -66,10 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       organizationId: session?.user.organization_id ?? null,
       isAuthenticated: Boolean(session?.access_token && session.user),
+      isInitializing,
       login,
       logout,
     }),
-    [login, logout, session],
+    [login, logout, session, isInitializing],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

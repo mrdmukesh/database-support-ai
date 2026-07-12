@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import json
+from pathlib import Path
 
 from legacydb_copilot.db.base import utc_now
 from legacydb_copilot.db.models import (

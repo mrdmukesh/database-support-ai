@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 
 from legacydb_copilot.routers import chat, reports
+from legacydb_copilot.routers import learning
 from legacydb_copilot.schemas import ChatAskRequest
 from legacydb_copilot.services import investigation_reports
 
@@ -103,3 +104,19 @@ def test_blob_download_returns_persisted_file_and_missing_is_clear(monkeypatch) 
         reports.download_report_file("INV", filename, db, SimpleNamespace(id="user"))
     assert error.value.status_code == 404
     assert "Blob Storage" in error.value.detail
+
+
+def test_saved_investigation_uses_exact_persisted_report_filenames() -> None:
+    filenames = {
+        f"report_INV_executive_rca{extension}": f"reports/history/INV/report_INV_executive_rca{extension}"
+        for extension in (".html", ".pdf", ".docx", ".xlsx")
+    }
+    investigation = SimpleNamespace(
+        id="INV",
+        report_storage_json=json.dumps(filenames),
+        report_snapshot_json="",
+    )
+    links = learning._report_links_for_investigation(investigation)
+    assert links is not None
+    assert links["pdf"] == "/reports/INV/report_INV_executive_rca.pdf"
+    assert links["html"] == "/reports/INV/report_INV_executive_rca.html"

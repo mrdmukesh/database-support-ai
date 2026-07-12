@@ -287,6 +287,8 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         index=True,
     )
+    connection_id: Mapped[str] = mapped_column(String, default="", nullable=False, index=True)
+    connection_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     conversation_id: Mapped[str | None] = mapped_column(
         ForeignKey("chat_conversations.id", ondelete="SET NULL"),
         nullable=True,
@@ -301,6 +303,7 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     ai_answer: Mapped[str] = mapped_column(Text, default="", nullable=False)
     confidence_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
     report_path: Mapped[str] = mapped_column(String(700), default="", nullable=False)
+    report_storage_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     report_snapshot_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     ai_debug_trace_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="AI_ANSWERED", nullable=False, index=True)

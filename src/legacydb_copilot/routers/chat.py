@@ -57,7 +57,10 @@ from legacydb_copilot.services.evidence_correlation_service import correlate_evi
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
-from legacydb_copilot.services.investigation_reports import generate_investigation_report_files
+from legacydb_copilot.services.investigation_reports import (
+    generate_investigation_report_files,
+    report_storage_references,
+)
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     ModeClassification,
@@ -212,7 +215,7 @@ def _evidence_sql_block(item) -> str:
 
 
 
-def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> DatabaseConnectionModel | None:
+def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> DatabaseConnectionModel:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -233,16 +236,17 @@ def _find_workspace_connection(db: Session, payload: ChatAskRequest) -> Database
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    return (
-        db.query(DatabaseConnectionModel)
-        .filter(
-            DatabaseConnectionModel.organization_id == payload.organization_id,
-            DatabaseConnectionModel.workspace_id == payload.workspace_id,
-            DatabaseConnectionModel.is_active.is_(True),
-        )
-        .order_by(DatabaseConnectionModel.created_at.desc())
-        .first()
-    )
+    connection_id = (payload.connection_id or "").strip()
+    if not connection_id:
+        raise HTTPException(status_code=400, detail="connection_id is required for investigation submission")
+    connection = db.get(DatabaseConnectionModel, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Selected database connection was not found")
+    if connection.organization_id != payload.organization_id or connection.workspace_id != payload.workspace_id:
+        raise HTTPException(status_code=400, detail="Selected database connection does not belong to the requested workspace")
+    if not connection.is_active:
+        raise HTTPException(status_code=400, detail="Selected database connection is inactive")
+    return connection
 
 
 def _connection_string_database(connection_string: str) -> str:
@@ -1591,6 +1595,7 @@ def _regenerate_report_with_verification(db: Session, investigation: Investigati
     generated = generate_investigation_report_files(updated_report)
     investigation.report_snapshot_json = json.dumps(report_to_dict(updated_report), default=str)
     investigation.report_path = str(generated.directory)
+    investigation.report_storage_json = json.dumps(report_storage_references(generated), default=str)
     return generated.links()
 
 
@@ -1846,7 +1851,7 @@ def _run_dynamic_investigation(
     report = compose_report(
         bundle=bundle,
         workspace_name=workspace.name if workspace else payload.workspace_id,
-        database_name=f"{connection.name} ({connection.engine})",
+        database_name=f"{connection.name} ({connection.engine}) [connection_id={connection.id}]",
         generated_by=generated_by,
     )
     generated_report = generate_investigation_report_files(report)
@@ -2047,6 +2052,7 @@ def _run_dynamic_investigation(
         "evidence": _evidence_to_json(evidence),
         "sql_queries": json.dumps([item.sql for item in evidence], default=str),
         "report_path": str(generated_report.directory),
+        "report_storage": json.dumps(report_storage_references(generated_report), default=str),
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
         "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
@@ -2145,6 +2151,7 @@ def ask_chat_question(
     assert_same_organization(current_user, payload.organization_id)
     assert_same_user(current_user, payload.user_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="investigate")
+    selected_connection = _find_workspace_connection(db, payload)
     conversation = _get_or_create_conversation(db, payload)
     report = analyze_prompt(payload.question, has_sources=True)
     if report.findings:
@@ -2185,10 +2192,20 @@ def ask_chat_question(
     db.add(user_message)
     db.add(assistant_message)
     investigation_id = investigation_metadata.get("investigation_id")
+    if not investigation_metadata.get("report_storage") and report_links and investigation_id:
+        investigation_metadata["report_storage"] = json.dumps(
+            {
+                link.rsplit("/", 1)[-1]: f"reports/history/{investigation_id}/{link.rsplit('/', 1)[-1]}"
+                for key, link in report_links.items()
+                if key != "investigation_id" and isinstance(link, str)
+            }
+        )
     investigation = InvestigationModel(
         id=investigation_id,
         organization_id=payload.organization_id,
         workspace_id=payload.workspace_id,
+        connection_id=selected_connection.id,
+        connection_name=selected_connection.name,
         conversation_id=conversation.id,
         created_by_id=current_user.id,
         user_question=payload.question,
@@ -2199,6 +2216,7 @@ def ask_chat_question(
         ai_answer=answer,
         confidence_score=confidence,
         report_path=investigation_metadata["report_path"],
+        report_storage_json=investigation_metadata.get("report_storage", "{}"),
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
         ai_debug_trace_json=investigation_metadata.get("ai_debug_trace", ""),
         status="AI_ANSWERED",
@@ -2253,6 +2271,8 @@ def ask_chat_question(
         "sources": sources,
         "report": report_links,
         "investigation_id": investigation.id,
+        "connection_id": selected_connection.id,
+        "connection_name": selected_connection.name,
     }
 
 

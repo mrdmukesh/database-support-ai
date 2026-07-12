@@ -21,6 +21,7 @@ export interface ChatMessage {
 export interface InvestigationSubmitRequest {
   organization_id: string;
   workspace_id: string;
+  connection_id: string;
   user_id: string;
   question: string;
   conversation_id?: string | null;
@@ -36,12 +37,16 @@ export interface InvestigationSubmitResponse {
   sources: string[];
   report: ReportLinks | null;
   investigation_id: string | null;
+  connection_id: string;
+  connection_name: string;
 }
 
 export interface InvestigationSummary {
   id: string;
   organization_id: string;
   workspace_id: string;
+  connection_id: string;
+  connection_name: string;
   user_question: string;
   detected_intent: string;
   ai_answer: string;

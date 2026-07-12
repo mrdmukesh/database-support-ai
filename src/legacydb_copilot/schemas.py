@@ -195,6 +195,7 @@ class SubscriptionRead(BaseModel):
 class ChatAskRequest(BaseModel):
     organization_id: str
     workspace_id: str
+    connection_id: str | None = None
     user_id: str
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: str | None = None
@@ -232,6 +233,8 @@ class ChatAskResponse(BaseModel):
     sources: list[str]
     report: dict[str, str] | None = None
     investigation_id: str | None = None
+    connection_id: str
+    connection_name: str
 
 
 class VerificationCheckRead(BaseModel):
@@ -293,6 +296,8 @@ class InvestigationRead(BaseModel):
     id: str
     organization_id: str
     workspace_id: str
+    connection_id: str
+    connection_name: str
     user_question: str
     detected_intent: str
     ai_answer: str

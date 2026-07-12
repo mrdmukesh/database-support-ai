@@ -5,6 +5,7 @@ import { useInvestigation } from "../../features/investigation/use-investigation
 import { useAuth } from "../../hooks/use-auth";
 import type { DatabaseConnection } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
+import { Alert, Card, FormField, InvestigationProgress, PrimaryButton, Select, Textarea } from "../ui";
 
 interface InvestigationFormProps {
   workspaces: Workspace[];
@@ -22,6 +23,9 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
     (connection) =>
       connection.is_active && connection.workspace_id === investigation.selectedWorkspaceId,
   );
+  const selectedConnection = availableConnections.find(
+    (connection) => connection.id === investigation.selectedConnectionId,
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,8 +35,8 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
       setValidationError("Select a workspace.");
       return;
     }
-    if (!investigation.selectedConnectionId) {
-      setValidationError("Select a database connection.");
+    if (!investigation.selectedConnectionId || !selectedConnection) {
+      setValidationError("Select an active database connection for this workspace.");
       return;
     }
     if (!trimmedQuestion) {
@@ -51,6 +55,7 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
       const response = await submitInvestigation({
         organization_id: organizationId,
         workspace_id: investigation.selectedWorkspaceId,
+        connection_id: investigation.selectedConnectionId,
         user_id: user.id,
         question: trimmedQuestion,
       });
@@ -63,10 +68,11 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
   }
 
   return (
-    <form onSubmit={handleSubmit} aria-label="Investigation form" noValidate>
-      <label>
-        Workspace
-        <select
+    <form className="investigation-form" onSubmit={handleSubmit} aria-label="Investigation form" noValidate>
+      <Card title="Investigation scope" description="Choose the exact workspace and active database connection the evidence collector must use.">
+      <div className="investigation-scope-grid">
+      <FormField label="Workspace" htmlFor="investigation-workspace" required>
+        <Select id="investigation-workspace"
           aria-label="Workspace"
           value={investigation.selectedWorkspaceId ?? ""}
           onChange={(event) => investigation.selectWorkspace(event.target.value || null)}
@@ -77,12 +83,19 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
           {availableWorkspaces.map((workspace) => (
             <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </FormField>
 
-      <label>
-        Database connection
-        <select
+      {selectedConnection ? (
+        <aside className="connection-summary" aria-label="Selected connection summary">
+          <div><span>Selected connection</span><strong>{selectedConnection.name}</strong></div>
+          <dl><dt>Engine</dt><dd>{selectedConnection.engine}</dd><dt>Environment</dt><dd>Workspace configured</dd><dt>Status</dt><dd><span className="connection-live-dot" /> Active</dd><dt>Access</dt><dd>Read-only investigation</dd></dl>
+          <small>Connection ID: {selectedConnection.id}</small>
+        </aside>
+      ) : null}
+
+      <FormField label="Database connection" htmlFor="investigation-connection" hint="Only active connections in the selected workspace are available." required>
+        <Select id="investigation-connection"
           aria-label="Database connection"
           value={investigation.selectedConnectionId ?? ""}
           onChange={(event) => investigation.selectConnection(event.target.value || null)}
@@ -93,27 +106,37 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
           {availableConnections.map((connection) => (
             <option key={connection.id} value={connection.id}>{connection.name}</option>
           ))}
-        </select>
-      </label>
+        </Select>
+      </FormField>
+      </div></Card>
 
-      <label>
-        Question
-        <textarea
+      <Card title="Describe the database issue" description="Include a business identifier, observed behavior, and what you expected to happen.">
+      <FormField label="Investigation question" htmlFor="investigation-question" hint="Example: Payment PAY-9001 was processed twice after retry job execution. Investigate duplicate payment creation." required>
+        <Textarea id="investigation-question"
           aria-label="Question"
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           disabled={investigation.isLoading}
+          placeholder="Describe the production symptom, affected record, and expected behavior…"
           maxLength={4000}
           required
         />
-      </label>
+      </FormField></Card>
 
       {(validationError || investigation.currentError) && (
-        <div role="alert">{validationError ?? investigation.currentError}</div>
+        <Alert title="Investigation could not start">{validationError ?? investigation.currentError}</Alert>
       )}
-      <button type="submit" disabled={investigation.isLoading}>
-        {investigation.isLoading ? "Analyzing..." : "Ask AI"}
-      </button>
+      {investigation.isLoading ? (
+        <Card title="Investigation in progress" description="Evidence collection is read-only. Keep this page open while the analysis completes."><InvestigationProgress stages={[
+          { label: "Request validation", state: "completed" }, { label: "Connection confirmation", state: "completed" },
+          { label: "Metadata discovery", state: "active" }, { label: "Evidence planning", state: "pending" },
+          { label: "Evidence collection", state: "pending" }, { label: "Evidence verification", state: "pending" },
+          { label: "Root-cause analysis", state: "pending" }, { label: "Report generation", state: "pending" },
+        ]} /></Card>
+      ) : null}
+      <div className="investigation-form-actions"><PrimaryButton type="submit" disabled={investigation.isLoading}>
+        {investigation.isLoading ? "Starting investigation…" : "Start Investigation"}
+      </PrimaryButton><span>All database queries are validated as read-only.</span></div>
     </form>
   );
 }

@@ -82,6 +82,23 @@ def _report_links_for_investigation(investigation: InvestigationModel) -> dict[s
     Safety considerations:
         Report generation must describe supplied evidence and must not execute SQL.
     """
+    try:
+        storage_refs = json.loads(investigation.report_storage_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        storage_refs = {}
+    if storage_refs:
+        by_extension = {
+            Path(filename).suffix.lower(): filename
+            for filename in storage_refs
+            if Path(filename).suffix.lower() in {".html", ".pdf", ".docx", ".xlsx"}
+            and "_executive_rca" in filename
+        }
+        if {".html", ".pdf", ".docx", ".xlsx"}.issubset(by_extension):
+            base = f"/reports/{investigation.id}"
+            return {
+                "investigation_id": investigation.id,
+                **{ext.lstrip("."): f"{base}/{filename}" for ext, filename in by_extension.items()},
+            }
     if not investigation.report_snapshot_json:
         report_dir = (REPORT_HISTORY_DIR / investigation.id).resolve()
         history_root = REPORT_HISTORY_DIR.resolve()
@@ -101,7 +118,7 @@ def _report_links_for_investigation(investigation: InvestigationModel) -> dict[s
         report = report_from_dict(json.loads(investigation.report_snapshot_json))
     except (TypeError, ValueError, json.JSONDecodeError):
         return None
-    stem = report_file_stem(report)
+    stem = f"{report_file_stem(report)}_executive_rca"
     base = f"/reports/{investigation.id}"
     return {
         "investigation_id": investigation.id,
@@ -259,6 +276,8 @@ def get_investigation(
         "id": investigation.id,
         "organization_id": investigation.organization_id,
         "workspace_id": investigation.workspace_id,
+        "connection_id": investigation.connection_id,
+        "connection_name": investigation.connection_name,
         "user_question": investigation.user_question,
         "detected_intent": investigation.detected_intent,
         "ai_answer": investigation.ai_answer,

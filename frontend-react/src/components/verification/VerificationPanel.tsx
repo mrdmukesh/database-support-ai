@@ -3,6 +3,7 @@ import { loadVerificationChecks, runAllVerificationChecks, runVerificationCheck,
 import type { VerificationCheck } from "../../models/verification";
 import { VerificationCheckCard } from "./VerificationCheckCard";
 import { LoadingState } from "../common/LoadingState"; import { ErrorMessage } from "../common/ErrorMessage"; import { EmptyState } from "../common/EmptyState";
+import { SecondaryButton } from "../ui";
 export function VerificationPanel({ investigationId }: { investigationId: string | null | undefined }) {
   const [checks, setChecks] = useState<VerificationCheck[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,11 +20,11 @@ export function VerificationPanel({ investigationId }: { investigationId: string
   async function action(work: () => Promise<unknown>) { setBusy(true); setError(null); try { await work(); await refresh(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Verification action failed."); } finally { setBusy(false); } }
   if (!investigationId) return <p>Generate an investigation to see verification checks.</p>;
   if (loading) return <LoadingState message="Loading verification checks..." />;
-  return <section aria-labelledby="verification-panel-title"><h3 id="verification-panel-title">Verification Checks</h3>
+  return <section className="verification-panel" aria-labelledby="verification-panel-title"><h3 className="visually-hidden" id="verification-panel-title">Verification Checks</h3>
     {error ? <ErrorMessage message={error} /> : null}
-    {checks.length ? <><button type="button" disabled={busy} onClick={() => void action(async () => { const result = await runAllVerificationChecks(investigationId); setChecks(result.checks); })}>Run All Pending Safe Checks</button>
-      {checks.map((check) => <VerificationCheckCard key={check.id} check={check} busy={busy}
-        onRun={(id) => void action(() => runVerificationCheck(id))} onSkip={(id) => void action(() => skipVerificationCheck(id))} />)}</>
+    {checks.length ? <><SecondaryButton disabled={busy} onClick={() => void action(async () => { const result = await runAllVerificationChecks(investigationId); setChecks(result.checks); })}>Run all pending safe checks</SecondaryButton>
+      <div className="verification-list">{checks.map((check) => <VerificationCheckCard key={check.id} check={check} busy={busy}
+        onRun={(id) => void action(() => runVerificationCheck(id))} onSkip={(id) => void action(() => skipVerificationCheck(id))} />)}</div></>
       : <EmptyState message="No verification checks were suggested." />}
   </section>;
 }

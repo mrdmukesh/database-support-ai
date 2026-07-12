@@ -54,6 +54,8 @@ describe("verified API model fixtures", () => {
       sources: [],
       report: null,
       investigation_id: null,
+      connection_id: "DB-1",
+      connection_name: "Primary DB",
     } satisfies InvestigationSubmitResponse;
 
     expect(response.report).toBeNull();
@@ -65,6 +67,8 @@ describe("verified API model fixtures", () => {
       id: "INV-1",
       organization_id: "ORG-1",
       workspace_id: "WS-1",
+      connection_id: "DB-1",
+      connection_name: "Primary DB",
       user_question: "Why did it fail?",
       detected_intent: "production_investigation",
       ai_answer: "Answer",

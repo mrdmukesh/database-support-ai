@@ -32,6 +32,8 @@ const baseResponse: InvestigationSubmitResponse = {
   assistant_message: { id: "assistant-message", conversation_id: "conversation-1", role: "assistant", content: "Partial evidence-backed answer", confidence: 0.6, source_count: 1, requires_human_review: true },
   findings: [], confidence: 0.6, requires_human_review: true, sources: ["SQL-1"], report: null,
   investigation_id: "INV-1",
+  connection_id: "connection-1",
+  connection_name: "Finance DB",
 };
 const auth: AuthState = {
   session: null,
@@ -53,11 +55,11 @@ function renderPage() {
 }
 
 async function fillAndSubmit() {
-  await screen.findByRole("button", { name: "Ask AI" });
+  await screen.findByRole("button", { name: "Start Investigation" });
   fireEvent.change(screen.getByLabelText("Workspace"), { target: { value: "workspace-1" } });
   fireEvent.change(screen.getByLabelText("Database connection"), { target: { value: "connection-1" } });
   fireEvent.change(screen.getByLabelText("Question"), { target: { value: "Why duplicate?" } });
-  fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 }
 
 describe("InvestigationPage orchestration", () => {
@@ -70,7 +72,7 @@ describe("InvestigationPage orchestration", () => {
   it("loads form options through services and displays the unchanged form", async () => {
     renderPage();
     expect(screen.getByRole("status")).toHaveTextContent("Loading investigation options...");
-    expect(await screen.findByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "Start Investigation" })).toBeEnabled();
     expect(listWorkspaces).toHaveBeenCalledWith("org-1", expect.any(AbortSignal));
     expect(listConnections).toHaveBeenCalledWith("org-1", undefined, expect.any(AbortSignal));
   });
@@ -79,16 +81,16 @@ describe("InvestigationPage orchestration", () => {
     listWorkspaces.mockRejectedValue(new Error("Workspace service unavailable."));
     renderPage();
     expect(await screen.findByRole("alert")).toHaveTextContent("Workspace service unavailable.");
-    expect(screen.queryByRole("button", { name: "Ask AI" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start Investigation" })).not.toBeInTheDocument();
   });
 
   it("shows submission loading and errors", async () => {
     submitInvestigation.mockRejectedValue(new Error("Evidence collection failed."));
     renderPage();
     await fillAndSubmit();
-    expect(screen.getByRole("button", { name: "Analyzing..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Starting investigation…" })).toBeDisabled();
     expect(await screen.findByRole("alert")).toHaveTextContent("Evidence collection failed.");
-    expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled();
   });
 
   it("navigates after a valid investigation ID is returned", async () => {

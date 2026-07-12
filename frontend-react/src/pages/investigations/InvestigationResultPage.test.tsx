@@ -15,6 +15,8 @@ const saved: SavedInvestigation = {
   id: "INV-7",
   organization_id: "ORG-1",
   workspace_id: "WS-1",
+  connection_id: "DB-1",
+  connection_name: "Primary DB",
   user_question: "Why was payment duplicated?",
   detected_intent: "duplicate_data",
   ai_answer: "## Confirmed Facts\n- SQL-1 returned two rows.",
@@ -73,7 +75,7 @@ describe("InvestigationResultPage route and loading", () => {
     expect(await screen.findByRole("heading", { name: "Investigation INV-7" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Executive Summary" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Most Likely Root Cause" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Confirmed Evidence" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Supporting evidence" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recommended Next Step" })).toBeInTheDocument();
     expect(screen.getByText("Confidence 0%")).toBeInTheDocument();
   });

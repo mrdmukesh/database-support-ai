@@ -23,6 +23,23 @@ _REPORT_CONTENT_TYPES = {
 }
 
 
+def report_storage_references(generated: GeneratedReport) -> dict[str, str]:
+    """Return the exact persisted object key for every generated artifact."""
+    return {
+        path.name: path.as_posix()
+        for path in (
+            generated.html_path,
+            generated.pdf_path,
+            generated.docx_path,
+            generated.xlsx_path,
+            generated.audit_html_path,
+            generated.audit_pdf_path,
+            generated.audit_docx_path,
+            generated.audit_xlsx_path,
+        )
+    }
+
+
 def generate_investigation_report_files(report: InvestigationReport) -> GeneratedReport:
     """
     Owner: Mukesh Dabi
@@ -65,15 +82,7 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
     write_docx(report, audit_docx_path)
     write_xlsx(report, audit_xlsx_path)
 
-    storage = get_app_storage()
-    for path in (html_path, pdf_path, docx_path, xlsx_path, audit_html_path, audit_pdf_path, audit_docx_path, audit_xlsx_path):
-        storage.save_bytes(
-            path.as_posix(),
-            path.read_bytes(),
-            _REPORT_CONTENT_TYPES.get(path.suffix.lower()),
-        )
-
-    return GeneratedReport(
+    generated = GeneratedReport(
         investigation_id=report.cover.investigation_id,
         directory=output_dir,
         html_path=html_path,
@@ -85,6 +94,14 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
         audit_docx_path=audit_docx_path,
         audit_xlsx_path=audit_xlsx_path,
     )
+    storage = get_app_storage()
+    try:
+        for filename, storage_key in report_storage_references(generated).items():
+            path = output_dir / filename
+            storage.save_bytes(storage_key, path.read_bytes(), _REPORT_CONTENT_TYPES.get(path.suffix.lower()))
+    except Exception as exc:
+        raise RuntimeError(f"Report persistence failed: {exc}") from exc
+    return generated
 
 
 def _executive_report(report: InvestigationReport) -> InvestigationReport:

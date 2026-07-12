@@ -29,6 +29,9 @@ _KNOWLEDGE_COLUMNS: dict[str, str] = {
 }
 
 _INVESTIGATION_COLUMNS: dict[str, str] = {
+    "connection_id": "VARCHAR NOT NULL DEFAULT ''",
+    "connection_name": "VARCHAR(255) NOT NULL DEFAULT ''",
+    "report_storage_json": "TEXT NOT NULL DEFAULT '{}'",
     "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
     "ai_debug_trace_json": "TEXT NOT NULL DEFAULT ''",
 }

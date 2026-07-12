@@ -28,6 +28,7 @@ const response = {
   user_message: { id: "user-message", conversation_id: "conversation-1", role: "user", content: "Question", confidence: null, source_count: 0, requires_human_review: false },
   assistant_message: { id: "assistant-message", conversation_id: "conversation-1", role: "assistant", content: "Answer", confidence: 0.8, source_count: 1, requires_human_review: false },
   findings: [], confidence: 0.8, requires_human_review: false, sources: ["SQL-1"], report: null, investigation_id: "investigation-1",
+  connection_id: "connection-1", connection_name: "Finance DB",
 } satisfies InvestigationSubmitResponse;
 
 const auth: AuthState = {
@@ -65,71 +66,72 @@ describe("InvestigationForm", () => {
 
   it("validates each required field before submission", () => {
     renderForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Select a workspace.");
     fireEvent.change(screen.getByLabelText("Workspace"), { target: { value: "workspace-1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
-    expect(screen.getByRole("alert")).toHaveTextContent("Select a database connection.");
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Select an active database connection for this workspace.");
     fireEvent.change(screen.getByLabelText("Database connection"), { target: { value: "connection-1" } });
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Enter an investigation question.");
     expect(mockedSubmitInvestigation).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled();
   });
 
   it("submits the verified payload and completes successfully", async () => {
     mockedSubmitInvestigation.mockResolvedValue(response);
     renderForm();
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 
-    expect(screen.getByRole("button", { name: "Analyzing..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Starting investigation…" })).toBeDisabled();
     await waitFor(() => expect(mockedSubmitInvestigation).toHaveBeenCalledWith({
       organization_id: "org-1",
       workspace_id: "workspace-1",
+      connection_id: "connection-1",
       user_id: "user-1",
       question: "Why is payment duplicated?",
     }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled());
   });
 
   it("shows rejected API errors and restores the enabled form", async () => {
     mockedSubmitInvestigation.mockRejectedValueOnce(new Error("Evidence collection failed."));
     renderForm();
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Evidence collection failed.");
-    expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled();
   });
 
   it("shows normalized server errors from the API client", async () => {
     mockedSubmitInvestigation.mockRejectedValueOnce(new ApiClientError("Report generation failed", 500, { detail: "Report generation failed" }));
     renderForm();
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Report generation failed");
-    expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled();
   });
 
   it("shows network errors without disabling the form permanently", async () => {
     mockedSubmitInvestigation.mockRejectedValueOnce(new ApiClientError("Network request failed.", 0));
     renderForm();
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Network request failed.");
-    expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled();
   });
 
   it("preserves the entered question and selections after a failed submission", async () => {
     mockedSubmitInvestigation.mockRejectedValueOnce(new Error("Evidence collection failed."));
     renderForm();
     fillForm();
-    fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Ask AI" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled());
     expect(screen.getByLabelText("Workspace")).toHaveValue("workspace-1");
     expect(screen.getByLabelText("Database connection")).toHaveValue("connection-1");
     expect(screen.getByLabelText("Question")).toHaveValue("  Why is payment duplicated?  ");

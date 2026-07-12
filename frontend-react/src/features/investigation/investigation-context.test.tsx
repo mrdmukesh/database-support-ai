@@ -38,6 +38,8 @@ const response: InvestigationSubmitResponse = {
   sources: ["SQL-1"],
   report: null,
   investigation_id: "investigation-1",
+  connection_id: "connection-1",
+  connection_name: "Finance DB",
 };
 
 function wrapper({ children }: { children: ReactNode }) {

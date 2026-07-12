@@ -10,6 +10,7 @@ import { useAuth } from "../../hooks/use-auth";
 import type { DatabaseConnection } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
 import { formatSafeText } from "../../utils/investigation-formatters";
+import { Alert, Card, PageHeader, SkeletonLoader } from "../../components/ui";
 
 function messageOf(cause: unknown): string {
   return cause instanceof Error ? cause.message : "Investigation setup failed.";
@@ -63,21 +64,17 @@ function InvestigationPageContent() {
 
   return (
     <section className="management-page" aria-labelledby="investigation-page-title">
-      <div className="management-page-heading">
-        <p className="eyebrow">Database support</p>
-        <h2 id="investigation-page-title">Investigations</h2>
-      </div>
-      {loadError ? <div className="form-message error" role="alert">{loadError}</div> : null}
+      <PageHeader eyebrow="Database support" title="Start an investigation" description="Collect read-only evidence from a selected database and generate an evidence-grounded root-cause report." />
+      {loadError ? <Alert title="Investigation setup unavailable">{loadError}</Alert> : null}
       {isLoadingOptions ? (
-        <p role="status">Loading investigation options...</p>
+        <Card><SkeletonLoader label="Loading investigation options" lines={5} /></Card>
       ) : !loadError ? (
         <InvestigationForm workspaces={workspaces} connections={connections} />
       ) : null}
       {inlineFallback ? (
-        <section aria-labelledby="inline-investigation-result-title">
-          <h3 id="inline-investigation-result-title">Investigation result</h3>
+        <Card title="Investigation result">
           <pre>{inlineFallback}</pre>
-        </section>
+        </Card>
       ) : null}
     </section>
   );

@@ -43,6 +43,8 @@ const saved: SavedInvestigation = {
   id: "INV-1",
   organization_id: "ORG-1",
   workspace_id: "WS-1",
+  connection_id: "DB-1",
+  connection_name: "Primary DB",
   user_question: "Why was payment duplicated?",
   detected_intent: "duplicate_data",
   ai_answer: legacyContent,
@@ -64,6 +66,7 @@ describe("investigation API", () => {
     const payload: InvestigationSubmitRequest = {
       organization_id: "ORG-1",
       workspace_id: "WS-1",
+      connection_id: "DB-1",
       user_id: "USER-1",
       question: "Why was payment duplicated?",
       conversation_id: null,
@@ -78,6 +81,8 @@ describe("investigation API", () => {
       sources: ["SQL-1"],
       report: null,
       investigation_id: null,
+      connection_id: "DB-1",
+      connection_name: "Primary DB",
     };
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(response(fixture, 201));
     vi.stubGlobal("fetch", fetchMock);

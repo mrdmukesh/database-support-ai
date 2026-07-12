@@ -140,14 +140,36 @@ def download_report_file(
         metadata={"filename": filename, "extension": extension},
     )
     db.commit()
+    settings = Settings.from_env()
+    try:
+        storage_refs = json.loads(investigation.report_storage_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        storage_refs = {}
+    storage_key = storage_refs.get(filename) or normalize_storage_key(
+        (REPORT_HISTORY_DIR / investigation_id / filename).as_posix()
+    )
+    if settings.storage_backend == "azure_blob":
+        storage = get_app_storage(settings)
+        try:
+            if not storage.exists(storage_key):
+                raise HTTPException(status_code=404, detail="Report file is missing from Blob Storage")
+            content = storage.read_bytes(storage_key)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Report could not be retrieved from Blob Storage: {exc}") from exc
+        disposition = "inline" if extension in {".html", ".pdf"} else "attachment"
+        return Response(
+            content,
+            media_type=_ALLOWED_EXTENSIONS[extension],
+            headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+        )
+
     report_path = (REPORT_HISTORY_DIR / investigation_id / filename).resolve()
     history_root = REPORT_HISTORY_DIR.resolve()
     if history_root not in report_path.parents:
         raise HTTPException(status_code=404, detail="Report file not found")
     if not report_path.exists():
-        storage_key = normalize_storage_key(
-            (REPORT_HISTORY_DIR / investigation_id / filename).as_posix()
-        )
         storage = get_app_storage()
         if not storage.exists(storage_key):
             raise HTTPException(status_code=404, detail="Report file not found")

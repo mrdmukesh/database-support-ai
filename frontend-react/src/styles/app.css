@@ -1,0 +1,483 @@
+:root {
+  color: #17242f;
+  background: #eef3f5;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.auth-card {
+  width: min(100%, 28rem);
+  padding: 2.5rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 3rem rgb(23 36 47 / 10%);
+}
+
+.auth-card h1 {
+  margin-bottom: 0.75rem;
+}
+
+.auth-card form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.auth-card input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  font: inherit;
+}
+
+.auth-card button {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 0;
+  border-radius: 0.4rem;
+  color: #fff;
+  background: #16786f;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.auth-card button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.form-message.error {
+  color: #9c2f2f;
+}
+
+.signup-card {
+  width: min(100%, 38rem);
+}
+
+.auth-card select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  font: inherit;
+}
+
+.auth-card fieldset {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.75rem 0;
+  padding: 1rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 0.5rem;
+}
+
+.auth-card fieldset label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.auth-card fieldset input {
+  width: auto;
+  margin-top: 0.2rem;
+}
+
+.app-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 2rem;
+}
+
+.startup-card {
+  width: min(100%, 42rem);
+  padding: 3rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 1rem 3rem rgb(23 36 47 / 10%);
+}
+
+.eyebrow {
+  color: #16786f;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0.5rem 0 1rem;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.05;
+}
+
+.startup-card > p:last-child {
+  margin-bottom: 0;
+  color: #52636f;
+  line-height: 1.6;
+}
+
+.application-layout {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.application-sidebar {
+  padding: 1.25rem 1rem;
+  color: #eef8f7;
+  background: #163a3a;
+}
+
+.application-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.application-brand-mark {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: #163a3a;
+  background: #9fe0d8;
+}
+
+.application-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.application-sidebar nav a {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  color: #d5e7e5;
+  text-decoration: none;
+}
+
+.application-sidebar nav a.active {
+  color: #fff;
+  background: #245554;
+  font-weight: 700;
+}
+
+.application-content {
+  min-width: 0;
+}
+
+.application-header {
+  display: flex;
+  min-height: 4.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 2rem;
+  background: #fff;
+  border-bottom: 1px solid #cfdbdf;
+}
+
+.application-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.authenticated-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.authenticated-user-label {
+  color: #52636f;
+  font-size: 0.9rem;
+}
+
+.authenticated-user button {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  cursor: pointer;
+}
+
+.application-main {
+  display: grid;
+  min-height: calc(100vh - 4.25rem);
+  place-items: center;
+  padding: 2rem;
+}
+
+@media (max-width: 760px) {
+  .application-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .application-sidebar {
+    padding: 0.75rem 1rem;
+  }
+
+  .application-brand {
+    margin-bottom: 0.75rem;
+  }
+
+  .application-sidebar nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .application-sidebar nav a {
+    white-space: nowrap;
+  }
+
+  .application-header {
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+  }
+
+  .authenticated-user {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .authenticated-user-label {
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .application-main {
+    padding: 1rem;
+  }
+}
+
+.management-page {
+  width: min(100%, 72rem);
+  align-self: start;
+}
+
+.management-page-heading h2 {
+  margin-top: 0.25rem;
+  font-size: 2rem;
+}
+
+.management-grid {
+  display: grid;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.workspace-form,
+.workspace-list {
+  padding: 1.25rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.workspace-form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.workspace-form input,
+.workspace-form button,
+.workspace-list button {
+  padding: 0.6rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  font: inherit;
+}
+
+.workspace-list {
+  overflow-x: auto;
+}
+
+.workspace-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.workspace-list th,
+.workspace-list td {
+  padding: 0.65rem;
+  border-bottom: 1px solid #e1e9eb;
+  text-align: left;
+}
+
+.workspace-list td:last-child {
+  display: flex;
+  gap: 0.4rem;
+}
+
+@media (max-width: 900px) {
+  .management-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.connections-grid {
+  grid-template-columns: minmax(18rem, 26rem) minmax(0, 1fr);
+  margin-top: 1rem;
+}
+
+.connection-form,
+.connection-list {
+  padding: 1.25rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.connection-form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.connection-form input,
+.connection-form select,
+.connection-form button,
+.connection-list button,
+#connection-workspace-filter {
+  padding: 0.6rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  font: inherit;
+}
+
+.field-note {
+  color: #52636f;
+  font-size: 0.85rem;
+}
+
+.connection-list {
+  overflow-x: auto;
+}
+
+.connection-list table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.connection-list th,
+.connection-list td {
+  padding: 0.6rem;
+  border-bottom: 1px solid #e1e9eb;
+  text-align: left;
+}
+
+.connection-test.success { color: #16786f; }
+.connection-test.error { color: #9c2f2f; }
+.connection-test.pending { color: #52636f; }
+
+@media (max-width: 1000px) {
+  .connections-grid { grid-template-columns: 1fr; }
+}
+
+.document-upload,
+.document-list {
+  padding: 1.25rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.document-upload {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.document-upload input,
+.document-upload select,
+.document-upload button {
+  padding: 0.6rem;
+  border: 1px solid #b9c9ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  font: inherit;
+}
+
+.document-list { overflow-x: auto; }
+.document-list table { width: 100%; border-collapse: collapse; }
+.document-list th, .document-list td { padding: 0.65rem; border-bottom: 1px solid #e1e9eb; text-align: left; }
+
+.dashboard-page {
+  width: min(100%, 72rem);
+  align-self: start;
+}
+
+.api-health-status {
+  color: #52636f;
+}
+
+.dashboard-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-counts article,
+.dashboard-panel {
+  padding: 1.25rem;
+  border: 1px solid #cfdbdf;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.dashboard-counts article {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.dashboard-counts strong {
+  font-size: 2rem;
+}
+
+.dashboard-details {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.dashboard-panel { overflow-x: auto; }
+.dashboard-panel table { width: 100%; border-collapse: collapse; }
+.dashboard-panel th, .dashboard-panel td { padding: 0.65rem; border-bottom: 1px solid #e1e9eb; text-align: left; }
+.dashboard-panel li + li { margin-top: 0.5rem; }
+
+@media (max-width: 850px) {
+  .dashboard-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-details { grid-template-columns: 1fr; }
+}

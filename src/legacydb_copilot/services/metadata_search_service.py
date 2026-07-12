@@ -22,7 +22,6 @@ _NOISE_TOKENS = {
     "procedure",
 }
 
-
 @dataclass(frozen=True)
 class TableMetadata:
     name: str
@@ -111,7 +110,19 @@ def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
         tokens.add(entities.likely_module.lower())
     if entities.suspected_issue:
         tokens.update(entities.suspected_issue.lower().split())
+    words = re.findall(r"[A-Za-z]+", question)
+    for size in range(2, min(4, len(words)) + 1):
+        for index in range(len(words) - size + 1):
+            phrase = words[index:index + size]
+            acronym = "".join(word[0] for word in phrase).lower()
+            if len(acronym) >= 3:
+                tokens.add(acronym)
     return tokens
+
+
+def query_relevance_terms(question: str, entities: EntityExtractionResult) -> set[str]:
+    """Return normalized, query-derived terms used consistently across metadata and definition search."""
+    return _tokens(question, entities)
 
 
 def _identifier_parts(value: str) -> set[str]:
@@ -373,7 +384,8 @@ def search_metadata(
                 )
             )
     tables.sort(key=lambda item: (item.score, item.name), reverse=True)
-    if not tables and metadata.tables:
+    relevance_required = bool(business_ids)
+    if not tables and metadata.tables and not relevance_required:
         table_trace = [item for item in trace if item.get("object_type") == "table"]
         fallback_names = {item["name"] for item in sorted(table_trace, key=lambda item: (item["score"], item["name"]), reverse=True)[:5]}
         for table_name in metadata.tables:
@@ -429,9 +441,9 @@ def search_metadata(
         if explicit_procedures:
             procedures = [proc for proc in metadata.procedures if proc.lower() in explicit_procedures]
     if not procedures:
-        procedures = [] if explicit_procedures or exact_procs else metadata.procedures[:20]
+        procedures = [] if explicit_procedures or exact_procs or relevance_required else metadata.procedures[:20]
     views = [view for view in metadata.views if any(token in view.lower() for token in tokens)]
-    if not views:
+    if not views and not relevance_required:
         views = metadata.views[:10]
     selected_names = {table.name for table in tables[:8]}
     for item in trace:

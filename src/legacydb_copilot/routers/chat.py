@@ -70,7 +70,10 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
-from legacydb_copilot.services.metadata_search_service import MetadataSearchContext
+from legacydb_copilot.services.metadata_search_service import (
+    MetadataSearchContext,
+    query_relevance_terms,
+)
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
@@ -89,6 +92,31 @@ from legacydb_copilot.services.stored_procedure_intelligence import analyze_stor
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
+
+
+def _definition_relevant_procedures(connector, procedure_names: list[str], relevance_terms: set[str]) -> list[str]:
+    """Select procedure names/definitions using only normalized terms derived from the current request."""
+    def identifier_terms(value: str) -> set[str]:
+        expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", value)
+        return {part.lower() for part in re.findall(r"[A-Za-z][A-Za-z0-9]*", expanded) if len(part) >= 2}
+
+    matched: list[str] = []
+    for procedure_name in procedure_names:
+        try:
+            definition = connector.get_procedure_definition(procedure_name) or ""
+        except Exception:
+            definition = ""
+        if relevance_terms & (identifier_terms(procedure_name) | identifier_terms(definition)):
+            matched.append(procedure_name)
+    return list(dict.fromkeys(matched))
+
+
+def _investigation_status(detected_intent: object) -> str:
+    return (
+        "INSUFFICIENT_DATABASE_EVIDENCE"
+        if str(detected_intent or "").startswith("INSUFFICIENT_DATABASE_EVIDENCE:")
+        else "AI_ANSWERED"
+    )
 
 
 def _title_from_question(question: str) -> str:
@@ -1710,6 +1738,32 @@ def _run_dynamic_investigation(
         entities=entities,
         metadata=context.metadata,
     )
+    relevance_terms = query_relevance_terms(payload.question, entities)
+    definition_procedures = _definition_relevant_procedures(
+        connector, active_schema_metadata.procedures, relevance_terms
+    )
+    ranking = replace(
+        ranking,
+        metadata=replace(ranking.metadata, procedures=definition_procedures[:20]),
+    )
+    business_identifiers = [
+        entity.value for entity in entities.entities
+        if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    ]
+    relevant_objects_examined = bool(ranking.metadata.tables or ranking.metadata.views or definition_procedures)
+    if business_identifiers and not relevant_objects_examined:
+        metadata = _empty_investigation_metadata()
+        metadata["detected_intent"] = "INSUFFICIENT_DATABASE_EVIDENCE:RELEVANT_SCHEMA_OBJECTS_NOT_DISCOVERED"
+        metadata["extracted_entities"] = json.dumps(
+            [{"entity_type": entity.entity_type, "value": entity.value} for entity in entities.entities]
+        )
+        return (
+            "INSUFFICIENT_DATABASE_EVIDENCE:RELEVANT_SCHEMA_OBJECTS_NOT_DISCOVERED",
+            [connection.name],
+            0.0,
+            None,
+            metadata,
+        )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
     planning_warning = ""
     try:
@@ -2200,6 +2254,7 @@ def ask_chat_question(
                 if key != "investigation_id" and isinstance(link, str)
             }
         )
+    investigation_status = _investigation_status(investigation_metadata.get("detected_intent"))
     investigation = InvestigationModel(
         id=investigation_id,
         organization_id=payload.organization_id,
@@ -2219,7 +2274,7 @@ def ask_chat_question(
         report_storage_json=investigation_metadata.get("report_storage", "{}"),
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
         ai_debug_trace_json=investigation_metadata.get("ai_debug_trace", ""),
-        status="AI_ANSWERED",
+        status=investigation_status,
     )
     db.add(investigation)
     db.flush()

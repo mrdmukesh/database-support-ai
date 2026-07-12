@@ -27,6 +27,13 @@ def test_react_html_and_frontend_fallback_are_no_cache(monkeypatch, tmp_path):
         assert "/react/assets/app-abc123.js" in response.text
 
 
+def test_root_redirects_to_react_by_default(monkeypatch, tmp_path):
+    client = _client(monkeypatch, tmp_path)
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/react"
+
+
 def test_hashed_react_assets_are_immutable_and_traversal_is_rejected(monkeypatch, tmp_path):
     client = _client(monkeypatch, tmp_path)
     response = client.get("/react/assets/app-abc123.js")

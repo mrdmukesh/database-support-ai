@@ -62,10 +62,12 @@ def create_fastapi_app() -> Any:
 
     @app.get("/", include_in_schema=False)
     def _redirect_to_local_ui() -> Any:
+        if react_root:
+            return RedirectResponse("/react")
         app_page = project_root / "app.html" if project_root else None
         if app_page and app_page.exists():
             return FileResponse(str(app_page))
-        return PlainTextResponse("UI file app.html was not found in the deployed container.", status_code=500)
+        return PlainTextResponse("No deployed UI was found.", status_code=500)
 
     @app.get("/app.html", include_in_schema=False)
     def _serve_app() -> Any:

@@ -30,15 +30,15 @@ describe("WorkspaceList", () => {
   });
 
   it("preserves delete confirmation and cancellation", () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     const onDelete = vi.fn();
     render(<WorkspaceList workspaces={[workspace]} onEdit={vi.fn()} onDelete={onDelete} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Deactivate this workspace? Existing history is kept.");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onDelete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-
-    expect(confirm).toHaveBeenCalledWith("Deactivate this workspace? Existing history is kept.");
+    fireEvent.click(screen.getByRole("dialog").querySelector("button:last-child")!);
     expect(onDelete).toHaveBeenCalledWith(workspace);
   });
 });

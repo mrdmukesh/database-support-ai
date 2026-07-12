@@ -16,14 +16,14 @@ describe("ConnectionList", () => {
   });
 
   it("preserves delete confirmation and exposes connection testing", () => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     const onDelete = vi.fn();
     const onTest = vi.fn();
     render(<ConnectionList connections={[connection]} testingIds={new Set()} testResults={{}} testErrors={{}} onEdit={vi.fn()} onDelete={onDelete} onTest={onTest} />);
     fireEvent.click(screen.getByRole("button", { name: "Test" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(onTest).toHaveBeenCalledWith(connection);
-    expect(window.confirm).toHaveBeenCalledWith("Deactivate this database connection? Existing history is kept.");
+    expect(screen.getByRole("dialog")).toHaveTextContent("Deactivate this database connection? Existing history is kept.");
+    fireEvent.click(screen.getByRole("dialog").querySelector("button:last-child")!);
     expect(onDelete).toHaveBeenCalledWith(connection);
   });
 });

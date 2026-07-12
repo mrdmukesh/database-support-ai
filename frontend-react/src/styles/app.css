@@ -16,6 +16,13 @@ body {
   min-height: 100vh;
 }
 
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 .auth-page {
   display: grid;
   min-height: 100vh;
@@ -480,4 +487,55 @@ h1 {
 @media (max-width: 850px) {
   .dashboard-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-details { grid-template-columns: 1fr; }
+}
+
+.investigation-header,
+.management-page > section,
+.verification-card,
+[aria-label="Report downloads"] {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.investigation-badges,
+[aria-label="Report downloads"] > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.management-page pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .management-page table {
+    min-width: 40rem;
+  }
+
+  .management-page:has(table) {
+    overflow-x: auto;
+  }
+
+  .management-page form,
+  .verification-card,
+  .investigation-header,
+  .management-page > section {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .management-page input,
+  .management-page select,
+  .management-page textarea {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  [aria-label="Report downloads"] button,
+  .verification-card button {
+    min-height: 2.75rem;
+  }
 }

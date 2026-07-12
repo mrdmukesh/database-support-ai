@@ -1,5 +1,5 @@
 import { API_BASE_URL } from "./config";
-import { ApiClientError, SESSION_EXPIRED_EVENT, SESSION_STORAGE_KEY } from "./client";
+import { ApiClientError, SESSION_EXPIRED_EVENT, SESSION_STORAGE_KEY, sanitizeErrorMessage } from "./client";
 
 export interface ReportArtifact { blob: Blob; filename: string; contentType: string }
 
@@ -14,23 +14,36 @@ function authorization(): string | null {
 }
 
 function fallbackFilename(path: string): string {
-  try { return decodeURIComponent(new URL(path, API_BASE_URL).pathname.split("/").pop() || "investigation_report"); }
+  try { return safeFilename(decodeURIComponent(new URL(path, window.location.origin).pathname.split("/").pop() || "investigation_report")); }
   catch { return "investigation_report"; }
+}
+
+export function safeFilename(value: string): string {
+  const basename=value.replace(/\\/g,"/").split("/").pop() ?? "";
+  const cleaned=basename.replace(/[\u0000-\u001f\u007f<>:"|?*]/g,"_").replace(/^\.+/,"").trim();
+  return cleaned || "investigation_report";
 }
 
 export function filenameFromDisposition(disposition: string | null, fallback: string): string {
   if (!disposition) return fallback;
   const utf8 = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8) { try { return decodeURIComponent(utf8[1]); } catch { return utf8[1]; } }
-  return disposition.match(/filename="([^"]+)"/i)?.[1] ?? disposition.match(/filename=([^;]+)/i)?.[1]?.trim() ?? fallback;
+  if (utf8) { try { return safeFilename(decodeURIComponent(utf8[1])); } catch { return safeFilename(utf8[1]); } }
+  return safeFilename(disposition.match(/filename="([^"]+)"/i)?.[1] ?? disposition.match(/filename=([^;]+)/i)?.[1]?.trim() ?? fallback);
+}
+
+export function resolveReportUrl(path: string): string {
+  if (!path || !path.startsWith("/reports/") || path.includes("\\")) throw new ApiClientError("Report link is unavailable.", 0);
+  const base=API_BASE_URL || window.location.origin; const url=new URL(path, base);
+  if (url.origin !== new URL(base, window.location.origin).origin || !url.pathname.startsWith("/reports/") || url.hash || url.search) throw new ApiClientError("Report link is unavailable.", 0);
+  return url.toString();
 }
 
 export async function fetchReportArtifact(path: string, signal?: AbortSignal): Promise<ReportArtifact> {
-  if (!path || !path.startsWith("/reports/")) throw new ApiClientError("Report link is unavailable.", 0);
+  const reportUrl=resolveReportUrl(path);
   const token = authorization();
   if (!token) throw new ApiClientError("Authentication is required.", 401);
   let response: Response;
-  try { response = await fetch(`${API_BASE_URL}${path}`, { headers: { Authorization: token }, signal }); }
+  try { response = await fetch(reportUrl, { headers: { Authorization: token }, signal }); }
   catch (cause) { throw new ApiClientError("Report download failed.", 0, undefined, { cause }); }
   if (!response.ok) {
     if (response.status === 401) {
@@ -38,7 +51,8 @@ export async function fetchReportArtifact(path: string, signal?: AbortSignal): P
       window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
     const body = await response.json().catch(() => undefined) as { detail?: unknown } | undefined;
-    throw new ApiClientError(typeof body?.detail === "string" ? body.detail : response.statusText || "Report download failed.", response.status, body?.detail);
+    const message=typeof body?.detail === "string" ? body.detail : response.statusText || "Report download failed.";
+    throw new ApiClientError(sanitizeErrorMessage(message), response.status, undefined);
   }
   return {
     blob: await response.blob(),

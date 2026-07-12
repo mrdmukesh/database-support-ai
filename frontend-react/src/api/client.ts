@@ -21,6 +21,13 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
 }
 
+export function sanitizeErrorMessage(message: string): string {
+  if (/(authorization|bearer|password|passwd|pwd|secret|api[_-]?key|connection[_-]?string|token)\s*[:=]/i.test(message)) {
+    return "Request failed. Sensitive error details were hidden.";
+  }
+  return message;
+}
+
 function getStoredSession(): Session | null {
   try {
     const value = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -100,7 +107,7 @@ export async function apiRequest<T = unknown>(
     }
     const detail = data && typeof data === "object" ? (data as Record<string, unknown>).detail : data;
     throw new ApiClientError(
-      errorMessage(detail, response.statusText || "Request failed"),
+      sanitizeErrorMessage(errorMessage(detail, response.statusText || "Request failed")),
       response.status,
       detail,
     );

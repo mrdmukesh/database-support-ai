@@ -20,6 +20,14 @@ def _static_root() -> Path | None:
     return None
 
 
+def _react_static_root() -> Path | None:
+    candidates = [Path.cwd() / "frontend-react-dist", Path("/app/frontend-react-dist")]
+    for candidate in candidates:
+        if (candidate / "index.html").is_file():
+            return candidate.resolve()
+    return None
+
+
 def health_response(container: ApplicationContainer | None = None) -> dict[str, Any]:
     container = container or create_container()
     snapshot = container.health()
@@ -47,6 +55,7 @@ def create_fastapi_app() -> Any:
 
     app = FastAPI(title="LegacyDB Support Copilot")
     project_root = _static_root()
+    react_root = _react_static_root()
 
     if project_root and (project_root / "assets").exists():
         app.mount("/assets", StaticFiles(directory=str(project_root / "assets")), name="assets")
@@ -120,5 +129,25 @@ def create_fastapi_app() -> Any:
     app.include_router(reports.router)
     app.include_router(billing.router)
     app.include_router(admin.router)
+
+    if react_root:
+        @app.get("/react/assets/{asset_path:path}", include_in_schema=False)
+        def _serve_react_asset(asset_path: str) -> Any:
+            asset = (react_root / "assets" / asset_path).resolve()
+            assets_root = (react_root / "assets").resolve()
+            if assets_root not in asset.parents or not asset.is_file():
+                return PlainTextResponse("Asset not found", status_code=404)
+            return FileResponse(
+                str(asset),
+                headers={"Cache-Control": "public, max-age=31536000, immutable"},
+            )
+
+        @app.get("/react", include_in_schema=False)
+        @app.get("/react/{frontend_path:path}", include_in_schema=False)
+        def _serve_react_spa(frontend_path: str = "") -> Any:
+            return FileResponse(
+                str(react_root / "index.html"),
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
     return app

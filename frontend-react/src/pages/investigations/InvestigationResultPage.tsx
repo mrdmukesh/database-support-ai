@@ -8,6 +8,9 @@ import { InvestigationBadges } from "../../components/investigation/Investigatio
 import { InvestigationHeader } from "../../components/investigation/InvestigationHeader";
 import { RecommendationSection } from "../../components/investigation/RecommendationSection";
 import { RootCauseSection } from "../../components/investigation/RootCauseSection";
+import { ReportDownloads } from "../../components/reports/ReportDownloads";
+import { VerificationPanel } from "../../components/verification/VerificationPanel";
+import { useAuth } from "../../hooks/use-auth";
 import type { SavedInvestigation } from "../../models/investigation";
 import { parseLegacyAssistantMessage } from "../../utils/investigation-parser";
 
@@ -18,6 +21,7 @@ type LoadState =
   | { status: "loaded"; investigation: SavedInvestigation };
 
 export function InvestigationResultPage() {
+  const { user } = useAuth();
   const { investigationId } = useParams<{ investigationId: string }>();
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
@@ -27,12 +31,13 @@ export function InvestigationResultPage() {
       setState({ status: "not-found" });
       return;
     }
+    const requestedId = id;
 
     const controller = new AbortController();
     setState({ status: "loading" });
     async function load() {
       try {
-        const investigation = await loadSavedInvestigation(id, controller.signal);
+        const investigation = await loadSavedInvestigation(requestedId, controller.signal);
         setState({ status: "loaded", investigation });
       } catch (cause: unknown) {
         const error = cause as { name?: unknown; status?: unknown; message?: unknown } | null;
@@ -86,6 +91,8 @@ export function InvestigationResultPage() {
       <RootCauseSection rootCauses={parsed.rootCauses} />
       <EvidenceSection evidence={parsed.confirmedFacts} />
       <RecommendationSection recommendations={parsed.recommendations} />
+      <ReportDownloads reports={result.report} showAiTrace={user?.role === "super_admin" || user?.role === "organization_admin"} />
+      <VerificationPanel investigationId={result.id} />
     </article>
   );
 }

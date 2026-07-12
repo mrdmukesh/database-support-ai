@@ -21,7 +21,7 @@ export function LearningPage() {
     {error?<div role="alert">{error}</div>:null}{loading?<p role="status">Loading learning workflow...</p>:<>
       {dashboard?<dl><dt>Open investigations</dt><dd>{dashboard.open_investigations}</dd><dt>Pending feedback</dt><dd>{dashboard.pending_feedback}</dd><dt>Pending approval</dt><dd>{dashboard.pending_approval}</dd><dt>Approved knowledge</dt><dd>{dashboard.approved_knowledge}</dd></dl>:null}
       <section><h3>Investigations available for review</h3>{investigations.length?<ul>{investigations.map((x)=><li key={x.id}>{x.user_question} — {x.status}</li>)}</ul>:<p>No open investigations.</p>}</section>
-      <section><h3>Feedback review</h3>{feedback.length?<ul>{feedback.map((x)=><li key={x.id}>{x.rating}: {x.actual_root_cause||"Not provided"} <button onClick={()=>void review(x.id,true)}>Approve</button><button onClick={()=>void review(x.id,false)}>Reject</button></li>)}</ul>:<p>No feedback awaiting approval.</p>}</section>
+      <section><h3>Feedback review</h3>{feedback.length?<ul>{feedback.map((x)=><li key={x.id}>{x.rating}: {x.actual_root_cause||"Not provided"} <button type="button" onClick={()=>void review(x.id,true)}>Approve</button><button type="button" onClick={()=>void review(x.id,false)}>Reject</button></li>)}</ul>:<p>No feedback awaiting approval.</p>}</section>
       <section><h3>Approved knowledge</h3>{knowledge.length?<ul>{knowledge.map((x)=><li key={x.id}>{x.title}: {x.actual_root_cause||"Not recorded"}</li>)}</ul>:<p>No approved knowledge yet.</p>}</section>
     </>}</section>;
 }

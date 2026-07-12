@@ -88,7 +88,7 @@ export function SignupPage() {
       <section className="auth-card signup-card" aria-labelledby="signup-title">
         <p className="eyebrow">LegacyDB Support Copilot</p>
         <h1 id="signup-title">Create account</h1>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-describedby={error ? "signup-error" : undefined}>
           <label htmlFor="organization-name">Organization name</label>
           <input id="organization-name" name="organizationName" maxLength={200} required disabled={isLoading} />
 
@@ -120,7 +120,7 @@ export function SignupPage() {
             <label><input type="checkbox" name="product_updates" /> Product updates</label>
           </fieldset>
 
-          {error ? <div className="form-message error" role="alert">{error}</div> : null}
+          {error ? <div id="signup-error" className="form-message error" role="alert">{error}</div> : null}
           <button type="submit" disabled={isLoading}>{isLoading ? "Creating account..." : "Create account"}</button>
         </form>
       </section>

@@ -1,5 +1,9 @@
 import type { ConnectionValidationResult, DatabaseConnection } from "../../models/connection";
 import { ConnectionTestResult } from "./ConnectionTestResult";
+import { useState } from "react";
+import { ConfirmationDialog } from "../common/ConfirmationDialog";
+import { EmptyState } from "../common/EmptyState";
+import { StatusBadge } from "../common/StatusBadge";
 
 interface ConnectionListProps {
   connections: DatabaseConnection[];
@@ -12,6 +16,7 @@ interface ConnectionListProps {
 }
 
 export function ConnectionList({ connections, testingIds, testResults, testErrors, onEdit, onDelete, onTest }: ConnectionListProps) {
+  const [pendingDelete, setPendingDelete] = useState<DatabaseConnection | null>(null);
   function edit(connection: DatabaseConnection) {
     const name = window.prompt("Connection name", connection.name);
     if (name === null) return;
@@ -20,12 +25,7 @@ export function ConnectionList({ connections, testingIds, testResults, testError
     void onEdit(connection, name.trim(), connectionString.trim() || undefined);
   }
 
-  function remove(connection: DatabaseConnection) {
-    if (!window.confirm("Deactivate this database connection? Existing history is kept.")) return;
-    void onDelete(connection);
-  }
-
-  if (!connections.length) return <p className="empty-state">No database connections yet.</p>;
+  if (!connections.length) return <EmptyState message="No database connections yet." />;
   return (
     <div className="connection-list">
       <h2>Connection list</h2>
@@ -36,17 +36,18 @@ export function ConnectionList({ connections, testingIds, testResults, testError
             <tr key={connection.id}>
               <td>{connection.name}</td>
               <td>{connection.engine}</td>
-              <td>{connection.is_active ? "Active" : "Inactive"}</td>
+              <td><StatusBadge status={connection.is_active ? "Active" : "Inactive"} /></td>
               <td><button type="button" onClick={() => void onTest(connection)} disabled={!connection.is_active || testingIds.has(connection.id)}>{testingIds.has(connection.id) ? "Testing..." : "Test"}</button></td>
               <td>
                 <button type="button" onClick={() => edit(connection)}>Edit</button>
-                <button type="button" onClick={() => remove(connection)} disabled={!connection.is_active}>Delete</button>
+                <button type="button" onClick={() => setPendingDelete(connection)} disabled={!connection.is_active}>Delete</button>
               </td>
               <td><ConnectionTestResult isTesting={testingIds.has(connection.id)} result={testResults[connection.id]} error={testErrors[connection.id]} /></td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ConfirmationDialog open={Boolean(pendingDelete)} title="Deactivate database connection" message="Deactivate this database connection? Existing history is kept." confirmLabel="Delete" onCancel={() => setPendingDelete(null)} onConfirm={() => { const connection=pendingDelete; setPendingDelete(null); if (connection) void onDelete(connection); }} />
     </div>
   );
 }

@@ -10,7 +10,7 @@ export function VerificationCheckCard({ check, busy = false, onRun, onSkip }: Pr
     {check.verification_sql ? <div><strong>Verification SQL</strong><pre>{check.verification_sql}</pre></div> : null}
     <p><strong>Expected:</strong> {check.expected_result || "Not provided"}</p>
     <VerificationResult actualResult={check.actual_result_summary} confidenceImpact={check.confidence_impact} status={check.status} notes={check.notes} />
-    {pending ? <div><button disabled={busy} onClick={() => onRun(check.id)}>Run this check</button><button disabled={busy} onClick={() => onSkip(check.id)}>Skip</button></div>
+    {pending ? <div><button type="button" disabled={busy} onClick={() => onRun(check.id)}>Run this check</button><button type="button" disabled={busy} onClick={() => onSkip(check.id)}>Skip</button></div>
       : <p>This check is {check.status}.</p>}
   </article>;
 }

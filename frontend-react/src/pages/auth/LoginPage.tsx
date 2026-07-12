@@ -45,6 +45,8 @@ export function LoginPage() {
             onChange={(event) => setEmail(event.target.value)}
             disabled={isLoading}
             required
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "login-error" : undefined}
           />
           <label htmlFor="login-password">Password</label>
           <input
@@ -56,8 +58,10 @@ export function LoginPage() {
             onChange={(event) => setPassword(event.target.value)}
             disabled={isLoading}
             required
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? "login-error" : undefined}
           />
-          {error ? <div className="form-message error" role="alert">{error}</div> : null}
+          {error ? <div id="login-error" className="form-message error" role="alert">{error}</div> : null}
           <button type="submit" disabled={isLoading}>
             {isLoading ? "Logging in..." : "Login"}
           </button>

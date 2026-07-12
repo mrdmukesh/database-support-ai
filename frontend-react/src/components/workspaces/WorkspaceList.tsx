@@ -1,4 +1,8 @@
 import type { Workspace } from "../../models/workspace";
+import { useState } from "react";
+import { ConfirmationDialog } from "../common/ConfirmationDialog";
+import { EmptyState } from "../common/EmptyState";
+import { StatusBadge } from "../common/StatusBadge";
 
 interface WorkspaceListProps {
   workspaces: Workspace[];
@@ -15,6 +19,7 @@ export function WorkspaceList({
   onEdit,
   onDelete,
 }: WorkspaceListProps) {
+  const [pendingDelete, setPendingDelete] = useState<Workspace | null>(null);
   function edit(workspace: Workspace) {
     const name = window.prompt("Workspace name", workspace.name);
     if (name === null) return;
@@ -23,12 +28,7 @@ export function WorkspaceList({
     void onEdit(workspace, name.trim(), slug.trim());
   }
 
-  function remove(workspace: Workspace) {
-    if (!window.confirm("Deactivate this workspace? Existing history is kept.")) return;
-    void onDelete(workspace);
-  }
-
-  if (!workspaces.length) return <p className="empty-state">No workspaces yet.</p>;
+  if (!workspaces.length) return <EmptyState message="No workspaces yet." />;
 
   return (
     <div className="workspace-list">
@@ -42,7 +42,7 @@ export function WorkspaceList({
             <tr key={workspace.id} aria-selected={selectedWorkspaceId === workspace.id || undefined}>
               <td>{workspace.name}</td>
               <td>{workspace.slug}</td>
-              <td>{workspace.is_active ? "Active" : "Inactive"}</td>
+              <td><StatusBadge status={workspace.is_active ? "Active" : "Inactive"} /></td>
               <td>
                 {onSelect ? (
                   <button type="button" onClick={() => onSelect(workspace)}>
@@ -50,12 +50,13 @@ export function WorkspaceList({
                   </button>
                 ) : null}
                 <button type="button" onClick={() => edit(workspace)}>Edit</button>
-                <button type="button" onClick={() => remove(workspace)} disabled={!workspace.is_active}>Delete</button>
+                <button type="button" onClick={() => setPendingDelete(workspace)} disabled={!workspace.is_active}>Delete</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <ConfirmationDialog open={Boolean(pendingDelete)} title="Deactivate workspace" message="Deactivate this workspace? Existing history is kept." confirmLabel="Delete" onCancel={() => setPendingDelete(null)} onConfirm={() => { const workspace=pendingDelete; setPendingDelete(null); if (workspace) void onDelete(workspace); }} />
     </div>
   );
 }

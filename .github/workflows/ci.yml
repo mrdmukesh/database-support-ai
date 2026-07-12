@@ -33,5 +33,13 @@ jobs:
           KNOWLEDGE_RETRIEVER_BACKEND: sqlite
         run: python -m pytest
 
+      - name: Upload payroll RCA regression summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payroll-rca-regression-summary
+          path: reports/payroll_rca_regression_summary.json
+          if-no-files-found: error
+
       - name: Build Docker image
         run: docker build -t legacydb-support-copilot:ci .

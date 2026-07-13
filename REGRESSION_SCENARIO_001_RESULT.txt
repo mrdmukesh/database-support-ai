@@ -1,0 +1,37 @@
+Scenario tested
+TC-001 - missing date of birth causes age calculation failure.
+
+Actual pipeline stages executed
+Question submission through _run_dynamic_investigation; intent/entity extraction; live metadata discovery; object ranking; stored-procedure definition discovery and analysis; safe read-only SQL planning and validation; SQL execution; evidence collection/correlation; evidence gate; hypothesis and root-cause reasoning; recommendation; confidence calculation; structured report composition.
+
+Database objects discovered
+Tables: employees, payroll_results, incident_knowledge_base.
+Procedure/equivalent definition: sp_calculate_employee_payroll.
+Primary ranked business objects: payroll_results and employees. incident_knowledge_base was excluded from affected-object ranking.
+
+SQL executed
+Read-only SELECT statements generated from discovered metadata, including employee lookup by employee_id, date_of_birth IS NULL proof for the requested employee, and payroll_results lookup by employee_id. Every executed statement passed the read-only and production-row-limit validators.
+
+Evidence collected
+SQL evidence found employee T001, confirmed employees.date_of_birth is NULL, and found the failed payroll result. PROC-1 captured the discovered procedure definition showing the age/date calculation reads date_of_birth. The confirmed claim cites existing SQL-* row evidence and PROC-1 logic evidence.
+
+Generated root cause
+The confirmed employee record has a missing date_of_birth, and the discovered payroll calculation depends on that field for its date/age calculation without safe null validation; this causes the calculation failure.
+
+Expected concepts
+missing_date_of_birth; age_calculation_failure; missing_null_handling.
+
+Matched concepts
+missing_date_of_birth; age_calculation_failure; missing_null_handling.
+
+Failed concepts
+None.
+
+Application files changed
+src/legacydb_copilot/agents/reasoning_agent.py
+src/legacydb_copilot/routers/chat.py
+src/legacydb_copilot/services/confidence_scoring_service.py
+src/legacydb_copilot/services/safe_sql_service.py
+
+Confirmation
+No scenario ID, employee ID, table name, expected answer, or root-cause sentence was added to application logic. The application changes infer null-field/calculation dependencies from live rows, discovered metadata, and procedure definitions.

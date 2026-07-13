@@ -173,6 +173,12 @@ def upsert_workspace_member(
     if user is None or user.organization_id != workspace.organization_id:
         raise HTTPException(status_code=404, detail="User not found")
     role = WorkspaceRole(payload.role)
+    if user.id == current_user.id:
+        raise HTTPException(status_code=403, detail="You cannot change your own workspace role")
+    if role == WorkspaceRole.OWNER and current_user.role not in {Role.SUPER_ADMIN.value, Role.ORG_ADMIN.value}:
+        actor_membership = db.query(WorkspaceMembershipModel).filter(WorkspaceMembershipModel.workspace_id == workspace.id, WorkspaceMembershipModel.user_id == current_user.id, WorkspaceMembershipModel.is_active.is_(True)).first()
+        if actor_membership is None or actor_membership.role != WorkspaceRole.OWNER.value:
+            raise HTTPException(status_code=403, detail="Only a workspace owner can assign the owner role")
     membership = (
         db.query(WorkspaceMembershipModel)
         .filter(
@@ -217,6 +223,8 @@ def deactivate_workspace_member(
     db: Annotated[Session, Depends(get_db_session)],
     current_user=Depends(get_current_user),
 ) -> None:
+    if user_id == current_user.id:
+        raise HTTPException(status_code=403, detail="You cannot deactivate your own workspace membership")
     workspace = require_workspace_access(db, current_user, workspace_id, action="manage")
     membership = (
         db.query(WorkspaceMembershipModel)

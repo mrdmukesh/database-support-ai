@@ -11,6 +11,7 @@ import { InvestigationResultPage } from "../pages/investigations/InvestigationRe
 import { ReportViewerPage } from "../pages/reports/ReportViewerPage";
 import { InvestigationHistoryPage } from "../pages/investigations/InvestigationHistoryPage";
 import { LearningPage } from "../pages/learning/LearningPage";
+import { UsersAccessPage } from "../pages/admin/UsersAccessPage";
 import {
   NotFoundPage,
 } from "../pages/migration-placeholders";
@@ -34,6 +35,7 @@ export function AppRoutes() {
           <Route path="investigations/history" element={<InvestigationHistoryPage />} />
           <Route path="reports/view" element={<ReportViewerPage />} />
           <Route path="learning" element={<LearningPage />} />
+          <Route path="admin/users" element={<UsersAccessPage />} />
         </Route>
       </Route>
       <Route path="*" element={<NotFoundPage />} />

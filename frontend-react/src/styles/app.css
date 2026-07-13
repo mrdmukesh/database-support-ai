@@ -755,3 +755,11 @@ h1 {
     min-height: 2.75rem;
   }
 }
+.access-grid { display:grid; grid-template-columns:minmax(18rem, 0.75fr) minmax(32rem, 1.75fr); gap:1.25rem; align-items:start; }
+.access-form { display:grid; gap:1rem; }
+.access-form label { display:grid; gap:.4rem; font-weight:600; }
+.access-form small, td small { color:var(--text-muted, #667085); font-weight:400; }
+.section-heading { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1rem; }
+.table-wrap { overflow-x:auto; } .table-wrap table { width:100%; border-collapse:collapse; } .table-wrap th,.table-wrap td { padding:.8rem; text-align:left; border-bottom:1px solid #e5e7eb; }
+.navigation-label { display:block; padding:.75rem 1rem .25rem; font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.65; }
+@media (max-width: 900px) { .access-grid { grid-template-columns:1fr; } .section-heading { align-items:stretch; flex-direction:column; } }

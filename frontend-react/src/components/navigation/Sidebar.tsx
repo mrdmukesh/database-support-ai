@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../../hooks/use-auth";
 
 const navigation = [
   ["Dashboard", "/app/dashboard"],
@@ -10,6 +11,8 @@ const navigation = [
 ] as const;
 
 export function Sidebar() {
+  const { user } = useAuth();
+  const canManageUsers = user?.role === "super_admin" || user?.role === "organization_admin";
   return (
     <aside className="application-sidebar">
       <div className="application-brand" aria-label="LegacyDB Support Copilot">
@@ -23,6 +26,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      {canManageUsers && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span><NavLink to="/app/admin/users">Users &amp; Access</NavLink></nav>}
     </aside>
   );
 }

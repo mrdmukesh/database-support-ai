@@ -45,6 +45,20 @@ class UserRead(BaseModel):
     is_active: bool
 
 
+class AdminUserCreate(BaseModel):
+    organization_id: str
+    email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=12, max_length=256)
+    full_name: str = Field(default="", max_length=200)
+    role: Role = Role.READ_ONLY
+
+
+class AdminUserUpdate(BaseModel):
+    full_name: str | None = Field(default=None, max_length=200)
+    role: Role | None = None
+    is_active: bool | None = None
+
+
 class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: str = Field(min_length=1)

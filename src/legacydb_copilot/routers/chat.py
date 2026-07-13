@@ -52,7 +52,7 @@ from legacydb_copilot.security.access_control import (
 )
 from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.confidence_scoring_service import confidence_factors, score_confidence
-from legacydb_copilot.services.evidence_execution_service import execute_evidence_plan
+from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
 from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
@@ -1772,6 +1772,22 @@ def _run_dynamic_investigation(
         plan = []
         planning_warning = f"Evidence SQL planning was skipped because generated SQL did not pass safety validation: {exc}"
     evidence = execute_evidence_plan(connector, plan)
+    for index, procedure in enumerate(procedure_analysis, start=1):
+        if not procedure.definition_available:
+            continue
+        evidence.append(
+            EvidenceResult(
+                purpose=f"Inspect calculation logic in {procedure.name}",
+                sql="",
+                rows=[{
+                    "procedure_name": procedure.name,
+                    "definition_excerpt": procedure.definition_excerpt,
+                    "business_rules": procedure.business_rules,
+                    "tables_read": procedure.tables_read,
+                }],
+                evidence_id=f"PROC-{index}",
+            )
+        )
     evidence.extend(_expand_related_id_evidence(connector, ranking.metadata, evidence))
     correlated_evidence = correlate_evidence(
         evidence=evidence,
@@ -2110,6 +2126,13 @@ def _run_dynamic_investigation(
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
         "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
+        "structured_result": json.dumps({
+            "ranked_objects": [asdict(item) for item in ranking.objects],
+            "procedures": [asdict(item) for item in procedure_analysis],
+            "root_cause_claims": [asdict(item) for item in reasoning.likely_root_causes],
+            "recommended_fix": reasoning.recommended_fix,
+            "confidence": confidence,
+        }, default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata
 

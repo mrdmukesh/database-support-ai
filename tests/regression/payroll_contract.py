@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Iterable
 
 READ_ONLY = re.compile(r"^\s*(select|with|show|describe|desc|explain)\b", re.I)
@@ -42,6 +42,9 @@ class Scenario:
     expected_status: str
     expected_confidence: str
     anti_hardcoding_rule: str
+    expected_root_cause_concepts: list[str] = field(default_factory=list)
+    required_evidence_types: list[str] = field(default_factory=list)
+    forbidden_claims: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

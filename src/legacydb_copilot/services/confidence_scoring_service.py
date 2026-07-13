@@ -48,6 +48,8 @@ def score_confidence(
         score += 0.08
     if evidence_focus and any(item.writes_affected_object for item in evidence_focus.ranked_procedures):
         score += 0.12
+    elif any(item.evidence_id.startswith("PROC-") and item.rows for item in evidence):
+        score += 0.08
     elif metadata.procedures:
         score -= 0.04
     if documents:
@@ -102,6 +104,8 @@ def confidence_factors(
     if evidence_focus and any(item.writes_affected_object for item in evidence_focus.ranked_procedures):
         writer = next(item.procedure for item in evidence_focus.ranked_procedures if item.writes_affected_object)
         factors.append(f"+ Stored procedure metadata confirms a direct writer: {writer}.")
+    elif any(item.evidence_id.startswith("PROC-") and item.rows for item in evidence):
+        factors.append("+ Stored procedure definition evidence confirms relevant calculation logic.")
     elif metadata.procedures:
         factors.append("- Stored procedures exist, but no direct writer was confirmed for the affected object.")
     if documents:

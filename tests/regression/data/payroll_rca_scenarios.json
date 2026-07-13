@@ -14,7 +14,10 @@
     "verification_expectation": "Query the target row and field, verify relevant procedure text/dependencies, and confirm the failing result/log condition before and after an approved correction.",
     "expected_status": "AI_ANSWERED only when live evidence confirms; otherwise INSUFFICIENT_DATABASE_EVIDENCE",
     "expected_confidence": "85-95% with row + procedure + log evidence; 60-75% with partial evidence",
-    "anti_hardcoding_rule": "The same reasoning must work when employee IDs, table names, column names, and procedure names are changed. Do not branch on this case ID or exact wording."
+    "anti_hardcoding_rule": "The same reasoning must work when employee IDs, table names, column names, and procedure names are changed. Do not branch on this case ID or exact wording.",
+    "expected_root_cause_concepts": ["missing_date_of_birth", "age_calculation_failure", "missing_null_handling"],
+    "required_evidence_types": ["employee_record", "calculation_logic"],
+    "forbidden_claims": ["employee_record_not_found", "database_connection_failure"]
   },
   {
     "case_id": "TC-002",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
@@ -228,6 +229,56 @@ def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
     return False
 
 
+def _null_dependency_claim(
+    evidence: list[EvidenceResult],
+    procedure_analysis: list[ProcedureAnalysis],
+) -> tuple[str, list[str], str] | None:
+    """Find a generic missing-value cause supported by row and calculation-logic evidence."""
+    null_fields: dict[str, list[str]] = {}
+    for item in evidence:
+        if not item.rows:
+            continue
+        for row in item.rows:
+            for column, value in row.items():
+                if value is None:
+                    null_fields.setdefault(str(column).lower(), []).append(item.evidence_id)
+    if not null_fields:
+        return None
+
+    calculation_terms = ("age", "date", "datediff", "extract", "year", "calculate", "convert")
+    for procedure in procedure_analysis:
+        definition = procedure.definition_excerpt.lower()
+        if not definition or not any(term in definition for term in calculation_terms):
+            continue
+        for column, row_refs in null_fields.items():
+            variants = {column, column.replace("_", "")}
+            compact_definition = definition.replace("_", "")
+            if not any(value in definition or value in compact_definition for value in variants):
+                continue
+            escaped_column = re.escape(column)
+            has_null_guard = bool(
+                re.search(
+                    rf"(?:{escaped_column}\s+is\s+(?:not\s+)?null|coalesce\s*\(\s*{escaped_column}|ifnull\s*\(\s*{escaped_column})",
+                    definition,
+                )
+            )
+            if has_null_guard:
+                continue
+            logic_refs = [
+                item.evidence_id
+                for item in evidence
+                if item.purpose == f"Inspect calculation logic in {procedure.name}" and item.rows
+            ]
+            if not logic_refs:
+                continue
+            conclusion = (
+                f"The confirmed record has missing {column}, and {procedure.name} depends on that field "
+                "for date/age calculation without safe null validation; this causes the calculation failure."
+            )
+            return conclusion, list(dict.fromkeys([*row_refs, *logic_refs])), column
+    return None
+
+
 def reason_about_evidence(
     question: str,
     intent: IntentResult,
@@ -267,6 +318,12 @@ def reason_about_evidence(
         supporting = [f"{item.purpose}: {len(item.rows)} row(s) returned" for item in non_empty]
     missing = [f"{item.purpose}: {item.error or 'no rows returned'}" for item in evidence if not item.rows]
     root_causes: list[str] = []
+    root_cause_refs: dict[str, list[str]] = {}
+    null_dependency = _null_dependency_claim(evidence, procedure_analysis)
+    if null_dependency:
+        conclusion, refs, _ = null_dependency
+        root_causes.append(conclusion)
+        root_cause_refs[conclusion] = refs
     if evidence_focus:
         write_procs = [
             proc
@@ -280,7 +337,9 @@ def reason_about_evidence(
         "duplicate" in item.purpose.lower() or (item.rows and "duplicate" in item.sql.lower())
         for item in evidence
     )
-    if duplicate_like:
+    if null_dependency:
+        pass
+    elif duplicate_like:
         if evidence_focus and evidence_focus.confirmed_facts:
             duplicate_facts = [fact for fact in evidence_focus.confirmed_facts if " has " in fact and evidence_focus.affected_object in fact]
             root_causes.extend(duplicate_facts[:2])
@@ -347,6 +406,14 @@ def reason_about_evidence(
         "Apply the smallest safe fix after confirming the exact broken status, key, procedure, or plan. Evidence: confirmed facts and ranked hypotheses.",
         "Do not run write or DDL commands without change approval, rollback plan, and backup validation. Evidence: safety policy.",
     ]
+    if null_dependency:
+        _, refs, column = null_dependency
+        ref_text = ", ".join(refs)
+        fix = [
+            f"Correct the missing or invalid {column} through the approved data process after source verification. Evidence: {ref_text}.",
+            f"Add explicit null and valid-date validation before date or age calculation, with a controlled error path. Evidence: {ref_text}.",
+            "Re-run the read-only record and calculation-logic checks before and after the approved change.",
+        ]
     proof_of_fix = ["Run proof SQL after the fix; expected result depends on the failure type and should show no duplicate/missing/failed condition remains."]
     if intent.intent == InvestigationIntent.MISSING_DATA and _rows_for_purpose(evidence, "Confirmed Missing Related Record Candidates"):
         proof_of_fix = [
@@ -363,7 +430,10 @@ def reason_about_evidence(
         ]
     return ReasoningResult(
         summary="Investigation generated dynamically from detected intent, extracted entities, ranked database objects, stored procedure analysis, retrieved documents, approved knowledge, and safe SQL evidence.",
-        likely_root_causes=[build_deterministic_root_cause_claim(item) for item in root_causes if item.strip()],
+        likely_root_causes=[
+            build_deterministic_root_cause_claim(item, root_cause_refs.get(item, []), evidence)
+            for item in root_causes if item.strip()
+        ],
         supporting_evidence=supporting or ["No confirming rows were returned by the safe evidence plan."],
         missing_evidence=missing_evidence,
         recommended_fix=fix,

@@ -17,7 +17,7 @@ def _load_scenarios() -> list[Scenario]:
     records = json.loads(DATA.read_text(encoding="utf-8"))
     required = {item.name for item in fields(Scenario)}
     assert len(records) == 100
-    assert all(required == set(record) for record in records)
+    assert all(required - {"expected_root_cause_concepts", "required_evidence_types", "forbidden_claims"} <= set(record) for record in records)
     assert len({record["case_id"] for record in records}) == len(records)
     return [Scenario(**record) for record in records]
 

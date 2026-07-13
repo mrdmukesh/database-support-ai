@@ -528,7 +528,11 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
         column_filters = []
         for column in table.columns:
             column_l = column.lower()
-            if any(term in column_l for term in ("number", "code", "status", "key", "reference", "name", "message")):
+            if (
+                column_l == "id"
+                or column_l.endswith("_id")
+                or any(term in column_l for term in ("number", "code", "status", "key", "reference", "name", "message"))
+            ):
                 column_filters.append(f"{_cast_to_text(column, engine_type)} = '{escaped}'")
         if column_filters:
             filters.append("(" + " OR ".join(column_filters[:6]) + ")")

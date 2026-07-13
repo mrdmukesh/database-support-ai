@@ -18,6 +18,7 @@ from legacydb_copilot.security import create_access_token
 
 @pytest.fixture
 def client() -> TestClient:
+    app = create_fastapi_app()
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -33,7 +34,6 @@ def client() -> TestClient:
         finally:
             db.close()
 
-    app = create_fastapi_app()
     app.dependency_overrides[get_db_session] = override_db_session
     return TestClient(app)
 
@@ -350,6 +350,26 @@ def test_feedback_requires_approval_before_knowledge_creation(client: TestClient
     assert feedback_response.status_code == 201
     feedback = feedback_response.json()
     assert feedback["status"] == "PENDING_APPROVAL"
+    investigation_after_feedback = client.get(
+        f"/learning/investigations/{investigation_id}", headers=headers
+    ).json()
+    assert investigation_after_feedback["status"] == "DEVELOPER_REVIEW"
+
+    dashboard_after_feedback = client.get(
+        f"/learning/dashboard?organization_id={org['id']}&workspace_id={workspace['id']}",
+        headers=headers,
+    ).json()
+    assert dashboard_after_feedback["open_investigations"] == 0
+    assert dashboard_after_feedback["pending_feedback"] == 1
+    assert dashboard_after_feedback["pending_approval"] == 1
+
+    duplicate_response = client.post(
+        f"/learning/investigations/{investigation_id}/feedback",
+        json={"rating": "HELPFUL", "notes": "Duplicate pending feedback."},
+        headers=headers,
+    )
+    assert duplicate_response.status_code == 409
+    assert duplicate_response.json()["detail"] == "Pending feedback already exists for this investigation"
 
     knowledge_before = client.get(
         f"/learning/knowledge?organization_id={org['id']}&workspace_id={workspace['id']}",
@@ -379,6 +399,76 @@ def test_feedback_requires_approval_before_knowledge_creation(client: TestClient
     ).json()
     assert knowledge_after[0]["title"] == "Duplicate shipment on retry"
     assert knowledge_after[0]["actual_root_cause"].startswith("Retry procedure")
+
+
+def test_user_without_feedback_permission_cannot_submit_investigation_feedback(client: TestClient) -> None:
+    org, user, workspace, connection, headers = _create_chat_fixture(client)
+    investigation_id = client.post(
+        "/chat/ask",
+        json={
+            "organization_id": org["id"],
+            "workspace_id": workspace["id"],
+            "connection_id": connection["id"],
+            "user_id": user["id"],
+            "question": "Why did the payroll export fail?",
+        },
+        headers=headers,
+    ).json()["investigation_id"]
+    signup = client.post(
+        "/auth/signup",
+        json={
+            "organization_id": org["id"],
+            "email": "readonly-feedback@example.com",
+            "password": "StrongPass123!",
+            "full_name": "Read Only Reviewer",
+            "role": "read_only_user",
+            "consents": ["terms_of_service", "privacy_policy", "document_processing", "ai_verification_required"],
+            "ip_address": "127.0.0.1",
+        },
+    )
+    assert signup.status_code == 201
+    read_only_headers = _auth_headers(client, "readonly-feedback@example.com")
+    response = client.post(
+        f"/learning/investigations/{investigation_id}/feedback",
+        json={"rating": "HELPFUL"},
+        headers=read_only_headers,
+    )
+    assert response.status_code == 403
+    assert client.get(f"/learning/investigations/{investigation_id}", headers=headers).json()["status"] == "AI_ANSWERED"
+
+
+def test_failed_feedback_commit_does_not_change_investigation_status(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    org, user, workspace, connection, headers = _create_chat_fixture(client)
+    investigation_id = client.post(
+        "/chat/ask",
+        json={
+            "organization_id": org["id"],
+            "workspace_id": workspace["id"],
+            "connection_id": connection["id"],
+            "user_id": user["id"],
+            "question": "Why did the reconciliation fail?",
+        },
+        headers=headers,
+    ).json()["investigation_id"]
+    original_commit = Session.commit
+
+    def fail_commit(_session: Session) -> None:
+        raise RuntimeError("simulated persistence failure")
+
+    monkeypatch.setattr(Session, "commit", fail_commit)
+    with pytest.raises(RuntimeError, match="simulated persistence failure"):
+        client.post(
+            f"/learning/investigations/{investigation_id}/feedback",
+            json={"rating": "HELPFUL"},
+            headers=headers,
+        )
+    monkeypatch.setattr(Session, "commit", original_commit)
+
+    detail = client.get(f"/learning/investigations/{investigation_id}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "AI_ANSWERED"
 
 
 def test_saved_investigation_can_be_reopened_for_feedback(client: TestClient) -> None:

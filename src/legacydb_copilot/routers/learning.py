@@ -324,6 +324,19 @@ def submit_feedback(
 
     investigation = _get_investigation(db, investigation_id)
     require_resource_owner_workspace(db, current_user, investigation, action="write")
+    existing_pending = (
+        db.query(InvestigationFeedbackModel.id)
+        .filter(
+            InvestigationFeedbackModel.investigation_id == investigation.id,
+            InvestigationFeedbackModel.status == InvestigationStatus.PENDING_APPROVAL.value,
+        )
+        .first()
+    )
+    if existing_pending is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pending feedback already exists for this investigation",
+        )
     feedback = InvestigationFeedbackModel(
         organization_id=investigation.organization_id,
         workspace_id=investigation.workspace_id,
@@ -340,9 +353,13 @@ def submit_feedback(
         notes=payload.notes,
         status=InvestigationStatus.PENDING_APPROVAL.value,
     )
-    investigation.status = InvestigationStatus.PENDING_APPROVAL.value
+    investigation.status = InvestigationStatus.DEVELOPER_REVIEW.value
     db.add(feedback)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(feedback)
     return feedback
 

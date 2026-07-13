@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Header } from "../components/navigation/Header";
 import { Sidebar } from "../components/navigation/Sidebar";
+import { HelpAssistant } from "../features/help/HelpAssistant";
 
 export function AppLayout() {
   return (
@@ -12,6 +13,7 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+      <HelpAssistant />
     </div>
   );
 }

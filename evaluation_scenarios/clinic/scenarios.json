@@ -1,0 +1,320 @@
+[
+  {
+    "scenario_id": "clinic-pilot-001",
+    "domain": "clinic",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "missing_workflow_output",
+    "difficulty": "medium",
+    "question": "Why was appointment APT-2101 not converted into an encounter?",
+    "baseline_script": "evaluation_databases/clinic/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/clinic/clinic-pilot-001/inject.sql",
+    "verification_script": "evaluation_scenarios/clinic/clinic-pilot-001/verify.sql",
+    "cleanup_script": "evaluation_scenarios/clinic/clinic-pilot-001/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "APT-2101"
+    ],
+    "expected_root_cause_concepts": [
+      "required downstream work item was not created after a completed upstream transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "appointments"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_clinic_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_clinic_workflow_1"
+    ],
+    "expected_functions": [
+      "eval.fn_clinic_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_providers_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-CLINIC-001",
+      "APT-2101",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "transactional workflow completion"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "clinic-pilot-002",
+    "domain": "clinic",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "duplicate_integration",
+    "difficulty": "hard",
+    "question": "Why was claim CLM-3302 submitted twice?",
+    "baseline_script": "evaluation_databases/clinic/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/clinic/clinic-pilot-002/inject.sql",
+    "verification_script": "evaluation_scenarios/clinic/clinic-pilot-002/verify.sql",
+    "cleanup_script": "evaluation_scenarios/clinic/clinic-pilot-002/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "CLM-3302"
+    ],
+    "expected_root_cause_concepts": [
+      "integration retry inserted the same business event without an idempotency guard"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "encounters"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_clinic_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_clinic_workflow_2"
+    ],
+    "expected_functions": [
+      "eval.fn_clinic_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_providers_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-CLINIC-002",
+      "CLM-3302",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "idempotency key"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "clinic-pilot-003",
+    "domain": "clinic",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "incorrect_selection",
+    "difficulty": "hard",
+    "question": "Why is lab result LAB-4403 not visible on its encounter?",
+    "baseline_script": "evaluation_databases/clinic/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/clinic/clinic-pilot-003/inject.sql",
+    "verification_script": "evaluation_scenarios/clinic/clinic-pilot-003/verify.sql",
+    "cleanup_script": "evaluation_scenarios/clinic/clinic-pilot-003/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "LAB-4403"
+    ],
+    "expected_root_cause_concepts": [
+      "selection used historical assignment instead of the active work item"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "diagnoses"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_clinic_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_clinic_workflow_3"
+    ],
+    "expected_functions": [
+      "eval.fn_clinic_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_providers_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-CLINIC-003",
+      "LAB-4403",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "active assignment filtering"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "clinic-pilot-004",
+    "domain": "clinic",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "stalled_status",
+    "difficulty": "medium",
+    "question": "Why does encounter ENC-5504 remain Open after checkout?",
+    "baseline_script": "evaluation_databases/clinic/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/clinic/clinic-pilot-004/inject.sql",
+    "verification_script": "evaluation_scenarios/clinic/clinic-pilot-004/verify.sql",
+    "cleanup_script": "evaluation_scenarios/clinic/clinic-pilot-004/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "ENC-5504"
+    ],
+    "expected_root_cause_concepts": [
+      "integration failure prevented the terminal status transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "procedures_performed"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_clinic_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_clinic_workflow_4"
+    ],
+    "expected_functions": [
+      "eval.fn_clinic_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_providers_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-CLINIC-004",
+      "ENC-5504",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "retry and reconciliation"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "clinic-pilot-005",
+    "domain": "clinic",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "evidence_safety",
+    "subcategory": "insufficient_evidence",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm patient PAT-6605 missed an appointment?",
+    "baseline_script": "evaluation_databases/clinic/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/clinic/clinic-pilot-005/inject.sql",
+    "verification_script": "evaluation_scenarios/clinic/clinic-pilot-005/verify.sql",
+    "cleanup_script": "evaluation_scenarios/clinic/clinic-pilot-005/cleanup.sql",
+    "expected_response_type": "insufficient_evidence",
+    "expected_entities": [
+      "PAT-6605"
+    ],
+    "expected_root_cause_concepts": [],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "prescriptions"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_clinic_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_clinic_workflow_5"
+    ],
+    "expected_functions": [
+      "eval.fn_clinic_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_providers_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-CLINIC-005",
+      "PAT-6605",
+      "absence of conclusive timestamps"
+    ],
+    "acceptable_fix_concepts": [
+      "collect additional timestamp evidence"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  }
+]

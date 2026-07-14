@@ -1,0 +1,28 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+INSERT eval.[customers] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('BANKING-001','Active',DATEADD(minute,-1,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[accounts] (BusinessKey, [CustomersId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-002', 1,'Active',DATEADD(minute,-2,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[account_balances] (BusinessKey, [AccountsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-003', 1,'Active',DATEADD(minute,-3,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[transactions] (BusinessKey, [AccountsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-004', 1,'Active',DATEADD(minute,-4,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[transfers] (BusinessKey, [AccountsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-005', 1,'Active',DATEADD(minute,-5,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[beneficiaries] (BusinessKey, [CustomersId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-006', 1,'Active',DATEADD(minute,-6,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[payment_instructions] (BusinessKey, [AccountsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-007', 1,'Active',DATEADD(minute,-7,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[loans] (BusinessKey, [CustomersId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-008', 1,'Active',DATEADD(minute,-8,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[loan_schedules] (BusinessKey, [LoansId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-009', 1,'Active',DATEADD(minute,-9,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[cards] (BusinessKey, [AccountsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-010', 1,'Active',DATEADD(minute,-10,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[fraud_alerts] (BusinessKey, [TransactionsId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-011', 1,'Active',DATEADD(minute,-11,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[compliance_cases] (BusinessKey, [CustomersId],Status,EventTime,Details,CorrelationId) VALUES ('BANKING-012', 1,'Active',DATEADD(minute,-12,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[integration_messages] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('BANKING-013','Active',DATEADD(minute,-13,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[batch_runs] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('BANKING-014','Active',DATEADD(minute,-14,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[exceptions] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('BANKING-015','Active',DATEADD(minute,-15,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.[audit_history] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('BANKING-016','Active',DATEADD(minute,-16,SYSUTCDATETIME()),'Synthetic baseline record','BASE-BANKING');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-TRF-3101','Processed',DATEADD(hour,-1,SYSUTCDATETIME()),'Synthetic workflow message','CORR-TRF-3101');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-PMT-3102','Processed',DATEADD(hour,-2,SYSUTCDATETIME()),'Synthetic workflow message','CORR-PMT-3102');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-ACC-3103','Processed',DATEADD(hour,-3,SYSUTCDATETIME()),'Synthetic workflow message','CORR-ACC-3103');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-BAT-3104','Processed',DATEADD(hour,-4,SYSUTCDATETIME()),'Synthetic workflow message','CORR-BAT-3104');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-TXN-3105','Processed',DATEADD(hour,-5,SYSUTCDATETIME()),'Synthetic workflow message','CORR-TXN-3105');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-BANKING-1','Completed',DATEADD(day,-1,SYSUTCDATETIME()),'Synthetic end-to-end workflow 1','WF-BANKING-1');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-BANKING-2','Completed',DATEADD(day,-2,SYSUTCDATETIME()),'Synthetic end-to-end workflow 2','WF-BANKING-2');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-BANKING-3','Completed',DATEADD(day,-3,SYSUTCDATETIME()),'Synthetic end-to-end workflow 3','WF-BANKING-3');
+COMMIT;
+GO

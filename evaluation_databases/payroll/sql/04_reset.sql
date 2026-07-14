@@ -1,0 +1,37 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+DELETE FROM eval.[audit_history];
+DELETE FROM eval.[exceptions];
+DELETE FROM eval.[batch_runs];
+DELETE FROM eval.[integration_messages];
+DELETE FROM eval.[tax_filings];
+DELETE FROM eval.[payments];
+DELETE FROM eval.[deductions];
+DELETE FROM eval.[payroll_items];
+DELETE FROM eval.[payroll_runs];
+DELETE FROM eval.[leave_requests];
+DELETE FROM eval.[time_entries];
+DELETE FROM eval.[pay_periods];
+DELETE FROM eval.[pay_groups];
+DELETE FROM eval.[employment_history];
+DELETE FROM eval.[employees];
+DELETE FROM eval.[departments];
+DBCC CHECKIDENT ('eval.departments', RESEED, 0);
+DBCC CHECKIDENT ('eval.employees', RESEED, 0);
+DBCC CHECKIDENT ('eval.employment_history', RESEED, 0);
+DBCC CHECKIDENT ('eval.pay_groups', RESEED, 0);
+DBCC CHECKIDENT ('eval.pay_periods', RESEED, 0);
+DBCC CHECKIDENT ('eval.time_entries', RESEED, 0);
+DBCC CHECKIDENT ('eval.leave_requests', RESEED, 0);
+DBCC CHECKIDENT ('eval.payroll_runs', RESEED, 0);
+DBCC CHECKIDENT ('eval.payroll_items', RESEED, 0);
+DBCC CHECKIDENT ('eval.deductions', RESEED, 0);
+DBCC CHECKIDENT ('eval.payments', RESEED, 0);
+DBCC CHECKIDENT ('eval.tax_filings', RESEED, 0);
+DBCC CHECKIDENT ('eval.integration_messages', RESEED, 0);
+DBCC CHECKIDENT ('eval.batch_runs', RESEED, 0);
+DBCC CHECKIDENT ('eval.exceptions', RESEED, 0);
+DBCC CHECKIDENT ('eval.audit_history', RESEED, 0);
+COMMIT;
+GO
+:r 02_seed.sql

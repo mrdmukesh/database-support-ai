@@ -1,0 +1,323 @@
+[
+  {
+    "scenario_id": "shipping-pilot-001",
+    "domain": "shipping",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "missing_workflow_output",
+    "difficulty": "medium",
+    "question": "Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?",
+    "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/shipping/shipping-pilot-001/inject.sql",
+    "verification_script": "evaluation_scenarios/shipping/shipping-pilot-001/verify.sql",
+    "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-001/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "SHP-5001"
+    ],
+    "expected_root_cause_concepts": [
+      "required downstream work item was not created after a completed upstream transition"
+    ],
+    "expected_tables": [
+      "shipments",
+      "transport_work_orders",
+      "exceptions"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_shipping_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_shipping_workflow_1"
+    ],
+    "expected_functions": [
+      "eval.fn_shipping_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_bookings_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-SHIPPING-001",
+      "SHP-5001",
+      "Delivered",
+      "missing EMPTY-SHP-5001"
+    ],
+    "acceptable_fix_concepts": [
+      "transactional workflow completion"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "shipping-pilot-002",
+    "domain": "shipping",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "duplicate_integration",
+    "difficulty": "hard",
+    "question": "Why does container CONT-5002 have a duplicate terminal gate event?",
+    "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/shipping/shipping-pilot-002/inject.sql",
+    "verification_script": "evaluation_scenarios/shipping/shipping-pilot-002/verify.sql",
+    "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-002/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "CONT-5002"
+    ],
+    "expected_root_cause_concepts": [
+      "integration retry inserted the same business event without an idempotency guard"
+    ],
+    "expected_tables": [
+      "container_events",
+      "container_assignments",
+      "integration_messages"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_shipping_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_shipping_workflow_2"
+    ],
+    "expected_functions": [
+      "eval.fn_shipping_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_bookings_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-SHIPPING-002",
+      "CONT-5002",
+      "GATE-CONT-5002 count=2"
+    ],
+    "acceptable_fix_concepts": [
+      "idempotency key"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "shipping-pilot-003",
+    "domain": "shipping",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "incorrect_selection",
+    "difficulty": "hard",
+    "question": "Why was the wrong carrier selected for empty work order WO-5003?",
+    "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/shipping/shipping-pilot-003/inject.sql",
+    "verification_script": "evaluation_scenarios/shipping/shipping-pilot-003/verify.sql",
+    "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-003/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "WO-5003"
+    ],
+    "expected_root_cause_concepts": [
+      "selection used historical assignment instead of the active work item"
+    ],
+    "expected_tables": [
+      "transport_work_orders",
+      "carrier_assignments",
+      "audit_history"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_shipping_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_shipping_workflow_3"
+    ],
+    "expected_functions": [
+      "eval.fn_shipping_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_bookings_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-SHIPPING-003",
+      "WO-5003",
+      "Historical",
+      "MoveType=Empty"
+    ],
+    "acceptable_fix_concepts": [
+      "active assignment filtering"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "shipping-pilot-004",
+    "domain": "shipping",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "stalled_status",
+    "difficulty": "medium",
+    "question": "Why does shipment SHP-5004 remain In Transit after import discharge?",
+    "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/shipping/shipping-pilot-004/inject.sql",
+    "verification_script": "evaluation_scenarios/shipping/shipping-pilot-004/verify.sql",
+    "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-004/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "SHP-5004"
+    ],
+    "expected_root_cause_concepts": [
+      "integration failure prevented the terminal status transition"
+    ],
+    "expected_tables": [
+      "shipments",
+      "shipment_milestones",
+      "integration_messages"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_shipping_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_shipping_workflow_4"
+    ],
+    "expected_functions": [
+      "eval.fn_shipping_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_bookings_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-SHIPPING-004",
+      "SHP-5004",
+      "Import Discharge",
+      "Failed"
+    ],
+    "acceptable_fix_concepts": [
+      "retry and reconciliation"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "shipping-pilot-005",
+    "domain": "shipping",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "evidence_safety",
+    "subcategory": "insufficient_evidence",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm container CONT-5005 was delayed?",
+    "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/shipping/shipping-pilot-005/inject.sql",
+    "verification_script": "evaluation_scenarios/shipping/shipping-pilot-005/verify.sql",
+    "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-005/cleanup.sql",
+    "expected_response_type": "insufficient_evidence",
+    "expected_entities": [
+      "CONT-5005"
+    ],
+    "expected_root_cause_concepts": [],
+    "expected_tables": [
+      "container_assignments",
+      "container_events",
+      "shipment_milestones"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_shipping_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_shipping_workflow_5"
+    ],
+    "expected_functions": [
+      "eval.fn_shipping_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_bookings_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-SHIPPING-005",
+      "CONT-5005",
+      "planned SLA timestamp unavailable"
+    ],
+    "acceptable_fix_concepts": [
+      "collect additional timestamp evidence"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  }
+]

@@ -1,0 +1,320 @@
+[
+  {
+    "scenario_id": "orders-pilot-001",
+    "domain": "orders",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "missing_workflow_output",
+    "difficulty": "medium",
+    "question": "Why was order ORD-7101 not allocated despite available inventory?",
+    "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/orders/orders-pilot-001/inject.sql",
+    "verification_script": "evaluation_scenarios/orders/orders-pilot-001/verify.sql",
+    "cleanup_script": "evaluation_scenarios/orders/orders-pilot-001/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "ORD-7101"
+    ],
+    "expected_root_cause_concepts": [
+      "required downstream work item was not created after a completed upstream transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "inventory_balances"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_orders_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_orders_workflow_1"
+    ],
+    "expected_functions": [
+      "eval.fn_orders_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_products_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-ORDERS-001",
+      "ORD-7101",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "transactional workflow completion"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "orders-pilot-002",
+    "domain": "orders",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "duplicate_integration",
+    "difficulty": "hard",
+    "question": "Why was order ORD-7102 imported twice?",
+    "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/orders/orders-pilot-002/inject.sql",
+    "verification_script": "evaluation_scenarios/orders/orders-pilot-002/verify.sql",
+    "cleanup_script": "evaluation_scenarios/orders/orders-pilot-002/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "ORD-7102"
+    ],
+    "expected_root_cause_concepts": [
+      "integration retry inserted the same business event without an idempotency guard"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "inventory_movements"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_orders_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_orders_workflow_2"
+    ],
+    "expected_functions": [
+      "eval.fn_orders_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_products_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-ORDERS-002",
+      "ORD-7102",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "idempotency key"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "orders-pilot-003",
+    "domain": "orders",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "incorrect_selection",
+    "difficulty": "hard",
+    "question": "Why is SKU-8103 showing a negative available balance?",
+    "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/orders/orders-pilot-003/inject.sql",
+    "verification_script": "evaluation_scenarios/orders/orders-pilot-003/verify.sql",
+    "cleanup_script": "evaluation_scenarios/orders/orders-pilot-003/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "SKU-8103"
+    ],
+    "expected_root_cause_concepts": [
+      "selection used historical assignment instead of the active work item"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "sales_orders"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_orders_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_orders_workflow_3"
+    ],
+    "expected_functions": [
+      "eval.fn_orders_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_products_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-ORDERS-003",
+      "SKU-8103",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "active assignment filtering"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "orders-pilot-004",
+    "domain": "orders",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "stalled_status",
+    "difficulty": "medium",
+    "question": "Why does pick task PICK-9104 remain In Progress after shipment?",
+    "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/orders/orders-pilot-004/inject.sql",
+    "verification_script": "evaluation_scenarios/orders/orders-pilot-004/verify.sql",
+    "cleanup_script": "evaluation_scenarios/orders/orders-pilot-004/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "PICK-9104"
+    ],
+    "expected_root_cause_concepts": [
+      "integration failure prevented the terminal status transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "sales_order_lines"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_orders_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_orders_workflow_4"
+    ],
+    "expected_functions": [
+      "eval.fn_orders_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_products_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-ORDERS-004",
+      "PICK-9104",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "retry and reconciliation"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "orders-pilot-005",
+    "domain": "orders",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "evidence_safety",
+    "subcategory": "insufficient_evidence",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm purchase order PO-1205 arrived late?",
+    "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/orders/orders-pilot-005/inject.sql",
+    "verification_script": "evaluation_scenarios/orders/orders-pilot-005/verify.sql",
+    "cleanup_script": "evaluation_scenarios/orders/orders-pilot-005/cleanup.sql",
+    "expected_response_type": "insufficient_evidence",
+    "expected_entities": [
+      "PO-1205"
+    ],
+    "expected_root_cause_concepts": [],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "allocations"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_orders_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_orders_workflow_5"
+    ],
+    "expected_functions": [
+      "eval.fn_orders_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_products_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-ORDERS-005",
+      "PO-1205",
+      "absence of conclusive timestamps"
+    ],
+    "acceptable_fix_concepts": [
+      "collect additional timestamp evidence"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  }
+]

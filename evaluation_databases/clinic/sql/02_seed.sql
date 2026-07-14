@@ -1,0 +1,28 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+INSERT eval.[clinics] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-001','Active',DATEADD(minute,-1,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[providers] (BusinessKey, [ClinicsId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-002', 1,'Active',DATEADD(minute,-2,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[patients] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-003','Active',DATEADD(minute,-3,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[appointments] (BusinessKey, [PatientsId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-004', 1,'Active',DATEADD(minute,-4,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[encounters] (BusinessKey, [AppointmentsId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-005', 1,'Active',DATEADD(minute,-5,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[diagnoses] (BusinessKey, [EncountersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-006', 1,'Active',DATEADD(minute,-6,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[procedures_performed] (BusinessKey, [EncountersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-007', 1,'Active',DATEADD(minute,-7,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[prescriptions] (BusinessKey, [EncountersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-008', 1,'Active',DATEADD(minute,-8,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[lab_orders] (BusinessKey, [EncountersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-009', 1,'Active',DATEADD(minute,-9,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[lab_results] (BusinessKey, [LabOrdersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-010', 1,'Active',DATEADD(minute,-10,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[insurance_policies] (BusinessKey, [PatientsId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-011', 1,'Active',DATEADD(minute,-11,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[claims] (BusinessKey, [EncountersId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-012', 1,'Active',DATEADD(minute,-12,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[payments] (BusinessKey, [ClaimsId],Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-013', 1,'Active',DATEADD(minute,-13,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[integration_messages] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-014','Active',DATEADD(minute,-14,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[exceptions] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-015','Active',DATEADD(minute,-15,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.[audit_history] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('CLINIC-016','Active',DATEADD(minute,-16,SYSUTCDATETIME()),'Synthetic baseline record','BASE-CLINIC');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-APT-2101','Processed',DATEADD(hour,-1,SYSUTCDATETIME()),'Synthetic workflow message','CORR-APT-2101');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-CLM-3302','Processed',DATEADD(hour,-2,SYSUTCDATETIME()),'Synthetic workflow message','CORR-CLM-3302');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-LAB-4403','Processed',DATEADD(hour,-3,SYSUTCDATETIME()),'Synthetic workflow message','CORR-LAB-4403');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-ENC-5504','Processed',DATEADD(hour,-4,SYSUTCDATETIME()),'Synthetic workflow message','CORR-ENC-5504');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-PAT-6605','Processed',DATEADD(hour,-5,SYSUTCDATETIME()),'Synthetic workflow message','CORR-PAT-6605');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-CLINIC-1','Completed',DATEADD(day,-1,SYSUTCDATETIME()),'Synthetic end-to-end workflow 1','WF-CLINIC-1');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-CLINIC-2','Completed',DATEADD(day,-2,SYSUTCDATETIME()),'Synthetic end-to-end workflow 2','WF-CLINIC-2');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-CLINIC-3','Completed',DATEADD(day,-3,SYSUTCDATETIME()),'Synthetic end-to-end workflow 3','WF-CLINIC-3');
+COMMIT;
+GO

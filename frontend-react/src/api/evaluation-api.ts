@@ -1,0 +1,10 @@
+import { ApiClientError, apiRequest } from "./client";
+import type { EvaluationComparison, EvaluationRun, EvaluationScenario, EvaluationScenarioDetail, EvaluationSummary } from "../models/evaluation";
+
+const required = <T>(value:T|undefined, message:string):T => { if (value === undefined) throw new ApiClientError(message, 200); return value; };
+export async function listEvaluationRuns(signal?:AbortSignal) { return required(await apiRequest<EvaluationRun[]>("/evaluation-dashboard/runs", {signal}), "Evaluation runs returned an empty response."); }
+export async function getEvaluationSummary(runId:string, signal?:AbortSignal) { return required(await apiRequest<EvaluationSummary>(`/evaluation-dashboard/runs/${encodeURIComponent(runId)}/summary`, {signal}), "Evaluation summary returned an empty response."); }
+export async function listEvaluationScenarios(runId:string, signal?:AbortSignal) { return required(await apiRequest<EvaluationScenario[]>(`/evaluation-dashboard/runs/${encodeURIComponent(runId)}/scenarios`, {signal}), "Evaluation scenarios returned an empty response."); }
+export async function getEvaluationScenario(resultId:string, signal?:AbortSignal) { return required(await apiRequest<EvaluationScenarioDetail>(`/evaluation-dashboard/scenarios/${encodeURIComponent(resultId)}`, {signal}), "Evaluation result returned an empty response."); }
+export async function listHumanReviews(runId:string, signal?:AbortSignal) { return required(await apiRequest<EvaluationScenario[]>(`/evaluation-dashboard/runs/${encodeURIComponent(runId)}/human-reviews`, {signal}), "Review queue returned an empty response."); }
+export async function compareEvaluationRuns(baseline:string, candidate:string, signal?:AbortSignal) { const query=new URLSearchParams({baseline_run_id:baseline,candidate_run_id:candidate}); return required(await apiRequest<EvaluationComparison>(`/evaluation-dashboard/compare?${query}`, {signal}), "Run comparison returned an empty response."); }

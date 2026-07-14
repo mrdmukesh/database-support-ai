@@ -1,0 +1,1 @@
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-PAYROLL-005' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[payroll_runs] WHERE Details='EVAL-PAYROLL-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'TAX-2026-07' ExpectedEntity, 'EVAL-PAYROLL-005' EvidenceValue; GO

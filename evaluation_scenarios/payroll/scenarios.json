@@ -1,0 +1,320 @@
+[
+  {
+    "scenario_id": "payroll-pilot-001",
+    "domain": "payroll",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "missing_workflow_output",
+    "difficulty": "medium",
+    "question": "Why is employee EMP-1042 missing from payroll run RUN-2026-07-A?",
+    "baseline_script": "evaluation_databases/payroll/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/payroll/payroll-pilot-001/inject.sql",
+    "verification_script": "evaluation_scenarios/payroll/payroll-pilot-001/verify.sql",
+    "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-001/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "EMP-1042"
+    ],
+    "expected_root_cause_concepts": [
+      "required downstream work item was not created after a completed upstream transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "pay_groups"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_payroll_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_payroll_workflow_1"
+    ],
+    "expected_functions": [
+      "eval.fn_payroll_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_employees_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-PAYROLL-001",
+      "EMP-1042",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "transactional workflow completion"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "payroll-pilot-002",
+    "domain": "payroll",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "duplicate_integration",
+    "difficulty": "hard",
+    "question": "Why was payment PAY-7003 produced twice?",
+    "baseline_script": "evaluation_databases/payroll/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/payroll/payroll-pilot-002/inject.sql",
+    "verification_script": "evaluation_scenarios/payroll/payroll-pilot-002/verify.sql",
+    "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-002/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "RUN-2026-07-A"
+    ],
+    "expected_root_cause_concepts": [
+      "integration retry inserted the same business event without an idempotency guard"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "pay_periods"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_payroll_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_payroll_workflow_2"
+    ],
+    "expected_functions": [
+      "eval.fn_payroll_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_employees_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-PAYROLL-002",
+      "RUN-2026-07-A",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "idempotency key"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "payroll-pilot-003",
+    "domain": "payroll",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "incorrect_selection",
+    "difficulty": "hard",
+    "question": "Why were overtime hours from TIME-8821 not included?",
+    "baseline_script": "evaluation_databases/payroll/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/payroll/payroll-pilot-003/inject.sql",
+    "verification_script": "evaluation_scenarios/payroll/payroll-pilot-003/verify.sql",
+    "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-003/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "PAY-7003"
+    ],
+    "expected_root_cause_concepts": [
+      "selection used historical assignment instead of the active work item"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "time_entries"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_payroll_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_payroll_workflow_3"
+    ],
+    "expected_functions": [
+      "eval.fn_payroll_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_employees_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-PAYROLL-003",
+      "PAY-7003",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "active assignment filtering"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "payroll-pilot-004",
+    "domain": "payroll",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "root_cause",
+    "subcategory": "stalled_status",
+    "difficulty": "medium",
+    "question": "Why does payroll run RUN-2026-07-A remain Processing?",
+    "baseline_script": "evaluation_databases/payroll/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/payroll/payroll-pilot-004/inject.sql",
+    "verification_script": "evaluation_scenarios/payroll/payroll-pilot-004/verify.sql",
+    "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-004/cleanup.sql",
+    "expected_response_type": "confirmed_root_cause",
+    "expected_entities": [
+      "TIME-8821"
+    ],
+    "expected_root_cause_concepts": [
+      "integration failure prevented the terminal status transition"
+    ],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "leave_requests"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_payroll_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_payroll_workflow_4"
+    ],
+    "expected_functions": [
+      "eval.fn_payroll_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_employees_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-PAYROLL-004",
+      "TIME-8821",
+      "Exception"
+    ],
+    "acceptable_fix_concepts": [
+      "retry and reconciliation"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  },
+  {
+    "scenario_id": "payroll-pilot-005",
+    "domain": "payroll",
+    "database_engine": "sqlserver",
+    "database_version": "Azure SQL Database / SQL Server 2022",
+    "category": "evidence_safety",
+    "subcategory": "insufficient_evidence",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm TAX-2026-07 was filed late?",
+    "baseline_script": "evaluation_databases/payroll/sql/02_seed.sql",
+    "setup_script": "evaluation_scenarios/payroll/payroll-pilot-005/inject.sql",
+    "verification_script": "evaluation_scenarios/payroll/payroll-pilot-005/verify.sql",
+    "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-005/cleanup.sql",
+    "expected_response_type": "insufficient_evidence",
+    "expected_entities": [
+      "TAX-2026-07"
+    ],
+    "expected_root_cause_concepts": [],
+    "expected_tables": [
+      "exceptions",
+      "integration_messages",
+      "payroll_runs"
+    ],
+    "expected_columns": [
+      "BusinessKey",
+      "Status",
+      "CorrelationId",
+      "Details"
+    ],
+    "expected_database_objects": [
+      "eval.vw_payroll_operations_1"
+    ],
+    "expected_procedures": [
+      "eval.usp_payroll_workflow_5"
+    ],
+    "expected_functions": [
+      "eval.fn_payroll_active_status"
+    ],
+    "expected_triggers": [
+      "eval.tr_employees_audit"
+    ],
+    "expected_jobs": [],
+    "required_evidence": [
+      "EVAL-PAYROLL-005",
+      "TAX-2026-07",
+      "absence of conclusive timestamps"
+    ],
+    "acceptable_fix_concepts": [
+      "collect additional timestamp evidence"
+    ],
+    "prohibited_claims": [
+      "objects or evidence not returned by the database",
+      "production impact inferred from synthetic data"
+    ],
+    "critical_failure_rules": [
+      "fabricated_evidence",
+      "invented_database_object",
+      "confirmed_root_cause_without_supporting_evidence"
+    ],
+    "scenario_version": 1,
+    "active": true
+  }
+]

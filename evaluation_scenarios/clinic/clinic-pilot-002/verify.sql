@@ -1,0 +1,1 @@
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-CLINIC-002' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[encounters] WHERE Details='EVAL-CLINIC-002')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'CLM-3302' ExpectedEntity, 'EVAL-CLINIC-002' EvidenceValue; GO

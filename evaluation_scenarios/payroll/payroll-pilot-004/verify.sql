@@ -1,0 +1,1 @@
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-PAYROLL-004' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[leave_requests] WHERE Details='EVAL-PAYROLL-004')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'TIME-8821' ExpectedEntity, 'EVAL-PAYROLL-004' EvidenceValue; GO

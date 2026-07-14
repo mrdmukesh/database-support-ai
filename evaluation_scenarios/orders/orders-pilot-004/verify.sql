@@ -1,0 +1,1 @@
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-ORDERS-004' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[sales_order_lines] WHERE Details='EVAL-ORDERS-004')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'PICK-9104' ExpectedEntity, 'EVAL-ORDERS-004' EvidenceValue; GO

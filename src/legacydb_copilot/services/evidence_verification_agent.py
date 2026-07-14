@@ -7,6 +7,7 @@ from typing import Any
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
+from legacydb_copilot.services.diagnostic_object_service import contains_diagnostic_reference
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus, ProcedureRank
 from legacydb_copilot.services.evidence_gate_service import EvidenceGateResult
@@ -985,7 +986,8 @@ def _verify_execution_path(evidence_focus: EvidenceFocus) -> VerificationResult 
     if not evidence_focus.ranked_procedures:
         return None
     top = evidence_focus.ranked_procedures[0]
-    if top.error_log_support or top.job_history_support:
+    diagnostic_support = contains_diagnostic_reference(top.evidence_found)
+    if top.error_log_support or top.job_history_support or diagnostic_support:
         status = "Verified"
         summary = "Job/error evidence supports the selected execution path."
     elif top.writes_affected_object:
@@ -1037,8 +1039,17 @@ def _verify_recommended_fix(
     writer_name = evidence_focus.ranked_procedures[0].procedure if evidence_focus and evidence_focus.ranked_procedures else ""
     writer = next((item for item in procedure_analysis if item.name == writer_name), None)
     doc_support = bool(documents)
-    proc_support = bool(writer and (writer.missing_exists_checks or writer.missing_uniqueness_checks or writer.tables_written))
-    status = "Verified" if proc_support and (writer.missing_exists_checks or writer.missing_uniqueness_checks) else "Partially Verified" if proc_support or doc_support else "Not Enough Evidence"
+    missing_guards = bool(
+        writer and (writer.missing_exists_checks or writer.missing_uniqueness_checks)
+    )
+    proc_support = bool(writer and (missing_guards or writer.tables_written))
+    status = (
+        "Verified"
+        if proc_support and missing_guards
+        else "Partially Verified"
+        if proc_support or doc_support
+        else "Not Enough Evidence"
+    )
     return VerificationResult(
         claim="Recommended fix is consistent with collected evidence.",
         verification_sql="Procedure analysis and retrieved document evidence",

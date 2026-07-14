@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import threading
 import time
@@ -234,12 +235,25 @@ class EvaluationRunner:
     def _extract(submission: dict[str, Any], detail: dict[str, Any]) -> dict[str, Any]:
         combined = {**submission, **detail}
         sections = combined.get("report_snapshot", {}).get("sections", [])
+        evidence = combined.get("evidence", []) or []
+        answer = str(combined.get("ai_answer", "") or "")
+        response_match = re.search(r"(?im)^Response Type:\s*([a-z_]+)\s*$", answer)
 
         def matching(*terms: str) -> list[Any]:
             return [
                 section
                 for section in sections
                 if any(term in str(section.get("title", "")).lower() for term in terms)
+            ]
+
+        citations = combined.get("citations") or []
+        if not citations:
+            citations = [
+                str(item[key])
+                for item in evidence
+                if isinstance(item, dict)
+                for key in ("evidence_id", "citation_id", "id")
+                if item.get(key)
             ]
 
         return {
@@ -251,17 +265,19 @@ class EvaluationRunner:
             ),
             "generated_sql": combined.get("generated_sql", combined.get("sql_queries", [])),
             "executed_sql": combined.get("executed_sql", []),
-            "evidence": combined.get("evidence", []),
-            "citations": combined.get("citations", combined.get("sources", []))
-            or matching("references used"),
+            "evidence": evidence,
+            "citations": citations,
             "verified_facts": combined.get("verified_facts", []) or matching("verified fact"),
             "interpretations": combined.get("interpretations", [])
             or matching("why it happened", "interpretation"),
             "confirmed_root_cause": combined.get("confirmed_root_cause", "")
             or matching("root cause"),
-            "recommendations": combined.get("recommendations", []) or matching("recommendation"),
+            "recommendations": combined.get("recommendations", [])
+            or matching("recommendation", "recommended fix", "fix"),
             "application_confidence": combined.get("confidence_score", combined.get("confidence")),
             "answer": combined.get("ai_answer", ""),
+            "response_type": combined.get("response_type")
+            or (response_match.group(1).lower() if response_match else ""),
             "report": combined.get("report"),
             "metadata_discovery_duration": combined.get("metadata_discovery_duration"),
             "sql_execution_duration": combined.get("sql_execution_duration"),

@@ -141,6 +141,50 @@ def test_successful_scenario_execution(tmp_path):
     assert len(store.records) == 1
 
 
+def test_extraction_derives_citation_from_evidence_not_connection_sources():
+    extracted = EvaluationRunner._extract(
+        {"sources": ["Read Only Connection"]},
+        {
+            "identified_entities": [
+                {"entity_type": "business_identifier", "value": "ORDER-42"}
+            ],
+            "evidence": [
+                {
+                    "evidence_id": "SQL-1",
+                    "sample_rows": [{"EvidenceValue": "WORKFLOW-ERROR-42"}],
+                }
+            ],
+        },
+    )
+
+    assert extracted["identified_entities"][0]["value"] == "ORDER-42"
+    assert extracted["citations"] == ["SQL-1"]
+    assert "Read Only Connection" not in extracted["citations"]
+
+
+def test_extraction_reads_structured_fix_section_as_recommendations():
+    extracted = EvaluationRunner._extract(
+        {},
+        {
+            "report_snapshot": {
+                "sections": [{"title": "Fix", "items": ["Replay only after an idempotency check."]}]
+            }
+        },
+    )
+
+    assert extracted["recommendations"][0]["title"] == "Fix"
+    assert "idempotency" in extracted["recommendations"][0]["items"][0]
+
+
+def test_extraction_preserves_explicit_application_response_type():
+    extracted = EvaluationRunner._extract(
+        {"ai_answer": "Investigation Complete.\nResponse Type: confirmed_root_cause"},
+        {},
+    )
+
+    assert extracted["response_type"] == "confirmed_root_cause"
+
+
 def test_setup_failure_stops_before_api_and_cleans_up(tmp_path):
     database = FakeDatabase(verified=False)
     api = FakeAPI(submit_error=AssertionError("must not submit"))

@@ -114,6 +114,25 @@ def concept_match(expected: str, actual: Any) -> float:
     return len(wanted & found) / len(wanted) if wanted else 1.0
 
 
+def localized_concept_match(expected: str, actual: Any) -> float:
+    """Match a claim within one structured item or sentence, not across an entire report."""
+    if isinstance(actual, dict):
+        candidates = [value for value in actual.values()]
+    elif isinstance(actual, list | tuple | set):
+        candidates = list(actual)
+    else:
+        candidates = [actual]
+    scores: list[float] = []
+    for candidate in candidates:
+        if isinstance(candidate, dict | list | tuple | set):
+            scores.append(localized_concept_match(expected, candidate))
+            continue
+        for segment in re.split(r"[\r\n]+|(?<=[.!?])\s+", str(candidate)):
+            if segment.strip():
+                scores.append(concept_match(expected, segment))
+    return max(scores, default=0.0)
+
+
 def infer_response_type(result: dict[str, Any]) -> ExpectedResponseType:
     explicit = result.get("response_type") or result.get("expected_response_type")
     if explicit:
@@ -224,12 +243,15 @@ class DeterministicValidator:
             item for item in expected_programmable if not (concepts(item) & object_terms)
         ]
         catalog = self.catalogs.get(scenario.domain, set())
-        named_objects = {match.group(1).lower() for match in SQL_OBJECT.finditer(object_text)}
+        sql_object_text = flatten([result.get("generated_sql"), result.get("executed_sql")])
+        named_objects = {match.group(1).lower() for match in SQL_OBJECT.finditer(sql_object_text)}
         invented_objects = sorted(item for item in named_objects if catalog and item not in catalog)
 
         expected_entity_terms = {item.lower() for item in scenario.expected_entities}
         entity_ok = all(item in entity_text.lower() for item in expected_entity_terms)
-        found_entities = {item.lower() for item in ENTITY.findall(entity_text)}
+        found_entities = {
+            item.lower() for item in ENTITY.findall(flatten(result.get("identified_entities")))
+        }
         wrong_entities = sorted(found_entities - expected_entity_terms)
         response_type = infer_response_type(result)
         response_ok = response_type == scenario.expected_response_type
@@ -278,7 +300,16 @@ class DeterministicValidator:
         unexpected_claims = [
             claim
             for claim in scenario.prohibited_claims
-            if concept_match(claim, [answer, recommendations]) >= 0.75
+            if localized_concept_match(
+                claim,
+                [
+                    result.get("answer"),
+                    result.get("confirmed_root_cause"),
+                    result.get("interpretations"),
+                    result.get("recommendations"),
+                ],
+            )
+            >= 0.75
         ]
 
         sql_values = _sql_values(result.get("generated_sql")) + _sql_values(
@@ -447,12 +478,13 @@ class DeterministicValidator:
 
 def _sql_values(value: Any) -> list[str]:
     if isinstance(value, str):
-        return [value]
+        return [value] if value.strip() else []
     if isinstance(value, list):
         return [
-            item if isinstance(item, str) else str(item.get("sql", ""))
+            sql
             for item in value
             if isinstance(item, str | dict)
+            if (sql := (item if isinstance(item, str) else str(item.get("sql", "")))).strip()
         ]
     return []
 

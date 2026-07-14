@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
+from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 
 _NOISE_TOKENS = {
     "analyze",
@@ -70,6 +71,29 @@ class MetadataSearchContext:
                 self.database_name.lower(),
             ]
         )
+
+
+def resolve_qualified_object_names(
+    objects: list[str],
+    requested_names: set[str] | list[str],
+) -> dict[str, str]:
+    """Resolve exact qualified names, or unique unqualified leaf names.
+
+    Ambiguous leaf names intentionally do not resolve; callers must request the
+    schema-qualified object when multiple accessible schemas expose that name.
+    """
+    exact = {name.lower(): name for name in objects}
+    leaves: dict[str, list[str]] = {}
+    for name in objects:
+        leaves.setdefault(name.lower().split(".")[-1], []).append(name)
+    resolved: dict[str, str] = {}
+    for requested in requested_names:
+        key = requested.lower()
+        if key in exact:
+            resolved[requested] = exact[key]
+        elif len(leaves.get(key, [])) == 1:
+            resolved[requested] = leaves[key][0]
+    return resolved
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
@@ -161,7 +185,8 @@ def _business_identifiers(entities: EntityExtractionResult) -> list[str]:
 
 def _explicit_names(question: str, label: str) -> set[str]:
     names: set[str] = set()
-    pattern = rf"\b{label}\s*:\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"
+    identifier = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
+    pattern = rf"\b{label}\s*:\s*({identifier})\b"
     names.update(match.group(1).lower() for match in re.finditer(pattern, question, re.I))
     return names
 
@@ -252,12 +277,12 @@ def search_metadata(
         for entity in entities.entities
         if entity.entity_type == "stored_procedure"
     }
-    exact_table_names = {table.lower(): table for table in metadata.tables}
-    exact_table_matches = {exact_table_names[name].lower() for name in explicit_tables if name in exact_table_names}
-    exact_proc_names = {proc.lower(): proc for proc in metadata.procedures}
-    exact_proc_matches = {exact_proc_names[name].lower() for name in explicit_procedures if name in exact_proc_names}
-    missing_tables = sorted(explicit_tables - set(exact_table_matches))
-    missing_procedures = sorted(explicit_procedures - set(exact_proc_matches))
+    resolved_tables = resolve_qualified_object_names(metadata.tables, explicit_tables)
+    exact_table_matches = {name.lower() for name in resolved_tables.values()}
+    resolved_procedures = resolve_qualified_object_names(metadata.procedures, explicit_procedures)
+    exact_proc_matches = {name.lower() for name in resolved_procedures.values()}
+    missing_tables = sorted(explicit_tables - set(resolved_tables))
+    missing_procedures = sorted(explicit_procedures - set(resolved_procedures))
     target_object_not_found = bool(missing_tables or missing_procedures)
     failure_reason = ""
     if missing_tables:
@@ -445,13 +470,44 @@ def search_metadata(
     views = [view for view in metadata.views if any(token in view.lower() for token in tokens)]
     if not views and not relevance_required:
         views = metadata.views[:10]
+    if tokens & {"missing", "absent", "failed", "failure", "stuck", "blocked"}:
+        selected_table_names = {table.name for table in tables}
+        for table_name in metadata.tables:
+            if table_name in selected_table_names or not is_diagnostic_object(table_name):
+                continue
+            try:
+                schema = connector.get_table_schema(table_name)
+                tables.append(
+                    TableMetadata(
+                        table_name,
+                        [column["name"] for column in schema["columns"]],
+                        0.0,
+                        schema.get("primary_key", []),
+                        schema.get("foreign_keys", []),
+                        schema.get("indexes", []),
+                    )
+                )
+                selected_table_names.add(table_name)
+            except Exception:
+                continue
+            if len([name for name in selected_table_names if is_diagnostic_object(name)]) >= 4:
+                break
     selected_names = {table.name for table in tables[:8]}
     for item in trace:
         if item["object_type"] == "table" and item["name"] not in selected_names and item["decision"] == "selected":
             item["decision"] = "rejected"
             item["reason"] += "; outside top scored metadata candidates"
+    output_tables = tables[:8]
+    output_names = {table.name for table in output_tables}
+    if tokens & {"missing", "absent", "failed", "failure", "stuck", "blocked"}:
+        for table in tables:
+            if table.name not in output_names and is_diagnostic_object(table.name):
+                output_tables.append(table)
+                output_names.add(table.name)
+            if len(output_tables) >= 12:
+                break
     return MetadataSearchResult(
-        tables=tables[:8],
+        tables=output_tables,
         views=views[:10],
         procedures=procedures[:20],
         version=metadata.version,

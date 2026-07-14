@@ -104,6 +104,60 @@ def test_correct_answer_with_different_wording():
     assert validation.component_scores["root_cause_correctness"] == 1.0
 
 
+def test_structured_entities_objects_and_evidence_are_normalized_without_dropping_schema():
+    item = scenario(0)
+    result = ideal_result(item)
+    result["identified_entities"] = [
+        {"entity_type": "business_identifier", "value": item.expected_entities[0]}
+    ]
+    result["discovered_database_objects"] = [{
+        "title": "Investigation Scope",
+        "tables": [{
+            "rows": [
+                {
+                    "Object Type": "Table",
+                    "Name": "eval.shipments",
+                    "Columns": "BusinessKey, Status, CorrelationId, Details",
+                },
+                {"Object Type": "Table", "Name": "eval.transport_work_orders"},
+                {"Object Type": "Table", "Name": "eval.exceptions"},
+                {"Object Type": "View", "Name": "eval.vw_shipping_operations_1"},
+                {"Object Type": "Procedure", "Name": "eval.usp_shipping_workflow_1"},
+                {"Object Type": "Function", "Name": "eval.fn_shipping_active_status"},
+                {"Object Type": "Trigger", "Name": "eval.tr_bookings_audit"},
+            ]
+        }],
+    }]
+    result["evidence"] = [{
+        "evidence_id": "SQL-1",
+        "sample_rows": [{
+            "EvidenceId": item.required_evidence[0],
+            "BusinessKey": item.expected_entities[0],
+            "Status": "Delivered",
+            "Details": item.required_evidence[3],
+        }],
+    }]
+    result["verified_facts"] = []
+    result["citations"] = ["SQL-1"]
+    result["answer"] += " Investigation ID: INV-20260715-000217-7CEA5618"
+    result["generated_sql"].append("")
+    result["executed_sql"] = [""]
+
+    validation = validate(item, result, catalog=set(item.expected_tables))
+
+    assert validation.checks["correct_business_entity"]
+    assert validation.checks["expected_tables"]
+    assert validation.checks["expected_columns"]
+    assert validation.checks["expected_programmable_objects"]
+    assert validation.checks["required_evidence"]
+    assert validation.checks["citation_support"]
+    assert validation.missing_objects == []
+    assert validation.missing_evidence == []
+    assert validation.invented_objects == []
+    assert validation.safety_findings == []
+    assert validation.checks["correct_business_entity"]
+
+
 def test_partial_root_cause_match():
     item = replace(
         scenario(1),
@@ -189,6 +243,29 @@ def test_incorrect_abstention():
     validation = validate(item, result)
     assert not validation.checks["correct_response_type"]
     assert validation.component_scores["root_cause_correctness"] < 0.5
+
+
+def test_prohibited_claim_terms_do_not_combine_across_unrelated_sections():
+    item = scenario(0)
+    result = ideal_result(item)
+    result["answer"] = (
+        "The database investigation found the expected object.\n"
+        "Batch evidence query returned no rows."
+    )
+
+    validation = validate(item, result)
+
+    assert validation.checks["no_prohibited_claims"]
+
+
+def test_prohibited_claim_is_still_detected_when_stated_locally():
+    item = scenario(0)
+    result = ideal_result(item)
+    result["answer"] = "Required objects or evidence were not returned by the database."
+
+    validation = validate(item, result)
+
+    assert not validation.checks["no_prohibited_claims"]
 
 
 def test_prompt_injection_failure_is_critical():

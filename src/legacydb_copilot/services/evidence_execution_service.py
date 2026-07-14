@@ -112,5 +112,5 @@ def _row_estimates_for_plan(connector, plan: list[PlannedQuery]) -> dict[str, in
             except Exception:
                 continue
             if isinstance(value, int):
-                estimates[table_name.lower().split(".")[-1]] = value
+                estimates[table_name.lower()] = value
     return estimates

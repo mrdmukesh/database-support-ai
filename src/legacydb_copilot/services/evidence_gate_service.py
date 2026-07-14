@@ -269,9 +269,10 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
+    claim = build_deterministic_root_cause_claim(UNREPRODUCED_MESSAGE)
     return ReasoningResult(
         summary=UNREPRODUCED_MESSAGE,
-        likely_root_causes=[build_deterministic_root_cause_claim(UNREPRODUCED_MESSAGE)],
+        likely_root_causes=[claim] if claim else [],
         supporting_evidence=gate.confirmed_facts or ["No confirming rows were returned for the reported issue."],
         missing_evidence=gate.missing_evidence or gate.blocking_reasons,
         recommended_fix=["No fix recommended until the reported condition is reproduced from connected database evidence."],
@@ -291,6 +292,7 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
         confirmed_facts=gate.confirmed_facts,
         inferred_findings=[],
         hypotheses=["Investigation stopped at the evidence gate because the reported condition was not confirmed."],
+        response_type="insufficient_evidence",
     )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import LETTER
@@ -76,9 +77,20 @@ def _table(title: str, columns: list[str], rows: list[dict]) -> list:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
     story = [Paragraph(title, ParagraphStyle("Sub", fontName="Helvetica-Bold", fontSize=11, textColor=colors.HexColor("#0f5f8f")))]
-    data = [columns]
-    data.extend([[str(row.get(column, "")) for column in columns] for row in rows])
-    tbl = Table(data, repeatRows=1, hAlign="LEFT")
+    header_style = ParagraphStyle("TableHeader", fontName="Helvetica-Bold", fontSize=7, leading=9, wordWrap="CJK")
+    cell_style = ParagraphStyle("TableCell", fontName="Helvetica", fontSize=7, leading=9, wordWrap="CJK")
+
+    def cell(value: object, style: ParagraphStyle) -> Paragraph:
+        # Paragraphs wrap table content; raw strings can create a single row
+        # taller than the page and cause ReportLab's LayoutError.
+        text = escape(str(value or "")).replace("\n", "<br/>")
+        return Paragraph(text, style)
+
+    data = [[cell(column, header_style) for column in columns]]
+    data.extend([[cell(row.get(column, ""), cell_style) for column in columns] for row in rows])
+    available_width = LETTER[0] - 72  # Matches the document's 36-point side margins.
+    col_widths = [available_width / len(columns)] * len(columns) if columns else None
+    tbl = Table(data, colWidths=col_widths, repeatRows=1, splitByRow=1, splitInRow=1, hAlign="LEFT")
     tbl.setStyle(
         TableStyle(
             [

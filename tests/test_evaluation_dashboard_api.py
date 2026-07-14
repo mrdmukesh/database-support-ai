@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from evaluation.framework.models import EvaluationRunModel, EvaluationScenarioExecutionModel, TestScenarioModel as ScenarioRecord
+from evaluation.framework.models import EvaluationAIJudgeScoreModel, EvaluationDeterministicScoreModel, EvaluationRunModel, EvaluationScenarioExecutionModel, TestScenarioModel as ScenarioRecord
 from legacydb_copilot.api import create_fastapi_app
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db import models as application_models  # noqa: F401
@@ -50,12 +50,21 @@ def test_dashboard_returns_only_organization_results(dashboard_client):
         run=EvaluationRunModel(application_commit="abc",application_version="0.1",status="created",configuration_json=json.dumps({"run_name":"pilot-v1"}),timing_cost_json="{}")
         scenario=ScenarioRecord(scenario_id="payroll-pilot-001",scenario_version=1,domain="payroll",database_engine="sqlserver",database_version="2022",category="root_cause",subcategory="missing",difficulty="medium",question="Why?",scripts_json="{}",expectations_json="{}",expected_response_type="confirmed_root_cause",active=True)
         db.add_all([run,scenario]);db.flush()
-        db.add(EvaluationScenarioExecutionModel(evaluation_run_id=run.id,test_scenario_id=scenario.id,scenario_id=scenario.scenario_id,scenario_version=1,domain="payroll",database_version="2022",attempt=1,status="completed",investigation_id="INV-1",investigation_status="AI_ANSWERED",raw_request_json=json.dumps({"organization_id":org_id}),raw_response_json="{}",result_json=json.dumps({"answer":"Persisted answer"}),timing_json=json.dumps({"total_seconds":12}),usage_cost_json=json.dumps({"token_usage":{"total_tokens":20},"estimated_cost":.01}),errors_json="[]",retry_count=0,recovery_artifact=""));db.commit();run_id=run.id
+        execution=EvaluationScenarioExecutionModel(evaluation_run_id=run.id,test_scenario_id=scenario.id,scenario_id=scenario.scenario_id,scenario_version=1,domain="payroll",database_version="2022",attempt=1,status="completed",investigation_id="INV-1",investigation_status="AI_ANSWERED",raw_request_json=json.dumps({"organization_id":org_id}),raw_response_json="{}",result_json=json.dumps({"answer":"Persisted answer"}),timing_json=json.dumps({"total_seconds":12}),usage_cost_json=json.dumps({"token_usage":{"total_tokens":20},"estimated_cost":.01}),errors_json="[]",retry_count=0,recovery_artifact="")
+        db.add(execution);db.flush()
+        deterministic=EvaluationDeterministicScoreModel(scenario_execution_id=execution.id,validation_version=1,root_cause_correctness=80,evidence_correctness=80,object_discovery=80,fix_correctness=80,citation_correctness=80,safety=80,completeness=80,unadjusted_score=80,final_score=80,classification="pass",critical_failure=False,details_json="{}")
+        db.add(deterministic);db.flush()
+        normalized={"root_cause_score":90,"evidence_score":85,"object_discovery_score":80,"fix_score":75,"citation_score":70,"safety_score":95,"completeness_score":85,"unsupported_claims":[],"missing_evidence":["lock evidence"],"incorrect_objects":[],"incorrect_entities":[],"critical_failure":False,"human_review_required":False,"explanation":"Evidence supports the answer."}
+        db.add(EvaluationAIJudgeScoreModel(deterministic_score_id=deterministic.id,scenario_execution_id=execution.id,judge_version=1,judge_index=1,provider="openai",model="judge-model",prompt_version="v1",temperature=0,prompt_json="{}",prompt_hash="a"*64,raw_response_json="{}",normalized_result_json=json.dumps(normalized),weighted_score=84,deterministic_difference=4,input_tokens=100,output_tokens=50,duration_ms=1250,estimated_cost_usd=.002,retry_count=0,status="completed",error=""))
+        db.commit();run_id=run.id
     runs=client.get("/evaluation-dashboard/runs",headers=headers).json()
     assert runs[0]["name"]=="pilot-v1" and runs[0]["completed_count"]==1
     summary=client.get(f"/evaluation-dashboard/runs/{run_id}/summary",headers=headers).json()
-    assert summary["scenario_count"]==1 and summary["deterministic_average"] is None
+    assert summary["scenario_count"]==1 and summary["deterministic_average"]==80
+    assert summary["ai_judge_average"]==84
     rows=client.get(f"/evaluation-dashboard/runs/{run_id}/scenarios",headers=headers).json()
     detail=client.get(f"/evaluation-dashboard/scenarios/{rows[0]['result_id']}",headers=headers).json()
     assert detail["answer"]=="Persisted answer"
+    assert detail["judge_report"]["invocations"][0]["model"]=="judge-model"
+    assert detail["judge_report"]["invocations"][0]["result"]["missing_evidence"]==["lock evidence"]
     assert "raw_request" not in detail and "expected_root_cause_concepts" not in detail

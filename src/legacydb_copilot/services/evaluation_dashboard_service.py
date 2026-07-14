@@ -97,6 +97,7 @@ class EvaluationDashboardService:
         result = _json(execution.result_json, {})
         deterministic = self._latest_deterministic(execution.id)
         judge = self._latest_judge(execution.id)
+        judge_report = self._judge_report(execution.id, judge)
         row.update({
             "question": scenario.question if scenario else "",
             "category": scenario.category if scenario else "",
@@ -113,6 +114,7 @@ class EvaluationDashboardService:
             "usage_cost": _json(execution.usage_cost_json, {}),
             "deterministic_details": _json(deterministic.details_json, {}) if deterministic else None,
             "judge_result": _json(judge.normalized_result_json, {}) if judge else None,
+            "judge_report": judge_report,
         })
         return row
 
@@ -144,6 +146,29 @@ class EvaluationDashboardService:
 
     def _latest_judge(self, execution_id: str):
         return self.db.query(EvaluationAIJudgeScoreModel).filter(EvaluationAIJudgeScoreModel.scenario_execution_id == execution_id, EvaluationAIJudgeScoreModel.judge_index == 1).order_by(EvaluationAIJudgeScoreModel.judge_version.desc()).first()
+
+    def _judge_report(self, execution_id: str, primary) -> dict[str, Any] | None:
+        if primary is None:
+            return None
+        invocations = self.db.query(EvaluationAIJudgeScoreModel).filter(
+            EvaluationAIJudgeScoreModel.scenario_execution_id == execution_id,
+            EvaluationAIJudgeScoreModel.judge_version == primary.judge_version,
+        ).order_by(EvaluationAIJudgeScoreModel.judge_index).all()
+        return {
+            "judge_version": primary.judge_version,
+            "prompt_version": primary.prompt_version,
+            "deterministic_difference": _number(primary.deterministic_difference),
+            "invocations": [{
+                "judge_index": item.judge_index, "provider": item.provider,
+                "model": item.model, "status": item.status,
+                "weighted_score": _number(item.weighted_score),
+                "result": _json(item.normalized_result_json, {}),
+                "input_tokens": item.input_tokens, "output_tokens": item.output_tokens,
+                "duration_ms": item.duration_ms,
+                "estimated_cost_usd": _number(item.estimated_cost_usd),
+                "retry_count": item.retry_count, "error": item.error,
+            } for item in invocations],
+        }
 
     def _scenario_row(self, execution: EvaluationScenarioExecutionModel) -> dict[str, Any]:
         deterministic = self._latest_deterministic(execution.id)

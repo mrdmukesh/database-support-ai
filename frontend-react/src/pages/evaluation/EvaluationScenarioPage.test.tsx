@@ -15,5 +15,10 @@ describe("EvaluationScenarioPage",()=>{
     expect(screen.getByText("judge-model")).toBeInTheDocument();
     expect(screen.getByText("Evidence supports the answer.")).toBeInTheDocument();
     expect(screen.getByText("lock evidence")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar",{name:"Root Cause: 90 out of 100"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Download PDF"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Download JSON"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Copy Report"})).toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"Compare Previous"})).toBeInTheDocument();
   });
 });

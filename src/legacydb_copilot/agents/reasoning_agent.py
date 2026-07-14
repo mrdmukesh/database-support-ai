@@ -6,6 +6,7 @@ from enum import StrEnum
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
+from legacydb_copilot.services.diagnostic_object_service import contains_diagnostic_reference
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
@@ -112,10 +113,11 @@ def build_deterministic_root_cause_claim(
     normalized_conclusion = str(conclusion or "").strip()
     if not normalized_conclusion:
         return None
+    candidates: list[object]
     if isinstance(evidence_refs, str):
         candidates = [evidence_refs]
-    elif isinstance(evidence_refs, (list, tuple)):
-        candidates = evidence_refs
+    elif isinstance(evidence_refs, list | tuple):
+        candidates = list(evidence_refs)
     else:
         candidates = []
     normalized_refs = [ref.strip() for ref in candidates if isinstance(ref, str) and ref.strip()]
@@ -137,6 +139,7 @@ class ReasoningResult:
     confirmed_facts: list[str] = field(default_factory=list)
     inferred_findings: list[str] = field(default_factory=list)
     hypotheses: list[str] = field(default_factory=list)
+    response_type: str = "multiple_possible_causes"
 
     def __post_init__(self) -> None:
         claims = [
@@ -197,6 +200,17 @@ def _issue_counts(rows: list[dict]) -> dict[str, int]:
         if issue_type:
             counts[issue_type] = counts.get(issue_type, 0) + 1
     return counts
+
+
+def _supports_failed_downstream_generation(item: EvidenceResult) -> bool:
+    if not item.rows or not contains_diagnostic_reference((item.purpose, item.sql)):
+        return False
+    failure_terms = ("absent", "failed", "failure", "missing", "not generated", "not created")
+    return any(
+        term in " ".join(str(value) for value in row.values()).casefold()
+        for row in item.rows
+        for term in failure_terms
+    )
 
 
 def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
@@ -313,6 +327,10 @@ def reason_about_evidence(
     correlated_evidence = correlated_evidence or []
     procedure_analysis = procedure_analysis or []
     non_empty = [item for item in evidence if item.rows]
+    diagnostic_evidence = [
+        item for item in non_empty if _supports_failed_downstream_generation(item)
+    ]
+    response_type = "multiple_possible_causes"
     supporting = [f"{item.evidence_type} - {item.subject}: {item.finding}" for item in correlated_evidence if item.confidence in {"High", "Medium"}]
     if not supporting:
         supporting = [f"{item.purpose}: {len(item.rows)} row(s) returned" for item in non_empty]
@@ -373,17 +391,42 @@ def reason_about_evidence(
         if issue_counts:
             summary = ", ".join(f"{key}={value}" for key, value in sorted(issue_counts.items()))
             supporting.append(f"Confirmed Missing Related Record Candidates: {len(missing_related_rows)} row(s) found; issue counts: {summary}.")
-            root_causes.extend(
-                [
+            if diagnostic_evidence:
+                response_type = "confirmed_root_cause"
+                confirmed = (
+                    "The required downstream work item was not created after the completed "
+                    "upstream transition; operational diagnostic evidence records the missing "
+                    "or failed downstream generation."
+                )
+                root_causes.append(confirmed)
+                root_cause_refs[confirmed] = list(
+                    dict.fromkeys(
+                        [
+                            *(
+                                item.evidence_id
+                                for item in evidence
+                                if item.rows
+                                and item.purpose
+                                in {
+                                    "Verify upstream entity and current transition status",
+                                    "Confirmed Missing Related Record Candidates",
+                                }
+                            ),
+                            *(item.evidence_id for item in diagnostic_evidence),
+                        ]
+                    )
+                )
+            else:
+                root_causes.extend([
                     "MISSING_RELATED_RECORD: expected child or related records are missing for parent records based on discovered metadata relationships.",
                     "parent_not_eligible or parent_status_not_ready: evaluate returned parent status/state columns and documented eligibility rules.",
                     "procedure_failed or batch_failed: only supported if error-log, job-history, or procedure evidence references the affected relationship.",
                     "duplicate_or_blocking_child_object: only supported if returned child rows show duplicate/blocking candidates for the same parent relationship.",
                     "dependency_missing: only supported when upstream foreign-key or dependency rows are absent from evidence.",
                     "unknown/evidence_missing: use this group when the missing child is confirmed but no write-path, status, job, or log evidence proves the cause.",
-                ]
-            )
+                ])
         else:
+            response_type = "insufficient_evidence"
             if write_procs:
                 root_causes.append(f"Downstream creation may be blocked by guard conditions in {', '.join(proc.name for proc in write_procs[:3])}.")
             root_causes.append("The expected downstream record was not confirmed; validate upstream status and procedure guard conditions.")
@@ -406,6 +449,24 @@ def reason_about_evidence(
         "Apply the smallest safe fix after confirming the exact broken status, key, procedure, or plan. Evidence: confirmed facts and ranked hypotheses.",
         "Do not run write or DDL commands without change approval, rollback plan, and backup validation. Evidence: safety policy.",
     ]
+    if intent.intent == InvestigationIntent.MISSING_DATA and _rows_for_purpose(
+        evidence, "Confirmed Missing Related Record Candidates"
+    ):
+        fix = [
+            (
+                "Correct the evidenced workflow condition or exception before completing "
+                "the approved transactional downstream workflow."
+            ),
+            (
+                "Before replay or regeneration, verify that no downstream item exists under "
+                "the expected key or another correlation identifier and confirm the operation "
+                "is idempotent."
+            ),
+            (
+                "Do not manually insert business records; use the validated workflow with "
+                "change approval, rollback planning, and duplicate checks."
+            ),
+        ]
     if null_dependency:
         _, refs, column = null_dependency
         ref_text = ", ".join(refs)
@@ -431,8 +492,17 @@ def reason_about_evidence(
     return ReasoningResult(
         summary="Investigation generated dynamically from detected intent, extracted entities, ranked database objects, stored procedure analysis, retrieved documents, approved knowledge, and safe SQL evidence.",
         likely_root_causes=[
-            build_deterministic_root_cause_claim(item, root_cause_refs.get(item, []), evidence)
-            for item in root_causes if item.strip()
+            claim
+            for item in root_causes
+            if item.strip()
+            if (
+                claim := build_deterministic_root_cause_claim(
+                    item,
+                    root_cause_refs.get(item, []),
+                    evidence,
+                )
+            )
+            is not None
         ],
         supporting_evidence=supporting or ["No confirming rows were returned by the safe evidence plan."],
         missing_evidence=missing_evidence,
@@ -447,4 +517,5 @@ def reason_about_evidence(
         confirmed_facts=evidence_focus.confirmed_facts if evidence_focus else supporting,
         inferred_findings=evidence_focus.inferred_findings if evidence_focus else root_causes,
         hypotheses=evidence_focus.hypotheses if evidence_focus else root_causes,
+        response_type=response_type,
     )

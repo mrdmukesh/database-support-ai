@@ -1,0 +1,1 @@
+"""Deterministic validator extension point."""

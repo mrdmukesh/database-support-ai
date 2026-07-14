@@ -1,0 +1,1 @@
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-BANKING-005' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[loans] WHERE Details='EVAL-BANKING-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'TXN-3105' ExpectedEntity, 'EVAL-BANKING-005' EvidenceValue; GO

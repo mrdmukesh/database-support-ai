@@ -105,6 +105,7 @@ def create_fastapi_app() -> Any:
         chat,
         databases,
         documents,
+        evaluation_dashboard,
         help,
         incidents,
         learning,
@@ -124,6 +125,7 @@ def create_fastapi_app() -> Any:
     app.include_router(workspaces.router)
     app.include_router(databases.router)
     app.include_router(documents.router)
+    app.include_router(evaluation_dashboard.router)
     app.include_router(incidents.router)
     app.include_router(chat.router)
     app.include_router(help.router)

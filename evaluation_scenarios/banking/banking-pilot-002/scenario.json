@@ -1,0 +1,64 @@
+{
+  "scenario_id": "banking-pilot-002",
+  "domain": "banking",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "root_cause",
+  "subcategory": "duplicate_integration",
+  "difficulty": "hard",
+  "question": "Why was payment instruction PMT-3102 posted twice?",
+  "baseline_script": "evaluation_databases/banking/sql/02_seed.sql",
+  "setup_script": "evaluation_scenarios/banking/banking-pilot-002/inject.sql",
+  "verification_script": "evaluation_scenarios/banking/banking-pilot-002/verify.sql",
+  "cleanup_script": "evaluation_scenarios/banking/banking-pilot-002/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "PMT-3102"
+  ],
+  "expected_root_cause_concepts": [
+    "integration retry inserted the same business event without an idempotency guard"
+  ],
+  "expected_tables": [
+    "exceptions",
+    "integration_messages",
+    "transfers"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.vw_banking_operations_1"
+  ],
+  "expected_procedures": [
+    "eval.usp_banking_workflow_2"
+  ],
+  "expected_functions": [
+    "eval.fn_banking_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_accounts_audit"
+  ],
+  "expected_jobs": [],
+  "required_evidence": [
+    "EVAL-BANKING-002",
+    "PMT-3102",
+    "Exception"
+  ],
+  "acceptable_fix_concepts": [
+    "idempotency key"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "confirmed_root_cause_without_supporting_evidence"
+  ],
+  "scenario_version": 1,
+  "active": true
+}

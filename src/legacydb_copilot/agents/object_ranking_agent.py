@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
+from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 
@@ -188,6 +189,14 @@ def rank_relevant_objects(
     for required in (target_table, parent_table):
         if required and required.name not in {table.name for table in selected_tables}:
             selected_tables = [required, *selected_tables[: max_tables - 1]]
+    if intent.intent == InvestigationIntent.MISSING_DATA:
+        for table in eligible_tables:
+            if table.name in {item.name for item in selected_tables}:
+                continue
+            if is_diagnostic_object(table.name):
+                selected_tables.append(table)
+            if len(selected_tables) >= max_tables + 4:
+                break
     selected_names = {table.name for table in selected_tables}
     if not selected_tables:
         selected_tables = eligible_tables[:max_tables]

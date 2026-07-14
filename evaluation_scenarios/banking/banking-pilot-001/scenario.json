@@ -1,0 +1,64 @@
+{
+  "scenario_id": "banking-pilot-001",
+  "domain": "banking",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "root_cause",
+  "subcategory": "missing_workflow_output",
+  "difficulty": "medium",
+  "question": "Why is transfer TRF-3101 completed without a matching balance movement?",
+  "baseline_script": "evaluation_databases/banking/sql/02_seed.sql",
+  "setup_script": "evaluation_scenarios/banking/banking-pilot-001/inject.sql",
+  "verification_script": "evaluation_scenarios/banking/banking-pilot-001/verify.sql",
+  "cleanup_script": "evaluation_scenarios/banking/banking-pilot-001/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "TRF-3101"
+  ],
+  "expected_root_cause_concepts": [
+    "required downstream work item was not created after a completed upstream transition"
+  ],
+  "expected_tables": [
+    "exceptions",
+    "integration_messages",
+    "transactions"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.vw_banking_operations_1"
+  ],
+  "expected_procedures": [
+    "eval.usp_banking_workflow_1"
+  ],
+  "expected_functions": [
+    "eval.fn_banking_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_accounts_audit"
+  ],
+  "expected_jobs": [],
+  "required_evidence": [
+    "EVAL-BANKING-001",
+    "TRF-3101",
+    "Exception"
+  ],
+  "acceptable_fix_concepts": [
+    "transactional workflow completion"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "confirmed_root_cause_without_supporting_evidence"
+  ],
+  "scenario_version": 1,
+  "active": true
+}

@@ -91,11 +91,23 @@ def recommend_actions(
         if has_missing_related_candidates:
             immediate = [
                 f"Confirm the affected parent record, relationship columns, and missing child record using the generated read-only SQL. Evidence: {evidence_ref}.",
-                f"Rerun or trigger the approved downstream creation workflow only after the upstream state and guard conditions are verified. Evidence: {evidence_ref}.",
+                (
+                    "Correct the evidenced workflow condition or exception, then complete the "
+                    "approved transactional workflow only after checking that no child exists "
+                    "under the expected key or another correlation identifier. "
+                    f"Evidence: {evidence_ref}."
+                ),
+                (
+                    "Do not manually insert business records; use the validated workflow after "
+                    "duplicate and idempotency checks."
+                ),
             ]
             permanent = [
                 f"Fix the procedure, job, or workflow branch that fails to create the expected related record. Evidence: {evidence_ref}.",
-                f"Add explicit logging when guard conditions block downstream record creation. Evidence: {evidence_ref}.",
+                (
+                    "Make replay/regeneration idempotent and add explicit logging when guard "
+                    f"conditions block downstream record creation. Evidence: {evidence_ref}."
+                ),
             ]
             future.append(f"Add a dashboard check for parent records that remain without their expected child records, grouped by discovered relationship and issue type. Evidence: {evidence_ref}.")
             monitoring.append(f"Alert on recurring missing-related-record candidates for the affected relationship. Evidence: {evidence_ref}.")

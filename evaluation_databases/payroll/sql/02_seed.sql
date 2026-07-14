@@ -1,0 +1,28 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+INSERT eval.[departments] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-001','Active',DATEADD(minute,-1,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[employees] (BusinessKey, [DepartmentsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-002', 1,'Active',DATEADD(minute,-2,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[employment_history] (BusinessKey, [EmployeesId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-003', 1,'Active',DATEADD(minute,-3,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[pay_groups] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-004','Active',DATEADD(minute,-4,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[pay_periods] (BusinessKey, [PayGroupsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-005', 1,'Active',DATEADD(minute,-5,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[time_entries] (BusinessKey, [EmployeesId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-006', 1,'Active',DATEADD(minute,-6,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[leave_requests] (BusinessKey, [EmployeesId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-007', 1,'Active',DATEADD(minute,-7,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[payroll_runs] (BusinessKey, [PayPeriodsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-008', 1,'Active',DATEADD(minute,-8,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[payroll_items] (BusinessKey, [PayrollRunsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-009', 1,'Active',DATEADD(minute,-9,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[deductions] (BusinessKey, [EmployeesId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-010', 1,'Active',DATEADD(minute,-10,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[payments] (BusinessKey, [PayrollItemsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-011', 1,'Active',DATEADD(minute,-11,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[tax_filings] (BusinessKey, [PayrollRunsId],Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-012', 1,'Active',DATEADD(minute,-12,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[integration_messages] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-013','Active',DATEADD(minute,-13,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[batch_runs] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-014','Active',DATEADD(minute,-14,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[exceptions] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-015','Active',DATEADD(minute,-15,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.[audit_history] (BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('PAYROLL-016','Active',DATEADD(minute,-16,SYSUTCDATETIME()),'Synthetic baseline record','BASE-PAYROLL');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-EMP-1042','Processed',DATEADD(hour,-1,SYSUTCDATETIME()),'Synthetic workflow message','CORR-EMP-1042');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-RUN-2026-07-A','Processed',DATEADD(hour,-2,SYSUTCDATETIME()),'Synthetic workflow message','CORR-RUN-2026-07-A');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-PAY-7003','Processed',DATEADD(hour,-3,SYSUTCDATETIME()),'Synthetic workflow message','CORR-PAY-7003');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-TIME-8821','Processed',DATEADD(hour,-4,SYSUTCDATETIME()),'Synthetic workflow message','CORR-TIME-8821');
+INSERT eval.integration_messages(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('MSG-TAX-2026-07','Processed',DATEADD(hour,-5,SYSUTCDATETIME()),'Synthetic workflow message','CORR-TAX-2026-07');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-PAYROLL-1','Completed',DATEADD(day,-1,SYSUTCDATETIME()),'Synthetic end-to-end workflow 1','WF-PAYROLL-1');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-PAYROLL-2','Completed',DATEADD(day,-2,SYSUTCDATETIME()),'Synthetic end-to-end workflow 2','WF-PAYROLL-2');
+INSERT eval.audit_history(BusinessKey,Status,EventTime,Details,CorrelationId) VALUES ('WF-PAYROLL-3','Completed',DATEADD(day,-3,SYSUTCDATETIME()),'Synthetic end-to-end workflow 3','WF-PAYROLL-3');
+COMMIT;
+GO

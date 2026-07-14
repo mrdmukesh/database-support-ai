@@ -1,0 +1,64 @@
+{
+  "scenario_id": "shipping-pilot-002",
+  "domain": "shipping",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "root_cause",
+  "subcategory": "duplicate_integration",
+  "difficulty": "hard",
+  "question": "Why does container CONT-5002 have a duplicate terminal gate event?",
+  "baseline_script": "evaluation_databases/shipping/sql/02_seed.sql",
+  "setup_script": "evaluation_scenarios/shipping/shipping-pilot-002/inject.sql",
+  "verification_script": "evaluation_scenarios/shipping/shipping-pilot-002/verify.sql",
+  "cleanup_script": "evaluation_scenarios/shipping/shipping-pilot-002/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "CONT-5002"
+  ],
+  "expected_root_cause_concepts": [
+    "integration retry inserted the same business event without an idempotency guard"
+  ],
+  "expected_tables": [
+    "container_events",
+    "container_assignments",
+    "integration_messages"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.vw_shipping_operations_1"
+  ],
+  "expected_procedures": [
+    "eval.usp_shipping_workflow_2"
+  ],
+  "expected_functions": [
+    "eval.fn_shipping_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_bookings_audit"
+  ],
+  "expected_jobs": [],
+  "required_evidence": [
+    "EVAL-SHIPPING-002",
+    "CONT-5002",
+    "GATE-CONT-5002 count=2"
+  ],
+  "acceptable_fix_concepts": [
+    "idempotency key"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "confirmed_root_cause_without_supporting_evidence"
+  ],
+  "scenario_version": 1,
+  "active": true
+}

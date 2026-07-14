@@ -73,6 +73,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
 from legacydb_copilot.services.metadata_search_service import (
     MetadataSearchContext,
     query_relevance_terms,
+    resolve_qualified_object_names,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
@@ -432,10 +433,13 @@ def _run_metadata_validation(
         )
     exact_tables = _explicit_metadata_names(payload.question, "table")
     exact_procedures = _explicit_metadata_names(payload.question, "procedure")
-    table_lookup = {table.lower(): table for table in active_schema_metadata.tables}
-    procedure_lookup = {proc.lower(): proc for proc in active_schema_metadata.procedures}
-    table_results = {name: table_lookup.get(name.lower()) for name in exact_tables}
-    procedure_results = {name: procedure_lookup.get(name.lower()) for name in exact_procedures}
+    resolved_tables = resolve_qualified_object_names(active_schema_metadata.tables, exact_tables)
+    resolved_procedures = resolve_qualified_object_names(
+        active_schema_metadata.procedures,
+        exact_procedures,
+    )
+    table_results = {name: resolved_tables.get(name) for name in exact_tables}
+    procedure_results = {name: resolved_procedures.get(name) for name in exact_procedures}
     missing_tables = [name for name, found in table_results.items() if not found]
     missing_procedures = [name for name, found in procedure_results.items() if not found]
     status_label = "TARGET_OBJECT_NOT_FOUND" if missing_tables or missing_procedures else "METADATA_VALIDATION_OK"
@@ -462,14 +466,15 @@ def _run_metadata_validation(
 
 
 def _explicit_metadata_names(question: str, label: str) -> list[str]:
-    pattern = rf"\b{label}\s*:\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"
+    identifier = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
+    pattern = rf"\b{label}\s*:\s*({identifier})\b"
     names = [match.group(1) for match in re.finditer(pattern, question, re.I)]
     if names:
         return list(dict.fromkeys(names))
     if label == "table":
-        match = re.search(r"\btable\s+([a-zA-Z_][a-zA-Z0-9_]*)\b", question, re.I)
+        match = re.search(rf"\btable\s+({identifier})\b", question, re.I)
     else:
-        match = re.search(r"\bprocedure\s+([a-zA-Z_][a-zA-Z0-9_]*)\b", question, re.I)
+        match = re.search(rf"\bprocedure\s+({identifier})\b", question, re.I)
     return [match.group(1)] if match else []
 
 
@@ -2008,6 +2013,7 @@ def _run_dynamic_investigation(
         f"Investigation ID: {report.cover.investigation_id}\n"
         f"Investigation Mode: {mode.mode.value}\n"
         f"Detected Intent: {intent.intent.value}\n"
+        f"Response Type: {reasoning.response_type}\n"
         f"Extracted Entities: {entity_text}\n"
         f"AI-assisted reasoning: {ai_status['ai_assisted_reasoning']}\n"
         f"Reason: {ai_status['reason']}\n"
@@ -2131,6 +2137,7 @@ def _run_dynamic_investigation(
             "procedures": [asdict(item) for item in procedure_analysis],
             "root_cause_claims": [asdict(item) for item in reasoning.likely_root_causes],
             "recommended_fix": reasoning.recommended_fix,
+            "response_type": reasoning.response_type,
             "confidence": confidence,
         }, default=str),
     }

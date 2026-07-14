@@ -612,6 +612,87 @@ class PostgreSQLAdapter(BaseDatabaseAdapter):
 class SQLServerAdapter(BaseDatabaseAdapter):
     engine_type = DatabaseEngine.SQL_SERVER
 
+    _SYSTEM_SCHEMAS = {"sys", "information_schema"}
+
+    def _accessible_schemas(self) -> list[str]:
+        """Return visible user schemas in deterministic order."""
+        schemas = inspect(self.engine).get_schema_names()
+        return sorted(
+            {
+                schema
+                for schema in schemas
+                if schema and schema.lower() not in self._SYSTEM_SCHEMAS
+            },
+            key=str.lower,
+        )
+
+    @staticmethod
+    def _qualified_name(schema: str, object_name: str) -> str:
+        return f"{schema}.{object_name}"
+
+    @staticmethod
+    def _split_qualified_name(object_name: str) -> tuple[str | None, str]:
+        cleaned = (
+            object_name.strip()
+            .replace("[", "")
+            .replace("]", "")
+            .replace('"', "")
+            .replace("`", "")
+        )
+        if "." not in cleaned:
+            return None, cleaned
+        schema, name = cleaned.split(".", 1)
+        return schema, name
+
+    def list_tables(self) -> list[str]:
+        inspector = inspect(self.engine)
+        return [
+            self._qualified_name(schema, table)
+            for schema in self._accessible_schemas()
+            for table in sorted(inspector.get_table_names(schema=schema), key=str.lower)
+        ]
+
+    def list_views(self) -> list[str]:
+        inspector = inspect(self.engine)
+        views: list[str] = []
+        for schema in self._accessible_schemas():
+            try:
+                schema_views = inspector.get_view_names(schema=schema)
+            except NotImplementedError:
+                schema_views = []
+            views.extend(
+                self._qualified_name(schema, view)
+                for view in sorted(schema_views, key=str.lower)
+            )
+        return views
+
+    def list_columns(self, table_name: str) -> list[dict[str, Any]]:
+        schema, name = self._split_qualified_name(table_name)
+        return inspect(self.engine).get_columns(name, schema=schema)
+
+    def get_primary_key(self, table_name: str) -> dict[str, Any]:
+        schema, name = self._split_qualified_name(table_name)
+        return inspect(self.engine).get_pk_constraint(name, schema=schema)
+
+    def list_foreign_keys(self, table_name: str) -> list[dict[str, Any]]:
+        schema, name = self._split_qualified_name(table_name)
+        foreign_keys = inspect(self.engine).get_foreign_keys(name, schema=schema)
+        qualified: list[dict[str, Any]] = []
+        for foreign_key in foreign_keys:
+            item = dict(foreign_key)
+            referred_schema = item.get("referred_schema") or schema
+            referred_table = item.get("referred_table")
+            if referred_schema and referred_table:
+                item["referred_table"] = self._qualified_name(
+                    str(referred_schema), str(referred_table)
+                )
+            qualified.append(item)
+        return qualified
+
+    def list_indexes(self, table_name: str) -> list[dict[str, Any]]:
+        schema, name = self._split_qualified_name(table_name)
+        return inspect(self.engine).get_indexes(name, schema=schema)
+
     def list_procedures(self) -> list[str]:
         """
         Owner: Mukesh Dabi
@@ -634,8 +715,16 @@ class SQLServerAdapter(BaseDatabaseAdapter):
             Must preserve read-only investigation behavior and avoid modifying customer databases.
         """
         with self.engine.connect() as conn:
-            result = conn.execute(text("SELECT name FROM sys.objects WHERE type='P' AND schema_id=SCHEMA_ID('dbo')"))
-            return [row[0] for row in result.fetchall()]
+            result = conn.execute(
+                text(
+                    "SELECT SCHEMA_NAME(schema_id) AS schema_name, name "
+                    "FROM sys.objects "
+                    "WHERE type IN ('P', 'PC', 'FN', 'FS', 'FT', 'IF', 'TF', 'TR') "
+                    "AND SCHEMA_NAME(schema_id) NOT IN ('sys', 'INFORMATION_SCHEMA') "
+                    "ORDER BY schema_name, name"
+                )
+            )
+            return [self._qualified_name(row[0], row[1]) for row in result.fetchall()]
 
     def get_procedure_definition(self, procedure_name: str) -> str:
         """

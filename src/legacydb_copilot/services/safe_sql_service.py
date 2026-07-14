@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
+from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms, terms_match_table
 
@@ -148,8 +149,11 @@ class ProductionReadSafetyValidator:
         Safety considerations:
             Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
         """
-        normalized_table = _unquote_identifier(table_name).lower().split(".")[-1]
-        estimate = self.row_estimates.get(normalized_table) or self.row_estimates.get(_unquote_identifier(table_name).lower())
+        qualified_table = _unquote_identifier(table_name).lower()
+        normalized_table = qualified_table.split(".")[-1]
+        estimate = self.row_estimates.get(qualified_table)
+        if estimate is None:
+            estimate = self.row_estimates.get(normalized_table)
         if estimate is not None:
             return estimate <= self.max_rows
         return bool(re.search(r"(^|_)(lookup|reference|ref|status|type|category|code)(_|s?$)", normalized_table))
@@ -165,6 +169,9 @@ class MissingChildFlow:
     child_id: str
     child_fk_to_parent: str
     child_label: str | None
+    parent_key_value: str | None = None
+    expected_child_terms: tuple[str, ...] = ()
+    engine_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1047,7 +1054,13 @@ def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityEx
         child_label = _find_column(child, ("number",)) or _find_column(child, ("name",)) or _find_column(child, ("code",))
         if not child_id:
             continue
-        parent_label = _find_column(parent, ("number",)) or _find_column(parent, ("name",)) or _find_column(parent, ("code",)) or parent_id
+        parent_label = (
+            _find_column(parent, ("business", "key"))
+            or _find_column(parent, ("number",))
+            or _find_column(parent, ("name",))
+            or _find_column(parent, ("code",))
+            or parent_id
+        )
         parent_status = _find_column(parent, ("status",))
         return MissingChildFlow(
             parent_table=parent,
@@ -1058,6 +1071,21 @@ def _infer_missing_child_flow(metadata: MetadataSearchResult, entities: EntityEx
             child_id=child_id,
             child_fk_to_parent=child_fk,
             child_label=child_label,
+            parent_key_value=next(
+                (
+                    entity.value
+                    for entity in entities.entities
+                    if entity.entity_type
+                    in {"business_key", "business_identifier", "exact_id_or_code"}
+                ),
+                None,
+            ),
+            expected_child_terms=tuple(
+                term.lower()
+                for term in dict.fromkeys([*problem.target_terms, *problem.parent_terms])
+                if len(term) >= 4
+            ),
+            engine_type=metadata.engine_type,
         )
     return None
 
@@ -1260,6 +1288,11 @@ def _missing_child_candidate_query(flow: MissingChildFlow) -> str:
     """
     status_select = f"p.{flow.parent_status} AS parent_status," if flow.parent_status else "NULL AS parent_status,"
     child_label_select = f"c.{flow.child_label} AS child_reference," if flow.child_label else "NULL AS child_reference,"
+    key_filter = ""
+    if flow.parent_key_value:
+        escaped = flow.parent_key_value.replace("'", "''")
+        key_filter = f" AND p.{flow.parent_label} = '{escaped}'"
+    child_match = _expected_child_join_filter(flow)
     return f"""
 SELECT
     p.{flow.parent_label} AS parent_reference,
@@ -1270,8 +1303,8 @@ SELECT
         ELSE 'OK'
     END AS issue_type
 FROM {flow.parent_table.name} p
-LEFT JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}
-WHERE c.{flow.child_id} IS NULL
+LEFT JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}{child_match}
+WHERE c.{flow.child_id} IS NULL{key_filter}
 ORDER BY p.{flow.parent_label}
 """.strip()
 
@@ -1297,6 +1330,11 @@ def _missing_child_summary_query(flow: MissingChildFlow) -> str:
     Safety considerations:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
+    key_filter = ""
+    if flow.parent_key_value:
+        escaped = flow.parent_key_value.replace("'", "''")
+        key_filter = f" AND p.{flow.parent_label} = '{escaped}'"
+    child_match = _expected_child_join_filter(flow)
     return f"""
 SELECT
     issue_type,
@@ -1310,12 +1348,150 @@ FROM (
             ELSE 'OK'
         END AS issue_type
     FROM {flow.parent_table.name} p
-    LEFT JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}
-    WHERE c.{flow.child_id} IS NULL
+    LEFT JOIN {flow.child_table.name} c
+        ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}{child_match}
+    WHERE c.{flow.child_id} IS NULL{key_filter}
 ) missing_related_candidates
 GROUP BY issue_type
 ORDER BY issue_count DESC
 """.strip()
+
+
+def _upstream_transition_query(flow: MissingChildFlow) -> str:
+    columns = list(dict.fromkeys([flow.parent_id, flow.parent_label, flow.parent_status]))
+    selected = ", ".join(column for column in columns if column)
+    where = ""
+    if flow.parent_key_value:
+        escaped = flow.parent_key_value.replace("'", "''")
+        where = f" WHERE {flow.parent_label} = '{escaped}'"
+    return f"SELECT {selected} FROM {flow.parent_table.name}{where}"
+
+
+def _expected_child_join_filter(flow: MissingChildFlow) -> str:
+    descriptor_columns = [
+        column
+        for column in flow.child_table.columns
+        if any(
+            marker in column.lower()
+            for marker in ("business", "name", "type", "detail", "description", "reference")
+        )
+    ]
+    if not descriptor_columns or not flow.expected_child_terms:
+        return ""
+    term_filters: list[str] = []
+    for term in flow.expected_child_terms:
+        escaped = term.replace("'", "''")
+        term_filters.append(
+            "(" + " OR ".join(
+                f"LOWER({_cast_to_text(f'c.{column}', flow.engine_type)}) LIKE '%{escaped}%'"
+                for column in descriptor_columns
+            ) + ")"
+        )
+    return " AND " + " AND ".join(term_filters)
+
+
+def _downstream_records_for_parent_query(flow: MissingChildFlow) -> str:
+    child_columns = list(
+        dict.fromkeys(
+            [
+                flow.child_id,
+                flow.child_fk_to_parent,
+                flow.child_label,
+                *(
+                    column
+                    for column in flow.child_table.columns
+                    if any(
+                        marker in column.lower()
+                        for marker in ("business", "status", "correlation", "reference")
+                    )
+                ),
+            ]
+        )
+    )
+    selected = ", ".join(f"c.{column}" for column in child_columns if column)
+    where = ""
+    if flow.parent_key_value:
+        escaped = flow.parent_key_value.replace("'", "''")
+        where = f" WHERE p.{flow.parent_label} = '{escaped}'"
+    return (
+        f"SELECT {selected} FROM {flow.parent_table.name} p "
+        f"JOIN {flow.child_table.name} c ON c.{flow.child_fk_to_parent} = p.{flow.parent_id}{where}"
+    )
+
+
+def _missing_flow_diagnostic_queries(
+    metadata: MetadataSearchResult,
+    entities: EntityExtractionResult,
+    flow: MissingChildFlow,
+) -> list[PlannedQuery]:
+    """Inspect generic workflow diagnostics without assuming a domain schema."""
+    problem = parse_problem_phrase(" ".join(entities.business_keywords or []))
+    terms = [
+        term.lower()
+        for term in dict.fromkeys([*problem.target_terms, "missing", "absent", "failed"])
+        if len(term) >= 4
+    ][:6]
+    queries: list[PlannedQuery] = []
+    for table in metadata.tables:
+        if table.name in {flow.parent_table.name, flow.child_table.name}:
+            continue
+        if not is_diagnostic_object(table.name):
+            continue
+        searchable = [
+            column
+            for column in table.columns
+            if any(
+                marker in column.lower()
+                for marker in (
+                    "detail",
+                    "message",
+                    "description",
+                    "error",
+                    "reason",
+                    "status",
+                    "key",
+                    "correlation",
+                    "reference",
+                )
+            )
+        ]
+        filters: list[str] = []
+        if flow.parent_key_value:
+            escaped = flow.parent_key_value.replace("'", "''")
+            for column in searchable:
+                if any(marker in column.lower() for marker in ("key", "correlation", "reference")):
+                    filters.append(f"{_cast_to_text(column, metadata.engine_type)} = '{escaped}'")
+        text_columns = [
+            column
+            for column in searchable
+            if any(
+                marker in column.lower()
+                for marker in ("detail", "message", "description", "error", "reason")
+            )
+        ]
+        for column in text_columns:
+            for term in terms:
+                escaped_term = term.replace("'", "''")
+                filters.append(
+                    f"LOWER({_cast_to_text(column, metadata.engine_type)}) "
+                    f"LIKE '%{escaped_term}%'"
+                )
+        if not filters:
+            continue
+        columns = ", ".join(table.columns[:8]) if table.columns else "*"
+        queries.append(
+            PlannedQuery(
+                purpose=(
+                    "Inspect workflow exception, integration, audit, or batch evidence in "
+                    f"{table.name}"
+                ),
+                sql=(
+                    f"SELECT {columns} FROM {table.name} WHERE "
+                    f"{' OR '.join(dict.fromkeys(filters))}"
+                ),
+            )
+        )
+    return queries[:4]
 
 
 def _duplicate_child_query(flow: DuplicateChildFlow) -> str:
@@ -1364,7 +1540,7 @@ def _duplicate_parent_lookup_query(flow: DuplicateChildFlow) -> str:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
     escaped = (flow.parent_key_value or "").replace("'", "''")
-    child_count_alias = f"{flow.child_table.name.rstrip('s')}_count"
+    child_count_alias = f"{flow.child_table.name.split('.')[-1].rstrip('s')}_count"
     parent_filter = f"\nWHERE p.{flow.parent_label} = '{escaped}'" if flow.parent_key_value else ""
     return f"""
 SELECT
@@ -1447,7 +1623,7 @@ def _duplicate_child_query_for_engine(flow: DuplicateChildFlow, engine_type: str
     Safety considerations:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
-    child_name = flow.child_table.name.rstrip("s")
+    child_name = flow.child_table.name.split(".")[-1].rstrip("s")
     count_alias = f"{child_name}_count" if flow.child_status else f"duplicate_{child_name}_count"
     records_alias = f"{child_name}_numbers" if flow.child_label and "number" in flow.child_label.lower() else f"{child_name}_records"
     child_label_expr = (
@@ -1531,27 +1707,17 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         planned.extend(_status_investigation_queries(metadata, entities))
     if intent in {InvestigationIntent.HEALTH_ASSESSMENT, InvestigationIntent.GENERAL_DATABASE_QUESTION}:
         planned.extend(_analytical_summary_queries(metadata, entities))
-    planned.extend(_entity_and_condition_queries(metadata, entities))
-    if duplicate_child_flow:
-        planned.extend(
-            [
-                PlannedQuery(
-                    purpose=f"Resolve parent business key in {duplicate_child_flow.parent_table.name}",
-                    sql=_duplicate_parent_lookup_query(duplicate_child_flow),
-                ),
-                PlannedQuery(
-                    purpose=f"Find duplicate {duplicate_child_flow.child_table.name} per {duplicate_child_flow.parent_table.name}",
-                    sql=_duplicate_child_query_for_engine(duplicate_child_flow, metadata.engine_type),
-                ),
-                PlannedQuery(
-                    purpose=f"Inspect {duplicate_child_flow.child_table.name} rows through {duplicate_child_flow.parent_table.name} key",
-                    sql=_duplicate_child_detail_query_for_engine(duplicate_child_flow, metadata.engine_type),
-                ),
-            ]
-        )
     if missing_child_flow:
         planned.extend(
             [
+                PlannedQuery(
+                    purpose="Verify upstream entity and current transition status",
+                    sql=_upstream_transition_query(missing_child_flow),
+                ),
+                PlannedQuery(
+                    purpose="Check downstream records under expected or alternate identifiers",
+                    sql=_downstream_records_for_parent_query(missing_child_flow),
+                ),
                 PlannedQuery(
                     purpose="Confirmed Missing Related Record Candidates",
                     sql=_missing_child_candidate_query(missing_child_flow),
@@ -1559,6 +1725,40 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
                 PlannedQuery(
                     purpose="Missing Related Record Summary by Issue Type",
                     sql=_missing_child_summary_query(missing_child_flow),
+                ),
+            ]
+        )
+        planned.extend(_missing_flow_diagnostic_queries(metadata, entities, missing_child_flow))
+    planned.extend(_entity_and_condition_queries(metadata, entities))
+    if duplicate_child_flow:
+        planned.extend(
+            [
+                PlannedQuery(
+                    purpose=(
+                        "Resolve parent business key in "
+                        f"{duplicate_child_flow.parent_table.name}"
+                    ),
+                    sql=_duplicate_parent_lookup_query(duplicate_child_flow),
+                ),
+                PlannedQuery(
+                    purpose=(
+                        f"Find duplicate {duplicate_child_flow.child_table.name} per "
+                        f"{duplicate_child_flow.parent_table.name}"
+                    ),
+                    sql=_duplicate_child_query_for_engine(
+                        duplicate_child_flow,
+                        metadata.engine_type,
+                    ),
+                ),
+                PlannedQuery(
+                    purpose=(
+                        f"Inspect {duplicate_child_flow.child_table.name} rows through "
+                        f"{duplicate_child_flow.parent_table.name} key"
+                    ),
+                    sql=_duplicate_child_detail_query_for_engine(
+                        duplicate_child_flow,
+                        metadata.engine_type,
+                    ),
                 ),
             ]
         )

@@ -1,0 +1,37 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+DELETE FROM eval.[audit_history];
+DELETE FROM eval.[exceptions];
+DELETE FROM eval.[batch_runs];
+DELETE FROM eval.[integration_messages];
+DELETE FROM eval.[compliance_cases];
+DELETE FROM eval.[fraud_alerts];
+DELETE FROM eval.[cards];
+DELETE FROM eval.[loan_schedules];
+DELETE FROM eval.[loans];
+DELETE FROM eval.[payment_instructions];
+DELETE FROM eval.[beneficiaries];
+DELETE FROM eval.[transfers];
+DELETE FROM eval.[transactions];
+DELETE FROM eval.[account_balances];
+DELETE FROM eval.[accounts];
+DELETE FROM eval.[customers];
+DBCC CHECKIDENT ('eval.customers', RESEED, 0);
+DBCC CHECKIDENT ('eval.accounts', RESEED, 0);
+DBCC CHECKIDENT ('eval.account_balances', RESEED, 0);
+DBCC CHECKIDENT ('eval.transactions', RESEED, 0);
+DBCC CHECKIDENT ('eval.transfers', RESEED, 0);
+DBCC CHECKIDENT ('eval.beneficiaries', RESEED, 0);
+DBCC CHECKIDENT ('eval.payment_instructions', RESEED, 0);
+DBCC CHECKIDENT ('eval.loans', RESEED, 0);
+DBCC CHECKIDENT ('eval.loan_schedules', RESEED, 0);
+DBCC CHECKIDENT ('eval.cards', RESEED, 0);
+DBCC CHECKIDENT ('eval.fraud_alerts', RESEED, 0);
+DBCC CHECKIDENT ('eval.compliance_cases', RESEED, 0);
+DBCC CHECKIDENT ('eval.integration_messages', RESEED, 0);
+DBCC CHECKIDENT ('eval.batch_runs', RESEED, 0);
+DBCC CHECKIDENT ('eval.exceptions', RESEED, 0);
+DBCC CHECKIDENT ('eval.audit_history', RESEED, 0);
+COMMIT;
+GO
+:r 02_seed.sql

@@ -1,0 +1,1 @@
+IF NOT ((SELECT COUNT(*) FROM eval.container_events WHERE BusinessKey='GATE-CONT-5002')=2 AND (SELECT COUNT(*) FROM eval.container_events WHERE CorrelationId='EVAL-SHIPPING-002')=1) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'CONT-5002' ExpectedEntity, 'EVAL-SHIPPING-002' EvidenceValue; GO

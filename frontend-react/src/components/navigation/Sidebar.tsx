@@ -26,7 +26,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      {canManageUsers && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span><NavLink to="/app/admin/users">Users &amp; Access</NavLink></nav>}
+      {canManageUsers && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span><NavLink to="/app/admin/users">Users &amp; Access</NavLink><NavLink to="/app/evaluation">Evaluation</NavLink></nav>}
     </aside>
   );
 }

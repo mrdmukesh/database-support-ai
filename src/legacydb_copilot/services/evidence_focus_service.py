@@ -125,6 +125,9 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     """
     table_scores: dict[str, float] = {table.name: 0.0 for table in metadata.tables}
     table_lookup = {table.name.lower(): table.name for table in metadata.tables}
+    leaf_lookup: dict[str, list[str]] = {}
+    for table in metadata.tables:
+        leaf_lookup.setdefault(table.name.lower().split(".")[-1], []).append(table.name)
     question_l = question.lower()
     explicit_write_target = _explicit_write_target(question, metadata)
     if explicit_write_target:
@@ -146,7 +149,11 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
         row_weight = 3.0 if item.rows else 0.5
         purpose_l = item.purpose.lower()
         for sql_table in sql_tables:
-            table = table_lookup.get(sql_table.lower().split(".")[-1], sql_table)
+            sql_name = sql_table.lower()
+            table = table_lookup.get(sql_name)
+            if table is None:
+                leaf_matches = leaf_lookup.get(sql_name.split(".")[-1], [])
+                table = leaf_matches[0] if len(leaf_matches) == 1 else sql_table
             if table in table_scores:
                 metadata_relevance = table_scores[table] > 0 or table.lower() in question_l
                 if not metadata_relevance:

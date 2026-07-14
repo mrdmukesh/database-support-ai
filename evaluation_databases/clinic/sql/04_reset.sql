@@ -1,0 +1,37 @@
+SET XACT_ABORT ON;
+BEGIN TRANSACTION;
+DELETE FROM eval.[audit_history];
+DELETE FROM eval.[exceptions];
+DELETE FROM eval.[integration_messages];
+DELETE FROM eval.[payments];
+DELETE FROM eval.[claims];
+DELETE FROM eval.[insurance_policies];
+DELETE FROM eval.[lab_results];
+DELETE FROM eval.[lab_orders];
+DELETE FROM eval.[prescriptions];
+DELETE FROM eval.[procedures_performed];
+DELETE FROM eval.[diagnoses];
+DELETE FROM eval.[encounters];
+DELETE FROM eval.[appointments];
+DELETE FROM eval.[patients];
+DELETE FROM eval.[providers];
+DELETE FROM eval.[clinics];
+DBCC CHECKIDENT ('eval.clinics', RESEED, 0);
+DBCC CHECKIDENT ('eval.providers', RESEED, 0);
+DBCC CHECKIDENT ('eval.patients', RESEED, 0);
+DBCC CHECKIDENT ('eval.appointments', RESEED, 0);
+DBCC CHECKIDENT ('eval.encounters', RESEED, 0);
+DBCC CHECKIDENT ('eval.diagnoses', RESEED, 0);
+DBCC CHECKIDENT ('eval.procedures_performed', RESEED, 0);
+DBCC CHECKIDENT ('eval.prescriptions', RESEED, 0);
+DBCC CHECKIDENT ('eval.lab_orders', RESEED, 0);
+DBCC CHECKIDENT ('eval.lab_results', RESEED, 0);
+DBCC CHECKIDENT ('eval.insurance_policies', RESEED, 0);
+DBCC CHECKIDENT ('eval.claims', RESEED, 0);
+DBCC CHECKIDENT ('eval.payments', RESEED, 0);
+DBCC CHECKIDENT ('eval.integration_messages', RESEED, 0);
+DBCC CHECKIDENT ('eval.exceptions', RESEED, 0);
+DBCC CHECKIDENT ('eval.audit_history', RESEED, 0);
+COMMIT;
+GO
+:r 02_seed.sql

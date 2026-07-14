@@ -1,0 +1,64 @@
+{
+  "scenario_id": "orders-pilot-003",
+  "domain": "orders",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "root_cause",
+  "subcategory": "incorrect_selection",
+  "difficulty": "hard",
+  "question": "Why is SKU-8103 showing a negative available balance?",
+  "baseline_script": "evaluation_databases/orders/sql/02_seed.sql",
+  "setup_script": "evaluation_scenarios/orders/orders-pilot-003/inject.sql",
+  "verification_script": "evaluation_scenarios/orders/orders-pilot-003/verify.sql",
+  "cleanup_script": "evaluation_scenarios/orders/orders-pilot-003/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "SKU-8103"
+  ],
+  "expected_root_cause_concepts": [
+    "selection used historical assignment instead of the active work item"
+  ],
+  "expected_tables": [
+    "exceptions",
+    "integration_messages",
+    "sales_orders"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.vw_orders_operations_1"
+  ],
+  "expected_procedures": [
+    "eval.usp_orders_workflow_3"
+  ],
+  "expected_functions": [
+    "eval.fn_orders_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_products_audit"
+  ],
+  "expected_jobs": [],
+  "required_evidence": [
+    "EVAL-ORDERS-003",
+    "SKU-8103",
+    "Exception"
+  ],
+  "acceptable_fix_concepts": [
+    "active assignment filtering"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "confirmed_root_cause_without_supporting_evidence"
+  ],
+  "scenario_version": 1,
+  "active": true
+}

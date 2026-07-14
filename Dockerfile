@@ -20,6 +20,7 @@ RUN adduser --disabled-password --gecos "" appuser
 COPY pyproject.toml README.md alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
+COPY evaluation ./evaluation
 COPY assets ./assets
 COPY docs ./docs
 COPY app.html index.html ASSETS.md ./

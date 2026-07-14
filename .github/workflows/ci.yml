@@ -43,3 +43,6 @@ jobs:
 
       - name: Build Docker image
         run: docker build -t legacydb-support-copilot:ci .
+
+      - name: Verify evaluation dashboard imports in container
+        run: docker run --rm legacydb-support-copilot:ci python -c "from legacydb_copilot.routers import evaluation_dashboard; from evaluation.framework import models"

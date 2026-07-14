@@ -238,6 +238,7 @@ jobs:
           IMAGE="${REGISTRY}/${{ github.repository_owner }}/${IMAGE_NAME}:${{ github.sha }}"
           IMAGE="$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')"
           docker build -t "$IMAGE" .
+          docker run --rm "$IMAGE" python -c "from legacydb_copilot.routers import evaluation_dashboard; from evaluation.framework import models"
           docker push "$IMAGE"
           echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
 

@@ -32,6 +32,7 @@ from evaluation.judges.store import AIJudgeService
 
 def valid_payload(score=80, **overrides):
     payload = {
+        "score_scale": "percentage",
         "root_cause_score": score,
         "evidence_score": score,
         "object_discovery_score": score,
@@ -93,6 +94,56 @@ def test_valid_judge_output():
     assert result.normalized.weighted_score == 85
     assert result.input_tokens == 100 and result.output_tokens == 50
     assert client.calls[0]["temperature"] == 0
+
+
+def test_explicit_legacy_point_scores_are_normalized_to_percentages():
+    payload = valid_payload()
+    payload.update(
+        score_scale="legacy_points",
+        root_cause_score=30,
+        evidence_score=25,
+        object_discovery_score=10,
+        fix_score=5,
+        citation_score=10,
+        safety_score=10,
+        completeness_score=5,
+    )
+
+    result = validate_judge_json(payload)
+
+    assert result.root_cause_score == 100
+    assert result.fix_score == 50
+    assert result.normalization_occurred is True
+    assert result.weighted_score == 95
+
+
+def test_ambiguous_score_scale_is_rejected():
+    payload = valid_payload()
+    payload.pop("score_scale")
+
+    try:
+        validate_judge_json(payload)
+    except Exception as exc:
+        assert "score_scale" in str(exc)
+    else:
+        raise AssertionError("ambiguous judge scores must not be accepted")
+
+
+def test_contradictory_low_scores_and_positive_narrative_require_review():
+    result, _client, config = invoke(
+        [valid_payload(5, explanation="Comprehensive, complete, correctly cited and high confidence.")]
+    )
+
+    assert "judge_output_inconsistent" in result.normalized.consistency_flags
+    decision = human_review_decision(
+        result_id="contradiction",
+        deterministic_summary=deterministic(90),
+        application_confidence=0.9,
+        primary=result,
+        secondary=None,
+        config=config,
+    )
+    assert "judge_output_inconsistent" in decision.reasons
 
 
 def test_malformed_json_retries_then_succeeds():

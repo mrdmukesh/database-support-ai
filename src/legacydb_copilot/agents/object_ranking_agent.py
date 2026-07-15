@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
@@ -33,6 +34,16 @@ _KNOWLEDGE_OBJECT_MARKERS = {
     "rag_document",
 }
 
+_INTERNAL_OBJECT_MARKERS = _KNOWLEDGE_OBJECT_MARKERS | {
+    "auth_", "user_session", "access_token", "alembic", "migration",
+    "evaluation_", "test_scenario", "framework_", "internal_",
+}
+
+_OPERATIONAL_MARKERS = {
+    "exception", "error", "integration", "message", "queue", "retry",
+    "workflow", "history", "event", "audit", "batch", "job", "staging", "interface",
+}
+
 
 @dataclass(frozen=True)
 class RankedObject:
@@ -52,6 +63,23 @@ def _is_knowledge_object(name: str) -> bool:
     """Keep retrieval infrastructure out of live affected-object ranking."""
     normalized = name.lower().replace("-", "_").replace(".", "_")
     return any(marker in normalized for marker in _KNOWLEDGE_OBJECT_MARKERS)
+
+
+def _is_internal_object(name: str) -> bool:
+    normalized = name.lower().replace("-", "_").replace(".", "_")
+    return any(marker in normalized for marker in _INTERNAL_OBJECT_MARKERS)
+
+
+def _operational_signals(table: TableMetadata) -> list[str]:
+    text = " ".join([table.name, *table.columns]).casefold()
+    signals = sorted(marker for marker in _OPERATIONAL_MARKERS if marker in text)
+    if table.foreign_keys:
+        signals.append("foreign-key relationship")
+    if any(re.search(r"status|state|stage", column, re.I) for column in table.columns):
+        signals.append("status field")
+    if any(re.search(r"created|updated|timestamp|date|time", column, re.I) for column in table.columns):
+        signals.append("timestamp field")
+    return signals
 
 
 def _tokens(question: str, entities: EntityExtractionResult) -> set[str]:
@@ -163,7 +191,7 @@ def rank_relevant_objects(
     target_table = resolve_table_from_terms(problem.target_terms, metadata)
     parent_table = resolve_table_from_terms(problem.parent_terms, metadata)
     ranked_tables: list[tuple[float, TableMetadata, str]] = []
-    eligible_tables = [table for table in metadata.tables if not _is_knowledge_object(table.name)]
+    eligible_tables = [table for table in metadata.tables if not _is_internal_object(table.name)]
     for table in eligible_tables:
         haystack_items = [table.name, *table.columns]
         haystack = " ".join(haystack_items).lower()
@@ -172,6 +200,11 @@ def rank_relevant_objects(
         index_bonus = 0.25 if table.indexes else 0.0
         score = float(table.score) + token_hits + relationship_bonus + index_bonus + _intent_bonus(intent.intent, table)
         reason = f"Matched {token_hits} question/entity token(s)"
+        operational_signals = _operational_signals(table)
+        if operational_signals:
+            operational_bonus = min(4.0, len(operational_signals) * 0.65)
+            score += operational_bonus
+            reason += "; operational metadata signals: " + ", ".join(operational_signals)
         if target_table and table.name == target_table.name:
             score += 12.0
             reason += "; selected from main problem phrase target"
@@ -222,19 +255,23 @@ def rank_relevant_objects(
     objects.extend(RankedObject("view", view, 0.8, "View name matched relevant tokens or retained for context") for view in views)
     selected_for_trace = {table.name for table in selected_tables}
     selected_for_trace.update(procedures)
+    base_trace = metadata.candidate_trace or [
+        {"object_type": "table", "name": table.name, "score": table.score, "decision": "candidate", "reason": "metadata candidate"}
+        for table in metadata.tables
+    ]
     candidate_trace = [
         {
             **item,
             "decision": "selected" if item.get("name") in selected_for_trace else "rejected",
             **(
-                {"rejection_reason": "knowledge objects cannot be affected business objects"}
-                if item.get("object_type") == "table" and _is_knowledge_object(str(item.get("name", "")))
+                {"rejection_reason": "unrelated internal, authentication, evaluation, framework, or knowledge objects cannot be affected business objects"}
+                if item.get("object_type") == "table" and _is_internal_object(str(item.get("name", "")))
                 else {}
             ),
         }
         if item.get("object_type") == "table"
         else item
-        for item in metadata.candidate_trace
+        for item in base_trace
     ]
     return ObjectRankingResult(
         objects=objects,

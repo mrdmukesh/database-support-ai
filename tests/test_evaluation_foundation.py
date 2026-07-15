@@ -149,3 +149,13 @@ def test_all_domain_manifests_preserve_the_five_pilot_definitions() -> None:
         scenarios = load_scenarios(f"evaluation_scenarios/{domain}/scenarios.json")
         assert sum("-pilot-" in item.scenario_id for item in scenarios) == 5
         assert all(item.domain == domain for item in scenarios)
+
+
+def test_complete_benchmark_has_required_distribution() -> None:
+    from evaluation.framework.benchmark_validator import validate_benchmark
+
+    scenarios = []
+    for domain in ("payroll", "clinic", "orders", "banking", "shipping"):
+        scenarios.extend(load_scenarios(f"evaluation_scenarios/{domain}/scenarios.json"))
+    assert len(scenarios) == 125
+    assert validate_benchmark(scenarios) == []

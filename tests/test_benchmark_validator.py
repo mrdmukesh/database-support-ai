@@ -20,6 +20,7 @@ def test_validator_detects_duplicate_ids_and_questions(tmp_path):
 
 def test_validator_rejects_unsafe_fixture_sql(tmp_path):
     item = scenario(
+        scenario_id="payroll-benchmark-999",
         business_description="A payment support incident.",
         expected_relationships=("payments -> messages",),
         unsafe_recommendations=("edit production rows",),

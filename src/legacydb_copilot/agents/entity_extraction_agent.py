@@ -97,6 +97,23 @@ def _concept_tokens(question: str) -> list[str]:
     return tokens
 
 
+def _business_identifiers(question: str) -> list[str]:
+    """Extract complete identifier candidates without interpreting their domain."""
+    candidates: list[tuple[int, str]] = []
+    separated = re.compile(
+        r"(?<![A-Za-z0-9])([A-Za-z][A-Za-z0-9]*(?:[-_/][A-Za-z0-9]+)+)(?![A-Za-z0-9])"
+    )
+    spaced = re.compile(
+        r"(?<![A-Za-z0-9])([A-Z]{2,12}(?:\s+[A-Za-z0-9]+){1,4})(?![A-Za-z0-9])"
+    )
+    for pattern in (separated, spaced):
+        for match in pattern.finditer(question):
+            value = match.group(1)
+            if any(character.isdigit() for character in value):
+                candidates.append((match.start(1), value))
+    return [value for _, value in sorted(set(candidates), key=lambda item: item[0])]
+
+
 def extract_entities(question: str) -> EntityExtractionResult:
     """
     Owner: Mukesh Dabi
@@ -125,9 +142,9 @@ def extract_entities(question: str) -> EntityExtractionResult:
     if app_match:
         application_name = f"{app_match.group(1)} {app_match.group(2)}"
         entities.append(ExtractedEntity("application_name", application_name))
-    business_key_pattern = r"\b(?:[A-Z]{1,12}-\d+[A-Z0-9]*|[A-Z]{1,8}\d{2,}[A-Z0-9]*|\d{2,}[A-Z]{1,8})\b"
-    business_keys = set(re.findall(business_key_pattern, question))
-    for value in re.findall(business_key_pattern, question):
+    business_key_pattern = r"\b(?:[A-Z]{1,8}\d{2,}[A-Z0-9]*|\d{2,}[A-Z]{1,8})\b"
+    business_keys = set(_business_identifiers(question) + re.findall(business_key_pattern, question))
+    for value in business_keys:
         entities.append(ExtractedEntity("exact_id_or_code", value))
         entities.append(ExtractedEntity("business_identifier", value))
     for value in re.findall(r"\bsp_[a-zA-Z0-9_]+\b", question):

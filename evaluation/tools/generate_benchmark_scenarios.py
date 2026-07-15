@@ -8,8 +8,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 DOMAINS = {
     "banking": {"prefix": "BNK", "objects": ["transactions", "transfers", "payment_instructions", "accounts", "beneficiaries", "loans", "cards", "fraud_alerts"], "subject": "payment", "trigger": "eval.tr_accounts_audit"},
-    "orders": {"prefix": "ORD", "objects": ["sales_orders", "sales_order_lines", "allocations", "pick_tasks", "shipments", "inventory_movements", "receipts", "purchase_orders"], "subject": "order", "trigger": "eval.tr_customers_audit"},
-    "shipping": {"prefix": "SHP", "objects": ["shipments", "bookings", "container_assignments", "container_events", "shipment_milestones", "transport_work_orders", "voyages", "bills_of_lading"], "subject": "shipment", "trigger": "eval.tr_customers_audit"},
+    "orders": {"prefix": "ORD", "objects": ["sales_orders", "sales_order_lines", "allocations", "pick_tasks", "shipments", "inventory_movements", "receipts", "purchase_orders"], "subject": "order", "trigger": "eval.tr_products_audit"},
+    "shipping": {"prefix": "SHP", "objects": ["shipments", "bookings", "container_assignments", "container_events", "shipment_milestones", "transport_work_orders", "voyages", "bills_of_lading"], "subject": "shipment", "trigger": "eval.tr_bookings_audit"},
     "payroll": {"prefix": "PAY", "objects": ["payroll_runs", "payroll_items", "payments", "time_entries", "deductions", "employees", "tax_filings", "leave_requests"], "subject": "payroll item", "trigger": "eval.tr_employees_audit"},
     "clinic": {"prefix": "CLN", "objects": ["appointments", "encounters", "claims", "lab_orders", "lab_results", "prescriptions", "payments", "procedures_performed"], "subject": "patient service", "trigger": "eval.tr_providers_audit"},
 }

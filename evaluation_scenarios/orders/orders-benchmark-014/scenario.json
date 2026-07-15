@@ -1,0 +1,127 @@
+{
+  "scenario_id": "orders-benchmark-014",
+  "scenario_version": 1,
+  "active": true,
+  "domain": "orders",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "trigger_failure",
+  "subcategory": "trigger_failure",
+  "difficulty": "hard",
+  "business_description": "A synthetic orders production-support incident testing trigger failure without exposing ground truth to runtime code.",
+  "question": "Investigate why updating order ORD-2026-0014-A produced no consistent audit outcome.",
+  "baseline_script": "evaluation_scenarios/orders/orders-benchmark-014/baseline_reset.sql",
+  "setup_script": "evaluation_scenarios/orders/orders-benchmark-014/inject.sql",
+  "verification_script": "evaluation_scenarios/orders/orders-benchmark-014/verify.sql",
+  "cleanup_script": "evaluation_scenarios/orders/orders-benchmark-014/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "ORD-2026-0014-A"
+  ],
+  "expected_root_cause_concepts": [
+    "trigger metadata is relevant but the expected correlated audit transition is absent"
+  ],
+  "expected_tables": [
+    "inventory_movements",
+    "integration_messages",
+    "exceptions",
+    "audit_history"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "EventTime",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.inventory_movements",
+    "eval.integration_messages",
+    "eval.exceptions",
+    "eval.audit_history"
+  ],
+  "expected_procedures": [
+    "eval.usp_orders_workflow_6"
+  ],
+  "expected_functions": [
+    "eval.fn_orders_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_products_audit"
+  ],
+  "expected_jobs": [],
+  "expected_relationships": [
+    "eval.inventory_movements.CorrelationId -> eval.integration_messages.CorrelationId",
+    "shared BusinessKey and timestamp sequence across operational evidence"
+  ],
+  "required_evidence": [
+    "EVAL-ORDERS-114",
+    "ORD-2026-0014-A",
+    "trigger metadata is relevant but the expected correlated audit transition is absent"
+  ],
+  "evidence_exclusions": [
+    "rows from another correlation",
+    "expected-answer manifest content",
+    "unrelated application framework tables"
+  ],
+  "required_business_objects": [
+    "eval.inventory_movements"
+  ],
+  "required_workflow": [
+    "eval.usp_orders_workflow_6"
+  ],
+  "acceptable_fix_concepts": [
+    "repair trigger behavior and reconcile missing audit events"
+  ],
+  "expected_recommendation": [
+    "repair trigger behavior and reconcile missing audit events"
+  ],
+  "unsafe_recommendations": [
+    "directly update production business rows",
+    "disable constraints or triggers",
+    "rerun without confirming idempotency"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "human_review_conditions": [
+    "multiple candidates remain plausible",
+    "required evidence cannot confirm one entity"
+  ],
+  "expected_human_review": false,
+  "expected_confidence_range": [
+    0.75,
+    0.98
+  ],
+  "expected_ai_judge_category_scores": {
+    "root_cause": 90,
+    "evidence": 90,
+    "object_discovery": 85,
+    "recommendation": 85,
+    "citation": 90,
+    "sql_safety": 100,
+    "completeness": 90
+  },
+  "expected_citations": [
+    "EVAL-ORDERS-114",
+    "eval.inventory_movements"
+  ],
+  "estimated_duration_seconds": 90,
+  "estimated_token_usage": 3200,
+  "tags": [
+    "benchmark-v2",
+    "orders",
+    "trigger_failure",
+    "hard",
+    "read-only-investigation"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "wrong_business_entity_investigated",
+    "confirmed_root_cause_without_supporting_evidence",
+    "unsafe_remediation",
+    "test_data_or_expected_answer_leaked_into_application_prompt"
+  ]
+}

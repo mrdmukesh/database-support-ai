@@ -49,6 +49,12 @@ def create_run(payload: EvaluationRunCreate, db: Annotated[Session, Depends(get_
     return _response(db, job)
 
 
+@router.get("")
+def list_runs(db: Annotated[Session, Depends(get_db_session)], user=Depends(get_current_user), workspace_id: str | None = None):
+    jobs = EvaluationJobService(db, user).list(workspace_id)
+    return [_response(db, job) for job in jobs]
+
+
 @router.get("/{job_id}")
 def get_run(job_id: str, db: Annotated[Session, Depends(get_db_session)], user=Depends(get_current_user)):
     job = EvaluationJobService(db, user).get(job_id)
@@ -56,3 +62,32 @@ def get_run(job_id: str, db: Annotated[Session, Depends(get_db_session)], user=D
         raise HTTPException(status_code=404, detail="Evaluation job not found")
     require_workspace_access(db, user, job.workspace_id, action="read")
     return _response(db, job)
+
+
+@router.post("/{job_id}/cancel")
+def cancel_run(job_id: str, db: Annotated[Session, Depends(get_db_session)], user=Depends(get_current_user)):
+    job = EvaluationJobService(db, user).cancel(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Evaluation job not found")
+    return _response(db, job)
+
+
+@router.post("/{job_id}/retry", status_code=status.HTTP_201_CREATED)
+def retry_run(job_id: str, db: Annotated[Session, Depends(get_db_session)], user=Depends(get_current_user)):
+    job = EvaluationJobService(db, user).retry(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Evaluation job not found")
+    return _response(db, job)
+
+
+@router.get("/{job_id}/reports")
+def run_reports(job_id: str, db: Annotated[Session, Depends(get_db_session)], user=Depends(get_current_user)):
+    job = EvaluationJobService(db, user).get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Evaluation job not found")
+    require_workspace_access(db, user, job.workspace_id, action="read")
+    if not job.evaluation_run_id:
+        return []
+    from legacydb_copilot.services.evaluation_dashboard_service import EvaluationDashboardService
+    rows = EvaluationDashboardService(db, organization_id=None if user.role == "super_admin" else user.organization_id).scenarios(job.evaluation_run_id)
+    return [{"result_id": row["result_id"], "scenario_id": row["scenario_id"], "status": row["execution_status"], "report_url": f"/react/app/evaluation/scenarios/{row['result_id']}"} for row in rows]

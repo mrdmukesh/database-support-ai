@@ -100,3 +100,15 @@ def test_job_reads_are_tenant_isolated(jobs_client: TestClient) -> None:
     _, _, other = account(jobs_client, "hidden")
     assert jobs_client.get(f"/evaluation/runs/{job['id']}", headers=headers).status_code == 200
     assert jobs_client.get(f"/evaluation/runs/{job['id']}", headers=other).status_code == 404
+
+
+def test_cancel_queued_job_and_retry_create_new_immutable_job(jobs_client: TestClient) -> None:
+    org, workspace, headers = account(jobs_client, "lifecycle")
+    original = jobs_client.post("/evaluation/runs", headers=headers, json=payload(org, workspace)).json()
+    cancelled = jobs_client.post(f"/evaluation/runs/{original['id']}/cancel", headers=headers).json()
+    assert cancelled["status"] == "cancelled"
+    retried = jobs_client.post(f"/evaluation/runs/{original['id']}/retry", headers=headers)
+    assert retried.status_code == 201
+    child = retried.json()
+    assert child["id"] != original["id"] and child["parent_run_id"] == original["id"]
+    assert child["run_name"].startswith("secure-pilot-rerun-")

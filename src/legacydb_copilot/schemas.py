@@ -136,6 +136,7 @@ class DatabaseConnectionRead(BaseModel):
     workspace_id: str
     engine: str
     name: str
+    database_name: str
     is_active: bool
 
 

@@ -63,7 +63,7 @@ def _build_connection_string(connection: DatabaseConnectionModel) -> str:
         return f"postgresql+psycopg://{secret}@{host}:{port}/{database}"
     elif engine == "sql_server":
         # Assuming secret is in format user:password
-        return f"mssql+pyodbc://{secret}@{host}:{port}/{database}?driver=ODBC+Driver+17+for+SQL+Server"
+        return f"mssql+pyodbc://{secret}@{host}:{port}/{database}?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
     elif engine == "sqlite":
         return f"sqlite:///{database}"
     else:

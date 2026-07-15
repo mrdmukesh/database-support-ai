@@ -1,4 +1,4 @@
 SET NOCOUNT ON;
-IF NOT EXISTS (SELECT 1 FROM eval.[lab_orders] WHERE BusinessKey LIKE N'CLN-2026-0012%' AND CorrelationId=N'EVAL-CLINIC-112') THROW 51100, 'Benchmark defect missing', 1;
-SELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[lab_orders] WHERE BusinessKey LIKE N'CLN-2026-0012%';
+IF EXISTS (SELECT 1 FROM eval.[lab_orders] WHERE BusinessKey LIKE N'CLN-2026-0012%' OR CorrelationId=N'EVAL-CLINIC-112') THROW 51101, 'Benchmark scenario contaminated before injection', 1;
+SELECT N'precondition_valid' AS validation_status;
 GO

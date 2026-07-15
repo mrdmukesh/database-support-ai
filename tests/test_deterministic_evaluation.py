@@ -417,9 +417,9 @@ def test_validation_persistence_is_append_only(monkeypatch):
 
 
 @pytest.mark.parametrize("domain", ("payroll", "clinic", "orders", "banking", "shipping"))
-def test_all_25_pilot_contracts_can_be_deterministically_validated(domain):
+def test_all_125_benchmark_contracts_can_be_deterministically_validated(domain):
     scenarios = load_scenarios(f"evaluation_scenarios/{domain}/scenarios.json")
     results = [validate(item, ideal_result(item)) for item in scenarios]
-    assert len(results) == 5
+    assert len(results) == 25
     assert all(result.classification == "pass" for result in results)
     assert all(result.final_score == 100 for result in results)

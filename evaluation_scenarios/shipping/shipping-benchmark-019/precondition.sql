@@ -1,4 +1,4 @@
 SET NOCOUNT ON;
-IF NOT EXISTS (SELECT 1 FROM eval.[container_assignments] WHERE BusinessKey LIKE N'SHP-2026-0019%' AND CorrelationId=N'EVAL-SHIPPING-119') THROW 51100, 'Benchmark defect missing', 1;
-SELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[container_assignments] WHERE BusinessKey LIKE N'SHP-2026-0019%';
+IF EXISTS (SELECT 1 FROM eval.[container_assignments] WHERE BusinessKey LIKE N'SHP-2026-0019%' OR CorrelationId=N'EVAL-SHIPPING-119') THROW 51101, 'Benchmark scenario contaminated before injection', 1;
+SELECT N'precondition_valid' AS validation_status;
 GO

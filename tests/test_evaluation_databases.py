@@ -48,10 +48,12 @@ def test_database_package_has_required_azure_sql_objects(domain: str) -> None:
 
 
 @pytest.mark.parametrize("domain", DOMAINS)
-def test_each_domain_has_five_complete_valid_scenarios(domain: str) -> None:
+def test_each_domain_has_twenty_five_complete_valid_scenarios(domain: str) -> None:
     manifest = load_scenarios(ROOT / "evaluation_scenarios" / domain / "scenarios.json")
-    assert len(manifest) == 5
-    assert len({scenario.scenario_id for scenario in manifest}) == 5
+    assert len(manifest) == 25
+    assert len({scenario.scenario_id for scenario in manifest}) == 25
+    assert sum("-pilot-" in scenario.scenario_id for scenario in manifest) == 5
+    assert sum("-benchmark-" in scenario.scenario_id for scenario in manifest) == 20
     for scenario in manifest:
         assert scenario.active
         assert scenario.database_engine == "sqlserver"

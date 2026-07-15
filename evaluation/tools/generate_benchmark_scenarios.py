@@ -117,8 +117,9 @@ def _scripts(domain: str, category: str, target: str, entity: str, partial: str,
     inject.append(f"INSERT eval.exceptions(BusinessKey,Status,Details,CorrelationId) VALUES (N'EX-{entity}',N'Open',N'Primary synthetic defect: {category.replace('_', ' ')}',N'{correlation}');")
     inject.append(f"INSERT eval.audit_history(BusinessKey,Status,Details,CorrelationId) VALUES (N'AUD-{entity}',N'Recorded',N'Observed workflow state',N'{correlation}');")
     inject.extend(["COMMIT;", "GO", ""])
+    precondition = f"SET NOCOUNT ON;\nIF EXISTS (SELECT 1 FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%' OR CorrelationId=N'{correlation}') THROW 51101, 'Benchmark scenario contaminated before injection', 1;\nSELECT N'precondition_valid' AS validation_status;\nGO\n"
     verify = f"SET NOCOUNT ON;\nIF NOT EXISTS (SELECT 1 FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%' AND CorrelationId=N'{correlation}') THROW 51100, 'Benchmark defect missing', 1;\nSELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%';\nGO\n"
-    return {"baseline_reset.sql": "\n".join(clean), "inject.sql": "\n".join(inject), "precondition.sql": verify, "verify.sql": verify, "cleanup.sql": "\n".join(cleanup)}
+    return {"baseline_reset.sql": "\n".join(clean), "inject.sql": "\n".join(inject), "precondition.sql": precondition, "verify.sql": verify, "cleanup.sql": "\n".join(cleanup)}
 
 
 if __name__ == "__main__":

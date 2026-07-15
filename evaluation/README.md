@@ -25,6 +25,11 @@ For unattended jobs, configure matching API/container secrets:
 Tokens default to 15 minutes (`EVALUATION_SERVICE_TOKEN_MINUTES`) and renew automatically
 after an HTTP 401. Never commit service secrets or bearer tokens.
 
+The deployed web container can claim durable evaluation jobs when
+`EVALUATION_WORKER_ENABLED=true`. Keep one web replica for this low-cost in-process mode;
+database row locking still prevents duplicate claims. Larger deployments should run
+`python -m evaluation.worker` as a separately scaled worker process instead.
+
 Examples:
 
 ```powershell

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from legacydb_copilot.ai import SafetyFinding, analyze_prompt
 from legacydb_copilot.agents.context_discovery_agent import discover_context
-from legacydb_copilot.agents.entity_extraction_agent import extract_entities
+from legacydb_copilot.agents.entity_extraction_agent import ExtractedEntity, extract_entities
 from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
 from legacydb_copilot.agents.intent_agent import InvestigationIntent, detect_intent
 from legacydb_copilot.agents.investigation_planner_agent import build_investigation_plan
@@ -57,6 +57,7 @@ from legacydb_copilot.services.evidence_correlation_service import correlate_evi
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
+from legacydb_copilot.services.entity_resolution_service import EntityResolutionResult, resolve_entities
 from legacydb_copilot.services.investigation_reports import (
     generate_investigation_report_files,
     report_storage_references,
@@ -1725,6 +1726,10 @@ def _run_dynamic_investigation(
             metadata_context=metadata_context,
             active_schema_metadata=active_schema_metadata,
         )
+    entity_resolution = resolve_entities(connector, context.metadata, entities)
+    if entity_resolution.resolutions and not entity_resolution.can_continue:
+        return _entity_resolution_blocked_answer(connection.name, entities, entity_resolution)
+    entities = _apply_entity_resolutions(entities, entity_resolution)
     target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata, intent)
     if target_missing:
         return _object_not_found_answer(
@@ -2122,6 +2127,9 @@ def _run_dynamic_investigation(
                     "value": entity.value,
                 }
                 for entity in entities.entities
+            ] + [
+                {"entity_type": "entity_resolution", **asdict(resolution)}
+                for resolution in entity_resolution.resolutions
             ],
             default=str,
         ),
@@ -2142,6 +2150,43 @@ def _run_dynamic_investigation(
         }, default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata
+
+
+def _apply_entity_resolutions(entities, result: EntityResolutionResult):
+    matched = {
+        resolution.extracted_value.casefold(): resolution.matched_value
+        for resolution in result.resolutions
+        if resolution.matched_value
+    }
+    return replace(
+        entities,
+        entities=[
+            ExtractedEntity(entity.entity_type, matched.get(entity.value.casefold(), entity.value))
+            for entity in entities.entities
+        ],
+    )
+
+
+def _entity_resolution_blocked_answer(connection_name: str, entities, result: EntityResolutionResult):
+    metadata = _empty_investigation_metadata()
+    metadata["detected_intent"] = f"INSUFFICIENT_DATABASE_EVIDENCE:ENTITY_{result.status.upper()}"
+    metadata["extracted_entities"] = json.dumps(
+        [
+            {"entity_type": entity.entity_type, "value": entity.value}
+            for entity in entities.entities
+        ] + [
+            {"entity_type": "entity_resolution", **asdict(resolution)}
+            for resolution in result.resolutions
+        ],
+        default=str,
+    )
+    if result.status == "ambiguous":
+        message = "AMBIGUOUS_ENTITY: Multiple plausible records matched. Select a candidate or request human review before investigation continues."
+    elif result.status == "blocked":
+        message = "ENTITY_LOOKUP_BLOCKED: The read-only candidate lookup was blocked; the identifier was not confirmed."
+    else:
+        message = "ENTITY_NOT_FOUND: No exact or safe partial database match confirmed the supplied identifier."
+    return message, [connection_name], 0.0, None, metadata
 
 
 def _expand_related_id_evidence(connector, metadata, evidence):

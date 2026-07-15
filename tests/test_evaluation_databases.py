@@ -71,7 +71,12 @@ def test_each_domain_has_five_complete_valid_scenarios(domain: str) -> None:
             "verify.sql",
             "cleanup.sql",
         ):
-            assert (scenario_folder / filename).is_file()
+            script = scenario_folder / filename
+            assert script.is_file()
+            for line in script.read_text(encoding="utf-8").splitlines():
+                assert not re.search(r"\S+\s+GO\s*$", line, re.IGNORECASE), (
+                    f"sqlcmd batch separator must be on its own line: {script}"
+                )
 
 
 def test_shipping_manifest_contains_requested_pilot_scenarios_and_lifecycle() -> None:

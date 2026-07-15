@@ -1,1 +1,2 @@
-IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-CLINIC-005' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[prescriptions] WHERE Details='EVAL-CLINIC-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'PAT-6605' ExpectedEntity, 'EVAL-CLINIC-005' EvidenceValue; GO
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-CLINIC-005' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[prescriptions] WHERE Details='EVAL-CLINIC-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'PAT-6605' ExpectedEntity, 'EVAL-CLINIC-005' EvidenceValue;
+GO

@@ -1,1 +1,2 @@
-IF NOT (EXISTS (SELECT 1 FROM eval.container_assignments WHERE BusinessKey='CONT-5005' AND Details LIKE '%planned SLA timestamp unavailable%' AND CorrelationId='EVAL-SHIPPING-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'CONT-5005' ExpectedEntity, 'EVAL-SHIPPING-005' EvidenceValue; GO
+IF NOT (EXISTS (SELECT 1 FROM eval.container_assignments WHERE BusinessKey='CONT-5005' AND Details LIKE '%planned SLA timestamp unavailable%' AND CorrelationId='EVAL-SHIPPING-005')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'CONT-5005' ExpectedEntity, 'EVAL-SHIPPING-005' EvidenceValue;
+GO

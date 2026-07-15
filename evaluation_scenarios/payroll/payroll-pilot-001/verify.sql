@@ -1,1 +1,2 @@
-IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-PAYROLL-001' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[pay_groups] WHERE Details='EVAL-PAYROLL-001')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'EMP-1042' ExpectedEntity, 'EVAL-PAYROLL-001' EvidenceValue; GO
+IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-PAYROLL-001' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[pay_groups] WHERE Details='EVAL-PAYROLL-001')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'EMP-1042' ExpectedEntity, 'EVAL-PAYROLL-001' EvidenceValue;
+GO

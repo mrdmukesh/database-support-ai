@@ -98,6 +98,7 @@ def create_fastapi_app() -> Any:
 
     from legacydb_copilot.config import Settings
     from legacydb_copilot.db.schema import initialize_application_schema
+    from legacydb_copilot.services.evaluation_worker_runtime import EvaluationWorkerRuntime, evaluation_worker_enabled
     from legacydb_copilot.routers import (
         admin,
         auth,
@@ -119,6 +120,16 @@ def create_fastapi_app() -> Any:
     @app.on_event("startup")
     def _initialize_database_schema() -> None:
         initialize_application_schema(Settings.from_env().database_url)
+        if evaluation_worker_enabled():
+            runtime = EvaluationWorkerRuntime()
+            runtime.start()
+            app.state.evaluation_worker_runtime = runtime
+
+    @app.on_event("shutdown")
+    def _stop_evaluation_worker() -> None:
+        runtime = getattr(app.state, "evaluation_worker_runtime", None)
+        if runtime is not None:
+            runtime.stop()
 
     app.include_router(system.router)
     app.include_router(auth.router)

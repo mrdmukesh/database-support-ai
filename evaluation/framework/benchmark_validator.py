@@ -19,7 +19,11 @@ REQUIRED_CATEGORIES = (
     "multi_table_investigation",
 )
 FORBIDDEN_SQL = re.compile(r"\b(drop|truncate|alter|create\s+(?:login|user)|grant|revoke)\b", re.I)
-EXPECTED_ANSWER_MARKERS = ("expected_root_cause", "acceptable_fix", "unsafe_recommendation")
+EXPECTED_ANSWER_MARKERS = (
+    "expected_root_cause_concepts",
+    "acceptable_fix_concepts",
+    "unsafe_recommendations",
+)
 
 
 @dataclass(frozen=True)

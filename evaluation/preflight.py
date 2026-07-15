@@ -13,6 +13,7 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 
 from evaluation.framework.scenario_loader import load_scenarios
+from evaluation.runners.public_api import EvaluationServiceTokenProvider
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 
 DOMAINS = ("payroll", "clinic", "orders", "banking", "shipping")
@@ -75,8 +76,11 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
 
     base_url = os.getenv("EVAL_API_BASE_URL", "").rstrip("/")
     token = os.getenv("EVAL_ACCESS_TOKEN", "")
-    auth_names = ["EVAL_ACCESS_TOKEN", "EVAL_ORGANIZATION_ID", "EVAL_WORKSPACE_ID", "EVAL_USER_ID"]
+    service_auth = bool(os.getenv("EVAL_SERVICE_CLIENT_ID") and os.getenv("EVAL_SERVICE_CLIENT_SECRET"))
+    auth_names = ["EVAL_ORGANIZATION_ID", "EVAL_WORKSPACE_ID", "EVAL_USER_ID"]
     missing_auth = [name for name in auth_names if not os.getenv(name)]
+    if not token and not service_auth:
+        missing_auth.append("EVAL_ACCESS_TOKEN or service credentials")
     add("authentication configuration", not missing_auth, "configured" if not missing_auth else "missing: " + ", ".join(missing_auth))
     if check_live and base_url:
         try:
@@ -88,8 +92,10 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
         add("application API health", False, "EVAL_API_BASE_URL is missing" if not base_url else "live checks disabled")
 
     connection_ids = {domain: os.getenv(f"EVAL_CONNECTION_ID_{domain.upper()}", "") for domain in DOMAINS}
-    if check_live and base_url and token and os.getenv("EVAL_ORGANIZATION_ID"):
+    if check_live and base_url and (token or service_auth) and os.getenv("EVAL_ORGANIZATION_ID"):
         try:
+            if service_auth:
+                token = EvaluationServiceTokenProvider(base_url, os.environ["EVAL_SERVICE_CLIENT_ID"], os.environ["EVAL_SERVICE_CLIENT_SECRET"])()
             query = parse.urlencode({"organization_id": os.environ["EVAL_ORGANIZATION_ID"], "workspace_id": os.getenv("EVAL_WORKSPACE_ID", "")})
             rows = _http_json("GET", f"{base_url}/databases/connections?{query}", token)
             by_id = {str(row.get("id")): row for row in rows if isinstance(row, dict)}

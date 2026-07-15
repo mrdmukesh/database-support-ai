@@ -11,11 +11,19 @@ or report-generation functions directly.
 Required environment variables:
 
 - `DATABASE_URL`: application/evaluation persistence database
-- `EVAL_API_BASE_URL`, `EVAL_ACCESS_TOKEN`
+- `EVAL_API_BASE_URL` and either `EVAL_SERVICE_CLIENT_ID` plus `EVAL_SERVICE_CLIENT_SECRET`
+  (recommended), or `EVAL_ACCESS_TOKEN` for short interactive runs
 - `EVAL_ORGANIZATION_ID`, `EVAL_WORKSPACE_ID`, `EVAL_USER_ID`
 - `EVAL_CONNECTION_ID_PAYROLL`, `EVAL_CONNECTION_ID_CLINIC`, `EVAL_CONNECTION_ID_ORDERS`
 - `EVAL_CONNECTION_ID_BANKING`, `EVAL_CONNECTION_ID_SHIPPING`
 - `EVAL_SQL_SERVER`, `EVAL_SQL_ADMIN`, `EVAL_SQL_PASSWORD`
+
+For unattended jobs, configure matching API/container secrets:
+`EVALUATION_SERVICE_CLIENT_ID`, `EVALUATION_SERVICE_CLIENT_SECRET`,
+`EVALUATION_SERVICE_USER_ID`, `EVALUATION_SERVICE_ORGANIZATION_ID`, and
+`EVALUATION_SERVICE_WORKSPACE_ID`. The user must have active membership in the workspace.
+Tokens default to 15 minutes (`EVALUATION_SERVICE_TOKEN_MINUTES`) and renew automatically
+after an HTTP 401. Never commit service secrets or bearer tokens.
 
 Examples:
 

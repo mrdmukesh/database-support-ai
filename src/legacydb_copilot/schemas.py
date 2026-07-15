@@ -72,6 +72,17 @@ class SessionRead(BaseModel):
     user: UserRead
 
 
+class EvaluationServiceTokenRequest(BaseModel):
+    client_id: str = Field(min_length=1, max_length=200)
+    client_secret: str = Field(min_length=1, max_length=512)
+
+
+class EvaluationServiceTokenRead(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+
+
 class WorkspaceCreate(BaseModel):
     organization_id: str
     name: str = Field(min_length=1, max_length=200)

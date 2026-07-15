@@ -13,6 +13,12 @@ class Settings:
     database_url: str = "postgresql+psycopg://legacydb:legacydb@localhost:5432/legacydb_copilot"
     jwt_secret: str = "dev-only-change-me"
     jwt_access_token_minutes: int = 60
+    evaluation_service_client_id: str | None = None
+    evaluation_service_client_secret: str | None = None
+    evaluation_service_user_id: str | None = None
+    evaluation_service_organization_id: str | None = None
+    evaluation_service_workspace_id: str | None = None
+    evaluation_service_token_minutes: int = 15
     session_timeout_minutes: int = 60
     upload_max_size_bytes: int = 25 * 1024 * 1024
     storage_backend: str = "local"
@@ -48,6 +54,12 @@ class Settings:
             ),
             jwt_secret=os.getenv("JWT_SECRET", "dev-only-change-me"),
             jwt_access_token_minutes=int(os.getenv("JWT_ACCESS_TOKEN_MINUTES", "60")),
+            evaluation_service_client_id=os.getenv("EVALUATION_SERVICE_CLIENT_ID") or None,
+            evaluation_service_client_secret=os.getenv("EVALUATION_SERVICE_CLIENT_SECRET") or None,
+            evaluation_service_user_id=os.getenv("EVALUATION_SERVICE_USER_ID") or None,
+            evaluation_service_organization_id=os.getenv("EVALUATION_SERVICE_ORGANIZATION_ID") or None,
+            evaluation_service_workspace_id=os.getenv("EVALUATION_SERVICE_WORKSPACE_ID") or None,
+            evaluation_service_token_minutes=int(os.getenv("EVALUATION_SERVICE_TOKEN_MINUTES", "15")),
             session_timeout_minutes=int(os.getenv("SESSION_TIMEOUT_MINUTES", "60")),
             upload_max_size_bytes=int(os.getenv("UPLOAD_MAX_SIZE_BYTES", str(25 * 1024 * 1024))),
             storage_backend=os.getenv("STORAGE_BACKEND", "local").lower(),

@@ -12,7 +12,7 @@ from evaluation.judges.openai_client import OpenAIJudgeClient
 from evaluation.judges.store import AIJudgeService
 from evaluation.runners.contracts import RunnerConfig, RunnerContext
 from evaluation.runners.investigation_reader import InvestigationPersistenceReader
-from evaluation.runners.public_api import PublicInvestigationAPI
+from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
 from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 from evaluation.runners.store import SQLAlchemyExecutionStore
@@ -80,9 +80,16 @@ def build_runner(args) -> EvaluationRunner:
     connection_ids = {
         domain: required_env(f"EVAL_CONNECTION_ID_{domain.upper()}") for domain in DOMAINS
     }
+    api_base_url = os.getenv("EVAL_API_BASE_URL", "http://127.0.0.1:8000")
+    service_client_id = os.getenv("EVAL_SERVICE_CLIENT_ID")
+    service_client_secret = os.getenv("EVAL_SERVICE_CLIENT_SECRET")
+    access_token = os.getenv("EVAL_ACCESS_TOKEN", "")
+    if not access_token and not (service_client_id and service_client_secret):
+        raise SystemExit("Configure EVAL_ACCESS_TOKEN or both EVAL_SERVICE_CLIENT_ID and EVAL_SERVICE_CLIENT_SECRET")
+    token_provider = EvaluationServiceTokenProvider(api_base_url, service_client_id, service_client_secret) if service_client_id and service_client_secret else None
     config = RunnerConfig(
-        api_base_url=os.getenv("EVAL_API_BASE_URL", "http://127.0.0.1:8000"),
-        access_token=required_env("EVAL_ACCESS_TOKEN"),
+        api_base_url=api_base_url,
+        access_token=access_token,
         context=RunnerContext(
             organization_id=required_env("EVAL_ORGANIZATION_ID"),
             workspace_id=required_env("EVAL_WORKSPACE_ID"),
@@ -106,7 +113,7 @@ def build_runner(args) -> EvaluationRunner:
     return EvaluationRunner(
         config=config,
         database=database,
-        api=PublicInvestigationAPI(config.api_base_url, config.access_token),
+        api=PublicInvestigationAPI(config.api_base_url, config.access_token, token_provider=token_provider),
         store=SQLAlchemyExecutionStore(session_factory),
         result_reader=InvestigationPersistenceReader(session_factory),
     )

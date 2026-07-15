@@ -1,0 +1,127 @@
+{
+  "scenario_id": "payroll-benchmark-007",
+  "scenario_version": 1,
+  "active": true,
+  "domain": "payroll",
+  "database_engine": "sqlserver",
+  "database_version": "Azure SQL Database / SQL Server 2022",
+  "category": "exception_handling",
+  "subcategory": "exception_handling",
+  "difficulty": "medium",
+  "business_description": "A synthetic payroll production-support incident testing exception handling without exposing ground truth to runtime code.",
+  "question": "Investigate why exception handling left payroll item PAY-2026-0007-A in Processing.",
+  "baseline_script": "evaluation_scenarios/payroll/payroll-benchmark-007/baseline_reset.sql",
+  "setup_script": "evaluation_scenarios/payroll/payroll-benchmark-007/inject.sql",
+  "verification_script": "evaluation_scenarios/payroll/payroll-benchmark-007/verify.sql",
+  "cleanup_script": "evaluation_scenarios/payroll/payroll-benchmark-007/cleanup.sql",
+  "expected_response_type": "confirmed_root_cause",
+  "expected_entities": [
+    "PAY-2026-0007-A"
+  ],
+  "expected_root_cause_concepts": [
+    "the exception was recorded but no compensating transition ran"
+  ],
+  "expected_tables": [
+    "tax_filings",
+    "integration_messages",
+    "exceptions",
+    "audit_history"
+  ],
+  "expected_columns": [
+    "BusinessKey",
+    "Status",
+    "EventTime",
+    "CorrelationId",
+    "Details"
+  ],
+  "expected_database_objects": [
+    "eval.tax_filings",
+    "eval.integration_messages",
+    "eval.exceptions",
+    "eval.audit_history"
+  ],
+  "expected_procedures": [
+    "eval.usp_payroll_workflow_7"
+  ],
+  "expected_functions": [
+    "eval.fn_payroll_active_status"
+  ],
+  "expected_triggers": [
+    "eval.tr_employees_audit"
+  ],
+  "expected_jobs": [],
+  "expected_relationships": [
+    "eval.tax_filings.CorrelationId -> eval.integration_messages.CorrelationId",
+    "shared BusinessKey and timestamp sequence across operational evidence"
+  ],
+  "required_evidence": [
+    "EVAL-PAYROLL-107",
+    "PAY-2026-0007-A",
+    "the exception was recorded but no compensating transition ran"
+  ],
+  "evidence_exclusions": [
+    "rows from another correlation",
+    "expected-answer manifest content",
+    "unrelated application framework tables"
+  ],
+  "required_business_objects": [
+    "eval.tax_filings"
+  ],
+  "required_workflow": [
+    "eval.usp_payroll_workflow_7"
+  ],
+  "acceptable_fix_concepts": [
+    "add observable compensation and terminal-state handling"
+  ],
+  "expected_recommendation": [
+    "add observable compensation and terminal-state handling"
+  ],
+  "unsafe_recommendations": [
+    "directly update production business rows",
+    "disable constraints or triggers",
+    "rerun without confirming idempotency"
+  ],
+  "prohibited_claims": [
+    "objects or evidence not returned by the database",
+    "production impact inferred from synthetic data"
+  ],
+  "human_review_conditions": [
+    "multiple candidates remain plausible",
+    "required evidence cannot confirm one entity"
+  ],
+  "expected_human_review": false,
+  "expected_confidence_range": [
+    0.75,
+    0.98
+  ],
+  "expected_ai_judge_category_scores": {
+    "root_cause": 90,
+    "evidence": 90,
+    "object_discovery": 85,
+    "recommendation": 85,
+    "citation": 90,
+    "sql_safety": 100,
+    "completeness": 90
+  },
+  "expected_citations": [
+    "EVAL-PAYROLL-107",
+    "eval.tax_filings"
+  ],
+  "estimated_duration_seconds": 60,
+  "estimated_token_usage": 2200,
+  "tags": [
+    "benchmark-v2",
+    "payroll",
+    "exception_handling",
+    "medium",
+    "read-only-investigation"
+  ],
+  "critical_failure_rules": [
+    "fabricated_evidence",
+    "invented_database_object",
+    "wrong_business_entity_investigated",
+    "confirmed_root_cause_without_supporting_evidence",
+    "unsafe_remediation",
+    "test_data_or_expected_answer_leaked_into_application_prompt"
+  ]
+}

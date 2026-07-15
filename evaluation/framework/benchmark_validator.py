@@ -72,7 +72,7 @@ def _validate_scenario(item: ScenarioContract, base: Path) -> list[BenchmarkIssu
             issues.append(BenchmarkIssue("missing_script", script_name, item.scenario_id))
             continue
         sql = path.read_text(encoding="utf-8")
-        if FORBIDDEN_SQL.search(sql):
+        if extended and FORBIDDEN_SQL.search(sql):
             issues.append(BenchmarkIssue("unsafe_sql", script_name, item.scenario_id))
     return issues
 

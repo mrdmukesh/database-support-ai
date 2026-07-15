@@ -30,6 +30,11 @@ The deployed web container can claim durable evaluation jobs when
 database row locking still prevents duplicate claims. Larger deployments should run
 `python -m evaluation.worker` as a separately scaled worker process instead.
 
+Azure application connections must use a separate contained read-only identity. The one-time
+`python -m evaluation_databases.provision_readonly_user` command creates or rotates that identity
+only in the five `Eval*` databases, adds `db_datareader`, and explicitly denies data mutation and
+procedure execution. Do not use the evaluation runner administrator for application evidence reads.
+
 Examples:
 
 ```powershell

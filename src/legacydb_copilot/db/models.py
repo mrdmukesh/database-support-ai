@@ -155,6 +155,38 @@ class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class EvaluationJobModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Durable, tenant-scoped request to execute a new immutable evaluation run."""
+
+    __tablename__ = "evaluation_jobs"
+
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    requested_by_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    evaluation_run_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    parent_run_id: Mapped[str | None] = mapped_column(String(80), index=True)
+    run_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    run_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="queued", nullable=False, index=True)
+    configuration_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    selected_scenarios_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    preflight_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    progress_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    error_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    model: Mapped[str] = mapped_column(String(160), nullable=False)
+    judge_version: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    estimated_cost_usd: Mapped[float] = mapped_column(Numeric(12, 6), default=0, nullable=False)
+    actual_cost_usd: Mapped[float] = mapped_column(Numeric(12, 6), default=0, nullable=False)
+    started_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    cancel_requested_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    worker_id: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    heartbeat_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_evaluation_jobs_workspace_status", "workspace_id", "status"),)
+
+
 class DocumentModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "documents"
 

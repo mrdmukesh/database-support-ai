@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { compareEvaluationRuns, getEvaluationSummary, listEvaluationRuns, listEvaluationScenarios, listHumanReviews } from "../../api/evaluation-api";
 import type { EvaluationComparison, EvaluationRun, EvaluationScenario, EvaluationSummary } from "../../models/evaluation";
+import { EvaluationJobControl } from "./EvaluationJobControl";
 
 const score = (value:number|null) => value === null ? "Not scored" : value.toFixed(1);
 const money = (value:number) => new Intl.NumberFormat("en-US", {style:"currency",currency:"USD",minimumFractionDigits:2,maximumFractionDigits:4}).format(value);
@@ -16,8 +17,8 @@ export function EvaluationDashboardPage() {
   useEffect(()=>{if(view!=="comparison"||!runId||!comparisonId){setComparison(null);return;} const controller=new AbortController(); compareEvaluationRuns(comparisonId,runId,controller.signal).then(setComparison).catch(cause=>setError(cause instanceof Error?cause.message:"Unable to compare runs.")); return()=>controller.abort();},[view,runId,comparisonId]);
   if(loading&&!runs.length) return <p>Loading evaluation dashboard…</p>;
   if(error&&!runs.length) return <div className="form-message error" role="alert">{error}</div>;
-  if(!runs.length) return <section className="evaluation-page"><header><p className="eyebrow">Research evaluation</p><h2>Evaluation Dashboard</h2></header><div className="evaluation-empty"><span aria-hidden="true">◎</span><h3>No completed evaluation runs yet</h3><p>Run the five-domain pilot smoke test, then the 25-scenario pilot. Persisted scores, timing, token usage, cost, and review flags will appear here automatically.</p><code>python -m evaluation.cli pilot-smoke --run-name pilot-smoke-v1</code></div></section>;
-  return <section className="evaluation-page" aria-labelledby="evaluation-title">
+  if(!runs.length) return <section className="evaluation-page"><header><p className="eyebrow">Research evaluation</p><h2>Evaluation Dashboard</h2></header><EvaluationJobControl/><div className="evaluation-empty"><span aria-hidden="true">◎</span><h3>No completed evaluation runs yet</h3><p>Run the five-domain pilot smoke test, then the 25-scenario pilot. Persisted scores, timing, token usage, cost, and review flags will appear here automatically.</p></div></section>;
+  return <section className="evaluation-page" aria-labelledby="evaluation-title"><EvaluationJobControl/>
     <header className="evaluation-heading"><div><p className="eyebrow">Research evaluation</p><h2 id="evaluation-title">Evaluation Dashboard</h2><p>Read-only pilot quality, safety, latency, and cost reporting.</p></div><label>Evaluation run<select aria-label="Evaluation run" value={runId} onChange={event=>setRunId(event.target.value)}>{runs.map(run=><option key={run.id} value={run.id}>{run.name} · {run.completed_count}/{run.scenario_count}</option>)}</select></label></header>
     {error&&<div className="form-message error" role="alert">{error}</div>}
     {summary&&<><div className="evaluation-metrics">

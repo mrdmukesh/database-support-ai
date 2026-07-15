@@ -62,6 +62,21 @@ class ScenarioContract:
     expected_functions: tuple[str, ...] = ()
     expected_triggers: tuple[str, ...] = ()
     expected_jobs: tuple[str, ...] = ()
+    business_description: str = "Legacy evaluation scenario"
+    expected_relationships: tuple[str, ...] = ()
+    evidence_exclusions: tuple[str, ...] = ()
+    required_business_objects: tuple[str, ...] = ()
+    required_workflow: tuple[str, ...] = ()
+    expected_recommendation: tuple[str, ...] = ()
+    unsafe_recommendations: tuple[str, ...] = ()
+    expected_confidence_range: tuple[float, float] = (0.0, 1.0)
+    expected_human_review: bool = False
+    human_review_conditions: tuple[str, ...] = ()
+    expected_ai_judge_category_scores: dict[str, float] = field(default_factory=dict)
+    expected_citations: tuple[str, ...] = ()
+    estimated_duration_seconds: int = 60
+    estimated_token_usage: int = 2000
+    tags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         for name in (
@@ -91,6 +106,13 @@ class ScenarioContract:
             raise ValueError("scenario_version must be at least 1")
         if not self.required_evidence:
             raise ValueError("required_evidence must contain at least one item")
+        low, high = self.expected_confidence_range
+        if not 0 <= low <= high <= 1:
+            raise ValueError("expected_confidence_range must be ordered values between 0 and 1")
+        if self.estimated_duration_seconds < 1 or self.estimated_token_usage < 1:
+            raise ValueError("scenario duration and token estimates must be positive")
+        if any(not 0 <= score <= 100 for score in self.expected_ai_judge_category_scores.values()):
+            raise ValueError("expected AI Judge category scores must be between 0 and 100")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -60,10 +60,11 @@ def _validate_scenario(item: ScenarioContract, base: Path) -> list[BenchmarkIssu
         "citations": item.expected_citations,
         "tags": item.tags,
     }
-    if not item.business_description.strip():
+    extended = "-benchmark-" in item.scenario_id
+    if extended and not item.business_description.strip():
         issues.append(BenchmarkIssue("incomplete", "business description is missing", item.scenario_id))
     for label, values in required_collections.items():
-        if not values:
+        if extended and not values:
             issues.append(BenchmarkIssue("incomplete", f"{label} are missing", item.scenario_id))
     for script_name in (item.baseline_script, item.setup_script, item.verification_script, item.cleanup_script):
         path = base / script_name

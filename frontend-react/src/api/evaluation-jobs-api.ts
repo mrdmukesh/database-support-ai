@@ -1,0 +1,10 @@
+import { ApiClientError, apiRequest } from "./client";
+export type EvaluationJobStatus="queued"|"preflight"|"running"|"completed"|"partially_completed"|"failed"|"cancelled";
+export interface EvaluationJob{id:string;organization_id:string;workspace_id:string;evaluation_run_id:string|null;parent_run_id:string|null;run_name:string;run_type:string;status:EvaluationJobStatus;scenario_ids:string[];concurrency:number;timeout_seconds:number;judge_model:string;estimated_cost_usd:number;actual_cost_usd:number;requested_by_email:string;created_at:string;started_at:string|null;completed_at:string|null;current_scenario:string|null;completed_count:number;failed_count:number;progress_percentage:number}
+export interface EvaluationJobCreate{organization_id:string;workspace_id:string;run_type:"pilot_smoke"|"selected_scenarios";run_name:string;scenario_ids:string[];concurrency:number;timeout_seconds:number;judge_model:string;estimated_cost_usd:number;confirmed:boolean}
+const required=<T>(value:T|undefined):T=>{if(value===undefined)throw new ApiClientError("Evaluation job returned an empty response.",200);return value};
+export async function listEvaluationJobs(workspaceId?:string,signal?:AbortSignal){const q=workspaceId?`?workspace_id=${encodeURIComponent(workspaceId)}`:"";return required(await apiRequest<EvaluationJob[]>(`/evaluation/runs${q}`,{signal}))}
+export async function createEvaluationJob(payload:EvaluationJobCreate){return required(await apiRequest<EvaluationJob>("/evaluation/runs",{method:"POST",body:payload}))}
+export async function cancelEvaluationJob(id:string){return required(await apiRequest<EvaluationJob>(`/evaluation/runs/${encodeURIComponent(id)}/cancel`,{method:"POST"}))}
+export async function retryEvaluationJob(id:string){return required(await apiRequest<EvaluationJob>(`/evaluation/runs/${encodeURIComponent(id)}/retry`,{method:"POST"}))}
+export async function regenerateEvaluationReports(id:string){return required(await apiRequest<{status:string;reports:unknown[]}>(`/evaluation/runs/${encodeURIComponent(id)}/regenerate-reports`,{method:"POST"}))}

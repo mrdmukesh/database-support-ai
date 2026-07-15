@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -89,6 +90,46 @@ class EvaluationJobService:
         if self.user.role != Role.SUPER_ADMIN.value and job.organization_id != self.user.organization_id:
             return None
         return job
+
+    def list(self, workspace_id: str | None = None) -> list[EvaluationJobModel]:
+        query = self.db.query(EvaluationJobModel)
+        if self.user.role != Role.SUPER_ADMIN.value:
+            query = query.filter(EvaluationJobModel.organization_id == self.user.organization_id)
+        if workspace_id:
+            query = query.filter(EvaluationJobModel.workspace_id == workspace_id)
+        return query.order_by(EvaluationJobModel.created_at.desc()).all()
+
+    def cancel(self, job_id: str) -> EvaluationJobModel | None:
+        if not may_manage_evaluations(self.user):
+            raise HTTPException(status_code=403, detail="Evaluation administrator permission required")
+        job = self.get(job_id)
+        if job is None:
+            return None
+        if job.status not in ACTIVE_STATUSES:
+            raise HTTPException(status_code=409, detail="Only active evaluation jobs can be cancelled")
+        job.cancel_requested_at = datetime.now(UTC)
+        if job.status == "queued":
+            job.status = "cancelled"; job.completed_at = datetime.now(UTC)
+        self.db.commit(); self.db.refresh(job); return job
+
+    def retry(self, job_id: str) -> EvaluationJobModel | None:
+        if not may_manage_evaluations(self.user):
+            raise HTTPException(status_code=403, detail="Evaluation administrator permission required")
+        original = self.get(job_id)
+        if original is None:
+            return None
+        if original.status in ACTIVE_STATUSES:
+            raise HTTPException(status_code=409, detail="Active evaluations cannot be retried")
+        config = json.loads(original.configuration_json or "{}")
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+        return self.create(EvaluationJobRequest(
+            organization_id=original.organization_id, workspace_id=original.workspace_id,
+            run_type=original.run_type, run_name=f"{original.run_name}-rerun-{stamp}",
+            scenario_ids=json.loads(original.selected_scenarios_json or "[]"),
+            concurrency=int(config.get("concurrency") or 1), timeout_seconds=int(config.get("timeout_seconds") or 600),
+            judge_model=original.model, estimated_cost_usd=float(original.estimated_cost_usd or 0),
+            confirmed=True, parent_run_id=original.evaluation_run_id or original.id,
+        ))
 
 
 def public_job(job: EvaluationJobModel, requested_by_email: str) -> dict[str, Any]:

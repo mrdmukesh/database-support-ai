@@ -1,0 +1,4 @@
+SET NOCOUNT ON;
+IF NOT EXISTS (SELECT 1 FROM eval.[loans] WHERE BusinessKey LIKE N'BNK-2026-0006%' AND CorrelationId=N'EVAL-BANKING-106') THROW 51100, 'Benchmark defect missing', 1;
+SELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[loans] WHERE BusinessKey LIKE N'BNK-2026-0006%';
+GO

@@ -1,5 +1,8 @@
 # Automated evaluation runner — Phase 1
 
+The release benchmark contains 125 scenarios. See [BENCHMARK.md](BENCHMARK.md) for named
+suites, distribution, validation, reporting, and the complete safe scenario inventory.
+
 The runner submits scenario questions through `POST /chat/ask`, polls the saved result through
 `GET /learning/investigations/{id}`, and then reads the already-persisted investigation snapshots
 for fields not exposed by the public detail response. It never calls reasoning, LLM, RAG, evidence,

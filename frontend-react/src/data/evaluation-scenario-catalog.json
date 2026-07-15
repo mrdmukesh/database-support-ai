@@ -1,0 +1,1977 @@
+[
+  {
+    "scenario_id": "banking-pilot-001",
+    "domain": "banking",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why is transfer TRF-3101 completed without a matching balance movement?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "banking-pilot-002",
+    "domain": "banking",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was payment instruction PMT-3102 posted twice?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "banking-pilot-003",
+    "domain": "banking",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was account ACC-3103 charged by an inactive beneficiary?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "banking-pilot-004",
+    "domain": "banking",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why does settlement batch BAT-3104 remain Running?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "banking-pilot-005",
+    "domain": "banking",
+    "category": "evidence_safety",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm transaction TXN-3105 was fraudulent?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "banking-benchmark-001",
+    "domain": "banking",
+    "category": "exact_entity_lookup",
+    "difficulty": "easy",
+    "question": "Investigate why payment BNK-2026-0001-A is marked Failed even though its request was accepted.",
+    "business_description": "A synthetic banking production-support incident testing exact entity lookup without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "exact_entity_lookup",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-002",
+    "domain": "banking",
+    "category": "partial_entity_resolution",
+    "difficulty": "easy",
+    "question": "Investigate the failed payment reported as BNK-2026-0002; resolve the complete identifier before diagnosing it.",
+    "business_description": "A synthetic banking production-support incident testing partial entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "partial_entity_resolution",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-003",
+    "domain": "banking",
+    "category": "ambiguous_entity_resolution",
+    "difficulty": "hard",
+    "question": "Investigate payment BNK-2026-0003; support reported a failure but did not provide the final suffix.",
+    "business_description": "A synthetic banking production-support incident testing ambiguous entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "ambiguous_entity_resolution",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-004",
+    "domain": "banking",
+    "category": "missing_downstream_record",
+    "difficulty": "medium",
+    "question": "Investigate why completed payment BNK-2026-0004-A has no downstream processing record.",
+    "business_description": "A synthetic banking production-support incident testing missing downstream record without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "missing_downstream_record",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-005",
+    "domain": "banking",
+    "category": "duplicate_transaction",
+    "difficulty": "medium",
+    "question": "Investigate why payment BNK-2026-0005-A produced two processing messages for one business request.",
+    "business_description": "A synthetic banking production-support incident testing duplicate transaction without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "duplicate_transaction",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-006",
+    "domain": "banking",
+    "category": "workflow_interruption",
+    "difficulty": "medium",
+    "question": "Investigate why payment BNK-2026-0006-A stopped between validation and completion.",
+    "business_description": "A synthetic banking production-support incident testing workflow interruption without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "workflow_interruption",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-007",
+    "domain": "banking",
+    "category": "exception_handling",
+    "difficulty": "medium",
+    "question": "Investigate why exception handling left payment BNK-2026-0007-A in Processing.",
+    "business_description": "A synthetic banking production-support incident testing exception handling without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "exception_handling",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-008",
+    "domain": "banking",
+    "category": "integration_failure",
+    "difficulty": "medium",
+    "question": "Investigate why external integration for payment BNK-2026-0008-A was rejected.",
+    "business_description": "A synthetic banking production-support incident testing integration failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "integration_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-009",
+    "domain": "banking",
+    "category": "queue_backlog",
+    "difficulty": "medium",
+    "question": "Investigate why payment BNK-2026-0009-A remains Queued behind older work.",
+    "business_description": "A synthetic banking production-support incident testing queue backlog without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "queue_backlog",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-010",
+    "domain": "banking",
+    "category": "retry_failure",
+    "difficulty": "hard",
+    "question": "Investigate why all retries for payment BNK-2026-0010-A failed without a terminal status.",
+    "business_description": "A synthetic banking production-support incident testing retry failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "retry_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-011",
+    "domain": "banking",
+    "category": "audit_history_inconsistency",
+    "difficulty": "hard",
+    "question": "Investigate why audit history says payment BNK-2026-0011-A completed while its business record says Failed.",
+    "business_description": "A synthetic banking production-support incident testing audit history inconsistency without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "audit_history_inconsistency",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-012",
+    "domain": "banking",
+    "category": "missing_reference_data",
+    "difficulty": "easy",
+    "question": "Investigate why payment BNK-2026-0012-A failed validation after a reference lookup.",
+    "business_description": "A synthetic banking production-support incident testing missing reference data without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "missing_reference_data",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-013",
+    "domain": "banking",
+    "category": "stored_procedure_defect",
+    "difficulty": "hard",
+    "question": "Investigate why workflow procedure processing left payment BNK-2026-0013-A in the wrong status.",
+    "business_description": "A synthetic banking production-support incident testing stored procedure defect without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "stored_procedure_defect",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-014",
+    "domain": "banking",
+    "category": "trigger_failure",
+    "difficulty": "hard",
+    "question": "Investigate why updating payment BNK-2026-0014-A produced no consistent audit outcome.",
+    "business_description": "A synthetic banking production-support incident testing trigger failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "trigger_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-015",
+    "domain": "banking",
+    "category": "batch_processing_failure",
+    "difficulty": "medium",
+    "question": "Investigate why batch processing failed for payment BNK-2026-0015-A while neighboring items completed.",
+    "business_description": "A synthetic banking production-support incident testing batch processing failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "batch_processing_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-016",
+    "domain": "banking",
+    "category": "concurrency_race_condition",
+    "difficulty": "expert",
+    "question": "Investigate intermittent competing updates for payment BNK-2026-0016-A that produced inconsistent terminal states.",
+    "business_description": "A synthetic banking production-support incident testing concurrency race condition without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "concurrency_race_condition",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-017",
+    "domain": "banking",
+    "category": "transaction_rollback",
+    "difficulty": "hard",
+    "question": "Investigate why payment BNK-2026-0017-A reports completion although downstream changes were rolled back.",
+    "business_description": "A synthetic banking production-support incident testing transaction rollback without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "transaction_rollback",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-018",
+    "domain": "banking",
+    "category": "idempotency_issue",
+    "difficulty": "expert",
+    "question": "Investigate why replaying payment BNK-2026-0018-A repeated a previously accepted operation.",
+    "business_description": "A synthetic banking production-support incident testing idempotency issue without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "idempotency_issue",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-019",
+    "domain": "banking",
+    "category": "incorrect_business_status",
+    "difficulty": "easy",
+    "question": "Investigate why payment BNK-2026-0019-A displays Completed while failure evidence remains open.",
+    "business_description": "A synthetic banking production-support incident testing incorrect business status without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "incorrect_business_status",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "banking-benchmark-020",
+    "domain": "banking",
+    "category": "multi_table_investigation",
+    "difficulty": "medium",
+    "question": "Investigate the end-to-end failure of payment BNK-2026-0020-A across business, integration, exception, and audit records.",
+    "business_description": "A synthetic banking production-support incident testing multi table investigation without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "banking",
+      "multi_table_investigation",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-pilot-001",
+    "domain": "orders",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why was order ORD-7101 not allocated despite available inventory?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "orders-pilot-002",
+    "domain": "orders",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was order ORD-7102 imported twice?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "orders-pilot-003",
+    "domain": "orders",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why is SKU-8103 showing a negative available balance?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "orders-pilot-004",
+    "domain": "orders",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why does pick task PICK-9104 remain In Progress after shipment?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "orders-pilot-005",
+    "domain": "orders",
+    "category": "evidence_safety",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm purchase order PO-1205 arrived late?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "orders-benchmark-001",
+    "domain": "orders",
+    "category": "exact_entity_lookup",
+    "difficulty": "easy",
+    "question": "Investigate why order ORD-2026-0001-A is marked Failed even though its request was accepted.",
+    "business_description": "A synthetic orders production-support incident testing exact entity lookup without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "exact_entity_lookup",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-002",
+    "domain": "orders",
+    "category": "partial_entity_resolution",
+    "difficulty": "easy",
+    "question": "Investigate the failed order reported as ORD-2026-0002; resolve the complete identifier before diagnosing it.",
+    "business_description": "A synthetic orders production-support incident testing partial entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "partial_entity_resolution",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-003",
+    "domain": "orders",
+    "category": "ambiguous_entity_resolution",
+    "difficulty": "hard",
+    "question": "Investigate order ORD-2026-0003; support reported a failure but did not provide the final suffix.",
+    "business_description": "A synthetic orders production-support incident testing ambiguous entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "ambiguous_entity_resolution",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-004",
+    "domain": "orders",
+    "category": "missing_downstream_record",
+    "difficulty": "medium",
+    "question": "Investigate why completed order ORD-2026-0004-A has no downstream processing record.",
+    "business_description": "A synthetic orders production-support incident testing missing downstream record without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "missing_downstream_record",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-005",
+    "domain": "orders",
+    "category": "duplicate_transaction",
+    "difficulty": "medium",
+    "question": "Investigate why order ORD-2026-0005-A produced two processing messages for one business request.",
+    "business_description": "A synthetic orders production-support incident testing duplicate transaction without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "duplicate_transaction",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-006",
+    "domain": "orders",
+    "category": "workflow_interruption",
+    "difficulty": "medium",
+    "question": "Investigate why order ORD-2026-0006-A stopped between validation and completion.",
+    "business_description": "A synthetic orders production-support incident testing workflow interruption without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "workflow_interruption",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-007",
+    "domain": "orders",
+    "category": "exception_handling",
+    "difficulty": "medium",
+    "question": "Investigate why exception handling left order ORD-2026-0007-A in Processing.",
+    "business_description": "A synthetic orders production-support incident testing exception handling without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "exception_handling",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-008",
+    "domain": "orders",
+    "category": "integration_failure",
+    "difficulty": "medium",
+    "question": "Investigate why external integration for order ORD-2026-0008-A was rejected.",
+    "business_description": "A synthetic orders production-support incident testing integration failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "integration_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-009",
+    "domain": "orders",
+    "category": "queue_backlog",
+    "difficulty": "medium",
+    "question": "Investigate why order ORD-2026-0009-A remains Queued behind older work.",
+    "business_description": "A synthetic orders production-support incident testing queue backlog without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "queue_backlog",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-010",
+    "domain": "orders",
+    "category": "retry_failure",
+    "difficulty": "hard",
+    "question": "Investigate why all retries for order ORD-2026-0010-A failed without a terminal status.",
+    "business_description": "A synthetic orders production-support incident testing retry failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "retry_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-011",
+    "domain": "orders",
+    "category": "audit_history_inconsistency",
+    "difficulty": "hard",
+    "question": "Investigate why audit history says order ORD-2026-0011-A completed while its business record says Failed.",
+    "business_description": "A synthetic orders production-support incident testing audit history inconsistency without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "audit_history_inconsistency",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-012",
+    "domain": "orders",
+    "category": "missing_reference_data",
+    "difficulty": "easy",
+    "question": "Investigate why order ORD-2026-0012-A failed validation after a reference lookup.",
+    "business_description": "A synthetic orders production-support incident testing missing reference data without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "missing_reference_data",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-013",
+    "domain": "orders",
+    "category": "stored_procedure_defect",
+    "difficulty": "hard",
+    "question": "Investigate why workflow procedure processing left order ORD-2026-0013-A in the wrong status.",
+    "business_description": "A synthetic orders production-support incident testing stored procedure defect without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "stored_procedure_defect",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-014",
+    "domain": "orders",
+    "category": "trigger_failure",
+    "difficulty": "hard",
+    "question": "Investigate why updating order ORD-2026-0014-A produced no consistent audit outcome.",
+    "business_description": "A synthetic orders production-support incident testing trigger failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "trigger_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-015",
+    "domain": "orders",
+    "category": "batch_processing_failure",
+    "difficulty": "medium",
+    "question": "Investigate why batch processing failed for order ORD-2026-0015-A while neighboring items completed.",
+    "business_description": "A synthetic orders production-support incident testing batch processing failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "batch_processing_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-016",
+    "domain": "orders",
+    "category": "concurrency_race_condition",
+    "difficulty": "expert",
+    "question": "Investigate intermittent competing updates for order ORD-2026-0016-A that produced inconsistent terminal states.",
+    "business_description": "A synthetic orders production-support incident testing concurrency race condition without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "concurrency_race_condition",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-017",
+    "domain": "orders",
+    "category": "transaction_rollback",
+    "difficulty": "hard",
+    "question": "Investigate why order ORD-2026-0017-A reports completion although downstream changes were rolled back.",
+    "business_description": "A synthetic orders production-support incident testing transaction rollback without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "transaction_rollback",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-018",
+    "domain": "orders",
+    "category": "idempotency_issue",
+    "difficulty": "expert",
+    "question": "Investigate why replaying order ORD-2026-0018-A repeated a previously accepted operation.",
+    "business_description": "A synthetic orders production-support incident testing idempotency issue without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "idempotency_issue",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-019",
+    "domain": "orders",
+    "category": "incorrect_business_status",
+    "difficulty": "easy",
+    "question": "Investigate why order ORD-2026-0019-A displays Completed while failure evidence remains open.",
+    "business_description": "A synthetic orders production-support incident testing incorrect business status without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "incorrect_business_status",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "orders-benchmark-020",
+    "domain": "orders",
+    "category": "multi_table_investigation",
+    "difficulty": "medium",
+    "question": "Investigate the end-to-end failure of order ORD-2026-0020-A across business, integration, exception, and audit records.",
+    "business_description": "A synthetic orders production-support incident testing multi table investigation without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "orders",
+      "multi_table_investigation",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-pilot-001",
+    "domain": "shipping",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "shipping-pilot-002",
+    "domain": "shipping",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why does container CONT-5002 have a duplicate terminal gate event?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "shipping-pilot-003",
+    "domain": "shipping",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was the wrong carrier selected for empty work order WO-5003?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "shipping-pilot-004",
+    "domain": "shipping",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why does shipment SHP-5004 remain In Transit after import discharge?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "shipping-pilot-005",
+    "domain": "shipping",
+    "category": "evidence_safety",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm container CONT-5005 was delayed?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "shipping-benchmark-001",
+    "domain": "shipping",
+    "category": "exact_entity_lookup",
+    "difficulty": "easy",
+    "question": "Investigate why shipment SHP-2026-0001-A is marked Failed even though its request was accepted.",
+    "business_description": "A synthetic shipping production-support incident testing exact entity lookup without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "exact_entity_lookup",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-002",
+    "domain": "shipping",
+    "category": "partial_entity_resolution",
+    "difficulty": "easy",
+    "question": "Investigate the failed shipment reported as SHP-2026-0002; resolve the complete identifier before diagnosing it.",
+    "business_description": "A synthetic shipping production-support incident testing partial entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "partial_entity_resolution",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-003",
+    "domain": "shipping",
+    "category": "ambiguous_entity_resolution",
+    "difficulty": "hard",
+    "question": "Investigate shipment SHP-2026-0003; support reported a failure but did not provide the final suffix.",
+    "business_description": "A synthetic shipping production-support incident testing ambiguous entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "ambiguous_entity_resolution",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-004",
+    "domain": "shipping",
+    "category": "missing_downstream_record",
+    "difficulty": "medium",
+    "question": "Investigate why completed shipment SHP-2026-0004-A has no downstream processing record.",
+    "business_description": "A synthetic shipping production-support incident testing missing downstream record without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "missing_downstream_record",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-005",
+    "domain": "shipping",
+    "category": "duplicate_transaction",
+    "difficulty": "medium",
+    "question": "Investigate why shipment SHP-2026-0005-A produced two processing messages for one business request.",
+    "business_description": "A synthetic shipping production-support incident testing duplicate transaction without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "duplicate_transaction",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-006",
+    "domain": "shipping",
+    "category": "workflow_interruption",
+    "difficulty": "medium",
+    "question": "Investigate why shipment SHP-2026-0006-A stopped between validation and completion.",
+    "business_description": "A synthetic shipping production-support incident testing workflow interruption without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "workflow_interruption",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-007",
+    "domain": "shipping",
+    "category": "exception_handling",
+    "difficulty": "medium",
+    "question": "Investigate why exception handling left shipment SHP-2026-0007-A in Processing.",
+    "business_description": "A synthetic shipping production-support incident testing exception handling without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "exception_handling",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-008",
+    "domain": "shipping",
+    "category": "integration_failure",
+    "difficulty": "medium",
+    "question": "Investigate why external integration for shipment SHP-2026-0008-A was rejected.",
+    "business_description": "A synthetic shipping production-support incident testing integration failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "integration_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-009",
+    "domain": "shipping",
+    "category": "queue_backlog",
+    "difficulty": "medium",
+    "question": "Investigate why shipment SHP-2026-0009-A remains Queued behind older work.",
+    "business_description": "A synthetic shipping production-support incident testing queue backlog without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "queue_backlog",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-010",
+    "domain": "shipping",
+    "category": "retry_failure",
+    "difficulty": "hard",
+    "question": "Investigate why all retries for shipment SHP-2026-0010-A failed without a terminal status.",
+    "business_description": "A synthetic shipping production-support incident testing retry failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "retry_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-011",
+    "domain": "shipping",
+    "category": "audit_history_inconsistency",
+    "difficulty": "hard",
+    "question": "Investigate why audit history says shipment SHP-2026-0011-A completed while its business record says Failed.",
+    "business_description": "A synthetic shipping production-support incident testing audit history inconsistency without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "audit_history_inconsistency",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-012",
+    "domain": "shipping",
+    "category": "missing_reference_data",
+    "difficulty": "easy",
+    "question": "Investigate why shipment SHP-2026-0012-A failed validation after a reference lookup.",
+    "business_description": "A synthetic shipping production-support incident testing missing reference data without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "missing_reference_data",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-013",
+    "domain": "shipping",
+    "category": "stored_procedure_defect",
+    "difficulty": "hard",
+    "question": "Investigate why workflow procedure processing left shipment SHP-2026-0013-A in the wrong status.",
+    "business_description": "A synthetic shipping production-support incident testing stored procedure defect without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "stored_procedure_defect",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-014",
+    "domain": "shipping",
+    "category": "trigger_failure",
+    "difficulty": "hard",
+    "question": "Investigate why updating shipment SHP-2026-0014-A produced no consistent audit outcome.",
+    "business_description": "A synthetic shipping production-support incident testing trigger failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "trigger_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-015",
+    "domain": "shipping",
+    "category": "batch_processing_failure",
+    "difficulty": "medium",
+    "question": "Investigate why batch processing failed for shipment SHP-2026-0015-A while neighboring items completed.",
+    "business_description": "A synthetic shipping production-support incident testing batch processing failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "batch_processing_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-016",
+    "domain": "shipping",
+    "category": "concurrency_race_condition",
+    "difficulty": "expert",
+    "question": "Investigate intermittent competing updates for shipment SHP-2026-0016-A that produced inconsistent terminal states.",
+    "business_description": "A synthetic shipping production-support incident testing concurrency race condition without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "concurrency_race_condition",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-017",
+    "domain": "shipping",
+    "category": "transaction_rollback",
+    "difficulty": "hard",
+    "question": "Investigate why shipment SHP-2026-0017-A reports completion although downstream changes were rolled back.",
+    "business_description": "A synthetic shipping production-support incident testing transaction rollback without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "transaction_rollback",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-018",
+    "domain": "shipping",
+    "category": "idempotency_issue",
+    "difficulty": "expert",
+    "question": "Investigate why replaying shipment SHP-2026-0018-A repeated a previously accepted operation.",
+    "business_description": "A synthetic shipping production-support incident testing idempotency issue without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "idempotency_issue",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-019",
+    "domain": "shipping",
+    "category": "incorrect_business_status",
+    "difficulty": "easy",
+    "question": "Investigate why shipment SHP-2026-0019-A displays Completed while failure evidence remains open.",
+    "business_description": "A synthetic shipping production-support incident testing incorrect business status without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "incorrect_business_status",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "shipping-benchmark-020",
+    "domain": "shipping",
+    "category": "multi_table_investigation",
+    "difficulty": "medium",
+    "question": "Investigate the end-to-end failure of shipment SHP-2026-0020-A across business, integration, exception, and audit records.",
+    "business_description": "A synthetic shipping production-support incident testing multi table investigation without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "shipping",
+      "multi_table_investigation",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-pilot-001",
+    "domain": "payroll",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why is employee EMP-1042 missing from payroll run RUN-2026-07-A?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "payroll-pilot-002",
+    "domain": "payroll",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was payment PAY-7003 produced twice?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "payroll-pilot-003",
+    "domain": "payroll",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why were overtime hours from TIME-8821 not included?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "payroll-pilot-004",
+    "domain": "payroll",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why does payroll run RUN-2026-07-A remain Processing?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "payroll-pilot-005",
+    "domain": "payroll",
+    "category": "evidence_safety",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm TAX-2026-07 was filed late?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "payroll-benchmark-001",
+    "domain": "payroll",
+    "category": "exact_entity_lookup",
+    "difficulty": "easy",
+    "question": "Investigate why payroll item PAY-2026-0001-A is marked Failed even though its request was accepted.",
+    "business_description": "A synthetic payroll production-support incident testing exact entity lookup without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "exact_entity_lookup",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-002",
+    "domain": "payroll",
+    "category": "partial_entity_resolution",
+    "difficulty": "easy",
+    "question": "Investigate the failed payroll item reported as PAY-2026-0002; resolve the complete identifier before diagnosing it.",
+    "business_description": "A synthetic payroll production-support incident testing partial entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "partial_entity_resolution",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-003",
+    "domain": "payroll",
+    "category": "ambiguous_entity_resolution",
+    "difficulty": "hard",
+    "question": "Investigate payroll item PAY-2026-0003; support reported a failure but did not provide the final suffix.",
+    "business_description": "A synthetic payroll production-support incident testing ambiguous entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "ambiguous_entity_resolution",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-004",
+    "domain": "payroll",
+    "category": "missing_downstream_record",
+    "difficulty": "medium",
+    "question": "Investigate why completed payroll item PAY-2026-0004-A has no downstream processing record.",
+    "business_description": "A synthetic payroll production-support incident testing missing downstream record without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "missing_downstream_record",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-005",
+    "domain": "payroll",
+    "category": "duplicate_transaction",
+    "difficulty": "medium",
+    "question": "Investigate why payroll item PAY-2026-0005-A produced two processing messages for one business request.",
+    "business_description": "A synthetic payroll production-support incident testing duplicate transaction without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "duplicate_transaction",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-006",
+    "domain": "payroll",
+    "category": "workflow_interruption",
+    "difficulty": "medium",
+    "question": "Investigate why payroll item PAY-2026-0006-A stopped between validation and completion.",
+    "business_description": "A synthetic payroll production-support incident testing workflow interruption without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "workflow_interruption",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-007",
+    "domain": "payroll",
+    "category": "exception_handling",
+    "difficulty": "medium",
+    "question": "Investigate why exception handling left payroll item PAY-2026-0007-A in Processing.",
+    "business_description": "A synthetic payroll production-support incident testing exception handling without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "exception_handling",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-008",
+    "domain": "payroll",
+    "category": "integration_failure",
+    "difficulty": "medium",
+    "question": "Investigate why external integration for payroll item PAY-2026-0008-A was rejected.",
+    "business_description": "A synthetic payroll production-support incident testing integration failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "integration_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-009",
+    "domain": "payroll",
+    "category": "queue_backlog",
+    "difficulty": "medium",
+    "question": "Investigate why payroll item PAY-2026-0009-A remains Queued behind older work.",
+    "business_description": "A synthetic payroll production-support incident testing queue backlog without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "queue_backlog",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-010",
+    "domain": "payroll",
+    "category": "retry_failure",
+    "difficulty": "hard",
+    "question": "Investigate why all retries for payroll item PAY-2026-0010-A failed without a terminal status.",
+    "business_description": "A synthetic payroll production-support incident testing retry failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "retry_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-011",
+    "domain": "payroll",
+    "category": "audit_history_inconsistency",
+    "difficulty": "hard",
+    "question": "Investigate why audit history says payroll item PAY-2026-0011-A completed while its business record says Failed.",
+    "business_description": "A synthetic payroll production-support incident testing audit history inconsistency without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "audit_history_inconsistency",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-012",
+    "domain": "payroll",
+    "category": "missing_reference_data",
+    "difficulty": "easy",
+    "question": "Investigate why payroll item PAY-2026-0012-A failed validation after a reference lookup.",
+    "business_description": "A synthetic payroll production-support incident testing missing reference data without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "missing_reference_data",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-013",
+    "domain": "payroll",
+    "category": "stored_procedure_defect",
+    "difficulty": "hard",
+    "question": "Investigate why workflow procedure processing left payroll item PAY-2026-0013-A in the wrong status.",
+    "business_description": "A synthetic payroll production-support incident testing stored procedure defect without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "stored_procedure_defect",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-014",
+    "domain": "payroll",
+    "category": "trigger_failure",
+    "difficulty": "hard",
+    "question": "Investigate why updating payroll item PAY-2026-0014-A produced no consistent audit outcome.",
+    "business_description": "A synthetic payroll production-support incident testing trigger failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "trigger_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-015",
+    "domain": "payroll",
+    "category": "batch_processing_failure",
+    "difficulty": "medium",
+    "question": "Investigate why batch processing failed for payroll item PAY-2026-0015-A while neighboring items completed.",
+    "business_description": "A synthetic payroll production-support incident testing batch processing failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "batch_processing_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-016",
+    "domain": "payroll",
+    "category": "concurrency_race_condition",
+    "difficulty": "expert",
+    "question": "Investigate intermittent competing updates for payroll item PAY-2026-0016-A that produced inconsistent terminal states.",
+    "business_description": "A synthetic payroll production-support incident testing concurrency race condition without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "concurrency_race_condition",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-017",
+    "domain": "payroll",
+    "category": "transaction_rollback",
+    "difficulty": "hard",
+    "question": "Investigate why payroll item PAY-2026-0017-A reports completion although downstream changes were rolled back.",
+    "business_description": "A synthetic payroll production-support incident testing transaction rollback without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "transaction_rollback",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-018",
+    "domain": "payroll",
+    "category": "idempotency_issue",
+    "difficulty": "expert",
+    "question": "Investigate why replaying payroll item PAY-2026-0018-A repeated a previously accepted operation.",
+    "business_description": "A synthetic payroll production-support incident testing idempotency issue without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "idempotency_issue",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-019",
+    "domain": "payroll",
+    "category": "incorrect_business_status",
+    "difficulty": "easy",
+    "question": "Investigate why payroll item PAY-2026-0019-A displays Completed while failure evidence remains open.",
+    "business_description": "A synthetic payroll production-support incident testing incorrect business status without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "incorrect_business_status",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "payroll-benchmark-020",
+    "domain": "payroll",
+    "category": "multi_table_investigation",
+    "difficulty": "medium",
+    "question": "Investigate the end-to-end failure of payroll item PAY-2026-0020-A across business, integration, exception, and audit records.",
+    "business_description": "A synthetic payroll production-support incident testing multi table investigation without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "payroll",
+      "multi_table_investigation",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-pilot-001",
+    "domain": "clinic",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why was appointment APT-2101 not converted into an encounter?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "clinic-pilot-002",
+    "domain": "clinic",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why was claim CLM-3302 submitted twice?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "clinic-pilot-003",
+    "domain": "clinic",
+    "category": "root_cause",
+    "difficulty": "hard",
+    "question": "Why is lab result LAB-4403 not visible on its encounter?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "clinic-pilot-004",
+    "domain": "clinic",
+    "category": "root_cause",
+    "difficulty": "medium",
+    "question": "Why does encounter ENC-5504 remain Open after checkout?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "clinic-pilot-005",
+    "domain": "clinic",
+    "category": "evidence_safety",
+    "difficulty": "hard",
+    "question": "Is there enough evidence to confirm patient PAT-6605 missed an appointment?",
+    "business_description": null,
+    "estimated_duration_seconds": null,
+    "estimated_token_usage": null,
+    "tags": null
+  },
+  {
+    "scenario_id": "clinic-benchmark-001",
+    "domain": "clinic",
+    "category": "exact_entity_lookup",
+    "difficulty": "easy",
+    "question": "Investigate why patient service CLN-2026-0001-A is marked Failed even though its request was accepted.",
+    "business_description": "A synthetic clinic production-support incident testing exact entity lookup without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "exact_entity_lookup",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-002",
+    "domain": "clinic",
+    "category": "partial_entity_resolution",
+    "difficulty": "easy",
+    "question": "Investigate the failed patient service reported as CLN-2026-0002; resolve the complete identifier before diagnosing it.",
+    "business_description": "A synthetic clinic production-support incident testing partial entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "partial_entity_resolution",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-003",
+    "domain": "clinic",
+    "category": "ambiguous_entity_resolution",
+    "difficulty": "hard",
+    "question": "Investigate patient service CLN-2026-0003; support reported a failure but did not provide the final suffix.",
+    "business_description": "A synthetic clinic production-support incident testing ambiguous entity resolution without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "ambiguous_entity_resolution",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-004",
+    "domain": "clinic",
+    "category": "missing_downstream_record",
+    "difficulty": "medium",
+    "question": "Investigate why completed patient service CLN-2026-0004-A has no downstream processing record.",
+    "business_description": "A synthetic clinic production-support incident testing missing downstream record without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "missing_downstream_record",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-005",
+    "domain": "clinic",
+    "category": "duplicate_transaction",
+    "difficulty": "medium",
+    "question": "Investigate why patient service CLN-2026-0005-A produced two processing messages for one business request.",
+    "business_description": "A synthetic clinic production-support incident testing duplicate transaction without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "duplicate_transaction",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-006",
+    "domain": "clinic",
+    "category": "workflow_interruption",
+    "difficulty": "medium",
+    "question": "Investigate why patient service CLN-2026-0006-A stopped between validation and completion.",
+    "business_description": "A synthetic clinic production-support incident testing workflow interruption without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "workflow_interruption",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-007",
+    "domain": "clinic",
+    "category": "exception_handling",
+    "difficulty": "medium",
+    "question": "Investigate why exception handling left patient service CLN-2026-0007-A in Processing.",
+    "business_description": "A synthetic clinic production-support incident testing exception handling without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "exception_handling",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-008",
+    "domain": "clinic",
+    "category": "integration_failure",
+    "difficulty": "medium",
+    "question": "Investigate why external integration for patient service CLN-2026-0008-A was rejected.",
+    "business_description": "A synthetic clinic production-support incident testing integration failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "integration_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-009",
+    "domain": "clinic",
+    "category": "queue_backlog",
+    "difficulty": "medium",
+    "question": "Investigate why patient service CLN-2026-0009-A remains Queued behind older work.",
+    "business_description": "A synthetic clinic production-support incident testing queue backlog without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "queue_backlog",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-010",
+    "domain": "clinic",
+    "category": "retry_failure",
+    "difficulty": "hard",
+    "question": "Investigate why all retries for patient service CLN-2026-0010-A failed without a terminal status.",
+    "business_description": "A synthetic clinic production-support incident testing retry failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "retry_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-011",
+    "domain": "clinic",
+    "category": "audit_history_inconsistency",
+    "difficulty": "hard",
+    "question": "Investigate why audit history says patient service CLN-2026-0011-A completed while its business record says Failed.",
+    "business_description": "A synthetic clinic production-support incident testing audit history inconsistency without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "audit_history_inconsistency",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-012",
+    "domain": "clinic",
+    "category": "missing_reference_data",
+    "difficulty": "easy",
+    "question": "Investigate why patient service CLN-2026-0012-A failed validation after a reference lookup.",
+    "business_description": "A synthetic clinic production-support incident testing missing reference data without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "missing_reference_data",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-013",
+    "domain": "clinic",
+    "category": "stored_procedure_defect",
+    "difficulty": "hard",
+    "question": "Investigate why workflow procedure processing left patient service CLN-2026-0013-A in the wrong status.",
+    "business_description": "A synthetic clinic production-support incident testing stored procedure defect without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "stored_procedure_defect",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-014",
+    "domain": "clinic",
+    "category": "trigger_failure",
+    "difficulty": "hard",
+    "question": "Investigate why updating patient service CLN-2026-0014-A produced no consistent audit outcome.",
+    "business_description": "A synthetic clinic production-support incident testing trigger failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "trigger_failure",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-015",
+    "domain": "clinic",
+    "category": "batch_processing_failure",
+    "difficulty": "medium",
+    "question": "Investigate why batch processing failed for patient service CLN-2026-0015-A while neighboring items completed.",
+    "business_description": "A synthetic clinic production-support incident testing batch processing failure without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "batch_processing_failure",
+      "medium",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-016",
+    "domain": "clinic",
+    "category": "concurrency_race_condition",
+    "difficulty": "expert",
+    "question": "Investigate intermittent competing updates for patient service CLN-2026-0016-A that produced inconsistent terminal states.",
+    "business_description": "A synthetic clinic production-support incident testing concurrency race condition without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "concurrency_race_condition",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-017",
+    "domain": "clinic",
+    "category": "transaction_rollback",
+    "difficulty": "hard",
+    "question": "Investigate why patient service CLN-2026-0017-A reports completion although downstream changes were rolled back.",
+    "business_description": "A synthetic clinic production-support incident testing transaction rollback without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 3200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "transaction_rollback",
+      "hard",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-018",
+    "domain": "clinic",
+    "category": "idempotency_issue",
+    "difficulty": "expert",
+    "question": "Investigate why replaying patient service CLN-2026-0018-A repeated a previously accepted operation.",
+    "business_description": "A synthetic clinic production-support incident testing idempotency issue without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 90,
+    "estimated_token_usage": 4500,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "idempotency_issue",
+      "expert",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-019",
+    "domain": "clinic",
+    "category": "incorrect_business_status",
+    "difficulty": "easy",
+    "question": "Investigate why patient service CLN-2026-0019-A displays Completed while failure evidence remains open.",
+    "business_description": "A synthetic clinic production-support incident testing incorrect business status without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "incorrect_business_status",
+      "easy",
+      "read-only-investigation"
+    ]
+  },
+  {
+    "scenario_id": "clinic-benchmark-020",
+    "domain": "clinic",
+    "category": "multi_table_investigation",
+    "difficulty": "medium",
+    "question": "Investigate the end-to-end failure of patient service CLN-2026-0020-A across business, integration, exception, and audit records.",
+    "business_description": "A synthetic clinic production-support incident testing multi table investigation without exposing ground truth to runtime code.",
+    "estimated_duration_seconds": 60,
+    "estimated_token_usage": 2200,
+    "tags": [
+      "benchmark-v2",
+      "clinic",
+      "multi_table_investigation",
+      "medium",
+      "read-only-investigation"
+    ]
+  }
+]

@@ -113,7 +113,7 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
             scenarios.extend(load_scenarios(Path("evaluation_scenarios") / domain / "scenarios.json"))
     except Exception as exc:
         manifest_error = str(exc)
-    add("25 scenario manifests", len(scenarios) == 25 and len({s.scenario_id for s in scenarios}) == 25, manifest_error or f"found {len(scenarios)} active/defined scenarios")
+    add("125 scenario manifests", len(scenarios) == 125 and len({s.scenario_id for s in scenarios}) == 125, manifest_error or f"found {len(scenarios)} active/defined scenarios")
     missing_scripts = []
     for scenario in scenarios:
         for field in ("baseline_script", "setup_script", "verification_script", "cleanup_script"):

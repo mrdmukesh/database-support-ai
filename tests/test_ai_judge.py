@@ -270,7 +270,7 @@ def test_strict_schema_rejects_extra_fields():
         raise AssertionError("Strict judge schema accepted an extra field")
 
 
-def test_all_25_pilot_scenarios_build_allowlisted_judge_inputs():
+def test_all_125_benchmark_scenarios_build_allowlisted_judge_inputs():
     judged = 0
     for domain in ("payroll", "clinic", "orders", "banking", "shipping"):
         for scenario in load_scenarios(f"evaluation_scenarios/{domain}/scenarios.json"):
@@ -286,7 +286,7 @@ def test_all_25_pilot_scenarios_build_allowlisted_judge_inputs():
             assert result.status == "completed"
             assert "application_confidence" not in json.dumps(payload)
             judged += 1
-    assert judged == 25
+    assert judged == 125
 
 
 def test_judge_versions_prompts_and_human_flags_are_append_only():

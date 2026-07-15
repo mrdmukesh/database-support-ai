@@ -20,7 +20,7 @@ class EvaluationRunCreate(BaseModel):
     workspace_id: str
     run_type: Literal["pilot_smoke", "selected_scenarios"]
     run_name: str = Field(min_length=1, max_length=200)
-    scenario_ids: list[str] = Field(default_factory=list, max_length=25)
+    scenario_ids: list[str] = Field(default_factory=list, max_length=125)
     concurrency: int = Field(default=1, ge=1, le=5)
     timeout_seconds: int = Field(default=600, ge=30, le=1800)
     judge_model: str = Field(min_length=1, max_length=160)

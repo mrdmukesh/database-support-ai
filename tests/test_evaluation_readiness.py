@@ -19,7 +19,7 @@ def test_preflight_reports_blocking_configuration_gaps(monkeypatch):
     report = run_preflight(check_live=False)
     assert not report.passed
     assert {item.status for item in report.checks} <= {"PASS", "FAIL", "WARNING"}
-    assert any(item.name == "25 scenario manifests" and item.status == "PASS" for item in report.checks)
+    assert any(item.name == "125 scenario manifests" and item.status == "PASS" for item in report.checks)
 
 
 def test_sql_lifecycle_rejects_unlisted_database():

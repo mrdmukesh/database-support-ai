@@ -32,13 +32,18 @@ def main() -> None:
     reader_password = os.environ["EVAL_READER_PASSWORD"]
     query = readonly_user_sql(reader_password)
     for database in DATABASES:
-        subprocess.run(
-            ["sqlcmd", "-S", server, "-U", admin, "-P", admin_password, "-C", "-b", "-d", database, "-Q", query],
-            check=True,
+        env = dict(os.environ)
+        env["SQLCMDPASSWORD"] = admin_password
+        completed = subprocess.run(
+            ["sqlcmd", "-S", server, "-U", admin, "-C", "-b", "-d", database],
+            input=query + "\nGO\n",
+            check=False,
             capture_output=True,
             text=True,
-            env=dict(os.environ),
+            env=env,
         )
+        if completed.returncode:
+            raise RuntimeError(f"Read-only user provisioning failed for {database} (sqlcmd exit {completed.returncode})")
         print(f"configured read-only user in {database}")
 
 

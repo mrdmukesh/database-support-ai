@@ -21,3 +21,11 @@ def test_reader_password_is_sql_escaped() -> None:
     sql = readonly_user_sql("reader'password")
     assert "reader''password" in sql
     assert "reader'password" not in sql
+
+
+def test_provisioning_source_never_places_secrets_in_process_arguments() -> None:
+    source = __import__("pathlib").Path("evaluation_databases/provision_readonly_user.py").read_text()
+    assert 'env["SQLCMDPASSWORD"] = admin_password' in source
+    assert 'input=query + "\\nGO\\n"' in source
+    assert '"-P", admin_password' not in source
+    assert '"-Q", query' not in source

@@ -11,6 +11,7 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
+    PATH="/opt/mssql-tools18/bin:${PATH}" \
     PORT=8000
 
 WORKDIR /app
@@ -22,13 +23,15 @@ RUN apt-get update \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
     && curl -fsSL https://packages.microsoft.com/config/debian/12/prod.list -o /etc/apt/sources.list.d/mssql-release.list \
     && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
+    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 mssql-tools18 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 COPY evaluation ./evaluation
+COPY evaluation_scenarios ./evaluation_scenarios
+COPY evaluation_databases ./evaluation_databases
 COPY assets ./assets
 COPY docs ./docs
 COPY app.html index.html ASSETS.md ./

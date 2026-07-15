@@ -10,8 +10,11 @@ depends_on = None
 
 
 def upgrade() -> None:
-    EvaluationJobModel.__table__.create(op.get_bind(), checkfirst=False)
+    # Application startup may run Base.metadata.create_all before Alembic in
+    # existing installations. Preserve that table and let Alembic adopt the
+    # matching model instead of failing while advancing from revision 0006.
+    EvaluationJobModel.__table__.create(op.get_bind(), checkfirst=True)
 
 
 def downgrade() -> None:
-    EvaluationJobModel.__table__.drop(op.get_bind(), checkfirst=False)
+    EvaluationJobModel.__table__.drop(op.get_bind(), checkfirst=True)

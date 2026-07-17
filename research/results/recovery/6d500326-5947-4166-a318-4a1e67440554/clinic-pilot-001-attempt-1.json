@@ -1,0 +1,35 @@
+{
+  "scenario_id": "clinic-pilot-001",
+  "domain": "clinic",
+  "status": "persistence_failed",
+  "investigation_id": "",
+  "investigation_status": "",
+  "raw_request": {
+    "organization_id": "d6996b41-5e41-491b-b34e-64870d0e84b9",
+    "workspace_id": "e22377ba-277c-4ea8-b132-4b1566ac4fc5",
+    "connection_id": "858ec93c-09a3-47e7-b344-c5ff6a4a38f5",
+    "user_id": "7fe6bde5-4e54-4a43-9003-2f53e3e19d9e",
+    "question": "Why was appointment APT-2101 not converted into an encounter?"
+  },
+  "raw_response": {},
+  "extracted_result": {
+    "setup_verification": {
+      "stdout": "ExpectedEntity EvidenceValue  \n-------------- ---------------\nAPT-2101       EVAL-CLINIC-001\n\n(1 row affected)\n",
+      "verified": true
+    },
+    "cleanup_status": "passed"
+  },
+  "timings": {
+    "database_setup_seconds": 32.88927309999963,
+    "cleanup_seconds": 4.7314318000007916,
+    "total_seconds": 211.74615950000043
+  },
+  "usage_cost": {},
+  "errors": [
+    "HTTP 500: Internal Server Error",
+    "Persistence failed: (sqlite3.OperationalError) database is locked\n[SQL: INSERT INTO evaluation_scenario_executions (evaluation_run_id, test_scenario_id, scenario_id, scenario_version, domain, database_version, attempt, status, investigation_id, investigation_status, raw_request_json, raw_response_json, result_json, timing_json, usage_cost_json, errors_json, retry_count, recovery_artifact, id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]\n[parameters: ('6d500326-5947-4166-a318-4a1e67440554', 'c82c8734-f5e7-4338-871e-862deb11cebd', 'clinic-pilot-001', 1, 'clinic', 'Azure SQL Database / SQL Server 2022', 1, 'api_submission_failed', '', '', '{\"organization_id\": \"d6996b41-5e41-491b-b34e-64870d0e84b9\", \"workspace_id\": \"e22377ba-277c-4ea8-b132-4b1566ac4fc5\", \"connection_id\": \"858ec93c-09a3-4 ... (2 characters truncated) ... 7-b344-c5ff6a4a38f5\", \"user_id\": \"7fe6bde5-4e54-4a43-9003-2f53e3e19d9e\", \"question\": \"Why was appointment APT-2101 not converted into an encounter?\"}', '{}', '{\"setup_verification\": {\"stdout\": \"ExpectedEntity EvidenceValue  \\\\n-------------- ---------------\\\\nAPT-2101       EVAL-CLINIC-001\\\\n\\\\n(1 row affected)\\\\n\", \"verified\": true}, \"cleanup_status\": \"passed\"}', '{\"database_setup_seconds\": 32.88927309999963, \"cleanup_seconds\": 4.7314318000007916, \"total_seconds\": 211.74615950000043}', '{}', '[\"HTTP 500: Internal Server Error\"]', 3, '', '33fde419-2ddd-4f8d-8d02-361653a8b6e1', '2026-07-16 13:22:56.230371', '2026-07-16 13:22:56.230379')]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  ],
+  "retries": 3,
+  "attempt": 1,
+  "recovery_artifact": ""
+}

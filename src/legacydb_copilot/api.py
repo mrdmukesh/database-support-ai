@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +121,14 @@ def create_fastapi_app() -> Any:
 
     @app.on_event("startup")
     def _initialize_database_schema() -> None:
+        from legacydb_copilot.runtime_diagnostics import write_runtime_diagnostic
+        started_at = datetime.now(timezone.utc).isoformat()
+        app.state.process_started_at = started_at
+        write_runtime_diagnostic(
+            "api",
+            Path(os.getenv("EVAL_API_RUNTIME_DIAGNOSTIC", ".tmp/local-evaluation/api-runtime.json")),
+            started_at=started_at,
+        )
         initialize_application_schema(Settings.from_env().database_url)
         if evaluation_worker_enabled():
             runtime = EvaluationWorkerRuntime()

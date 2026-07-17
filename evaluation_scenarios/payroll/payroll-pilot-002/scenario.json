@@ -13,7 +13,7 @@
   "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-002/cleanup.sql",
   "expected_response_type": "confirmed_root_cause",
   "expected_entities": [
-    "RUN-2026-07-A"
+    "PAY-7003"
   ],
   "expected_root_cause_concepts": [
     "integration retry inserted the same business event without an idempotency guard"
@@ -21,7 +21,8 @@
   "expected_tables": [
     "exceptions",
     "integration_messages",
-    "pay_periods"
+    "pay_periods",
+    "payments"
   ],
   "expected_columns": [
     "BusinessKey",
@@ -44,7 +45,7 @@
   "expected_jobs": [],
   "required_evidence": [
     "EVAL-PAYROLL-002",
-    "RUN-2026-07-A",
+    "PAY-7003",
     "Exception"
   ],
   "acceptable_fix_concepts": [
@@ -60,5 +61,18 @@
     "confirmed_root_cause_without_supporting_evidence"
   ],
   "scenario_version": 1,
-  "active": true
+  "active": true,
+  "expected_entity_type": "payment",
+  "expected_entity_value": "PAY-7003",
+  "expected_entity_schema": "eval",
+  "expected_entity_table": "payments",
+  "expected_entity_column": "BusinessKey",
+  "expected_entity_match_mode": "exact",
+  "expected_entity_database": "EvalPayroll",
+  "expected_defect_table": "exceptions",
+  "expected_defect_column": "CorrelationId",
+  "expected_defect_value": "EVAL-PAYROLL-002",
+  "expected_defect_link_column": "CorrelationId",
+  "expected_entity_link_column": "CorrelationId",
+  "expected_entity_question_value": "PAY-7003"
 }

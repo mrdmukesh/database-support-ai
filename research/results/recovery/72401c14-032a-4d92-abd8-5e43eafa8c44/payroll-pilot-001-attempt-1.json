@@ -1,0 +1,35 @@
+{
+  "scenario_id": "payroll-pilot-001",
+  "domain": "payroll",
+  "status": "persistence_failed",
+  "investigation_id": "",
+  "investigation_status": "",
+  "raw_request": {
+    "organization_id": "d6996b41-5e41-491b-b34e-64870d0e84b9",
+    "workspace_id": "e22377ba-277c-4ea8-b132-4b1566ac4fc5",
+    "connection_id": "9f699b4b-a990-4dfc-b97a-4eae0e443936",
+    "user_id": "7fe6bde5-4e54-4a43-9003-2f53e3e19d9e",
+    "question": "Why is employee EMP-1042 missing from payroll run RUN-2026-07-A?"
+  },
+  "raw_response": {},
+  "extracted_result": {
+    "setup_verification": {
+      "stdout": "ExpectedEntity EvidenceValue   \n-------------- ----------------\nEMP-1042       EVAL-PAYROLL-001\n\n(1 row affected)\n",
+      "verified": true
+    },
+    "cleanup_status": "passed"
+  },
+  "timings": {
+    "database_setup_seconds": 13.056822099999408,
+    "cleanup_seconds": 4.889130500001556,
+    "total_seconds": 264.99794330000077
+  },
+  "usage_cost": {},
+  "errors": [
+    "API network failure: timed out",
+    "Persistence failed: (sqlite3.OperationalError) database is locked\n[SQL: INSERT INTO evaluation_scenario_executions (evaluation_run_id, test_scenario_id, scenario_id, scenario_version, domain, database_version, attempt, status, investigation_id, investigation_status, raw_request_json, raw_response_json, result_json, timing_json, usage_cost_json, errors_json, retry_count, recovery_artifact, id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]\n[parameters: ('72401c14-032a-4d92-abd8-5e43eafa8c44', '50586934-ce34-493e-974e-2e1d63e7c756', 'payroll-pilot-001', 1, 'payroll', 'Azure SQL Database / SQL Server 2022', 1, 'api_submission_failed', '', '', '{\"organization_id\": \"d6996b41-5e41-491b-b34e-64870d0e84b9\", \"workspace_id\": \"e22377ba-277c-4ea8-b132-4b1566ac4fc5\", \"connection_id\": \"9f699b4b-a990-4 ... (5 characters truncated) ... 97a-4eae0e443936\", \"user_id\": \"7fe6bde5-4e54-4a43-9003-2f53e3e19d9e\", \"question\": \"Why is employee EMP-1042 missing from payroll run RUN-2026-07-A?\"}', '{}', '{\"setup_verification\": {\"stdout\": \"ExpectedEntity EvidenceValue   \\\\n-------------- ----------------\\\\nEMP-1042       EVAL-PAYROLL-001\\\\n\\\\n(1 row affected)\\\\n\", \"verified\": true}, \"cleanup_status\": \"passed\"}', '{\"database_setup_seconds\": 13.056822099999408, \"cleanup_seconds\": 4.889130500001556, \"total_seconds\": 264.99794330000077}', '{}', '[\"API network failure: timed out\"]', 3, '', '03a62f36-3064-4482-b99d-96962f4fe08f', '2026-07-16 13:33:00.857006', '2026-07-16 13:33:00.857020')]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  ],
+  "retries": 3,
+  "attempt": 1,
+  "recovery_artifact": ""
+}

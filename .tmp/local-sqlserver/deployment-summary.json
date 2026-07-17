@@ -1,0 +1,18 @@
+﻿{
+    "container":  "legacydb-evaluation-sqlserver",
+    "image":  "mcr.microsoft.com/mssql/server:2022-latest",
+    "host":  "127.0.0.1",
+    "port":  14333,
+    "persistent_volume":  "legacydb-evaluation-sqlserver-data",
+    "databases":  [
+                      "EvalPayroll",
+                      "EvalClinic",
+                      "EvalOrders",
+                      "EvalBanking",
+                      "EvalShipping"
+                  ],
+    "admin_login":  "evaladmin",
+    "reader_login":  "evalreader",
+    "password_present":  true,
+    "deployed_at":  "2026-07-16T18:42:14.4077627Z"
+}

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -32,6 +33,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
+from legacydb_copilot.routers.chat import _expand_related_id_evidence, _terminal_ai_trace
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
@@ -1996,8 +1998,8 @@ def test_metadata_search_isolates_active_database_and_exact_user_objects() -> No
     assert active.procedures == ["sp_calculate_employee_age"]
     assert "shipments" not in {table.name for table in active.tables}
     assert "sp_create_shipment_for_order" not in active.procedures
-    assert active.metadata_cache_key == "org-b|workspace-b|connection-b|employeepayrollrcademo"
-    assert any(item["object_type"] == "metadata_context" and "metadata_cache_key=org-b|workspace-b|connection-b|employeepayrollrcademo" in item["reason"] for item in active.candidate_trace)
+    assert active.metadata_cache_key.startswith("metadata-v2|org-b|workspace-b|connection-b|employeepayrollrcademo|")
+    assert any(item["object_type"] == "metadata_context" and "metadata_cache_key=metadata-v2|org-b|workspace-b|connection-b|employeepayrollrcademo|" in item["reason"] for item in active.candidate_trace)
     assert stale.target_object_not_found
     assert stale.tables == []
     assert stale.procedures == []
@@ -2034,7 +2036,9 @@ def test_connection_pool_recreates_when_database_changes_for_same_connection_id(
     second = pool.get_or_create("conn-1", DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_b")
 
     assert second is not first
-    assert "db_b" in pool.connector_cache_key(DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_b")
+    key = pool.connector_cache_key(DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_b")
+    assert len(key) == 64
+    assert "pw" not in key
 
 
 class _DatabaseIdentityConnector:
@@ -2298,6 +2302,36 @@ def test_optional_llm_reasoning_is_disabled_by_default() -> None:
     assert result is reasoning
 
 
+def test_terminal_ai_trace_classifies_early_insufficient_evidence_truthfully() -> None:
+    trace = _terminal_ai_trace({
+        "detected_intent": "INSUFFICIENT_DATABASE_EVIDENCE:RELEVANT_SCHEMA_OBJECTS_NOT_DISCOVERED",
+        "ai_debug_trace": "",
+    })
+    assert trace == {
+        "ai_reasoning_invoked": False,
+        "ai_skip_reason": "relevant_schema_objects_not_discovered",
+        "ai_outcome": "insufficient_evidence",
+    }
+
+
+def test_terminal_ai_trace_preserves_successful_provider_values() -> None:
+    trace = _terminal_ai_trace({
+        "answer_provenance": "AI_ANSWERED",
+        "ai_debug_trace": json.dumps({
+            "ai_reasoning_invoked": True,
+            "llm_model_name": "real-model",
+            "prompt_version": "real-prompt",
+            "input_tokens": 11,
+            "output_tokens": 7,
+        }),
+    })
+    assert trace["llm_model_name"] == "real-model"
+    assert trace["prompt_version"] == "real-prompt"
+    assert trace["input_tokens"] == 11
+    assert trace["output_tokens"] == 7
+    assert trace["ai_outcome"] == "success"
+
+
 def test_ai_reasoning_requires_explicit_switch_and_openai_key() -> None:
     disabled = Settings(
         environment=Environment.DEVELOPMENT,
@@ -2367,7 +2401,9 @@ def test_llm_payload_masks_pii_before_openai_reasoning() -> None:
 
 
 def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch) -> None:
-    def fake_call(settings, payload):
+    def fake_call(settings, payload, *, debug_trace=None):
+        if debug_trace is not None:
+            debug_trace.update({"ai_reasoning_invoked": True, "input_tokens": 10, "output_tokens": 5})
         return {
             "summary": "Masked reasoning",
             "likely_root_causes": [
@@ -2410,3 +2446,121 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
     assert "jane@example.com" not in trace["user_prompt"]
     assert trace["validated_citations"][0]["claim"] == "Supported claim"
     assert trace["rejected_or_unsupported_claims"][0]["claim"] == "Unsupported claim"
+
+
+def test_llm_invocation_failure_records_sanitized_diagnostics(monkeypatch) -> None:
+    import legacydb_copilot.services.llm_reasoning_service as llm_service
+
+    def fail_call(settings, payload, *, debug_trace=None):
+        if debug_trace is not None:
+            debug_trace["ai_reasoning_invoked"] = True
+        raise TimeoutError("secret-bearing provider detail")
+
+    monkeypatch.setattr(llm_service, "_call_openai_responses", fail_call)
+    trace: dict = {}
+    base = ReasoningResult(
+        summary="base", likely_root_causes=[], supporting_evidence=[], missing_evidence=[],
+        recommended_fix=[], test_cases=[], proof_of_fix=[], rollback_plan=[], risks=[],
+    )
+    result = enhance_reasoning_with_llm(
+        question="Why?",
+        intent=IntentResult(InvestigationIntent.PRODUCTION_INVESTIGATION, 0.9, "test"),
+        deterministic_reasoning=base,
+        evidence=[], correlated_evidence=[], procedure_analysis=[], documents=[],
+        settings=Settings(environment=Environment.DEVELOPMENT, ai_reasoning_enabled=True, llm_enabled=True, openai_api_key="test"),
+        debug_trace=trace,
+    )
+    assert result is base
+    assert trace["ai_outcome"] == "provider_failure"
+    assert trace["request_submitted"] is True
+    assert trace["sanitized_error_reason"] == "TimeoutError"
+    assert "secret-bearing" not in str(trace)
+
+
+def test_related_evidence_expands_string_correlation_ids() -> None:
+    class Connector:
+        def execute_read_only_query(self, sql, limit=25):
+            assert "CorrelationId IN ('CORR-17')" in sql
+            return [
+                {"BusinessKey": "MSG-1", "CorrelationId": "CORR-17", "Status": "Failed"},
+                {"BusinessKey": "MSG-2", "CorrelationId": "CORR-17", "Status": "Failed"},
+            ]
+
+    metadata = MetadataSearchResult(
+        [TableMetadata("eval.integration_messages", ["BusinessKey", "CorrelationId", "Status"], 5)],
+        [], [], "test", engine_type="sql_server",
+    )
+    evidence = [EvidenceResult("Primary entity", "SELECT ...", [{"BusinessKey": "SHP-17-A", "CorrelationId": "CORR-17"}])]
+    related = _expand_related_id_evidence(Connector(), metadata, evidence)
+    assert len(related) == 1
+    assert "duplicate correlated" in related[0].purpose.lower()
+    assert len(related[0].rows) == 2
+
+
+def test_production_retry_condition_does_not_require_duplicate_evidence() -> None:
+    entities = extract_entities("Why did all retries for ORD-10-A fail?")
+    metadata = MetadataSearchResult(
+        [TableMetadata("orders", ["BusinessKey", "CorrelationId", "Status"], 5)],
+        [], [], "test",
+    )
+    evidence = [EvidenceResult(
+        "Inspect correlated retry records",
+        "SELECT ...",
+        [{"BusinessKey": "ORD-10-A", "CorrelationId": "CORR-10", "Status": "Failed", "Details": "Retries exhausted"}],
+    )]
+    gate = run_evidence_gate(
+        question="Why did all retries for ORD-10-A fail?",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=None,
+        documents=[],
+    )
+    assert gate.reported_condition_exists is True
+
+
+def test_process_flow_gate_accepts_keyed_missing_downstream_evidence() -> None:
+    entities = extract_entities("Why does SHP-4-A have no downstream processing record?")
+    metadata = MetadataSearchResult(
+        [TableMetadata("container_events", ["BusinessKey", "Details", "CorrelationId"], 5)],
+        [], [], "test",
+    )
+    evidence = [EvidenceResult(
+        "Prove requested entity exists in container_events",
+        "SELECT * FROM container_events WHERE BusinessKey = 'SHP-4-A'",
+        [{"BusinessKey": "SHP-4-A", "Details": "missing downstream record", "CorrelationId": "C-4"}],
+    )]
+    gate = run_evidence_gate(
+        question="Why does SHP-4-A have no downstream processing record?",
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities, metadata=metadata, evidence=evidence,
+        evidence_focus=None, documents=[],
+    )
+    assert gate.affected_rows_exist is True
+    assert gate.reported_condition_exists is True
+    assert gate.reproduced is True
+
+
+def test_duplicate_gate_requires_repeated_correlated_evidence() -> None:
+    entities = extract_entities("Why did SHP-5-A create two processing messages?")
+    metadata = MetadataSearchResult(
+        [TableMetadata("messages", ["BusinessKey", "CorrelationId"], 5)], [], [], "test"
+    )
+    one = [EvidenceResult("Inspect duplicate correlated rows", "SELECT ...", [{"BusinessKey": "MSG-1", "CorrelationId": "C-1"}])]
+    blocked = run_evidence_gate(
+        question="Why did SHP-5-A create two processing messages?",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=entities, metadata=metadata, evidence=one, evidence_focus=None, documents=[],
+    )
+    two = [EvidenceResult("Inspect duplicate correlated rows", "SELECT ...", [
+        {"BusinessKey": "MSG-1", "CorrelationId": "C-1"},
+        {"BusinessKey": "MSG-2", "CorrelationId": "C-1"},
+    ])]
+    passed = run_evidence_gate(
+        question="Why did SHP-5-A create two processing messages?",
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=entities, metadata=metadata, evidence=two, evidence_focus=None, documents=[],
+    )
+    assert blocked.reported_condition_exists is False
+    assert passed.reported_condition_exists is True

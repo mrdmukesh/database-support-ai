@@ -10,7 +10,7 @@ from typing import Any, Protocol
 from evaluation.framework.contracts import ScenarioContract
 from evaluation.framework.redaction import redact
 
-PROMPT_VERSION = "ai-judge-v1"
+PROMPT_VERSION = "ai-judge-v2-entity-provenance"
 RUBRIC = {
     "root_cause_score": 30,
     "evidence_score": 25,
@@ -51,7 +51,8 @@ or unrelated answers. Return one strict JSON object with exactly the requested s
 Every category score is a percentage from 0 to 100 and score_scale must be "percentage".
 Do not return category point maxima. Do not include markdown or additional keys.
 Keep explanations concise and provide conclusions, not chain-of-thought.
-The deterministic critical-failure decision is authoritative and cannot be removed by this judge."""
+Assess the answer and verified evidence independently. Deterministic critical findings are context,
+not forced ground truth. Resolver diagnostics are never business entity values."""
 
 
 class JudgeError(RuntimeError):
@@ -224,11 +225,17 @@ def build_judge_payload(
     actual_result: dict[str, Any],
     deterministic_summary: dict[str, Any],
 ) -> dict[str, Any]:
+    from evaluation.framework.entity_provenance import canonicalize_entities
+
+    provenance = actual_result.get("entity_provenance") or canonicalize_entities(
+        actual_result.get("identified_entities"), actual_result.get("evidence")
+    )
+    if provenance.get("evaluator_input_defects"):
+        raise JudgeError("INVALID_EVALUATOR_INPUT")
     allowed_actual = {
         key: _without_application_confidence(actual_result.get(key))
         for key in (
             "answer",
-            "identified_entities",
             "discovered_database_objects",
             "generated_sql",
             "executed_sql",
@@ -242,6 +249,10 @@ def build_judge_payload(
     }
     payload = {
         "scenario_question": scenario.question,
+        "expected_entities": list(scenario.expected_entities),
+        "canonical_investigated_entity": provenance.get("canonical_investigated_entity"),
+        "canonical_entities": provenance.get("canonical_entities", []),
+        "evidence_linked_entities": provenance.get("evidence_linked_entities", []),
         "expected_structured_concepts": list(scenario.expected_root_cause_concepts),
         "expected_response_type": scenario.expected_response_type.value,
         "expected_objects": {
@@ -259,6 +270,7 @@ def build_judge_payload(
         "actual_structured_investigation_result": allowed_actual,
         "actual_evidence": actual_result.get("evidence", []),
         "actual_citations": actual_result.get("citations", []),
+        "entity_resolution_diagnostics": provenance.get("diagnostics", []),
         "deterministic_validation_summary": {
             key: deterministic_summary.get(key)
             for key in (
@@ -345,14 +357,6 @@ class AIJudge:
                 output_tokens += response.output_tokens
                 cost += response.estimated_cost_usd
                 normalized = validate_judge_json(response.raw_text)
-                if deterministic_critical and not normalized.critical_failure:
-                    normalized = NormalizedJudgeResult(
-                        **{
-                            **asdict(normalized),
-                            "critical_failure": True,
-                            "human_review_required": True,
-                        }
-                    )
                 return JudgeInvocation(
                     model=model,
                     prompt=payload,

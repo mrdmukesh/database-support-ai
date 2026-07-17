@@ -1,0 +1,189 @@
+﻿scenario_id,domain,difficulty,category,database_engine,question,expected_answer,application_answer,status,investigation_status,investigation_id,canonical_investigated_entity,evidence_linked_entities,entity_provenance,benchmark_validity,deterministic_pass,deterministic_score,unadjusted_score,classification,ai_judge_score,judge_explanation,confidence,latency_seconds,input_tokens,output_tokens,estimated_cost_usd,model_version,prompt_version,human_review_required,human_review_reasons,failure,persisted_result_row
+clinic-pilot-001,clinic,medium,root_cause,sqlserver,Why was appointment APT-2101 not converted into an encounter?,"{""scenario_id"": ""clinic-pilot-001"", ""domain"": ""clinic"", ""database_engine"": ""sqlserver"", ""database_version"": ""Azure SQL Database / SQL Server 2022"", ""category"": ""root_cause"", ""subcategory"": ""missing_workflow_output"", ""difficulty"": ""medium"", ""question"": ""Why was appointment APT-2101 not converted into an encounter?"", ""baseline_script"": ""evaluation_databases/clinic/sql/02_seed.sql"", ""setup_script"": ""evaluation_scenarios/clinic/clinic-pilot-001/inject.sql"", ""verification_script"": ""evaluation_scenarios/clinic/clinic-pilot-001/verify.sql"", ""cleanup_script"": ""evaluation_scenarios/clinic/clinic-pilot-001/cleanup.sql"", ""expected_response_type"": ""confirmed_root_cause"", ""expected_entities"": [""APT-2101""], ""expected_root_cause_concepts"": [""required downstream work item was not created after a completed upstream transition""], ""expected_tables"": [""exceptions"", ""integration_messages"", ""appointments""], ""expected_columns"": [""BusinessKey"", ""Status"", ""CorrelationId"", ""Details""], ""expected_database_objects"": [""eval.vw_clinic_operations_1""], ""required_evidence"": [""EVAL-CLINIC-001"", ""APT-2101"", ""Exception""], ""acceptable_fix_concepts"": [""transactional workflow completion""], ""prohibited_claims"": [""objects or evidence not returned by the database"", ""production impact inferred from synthetic data""], ""critical_failure_rules"": [""fabricated_evidence"", ""invented_database_object"", ""confirmed_root_cause_without_supporting_evidence""], ""scenario_version"": 1, ""active"": true, ""expected_procedures"": [""eval.usp_clinic_workflow_1""], ""expected_functions"": [""eval.fn_clinic_active_status""], ""expected_triggers"": [""eval.tr_providers_audit""], ""expected_jobs"": [], ""business_description"": ""Legacy evaluation scenario"", ""expected_relationships"": [], ""evidence_exclusions"": [], ""required_business_objects"": [], ""required_workflow"": [], ""expected_recommendation"": [], ""unsafe_recommendations"": [], ""expected_confidence_range"": [0.0, 1.0], ""expected_human_review"": false, ""human_review_conditions"": [], ""expected_ai_judge_category_scores"": {}, ""expected_citations"": [], ""estimated_duration_seconds"": 60, ""estimated_token_usage"": 2000, ""tags"": []}","Investigation Complete.
+
+Investigation ID: INV-20260717-011745-078B7DE7
+Investigation Mode: INVESTIGATION
+Detected Intent: GENERAL_DATABASE_QUESTION
+Response Type: multiple_possible_causes
+Extracted Entities: exact_id_or_code=APT-2101, business_identifier=APT-2101, possible_table_or_column=Why, possible_table_or_column=was, possible_table_or_column=appointment, possible_column=APT, possible_table_or_column=not, possible_table_or_column=converted, possible_table_or_column=into, possible_table_or_column=an, possible_table_or_column=encounter
+AI-assisted reasoning: Enabled
+Reason: OpenAI LLM reasoning was applied after deterministic evidence collection.
+Evidence package sent: Yes
+LLM evidence validation: Passed
+Evidence citations: Passed
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: GENERAL_DATABASE_QUESTION
+- User Goal: Answer the user question with database evidence: Why was appointment APT-2101 not converted into an encounter?
+- Working Hypothesis: The database evidence should explain the reported behavior.
+
+## Stage 2 - Discover Context
+- Target Object: eval.appointments
+- Target Reason: Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: eval.appointments, eval.procedures_performed, eval.prescriptions, eval.lab_orders, eval.diagnoses
+- Upstream Objects: eval.appointments
+- Downstream Objects: eval.procedures_performed, eval.prescriptions, eval.lab_orders, eval.diagnoses
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 5c43b992-e80b-4bc6-a80a-fb83d1832a8c
+- database_name: EvalClinic
+- schema_name: default
+- database_engine: sql_server
+- connection_string_database: EvalClinic
+- metadata_cache_key: metadata-v2|678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|5c43b992-e80b-4bc6-a80a-fb83d1832a8c|evalclinic||5cbf461ad09201ea8da326c9a9b9af90d9e836124541cd5f811d3c3abfe6a567
+- Discovered tables: eval.appointments, eval.audit_history, eval.claims, eval.clinics, eval.diagnoses, eval.encounters, eval.evaluation_marker, eval.exceptions, eval.insurance_policies, eval.integration_messages, eval.lab_orders, eval.lab_results, eval.patients, eval.payments, eval.prescriptions, eval.procedures_performed, eval.providers
+- Discovered procedures: eval.tr_providers_audit
+- Selected candidates: table:eval.appointments (table name relevance=4; column name relevance=1.5; relationship relevance=1); table:eval.diagnoses (column name relevance=1.5; relationship relevance=1); table:eval.encounters (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.lab_orders (column name relevance=1.5; relationship relevance=1); table:eval.prescriptions (column name relevance=1.5; relationship relevance=1); table:eval.procedures_performed (column name relevance=1.5; relationship relevance=1)
+- Rejected candidates: table:eval.audit_history (no exact/normalized metadata, key, or relationship match); table:eval.claims (column name relevance=1.5; relationship relevance=1); table:eval.clinics (no exact/normalized metadata, key, or relationship match); table:eval.evaluation_marker (no exact/normalized metadata, key, or relationship match); table:eval.exceptions (no exact/normalized metadata, key, or relationship match); table:eval.insurance_policies (relationship relevance=1; outside top scored metadata candidates); table:eval.integration_messages (no exact/normalized metadata, key, or relationship match); table:eval.lab_results (relationship relevance=1; outside top scored metadata candidates); table:eval.patients (no exact/normalized metadata, key, or relationship match); table:eval.payments (relationship relevance=1; outside top scored metadata candidates)
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: Relationship path eval.appointments -> eval.encounters does not contain the expected related row or transition evidence. (48% initial)
+- H2: State or status values in eval.encounters, eval.appointments, eval.procedures_performed may be preventing the expected workflow transition. (42% initial)
+- H3: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Summarize analytical results in eval.encounters: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.appointments: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.procedures_performed: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.encounters: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.appointments: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.procedures_performed: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.encounters: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.appointments: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Summarize analytical results in eval.encounters: Production scan protection rejected unrestricted table scan
+- SQL Summarize analytical results in eval.appointments: Production scan protection rejected unrestricted table scan
+- SQL Summarize analytical results in eval.procedures_performed: Production scan protection rejected unrestricted table scan
+- SQL Prove requested entity exists in eval.encounters: No rows returned
+- SQL Prove requested entity exists in eval.appointments: 1 row(s) returned
+- SQL Prove requested entity exists in eval.procedures_performed: No rows returned
+- SQL Inspect relevant rows in eval.encounters: No rows returned
+- SQL Inspect relevant rows in eval.appointments: 1 row(s) returned
+
+## Evidence Gate
+- Gate Required: No
+- Issue Reproduced: Yes
+- Business Key Exists: Yes
+- Reported Condition Exists: Yes
+- Affected Rows Exist: Yes
+- Parent/Child Relationship Exists: Yes
+
+## Suggested Verification Checks
+- Pending: eval.appointments is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Reported condition passes the evidence gate. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: eval.encounters (13.35) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.appointments (10.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.procedures_performed (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.prescriptions (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.lab_orders (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.diagnoses (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+
+## Stage 6 - Reason
+The appointment with BusinessKey 'APT-2101' exists in the eval.appointments table with a status of 'Exception', but there are no corresponding records in eval.encounters or eval.procedures_performed tables. This indicates that the appointment was not converted into an encounter, likely due to the exception status. However, unrestricted scans on key tables were blocked by production scan protection, limiting deeper analysis. Senior engineer explanation: The investigation confirms that appointment 'APT-2101' is present in the appointments table with a status marked as 'Exception', which typically indicates an error or issue during processing. No related encounter or procedure records exist for this appointment, suggesting the conversion process from appointment to encounter did not complete successfully. The lack of unrestricted table scans due to production protections restricts the ability to analyze broader context or related data that might clarify the root cause. Therefore, the exception status on the appointment is the primary indicator of failure to convert, but further investigation with full data access is needed to pinpoint the exact failure mechanism. Clearer report wording: Appointment 'APT-2101' exists with an 'Exception' status in the appointments table but has no corresponding encounter or procedure records, indicating it was not converted. The exception status likely caused the failure. However, production scan protections prevented full data analysis, limiting root cause identification. Confidence note: Confidence is medium regarding the appointment's non-conversion due to the exception status and absence of related encounter records. Confidence is limited by the inability to perform unrestricted scans on key tables, which restricts comprehensive analysis. Recommended next questions: What specific error or condition caused the appointment 'APT-2101' to have an 'Exception' status? Evidence: SQL-5. Are there any related audit or error logs that document the failure to convert appointment 'APT-2101' into an encounter? Evidence: SQL-5. Can production scan protection be temporarily relaxed or DBA assistance obtained to allow unrestricted scans for deeper analysis? Evidence: SQL-1, SQL-2, SQL-3.
+
+## AI-assisted reasoning over collected evidence
+OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.
+
+## Root Cause Analysis
+- The appointment 'APT-2101' was not converted into an encounter because its status is 'Exception', indicating a processing error prevented successful conversion. Evidence: SQL-4, SQL-5, SQL-6, SQL-7, SQL-8.
+
+## Diagnostic Hypotheses
+- Rank 1: H3 48% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 2: H1 34% - Relationship path eval.appointments -> eval.encounters does not contain the expected related row or transition evidence.; Supported by collected evidence.
+- Rank 3: H2 32% - State or status values in eval.encounters, eval.appointments, eval.procedures_performed may be preventing the expected workflow transition.; Supported by collected evidence.
+
+## Confirmed Facts
+- Affected object: eval.appointments.
+- Prove requested entity exists in eval.appointments: 1 row(s) returned.
+- Inspect relevant rows in eval.appointments: 1 row(s) returned.
+
+## Inferred Findings
+- At least one read-only evidence query returned rows, so reasoning should prioritize observed data over metadata-only matches.
+
+## Hypotheses
+- Some evidence queries failed, so missing privileges or metadata gaps may hide a stronger explanation.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write eval.appointments; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- SQL - Prove requested entity exists in eval.encounters: No rows returned
+- SQL - Prove requested entity exists in eval.appointments: 1 row(s) returned
+- SQL - Prove requested entity exists in eval.procedures_performed: No rows returned
+- SQL - Inspect relevant rows in eval.encounters: No rows returned
+- SQL - Inspect relevant rows in eval.appointments: 1 row(s) returned
+
+## Recommended Next SQL
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.encounters GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.appointments GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.procedures_performed GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT EncountersId, AppointmentsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.encounters WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'APT-2101' OR CAST(Status AS NVARCHAR(MAX)) = 'APT-2101')
+```
+
+```sql
+SELECT AppointmentsId, PatientsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.appointments WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'APT-2101' OR CAST(Status AS NVARCHAR(MAX)) = 'APT-2101')
+```
+
+## Recommendation
+- Immediate Fix: Validate the top-ranked root cause with the recommended read-only SQL before making changes. Evidence: SQL - Prove requested entity exists in eval.encounters.
+- Permanent Fix: Apply the smallest approved schema/procedure/configuration change that directly addresses the confirmed cause. Evidence: SQL - Prove requested entity exists in eval.encounters.
+- Monitoring: Alert on recurrence of the failed condition and on increased duration/error count for related jobs.
+- Risk: Medium
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? eval.appointments.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies eval.appointments investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 36%
+- + 2 evidence query result(s) returned rows.
+- + 3 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: eval.appointments.
+- - 3 evidence query result(s) failed or were unavailable.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Summary analytical results from unrestricted scans of eval.encounters, eval.appointments, and eval.procedures_performed tables to identify patterns or related issues.
+- Detailed error logs or processing history explaining the 'Exception' status on the appointment.
+- Data from related tables or audit logs that could reveal why the conversion process failed.",completed,AI_ANSWERED,INV-20260717-011745-078B7DE7,APT-2101,"[""APT-2101""]","{""canonical_entities"": [{""canonical_investigated_entity"": ""APT-2101"", ""original_entity_text"": ""APT-2101"", ""normalized_entity_text"": ""APT-2101"", ""resolved_entity_value"": ""APT-2101"", ""resolved_entity_type"": ""business_identifier"", ""resolved_table"": ""eval.appointments"", ""resolved_column"": ""BusinessKey"", ""resolution_confidence"": 1.0, ""resolution_method"": ""exact"", ""supporting_evidence_ids"": [""ENTITY-1-EXACT-4""]}], ""canonical_investigated_entity"": ""APT-2101"", ""evidence_linked_entities"": [""APT-2101""], ""diagnostics"": [{""entity_type"": ""entity_resolution_diagnostic"", ""resolution_trace_id"": ""ENTITY-1-EXACT-4"", ""internal_match_id"": ""ENTITY-1-EXACT-4"", ""candidate_id"": """", ""resolver_rule_id"": ""exact"", ""extracted_value"": ""APT-2101"", ""matched_value"": ""APT-2101"", ""match_type"": ""exact"", ""confidence"": 1.0, ""evidence_id"": ""ENTITY-1-EXACT-4"", ""candidates"": [{""identifier"": ""APT-2101"", ""metadata"": {""Status"": ""Exception""}, ""evidence_id"": ""ENTITY-1-EXACT-4"", ""table"": ""eval.appointments"", ""column"": ""BusinessKey""}], ""reason"": ""Exact database evidence match."", ""resolved_table"": ""eval.appointments"", ""resolved_column"": ""BusinessKey""}], ""evaluator_input_defects"": []}",valid,True,81.349,81.349,pass,81.35,"The investigation correctly identifies that appointment APT-2101 was not converted into an encounter due to its 'Exception' status, supported by direct SQL evidence showing no related encounter or procedure records. The evidence is valid and well-cited, and the relevant database objects were discovered with high confidence. However, the fix recommendation is incomplete as no direct fix was proposed, and some expected tables (exceptions, integration_messages) were missing from the evidence, limiting completeness. No prohibited claims or safety issues were found. Overall, the root cause and evidence are well supported, but further data access and error log analysis are needed to fully confirm and fix the issue.",,20.766977599996608,21537,262,0.0,gpt-4.1-mini,ai-judge-v2-entity-provenance,False,[],,True

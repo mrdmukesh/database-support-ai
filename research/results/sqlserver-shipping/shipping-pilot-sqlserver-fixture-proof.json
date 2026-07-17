@@ -1,0 +1,40 @@
+{
+  "scenario_id": "shipping-pilot-001",
+  "verified_at": "2026-07-16T18:47:49.733004+00:00",
+  "database_engine": "sql_server",
+  "database_name": "EvalShipping",
+  "fixture_validity": "VALID",
+  "verification": {
+    "stdout": "ExpectedEntity EvidenceValue    \n-------------- -----------------\nSHP-5001       EVAL-SHIPPING-001\n\n(1 row affected)\n",
+    "verified": true
+  },
+  "records": {
+    "shipment": [
+      {
+        "BusinessKey": "SHP-5001",
+        "Status": "Delivered",
+        "CorrelationId": "SHIP-WF-1",
+        "Details": "Synthetic delivery completed"
+      }
+    ],
+    "work_order": [],
+    "exception": [
+      {
+        "BusinessKey": "EVAL-SHIPPING-001",
+        "Status": "Open",
+        "CorrelationId": "EVAL-SHIPPING-001",
+        "Details": "Downstream empty-return creation absent"
+      }
+    ]
+  },
+  "relationships": [
+    {
+      "constraint": "FK__transport__Shipm__73BA3083",
+      "child": "eval.transport_work_orders",
+      "child_key": "ShipmentsId",
+      "parent": "eval.shipments",
+      "parent_key": "ShipmentsId",
+      "source": "DECLARED_FOREIGN_KEY"
+    }
+  ]
+}

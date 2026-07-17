@@ -1,0 +1,190 @@
+﻿scenario_id,domain,difficulty,category,database_engine,question,expected_answer,application_answer,status,investigation_status,investigation_id,canonical_investigated_entity,evidence_linked_entities,entity_provenance,benchmark_validity,deterministic_pass,deterministic_score,unadjusted_score,classification,ai_judge_score,judge_explanation,confidence,latency_seconds,input_tokens,output_tokens,estimated_cost_usd,model_version,prompt_version,human_review_required,human_review_reasons,failure,persisted_result_row
+shipping-pilot-001,shipping,medium,root_cause,sqlserver,Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?,"{""scenario_id"": ""shipping-pilot-001"", ""domain"": ""shipping"", ""database_engine"": ""sqlserver"", ""database_version"": ""Azure SQL Database / SQL Server 2022"", ""category"": ""root_cause"", ""subcategory"": ""missing_workflow_output"", ""difficulty"": ""medium"", ""question"": ""Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?"", ""baseline_script"": ""evaluation_databases/shipping/sql/02_seed.sql"", ""setup_script"": ""evaluation_scenarios/shipping/shipping-pilot-001/inject.sql"", ""verification_script"": ""evaluation_scenarios/shipping/shipping-pilot-001/verify.sql"", ""cleanup_script"": ""evaluation_scenarios/shipping/shipping-pilot-001/cleanup.sql"", ""expected_response_type"": ""confirmed_root_cause"", ""expected_entities"": [""SHP-5001""], ""expected_root_cause_concepts"": [""required downstream work item was not created after a completed upstream transition""], ""expected_tables"": [""shipments"", ""transport_work_orders"", ""exceptions""], ""expected_columns"": [""BusinessKey"", ""Status"", ""CorrelationId"", ""Details""], ""expected_database_objects"": [""eval.vw_shipping_operations_1""], ""required_evidence"": [""EVAL-SHIPPING-001"", ""SHP-5001"", ""Delivered"", ""missing EMPTY-SHP-5001""], ""acceptable_fix_concepts"": [""transactional workflow completion""], ""prohibited_claims"": [""objects or evidence not returned by the database"", ""production impact inferred from synthetic data""], ""critical_failure_rules"": [""fabricated_evidence"", ""invented_database_object"", ""confirmed_root_cause_without_supporting_evidence""], ""scenario_version"": 1, ""active"": true, ""expected_procedures"": [""eval.usp_shipping_workflow_1""], ""expected_functions"": [""eval.fn_shipping_active_status""], ""expected_triggers"": [""eval.tr_bookings_audit""], ""expected_jobs"": [], ""business_description"": ""Legacy evaluation scenario"", ""expected_relationships"": [], ""evidence_exclusions"": [], ""required_business_objects"": [], ""required_workflow"": [], ""expected_recommendation"": [], ""unsafe_recommendations"": [], ""expected_confidence_range"": [0.0, 1.0], ""expected_human_review"": false, ""human_review_conditions"": [], ""expected_ai_judge_category_scores"": {}, ""expected_citations"": [], ""estimated_duration_seconds"": 60, ""estimated_token_usage"": 2000, ""tags"": []}","Investigation Complete.
+
+Investigation ID: INV-20260716-222609-48F09840
+Investigation Mode: INVESTIGATION
+Detected Intent: MISSING_DATA
+Response Type: insufficient_evidence
+Extracted Entities: exact_id_or_code=SHP-5001, business_identifier=SHP-5001, possible_table_or_column=Delivery, possible_table_or_column=is, possible_table_or_column=complete, possible_table_or_column=for, possible_table_or_column=shipment, possible_column=SHP, possible_table_or_column=why, possible_table_or_column=the, possible_table_or_column=empty, possible_table_or_column=return, possible_table_or_column=work, possible_table_or_column=order
+AI-assisted reasoning: Disabled
+Reason: AI_REASONING_ENABLED=false
+Evidence package sent: No
+LLM evidence validation: Not applicable
+Evidence citations: Not applicable
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: MISSING_DATA
+- User Goal: Answer the user question with database evidence: Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?
+- Working Hypothesis: A downstream record should have been generated but is missing.
+
+## Stage 2 - Discover Context
+- Target Object: transport_work_orders
+- Target Reason: Selected from main problem phrase 'work order missing' (missing); parent and secondary-cause terms do not override the target.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: empty_return_instructions, shipment_milestones, shipments, repair_orders, truck_movements, integration_messages
+- Upstream Objects: None discovered
+- Downstream Objects: None discovered
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 19eec4fd-2e15-4480-a2c4-27a764982d73
+- database_name: eval_shipping
+- schema_name: default
+- database_engine: mysql
+- connection_string_database: eval_shipping
+- metadata_cache_key: 678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|19eec4fd-2e15-4480-a2c4-27a764982d73|eval_shipping
+- Discovered tables: audit_history, batch_runs, bills_of_lading, bookings, carrier_assignments, container_assignments, container_events, container_master, customers, customs_holds, customs_releases, damage_reports, dangerous_goods, demurrage_detention, depots, empty_return_instructions, equipment_interchange, evaluation_marker, exceptions, gate_transactions, integration_messages, invoices, ports, rail_movements, reefer_readings, reefer_settings, repair_orders, shipment_milestones, shipments, terminals
+- Discovered procedures: None
+- Selected candidates: table:audit_history (column name relevance=1.5; outside top scored metadata candidates); table:batch_runs (column name relevance=1.5; outside top scored metadata candidates); table:empty_return_instructions (table name relevance=8; column name relevance=4.5); table:exceptions (column name relevance=1.5; outside top scored metadata candidates); table:integration_messages (column name relevance=1.5; outside top scored metadata candidates); table:repair_orders (table name relevance=4; column name relevance=3); table:shipment_milestones (table name relevance=4; column name relevance=4.5); table:shipments (table name relevance=4; column name relevance=3); table:transport_work_orders (table name relevance=8; column name relevance=6); table:truck_movements (column name relevance=4.5)
+- Rejected candidates: table:bills_of_lading (column name relevance=3; outside top scored metadata candidates); table:bookings (column name relevance=1.5; outside top scored metadata candidates); table:carrier_assignments (column name relevance=4.5); table:container_assignments (column name relevance=3; outside top scored metadata candidates); table:container_events (column name relevance=1.5; outside top scored metadata candidates); table:container_master (column name relevance=1.5; outside top scored metadata candidates); table:customers (column name relevance=1.5; outside top scored metadata candidates); table:customs_holds (column name relevance=3; outside top scored metadata candidates); table:customs_releases (column name relevance=1.5; outside top scored metadata candidates); table:damage_reports (column name relevance=1.5; outside top scored metadata candidates)
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: State or status values in transport_work_orders, empty_return_instructions, shipment_milestones may be preventing the expected workflow transition. (42% initial)
+- H2: Operational history or error evidence in batch_runs, audit_history may identify the failed step. (38% initial)
+- H3: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Prove requested entity exists in transport_work_orders: expected read-only evidence from generated SQL
+- Prove reported condition on transport_work_orders.TransportWorkOrdersId: expected read-only evidence from generated SQL
+- Prove reported condition on transport_work_orders.IsActive: expected read-only evidence from generated SQL
+- Prove reported condition on transport_work_orders.ShipmentsId: expected read-only evidence from generated SQL
+- Prove requested entity exists in empty_return_instructions: expected read-only evidence from generated SQL
+- Prove reported condition on empty_return_instructions.EmptyReturnInstructionsId: expected read-only evidence from generated SQL
+- Prove reported condition on empty_return_instructions.IsActive: expected read-only evidence from generated SQL
+- Prove requested entity exists in shipment_milestones: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Prove requested entity exists in transport_work_orders: No rows returned
+- SQL Prove reported condition on transport_work_orders.TransportWorkOrdersId: No rows returned
+- SQL Prove reported condition on transport_work_orders.IsActive: No rows returned
+- SQL Prove reported condition on transport_work_orders.ShipmentsId: No rows returned
+- SQL Prove requested entity exists in empty_return_instructions: No rows returned
+- SQL Prove reported condition on empty_return_instructions.EmptyReturnInstructionsId: No rows returned
+- SQL Prove reported condition on empty_return_instructions.IsActive: No rows returned
+- SQL Prove requested entity exists in shipment_milestones: No rows returned
+
+## Evidence Gate
+- Gate Required: Yes
+- Issue Reproduced: No
+- Business Key Exists: No
+- Reported Condition Exists: No
+- Affected Rows Exist: No
+- Parent/Child Relationship Exists: No
+- Blocked: Supplied business key not found in returned rows: SHP-5001.
+- Blocked: No affected rows were returned by the evidence plan.
+- Blocked: Parent-child relationship was not confirmed by metadata or SQL join evidence.
+- Blocked: Missing related records were not confirmed by returned rows.
+
+## Suggested Verification Checks
+- Pending: transport_work_orders is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: transport_work_orders (32.4) - Matched 3 question/entity token(s); operational metadata signals: event, status field, timestamp field; selected from main problem phrase target; has indexes
+- table: empty_return_instructions (21.9) - Matched 2 question/entity token(s); operational metadata signals: event, status field, timestamp field; selected from main problem phrase parent; has indexes
+- table: shipment_milestones (12.899999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, status field, timestamp field; has indexes
+- table: shipments (11.399999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, status field, timestamp field; has indexes
+- table: repair_orders (11.399999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, status field, timestamp field; has indexes
+- table: truck_movements (9.9) - Matched 2 question/entity token(s); operational metadata signals: event, status field, timestamp field; has indexes
+- table: integration_messages (6.2) - Matched 0 question/entity token(s); operational metadata signals: event, integration, message, status field, timestamp field; has indexes
+- table: audit_history (6.2) - Matched 0 question/entity token(s); operational metadata signals: audit, event, history, status field, timestamp field; has indexes
+
+## Stage 6 - Reason
+Reported issue could not be reproduced from connected database evidence.
+
+AI reasoning note: AI_REASONING_ENABLED=false.
+
+## Root Cause Analysis
+- Reported issue could not be reproduced from connected database evidence.
+
+## Diagnostic Hypotheses
+- Rank 1: H1 27% - State or status values in transport_work_orders, empty_return_instructions, shipment_milestones may be preventing the expected workflow transition.; Supported by collected evidence.
+- Rank 2: H3 15% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 3: H2 11% - Operational history or error evidence in batch_runs, audit_history may identify the failed step.; Unable to confirm. Additional evidence required.
+
+## Confirmed Facts
+
+
+## Inferred Findings
+
+
+## Hypotheses
+- Investigation stopped at the evidence gate because the reported condition was not confirmed.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write transport_work_orders; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: State or status values in transport_work_orders, empty_return_instructions, shipment_milestones may be preventing the expected workflow transition.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- No confirming rows were returned for the reported issue.
+
+## Recommended Next SQL
+```sql
+SELECT TransportWorkOrdersId, ShipmentsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM transport_work_orders WHERE (CAST(BusinessKey AS CHAR) = 'SHP-5001' OR CAST(Status AS CHAR) = 'SHP-5001')
+```
+
+```sql
+SELECT TransportWorkOrdersId, ShipmentsId, BusinessKey, Status, EventTime, Details, CorrelationId FROM transport_work_orders WHERE ((CAST(BusinessKey AS CHAR) = 'SHP-5001' OR CAST(Status AS CHAR) = 'SHP-5001')) AND TransportWorkOrdersId IS NULL
+```
+
+```sql
+SELECT IsActive, TransportWorkOrdersId, ShipmentsId, BusinessKey, Status, EventTime, Details, CorrelationId FROM transport_work_orders WHERE ((CAST(BusinessKey AS CHAR) = 'SHP-5001' OR CAST(Status AS CHAR) = 'SHP-5001')) AND IsActive IS NULL
+```
+
+```sql
+SELECT ShipmentsId, TransportWorkOrdersId, BusinessKey, Status, EventTime, Details, CorrelationId FROM transport_work_orders WHERE ((CAST(BusinessKey AS CHAR) = 'SHP-5001' OR CAST(Status AS CHAR) = 'SHP-5001')) AND ShipmentsId IS NULL
+```
+
+```sql
+SELECT EmptyReturnInstructionsId, ContainerAssignmentsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM empty_return_instructions WHERE (CAST(BusinessKey AS CHAR) = 'SHP-5001' OR CAST(Status AS CHAR) = 'SHP-5001')
+```
+
+## Recommendation
+- Immediate Fix: No fix recommended until read-only evidence reproduces the reported condition.
+- Permanent Fix: Collect the missing key, relationship, affected-row, and condition evidence before changing schema, data, procedures, or jobs.
+- Monitoring: Track this investigation as evidence-blocked until reproduction SQL returns confirming rows.
+- Risk: Unknown
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? transport_work_orders.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies transport_work_orders investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 35%
+- + 8 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: transport_work_orders.
+- - Evidence gate blocked root-cause analysis: Supplied business key not found in returned rows: SHP-5001.
+- - Evidence gate blocked root-cause analysis: No affected rows were returned by the evidence plan.
+- - Evidence gate blocked root-cause analysis: Parent-child relationship was not confirmed by metadata or SQL join evidence.
+- - Evidence gate blocked root-cause analysis: Missing related records were not confirmed by returned rows.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Supplied business key not found in returned rows: SHP-5001.
+- No affected rows were returned by the evidence plan.
+- Parent-child relationship was not confirmed by metadata or SQL join evidence.
+- Missing related records were not confirmed by returned rows.",completed,AI_ANSWERED,INV-20260716-222609-48F09840,,[],{},valid,False,0.0,66.198,fail,0.0,The investigation failed the critical validation due to analyzing the wrong business entity (SHP-5001 not found in evidence). No evidence was found to confirm the missing empty-return work order or related records. No root cause or fix could be confirmed. The response type was insufficient evidence rather than confirmed root cause as expected.,,3.7353582000032475,22241,152,0.0,gpt-4.1-mini,ai-judge-v1,True,"[""ai_judge_critical_failure"", ""ai_score_below_70"", ""deterministic_critical_failure"", ""deterministic_score_below_70"", ""expected_response_type_disputed"", ""judge_output_inconsistent""]",fail,True

@@ -1,0 +1,275 @@
+{
+  "all_valid": true,
+  "scenarios": [
+    {
+      "scenario_id": "banking-pilot-001",
+      "domain": "banking",
+      "expected_entity": "TRF-3101",
+      "declared_table": "eval.transfers",
+      "declared_column": "BusinessKey",
+      "entity_found": true,
+      "exact_row_count": 1,
+      "defect_found": true,
+      "entity_defect_linkage_valid": true,
+      "application_credentials_visible": true,
+      "manifest_sql_consistency": "CONSISTENT",
+      "fixture_status": "VALID",
+      "failure_reason": "",
+      "proof": {
+        "stdout": "EntityStatus EntityTable    EntityColumn ExpectedEntity ExactRowCount\n------------ -------------- ------------ -------------- -------------\nENTITY_FOUND eval.transfers BusinessKey  TRF-3101                   1\n\n",
+        "verified": true,
+        "fixture_status": "VALID",
+        "manifest_consistency": {
+          "status": "CONSISTENT",
+          "consistent": true,
+          "reasons": []
+        },
+        "entity": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "transfers",
+          "column": "BusinessKey",
+          "expected_value": "TRF-3101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": false
+        },
+        "application_visibility": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "transfers",
+          "column": "BusinessKey",
+          "expected_value": "TRF-3101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": true
+        },
+        "defect_linkage": {
+          "valid": true,
+          "linked_row_count": 1,
+          "defect_table": "exceptions",
+          "defect_value": "EVAL-BANKING-001"
+        },
+        "database": "EvalBanking"
+      }
+    },
+    {
+      "scenario_id": "orders-pilot-001",
+      "domain": "orders",
+      "expected_entity": "ORD-7101",
+      "declared_table": "eval.sales_orders",
+      "declared_column": "BusinessKey",
+      "entity_found": true,
+      "exact_row_count": 1,
+      "defect_found": true,
+      "entity_defect_linkage_valid": true,
+      "application_credentials_visible": true,
+      "manifest_sql_consistency": "CONSISTENT",
+      "fixture_status": "VALID",
+      "failure_reason": "",
+      "proof": {
+        "stdout": "EntityStatus EntityTable       EntityColumn ExpectedEntity ExactRowCount\n------------ ----------------- ------------ -------------- -------------\nENTITY_FOUND eval.sales_orders BusinessKey  ORD-7101                   1\n\n",
+        "verified": true,
+        "fixture_status": "VALID",
+        "manifest_consistency": {
+          "status": "CONSISTENT",
+          "consistent": true,
+          "reasons": []
+        },
+        "entity": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "sales_orders",
+          "column": "BusinessKey",
+          "expected_value": "ORD-7101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": false
+        },
+        "application_visibility": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "sales_orders",
+          "column": "BusinessKey",
+          "expected_value": "ORD-7101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": true
+        },
+        "defect_linkage": {
+          "valid": true,
+          "linked_row_count": 1,
+          "defect_table": "exceptions",
+          "defect_value": "EVAL-ORDERS-001"
+        },
+        "database": "EvalOrders"
+      }
+    },
+    {
+      "scenario_id": "shipping-pilot-001",
+      "domain": "shipping",
+      "expected_entity": "SHP-5001",
+      "declared_table": "eval.shipments",
+      "declared_column": "BusinessKey",
+      "entity_found": true,
+      "exact_row_count": 1,
+      "defect_found": true,
+      "entity_defect_linkage_valid": true,
+      "application_credentials_visible": true,
+      "manifest_sql_consistency": "CONSISTENT",
+      "fixture_status": "VALID",
+      "failure_reason": "",
+      "proof": {
+        "stdout": "EntityStatus EntityTable    EntityColumn ExpectedEntity ExactRowCount\n------------ -------------- ------------ -------------- -------------\nENTITY_FOUND eval.shipments BusinessKey  SHP-5001                   1\n\n(1 row affected)\n",
+        "verified": true,
+        "fixture_status": "VALID",
+        "manifest_consistency": {
+          "status": "CONSISTENT",
+          "consistent": true,
+          "reasons": []
+        },
+        "entity": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "shipments",
+          "column": "BusinessKey",
+          "expected_value": "SHP-5001",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": false
+        },
+        "application_visibility": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "shipments",
+          "column": "BusinessKey",
+          "expected_value": "SHP-5001",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": true
+        },
+        "defect_linkage": {
+          "valid": true,
+          "linked_row_count": 1,
+          "defect_table": "exceptions",
+          "defect_value": "EVAL-SHIPPING-001"
+        },
+        "database": "EvalShipping"
+      }
+    },
+    {
+      "scenario_id": "payroll-pilot-001",
+      "domain": "payroll",
+      "expected_entity": "EMP-1042",
+      "declared_table": "eval.employees",
+      "declared_column": "BusinessKey",
+      "entity_found": true,
+      "exact_row_count": 1,
+      "defect_found": true,
+      "entity_defect_linkage_valid": true,
+      "application_credentials_visible": true,
+      "manifest_sql_consistency": "CONSISTENT",
+      "fixture_status": "VALID",
+      "failure_reason": "",
+      "proof": {
+        "stdout": "EntityStatus EntityTable    EntityColumn ExpectedEntity ExactRowCount\n------------ -------------- ------------ -------------- -------------\nENTITY_FOUND eval.employees BusinessKey  EMP-1042                   1\n\n",
+        "verified": true,
+        "fixture_status": "VALID",
+        "manifest_consistency": {
+          "status": "CONSISTENT",
+          "consistent": true,
+          "reasons": []
+        },
+        "entity": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "employees",
+          "column": "BusinessKey",
+          "expected_value": "EMP-1042",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": false
+        },
+        "application_visibility": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "employees",
+          "column": "BusinessKey",
+          "expected_value": "EMP-1042",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": true
+        },
+        "defect_linkage": {
+          "valid": true,
+          "linked_row_count": 1,
+          "defect_table": "exceptions",
+          "defect_value": "EVAL-PAYROLL-001"
+        },
+        "database": "EvalPayroll"
+      }
+    },
+    {
+      "scenario_id": "clinic-pilot-001",
+      "domain": "clinic",
+      "expected_entity": "APT-2101",
+      "declared_table": "eval.appointments",
+      "declared_column": "BusinessKey",
+      "entity_found": true,
+      "exact_row_count": 1,
+      "defect_found": true,
+      "entity_defect_linkage_valid": true,
+      "application_credentials_visible": true,
+      "manifest_sql_consistency": "CONSISTENT",
+      "fixture_status": "VALID",
+      "failure_reason": "",
+      "proof": {
+        "stdout": "EntityStatus EntityTable       EntityColumn ExpectedEntity ExactRowCount\n------------ ----------------- ------------ -------------- -------------\nENTITY_FOUND eval.appointments BusinessKey  APT-2101                   1\n\n",
+        "verified": true,
+        "fixture_status": "VALID",
+        "manifest_consistency": {
+          "status": "CONSISTENT",
+          "consistent": true,
+          "reasons": []
+        },
+        "entity": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "appointments",
+          "column": "BusinessKey",
+          "expected_value": "APT-2101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": false
+        },
+        "application_visibility": {
+          "status": "ENTITY_FOUND",
+          "schema": "eval",
+          "table": "appointments",
+          "column": "BusinessKey",
+          "expected_value": "APT-2101",
+          "match_mode": "exact",
+          "exact_row_count": 1,
+          "duplicate": false,
+          "visible_to_application_credentials": true
+        },
+        "defect_linkage": {
+          "valid": true,
+          "linked_row_count": 1,
+          "defect_table": "exceptions",
+          "defect_value": "EVAL-CLINIC-001"
+        },
+        "database": "EvalClinic"
+      }
+    }
+  ]
+}

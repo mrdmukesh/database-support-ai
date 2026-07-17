@@ -1,0 +1,186 @@
+﻿scenario_id,domain,difficulty,category,database_engine,question,expected_answer,application_answer,status,investigation_status,investigation_id,canonical_investigated_entity,evidence_linked_entities,entity_provenance,benchmark_validity,deterministic_pass,deterministic_score,unadjusted_score,classification,ai_judge_score,judge_explanation,confidence,latency_seconds,input_tokens,output_tokens,estimated_cost_usd,model_version,prompt_version,human_review_required,human_review_reasons,failure,persisted_result_row
+orders-pilot-001,orders,medium,root_cause,sqlserver,Why was order ORD-7101 not allocated despite available inventory?,"{""scenario_id"": ""orders-pilot-001"", ""domain"": ""orders"", ""database_engine"": ""sqlserver"", ""database_version"": ""Azure SQL Database / SQL Server 2022"", ""category"": ""root_cause"", ""subcategory"": ""missing_workflow_output"", ""difficulty"": ""medium"", ""question"": ""Why was order ORD-7101 not allocated despite available inventory?"", ""baseline_script"": ""evaluation_databases/orders/sql/02_seed.sql"", ""setup_script"": ""evaluation_scenarios/orders/orders-pilot-001/inject.sql"", ""verification_script"": ""evaluation_scenarios/orders/orders-pilot-001/verify.sql"", ""cleanup_script"": ""evaluation_scenarios/orders/orders-pilot-001/cleanup.sql"", ""expected_response_type"": ""confirmed_root_cause"", ""expected_entities"": [""ORD-7101""], ""expected_root_cause_concepts"": [""required downstream work item was not created after a completed upstream transition""], ""expected_tables"": [""exceptions"", ""integration_messages"", ""inventory_balances""], ""expected_columns"": [""BusinessKey"", ""Status"", ""CorrelationId"", ""Details""], ""expected_database_objects"": [""eval.vw_orders_operations_1""], ""required_evidence"": [""EVAL-ORDERS-001"", ""ORD-7101"", ""Exception""], ""acceptable_fix_concepts"": [""transactional workflow completion""], ""prohibited_claims"": [""objects or evidence not returned by the database"", ""production impact inferred from synthetic data""], ""critical_failure_rules"": [""fabricated_evidence"", ""invented_database_object"", ""confirmed_root_cause_without_supporting_evidence""], ""scenario_version"": 1, ""active"": true, ""expected_procedures"": [""eval.usp_orders_workflow_1""], ""expected_functions"": [""eval.fn_orders_active_status""], ""expected_triggers"": [""eval.tr_products_audit""], ""expected_jobs"": [], ""business_description"": ""Legacy evaluation scenario"", ""expected_relationships"": [], ""evidence_exclusions"": [], ""required_business_objects"": [], ""required_workflow"": [], ""expected_recommendation"": [], ""unsafe_recommendations"": [], ""expected_confidence_range"": [0.0, 1.0], ""expected_human_review"": false, ""human_review_conditions"": [], ""expected_ai_judge_category_scores"": {}, ""expected_citations"": [], ""estimated_duration_seconds"": 60, ""estimated_token_usage"": 2000, ""tags"": []}","Investigation Complete.
+
+Investigation ID: INV-20260717-011653-9D04E0E4
+Investigation Mode: INVESTIGATION
+Detected Intent: GENERAL_DATABASE_QUESTION
+Response Type: multiple_possible_causes
+Extracted Entities: exact_id_or_code=ORD-7101, business_identifier=ORD-7101, possible_table_or_column=Why, possible_table_or_column=was, possible_table_or_column=order, possible_column=ORD, possible_table_or_column=not, possible_table_or_column=allocated, possible_table_or_column=despite, possible_table_or_column=available, possible_table_or_column=inventory
+AI-assisted reasoning: Enabled
+Reason: OpenAI LLM reasoning was applied after deterministic evidence collection.
+Evidence package sent: Yes
+LLM evidence validation: Passed
+Evidence citations: Passed
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: GENERAL_DATABASE_QUESTION
+- User Goal: Answer the user question with database evidence: Why was order ORD-7101 not allocated despite available inventory?
+- Working Hypothesis: The database evidence should explain the reported behavior.
+
+## Stage 2 - Discover Context
+- Target Object: eval.sales_order_lines
+- Target Reason: Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: eval.purchase_order_lines, eval.inventory_movements, eval.sales_orders, eval.inventory_balances, eval.purchase_orders, eval.vw_orders_operations_1
+- Upstream Objects: eval.sales_orders
+- Downstream Objects: None discovered
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 7b15039d-cf52-4f04-a533-a921efd0cd9b
+- database_name: EvalOrders
+- schema_name: default
+- database_engine: sql_server
+- connection_string_database: EvalOrders
+- metadata_cache_key: metadata-v2|678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|7b15039d-cf52-4f04-a533-a921efd0cd9b|evalorders||dabdd56a7b115690e48ddc1e592a7e60c6bfef25f26b072645ba1f88002fc572
+- Discovered tables: eval.allocations, eval.audit_history, eval.batch_runs, eval.customers, eval.evaluation_marker, eval.exceptions, eval.integration_messages, eval.inventory_balances, eval.inventory_movements, eval.pick_tasks, eval.products, eval.purchase_order_lines, eval.purchase_orders, eval.receipts, eval.sales_order_lines, eval.sales_orders, eval.shipments, eval.warehouses
+- Discovered procedures: eval.tr_products_audit
+- Selected candidates: table:eval.inventory_balances (table name relevance=4; column name relevance=1.5; relationship relevance=1); table:eval.inventory_movements (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.purchase_order_lines (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.purchase_orders (table name relevance=4; column name relevance=1.5); table:eval.sales_order_lines (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.sales_orders (table name relevance=4; column name relevance=1.5; relationship relevance=1)
+- Rejected candidates: table:eval.allocations (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.audit_history (no exact/normalized metadata, key, or relationship match); table:eval.batch_runs (no exact/normalized metadata, key, or relationship match); table:eval.customers (no exact/normalized metadata, key, or relationship match); table:eval.evaluation_marker (no exact/normalized metadata, key, or relationship match); table:eval.exceptions (no exact/normalized metadata, key, or relationship match); table:eval.integration_messages (no exact/normalized metadata, key, or relationship match); table:eval.pick_tasks (relationship relevance=1; outside top scored metadata candidates); table:eval.products (no exact/normalized metadata, key, or relationship match); table:eval.receipts (column name relevance=1.5; relationship relevance=1)
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: Relationship path eval.sales_orders -> eval.sales_order_lines does not contain the expected related row or transition evidence. (48% initial)
+- H2: State or status values in eval.sales_order_lines, eval.purchase_order_lines, eval.inventory_movements may be preventing the expected workflow transition. (42% initial)
+- H3: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Summarize analytical results in eval.sales_order_lines: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.purchase_order_lines: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.inventory_movements: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.sales_order_lines: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.purchase_order_lines: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.inventory_movements: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.sales_order_lines: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.purchase_order_lines: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Summarize analytical results in eval.sales_order_lines: Production scan protection rejected unrestricted table scan
+- SQL Summarize analytical results in eval.purchase_order_lines: Production scan protection rejected unrestricted table scan
+- SQL Summarize analytical results in eval.inventory_movements: Production scan protection rejected unrestricted table scan
+- SQL Prove requested entity exists in eval.sales_order_lines: No rows returned
+- SQL Prove requested entity exists in eval.purchase_order_lines: No rows returned
+- SQL Prove requested entity exists in eval.inventory_movements: No rows returned
+- SQL Inspect relevant rows in eval.sales_order_lines: No rows returned
+- SQL Inspect relevant rows in eval.purchase_order_lines: No rows returned
+
+## Evidence Gate
+- Gate Required: No
+- Issue Reproduced: Yes
+- Business Key Exists: No
+- Reported Condition Exists: Yes
+- Affected Rows Exist: No
+- Parent/Child Relationship Exists: Yes
+
+## Suggested Verification Checks
+- Pending: eval.sales_order_lines is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: eval.sales_order_lines (13.35) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.purchase_order_lines (13.35) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.inventory_movements (12.35) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.sales_orders (11.85) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.inventory_balances (10.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.purchase_orders (9.7) - Matched 2 question/entity token(s); operational metadata signals: event, status field, timestamp field; has indexes
+- view: eval.vw_orders_operations_1 (0.8) - View name matched relevant tokens or retained for context
+- view: eval.vw_orders_operations_2 (0.8) - View name matched relevant tokens or retained for context
+
+## Stage 6 - Reason
+The investigation into why order ORD-7101 was not allocated despite available inventory found no matching records for this order in the key tables eval.sales_order_lines, eval.purchase_order_lines, and eval.inventory_movements. Attempts to summarize data in these tables were blocked by production scan protection, preventing unrestricted scans. The absence of any rows related to ORD-7101 suggests that the order either does not exist in the system or is not recorded in the expected tables, which explains why allocation did not occur. Senior engineer explanation: A thorough database investigation was conducted to identify the root cause of the allocation failure for order ORD-7101. Multiple targeted queries searching for the order in sales order lines, purchase order lines, and inventory movements returned zero rows, indicating the order is not present in these critical tables. Additionally, attempts to perform broader analytical queries were blocked by production scan protections, limiting visibility. Without evidence of the order in these tables, it is clear that the allocation process could not proceed because the system lacks the necessary order data. This points to either a data ingestion issue or that the order was never created or recorded properly in the database. Clearer report wording: No records for order ORD-7101 were found in the sales order lines, purchase order lines, or inventory movements tables. Production scan protections prevented broader data analysis. The lack of order data in these tables explains why allocation did not occur despite available inventory. Confidence note: Confidence in this conclusion is medium due to the absence of direct evidence of the order in the database tables and the inability to perform unrestricted scans due to production protections. Missing evidence includes summarized analytical results and broader data scans that could confirm system-wide status. Additional metadata or logs outside the database might be needed for full certainty. Recommended next questions: Is there any external system or log that confirms the creation or ingestion of order ORD-7101? Evidence: SQL-4, SQL-5, SQL-6. Are there any permissions or production protections preventing full data scans that could be temporarily lifted for deeper investigation? Evidence: SQL-1, SQL-2, SQL-3.
+
+## AI-assisted reasoning over collected evidence
+OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.
+
+## Root Cause Analysis
+- Order ORD-7101 does not exist in the key database tables responsible for allocation, preventing allocation despite available inventory. Evidence: SQL-4, SQL-5, SQL-6, SQL-7, SQL-8.
+
+## Diagnostic Hypotheses
+- Rank 1: H2 27% - State or status values in eval.sales_order_lines, eval.purchase_order_lines, eval.inventory_movements may be preventing the expected workflow transition.; Supported by collected evidence.
+- Rank 2: H3 27% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 3: H1 13% - Relationship path eval.sales_orders -> eval.sales_order_lines does not contain the expected related row or transition evidence.; Unable to confirm. Additional evidence required.
+
+## Confirmed Facts
+- Affected object: eval.sales_order_lines.
+
+## Inferred Findings
+
+
+## Hypotheses
+- Some evidence queries failed, so missing privileges or metadata gaps may hide a stronger explanation.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write eval.sales_order_lines; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: State or status values in eval.sales_order_lines, eval.purchase_order_lines, eval.inventory_movements may be preventing the expected workflow transition.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- SQL - Prove requested entity exists in eval.sales_order_lines: No rows returned
+- SQL - Prove requested entity exists in eval.purchase_order_lines: No rows returned
+- SQL - Prove requested entity exists in eval.inventory_movements: No rows returned
+- SQL - Inspect relevant rows in eval.sales_order_lines: No rows returned
+- SQL - Inspect relevant rows in eval.purchase_order_lines: No rows returned
+
+## Recommended Next SQL
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.sales_order_lines GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.purchase_order_lines GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.inventory_movements GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT SalesOrderLinesId, SalesOrdersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.sales_order_lines WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'ORD-7101' OR CAST(Status AS NVARCHAR(MAX)) = 'ORD-7101')
+```
+
+```sql
+SELECT PurchaseOrderLinesId, PurchaseOrdersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.purchase_order_lines WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'ORD-7101' OR CAST(Status AS NVARCHAR(MAX)) = 'ORD-7101')
+```
+
+## Recommendation
+- Immediate Fix: Validate the top-ranked root cause with the recommended read-only SQL before making changes. Evidence: SQL - Prove requested entity exists in eval.sales_order_lines.
+- Permanent Fix: Apply the smallest approved schema/procedure/configuration change that directly addresses the confirmed cause. Evidence: SQL - Prove requested entity exists in eval.sales_order_lines.
+- Monitoring: Alert on recurrence of the failed condition and on increased duration/error count for related jobs.
+- Risk: Medium
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? eval.sales_order_lines.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies eval.sales_order_lines investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 24%
+- + 5 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: eval.sales_order_lines.
+- - 3 evidence query result(s) failed or were unavailable.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Summarized analytical results from eval.sales_order_lines, eval.purchase_order_lines, and eval.inventory_movements due to production scan protection.
+- Broader metadata or logs that could confirm order creation or ingestion status.",completed,AI_ANSWERED,INV-20260717-011653-9D04E0E4,ORD-7101,"[""ORD-7101""]","{""canonical_entities"": [{""canonical_investigated_entity"": ""ORD-7101"", ""original_entity_text"": ""ORD-7101"", ""normalized_entity_text"": ""ORD-7101"", ""resolved_entity_value"": ""ORD-7101"", ""resolved_entity_type"": ""business_identifier"", ""resolved_table"": ""eval.sales_orders"", ""resolved_column"": ""BusinessKey"", ""resolution_confidence"": 1.0, ""resolution_method"": ""exact"", ""supporting_evidence_ids"": [""ENTITY-1-EXACT-8""]}], ""canonical_investigated_entity"": ""ORD-7101"", ""evidence_linked_entities"": [""ORD-7101""], ""diagnostics"": [{""entity_type"": ""entity_resolution_diagnostic"", ""resolution_trace_id"": ""ENTITY-1-EXACT-8"", ""internal_match_id"": ""ENTITY-1-EXACT-8"", ""candidate_id"": """", ""resolver_rule_id"": ""exact"", ""extracted_value"": ""ORD-7101"", ""matched_value"": ""ORD-7101"", ""match_type"": ""exact"", ""confidence"": 1.0, ""evidence_id"": ""ENTITY-1-EXACT-8"", ""candidates"": [{""identifier"": ""ORD-7101"", ""metadata"": {""Status"": ""Exception""}, ""evidence_id"": ""ENTITY-1-EXACT-8"", ""table"": ""eval.sales_orders"", ""column"": ""BusinessKey""}], ""reason"": ""Exact database evidence match."", ""resolved_table"": ""eval.sales_orders"", ""resolved_column"": ""BusinessKey""}], ""evaluator_input_defects"": []}",valid,True,72.46,72.46,pass,72.55,"The root cause that order ORD-7101 was not allocated despite available inventory is well supported by evidence showing the order does not exist in key allocation-related tables (eval.sales_order_lines, eval.purchase_order_lines, eval.inventory_movements). This explains the failure to allocate. Evidence correctness is moderate due to production scan protections blocking broader data scans and no direct exception or integration message evidence was found, which limits completeness. The discovered database objects are appropriate and relevant. No fix was proposed or confirmed, so fix correctness is zero. Citation correctness and safety are fully met. Overall, the investigation correctly identifies the missing downstream work item (order data) as the root cause, but lacks some required evidence (exceptions, integration messages) to fully confirm the scenario. No unsupported or incorrect claims were made.",,22.36666339999647,21804,294,0.0,gpt-4.1-mini,ai-judge-v2-entity-provenance,False,[],,True

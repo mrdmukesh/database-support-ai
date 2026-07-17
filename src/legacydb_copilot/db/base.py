@@ -3,12 +3,27 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, String, Text
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 def utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+@compiles(String, "mysql")
+def compile_mysql_string(type_: String, compiler, **kwargs) -> str:
+    """MySQL requires a length for VARCHAR; inferred model strings use a safe default."""
+    if type_.length is None:
+        return "VARCHAR(255)"
+    return compiler.visit_VARCHAR(type_, **kwargs)
+
+
+@compiles(Text, "mysql")
+def compile_mysql_text(_type: Text, _compiler, **_kwargs) -> str:
+    """Evaluation snapshots and reports routinely exceed MySQL TEXT's 64 KiB limit."""
+    return "LONGTEXT"
 
 
 class Base(DeclarativeBase):
@@ -26,4 +41,4 @@ class TimestampMixin:
 
 
 class UUIDPrimaryKeyMixin:
-    id: Mapped[str] = mapped_column(primary_key=True, default=lambda: str(uuid4()))
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
+import time
 from typing import Any
 
 from sqlalchemy import create_engine, inspect, text
@@ -52,12 +55,14 @@ class SchemaMetadata:
         views: list[str],
         procedures: list[str],
         version: str,
+        cache_diagnostics: dict[str, Any] | None = None,
     ):
         self.engine_type = engine_type
         self.tables = tables
         self.views = views
         self.procedures = procedures
         self.version = version
+        self.cache_diagnostics = cache_diagnostics or {}
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -66,6 +71,7 @@ class SchemaMetadata:
             "views": self.views,
             "procedures": self.procedures,
             "version": self.version,
+            "cache_diagnostics": self.cache_diagnostics,
         }
 
 
@@ -77,6 +83,8 @@ class DatabaseConnector:
         self.connection_string = connection_string
         self._engine: Engine | None = None
         self._adapter: BaseDatabaseAdapter | None = None
+        self._schema_metadata_cache: SchemaMetadata | None = None
+        self._schema_metadata_cached_at: float | None = None
 
     def _build_connection_config(self) -> tuple[str, dict[str, Any]]:
         """Build SQLAlchemy connection string and driver options based on engine type."""
@@ -93,6 +101,15 @@ class DatabaseConnector:
         """Establish connection to the database."""
         try:
             conn_string, connect_args = self._build_connection_config()
+            engine_options: dict[str, Any] = {}
+            if self.database_engine == DatabaseEngine.SQL_SERVER:
+                # Investigation connections execute read-only statements. Azure SQL/ODBC can
+                # otherwise hang while SQLAlchemy rolls back an inspector connection on close.
+                engine_options.update(
+                    isolation_level="AUTOCOMMIT",
+                    pool_reset_on_return=None,
+                    skip_autocommit_rollback=True,
+                )
             self._engine = create_engine(
                 conn_string,
                 pool_size=5,
@@ -100,6 +117,7 @@ class DatabaseConnector:
                 pool_pre_ping=True,
                 connect_args=connect_args,
                 echo=False,
+                **engine_options,
             )
             # Test the connection
             with self._engine.connect() as conn:
@@ -119,6 +137,8 @@ class DatabaseConnector:
             self._engine.dispose()
             self._engine = None
             self._adapter = None
+        self._schema_metadata_cache = None
+        self._schema_metadata_cached_at = None
 
     def get_engine(self) -> Engine:
         """Get the SQLAlchemy engine, connecting if necessary."""
@@ -142,9 +162,19 @@ class DatabaseConnector:
         except Exception:
             return False
 
-    def get_schema_metadata(self) -> SchemaMetadata:
+    def get_schema_metadata(self, *, force_refresh: bool = False) -> SchemaMetadata:
         """Extract schema metadata from the database."""
         try:
+            now = time.time()
+            if self._schema_metadata_cache is not None and not force_refresh:
+                cached = self._schema_metadata_cache
+                cached.cache_diagnostics = {
+                    **cached.cache_diagnostics,
+                    "cache_hit": True,
+                    "cache_age_seconds": round(now - float(self._schema_metadata_cached_at or now), 3),
+                    "refresh_reason": "cache_hit",
+                }
+                return cached
             adapter = self.get_adapter()
 
             # Get tables
@@ -159,13 +189,26 @@ class DatabaseConnector:
             # Get version
             version = adapter.get_version()
 
-            return SchemaMetadata(
+            metadata = SchemaMetadata(
                 engine_type=self.database_engine.value,
                 tables=tables,
                 views=views,
                 procedures=procedures,
                 version=version,
+                cache_diagnostics={
+                    "cache_hit": False,
+                    "cache_created_at_epoch": now,
+                    "cache_age_seconds": 0.0,
+                    "refresh_reason": "forced_refresh" if force_refresh else "initial_load",
+                    "object_count": len(tables) + len(views) + len(procedures),
+                    "table_count": len(tables),
+                    "view_count": len(views),
+                    "procedure_count": len(procedures),
+                },
             )
+            self._schema_metadata_cache = metadata
+            self._schema_metadata_cached_at = now
+            return metadata
         except Exception as exc:
             raise DatabaseConnectionError(f"Failed to extract schema metadata: {str(exc)}") from exc
 
@@ -316,16 +359,17 @@ class ConnectionPool:
 
     def connector_cache_key(self, database_engine: DatabaseEngine, connection_string: str) -> str:
         url = make_url(connection_string)
-        return "|".join(
-            [
-                database_engine.value,
-                url.host or "",
-                str(url.port or ""),
-                url.database or "",
-                url.username or "",
-                connection_string,
-            ]
-        )
+        safe_components = {
+            "engine": database_engine.value,
+            "host": url.host or "",
+            "port": str(url.port or ""),
+            "database": url.database or "",
+            "schema": url.query.get("schema", ""),
+            "metadata_discovery_version": "2",
+            "include": url.query.get("metadata_include", ""),
+            "exclude": url.query.get("metadata_exclude", ""),
+        }
+        return hashlib.sha256(json.dumps(safe_components, sort_keys=True).encode("utf-8")).hexdigest()
 
     def close(self, connection_id: str) -> None:
         """Close a specific connection."""

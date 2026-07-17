@@ -1,0 +1,25 @@
+{
+  "scenario_id": "shipping-benchmark-020",
+  "domain": "shipping",
+  "status": "persistence_failed",
+  "investigation_id": "",
+  "investigation_status": "",
+  "raw_request": {},
+  "raw_response": {},
+  "extracted_result": {
+    "cleanup_status": "failed"
+  },
+  "timings": {
+    "cleanup_seconds": 0.00010209999891230837,
+    "total_seconds": 0.9238784000008309
+  },
+  "usage_cost": {},
+  "errors": [
+    "[Errno 22] Invalid argument",
+    "Cleanup failed: [Errno 22] Invalid argument",
+    "Persistence failed: [Errno 22] Invalid argument"
+  ],
+  "retries": 0,
+  "attempt": 1,
+  "recovery_artifact": ""
+}

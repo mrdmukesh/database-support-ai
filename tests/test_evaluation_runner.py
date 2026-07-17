@@ -121,12 +121,13 @@ def config(tmp_path, **overrides):
     return RunnerConfig(**values)
 
 
-def runner(tmp_path, *, database=None, api=None, store=None, clock=time.monotonic):
+def runner(tmp_path, *, database=None, api=None, store=None, result_reader=None, clock=time.monotonic):
     return EvaluationRunner(
         config=config(tmp_path),
         database=database or FakeDatabase(),
         api=api or FakeAPI(),
         store=store or FakeStore(),
+        result_reader=result_reader,
         sleeper=lambda _seconds: None,
         clock=clock,
     )
@@ -139,6 +140,51 @@ def test_successful_scenario_execution(tmp_path):
     assert result.investigation_id == "INV-1"
     assert result.extracted_result["evidence"] == []
     assert len(store.records) == 1
+
+
+def test_ai_enabled_run_is_invalid_without_application_invocation_proof(tmp_path):
+    app = runner(tmp_path)
+    app.config = replace(app.config, ai_enabled=True)
+    result = app.run_scenario("RUN", scenario())
+    assert result.status == "invalid_configuration"
+    assert "application AI reasoning invocation was not recorded" in result.errors
+    assert result.extracted_result["ai_diagnostic_category"] == "missing_ai_instrumentation"
+
+
+def test_ai_diagnostic_categories_do_not_weaken_validation(tmp_path):
+    cases = [
+        ({"ai_reasoning_invoked": False, "ai_outcome": "insufficient_evidence"}, "INSUFFICIENT_DATABASE_EVIDENCE", "insufficient_evidence_before_ai"),
+        ({"ai_reasoning_invoked": False, "ai_outcome": "evidence_gate", "ai_skip_reason": "evidence_gate_not_reproduced"}, "AI_SKIPPED_BY_EVIDENCE_GATE", "evidence_gate_skipped_ai"),
+        ({"ai_reasoning_invoked": True, "ai_outcome": "provider_failure", "input_tokens": 0, "output_tokens": 0}, "AI_INVOCATION_FAILED", "ai_invocation_failed"),
+    ]
+    for trace, status, expected_category in cases:
+        class Reader:
+            def read(self, *_args, **_kwargs):
+                return {"debug_trace": trace}
+
+        app = runner(tmp_path, api=FakeAPI(detail={"id": "INV-1", "status": status, "ai_answer": "fallback"}), result_reader=Reader())
+        app.config = replace(app.config, ai_enabled=True)
+        result = app.run_scenario("RUN", scenario())
+        assert result.status == "invalid_configuration"
+        assert result.extracted_result["ai_diagnostic_category"] == expected_category
+
+
+def test_ai_enabled_run_accepts_complete_application_trace(tmp_path):
+    class Reader:
+        def read(self, *_args, **_kwargs):
+            return {"debug_trace": {"ai_reasoning_invoked": True, "llm_model_name": "gpt-test", "prompt_version": "v1", "input_tokens": 10, "output_tokens": 5}}
+
+    app = runner(tmp_path, result_reader=Reader())
+    app.config = replace(app.config, ai_enabled=True)
+    assert app.run_scenario("RUN", scenario()).status == "completed"
+
+
+def test_sql_server_scenario_cannot_run_silently_on_mysql(tmp_path):
+    app = runner(tmp_path)
+    app.config = replace(app.config, database_engine="mysql")
+    result = app.run_scenario("RUN", scenario())
+    assert result.status == "unsupported_database_engine"
+    assert "configured engine is mysql" in result.errors[0]
 
 
 def test_extraction_derives_citation_from_evidence_not_connection_sources():
@@ -160,6 +206,28 @@ def test_extraction_derives_citation_from_evidence_not_connection_sources():
     assert extracted["identified_entities"][0]["value"] == "ORDER-42"
     assert extracted["citations"] == ["SQL-1"]
     assert "Read Only Connection" not in extracted["citations"]
+
+
+def test_extraction_persists_canonical_entity_and_keeps_internal_id_diagnostic():
+    extracted = EvaluationRunner._extract(
+        {},
+        {
+            "identified_entities": [
+                {"entity_type": "business_identifier", "value": "SHP-5001"},
+                {
+                    "entity_type": "entity_resolution_diagnostic",
+                    "extracted_value": "SHP-5001",
+                    "matched_value": "SHP-5001",
+                    "evidence_id": "ENTITY-1-EXACT-8",
+                    "match_type": "exact",
+                },
+            ],
+            "evidence": [{"sample_rows": [{"BusinessKey": "SHP-5001"}]}],
+        },
+    )
+    assert extracted["canonical_investigated_entity"] == "SHP-5001"
+    assert extracted["evidence_linked_entities"] == ["SHP-5001"]
+    assert extracted["entity_provenance"]["diagnostics"][0]["evidence_id"] == "ENTITY-1-EXACT-8"
 
 
 def test_extraction_reads_structured_fix_section_as_recommendations():

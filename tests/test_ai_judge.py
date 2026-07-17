@@ -173,7 +173,7 @@ def test_judge_rate_limit_retries():
     assert result.status == "completed" and result.retries == 1
 
 
-def test_judge_cannot_override_deterministic_critical_failure():
+def test_judge_independently_assesses_deterministic_critical_failure():
     client = FakeClient([valid_payload(100, critical_failure=False)])
     config = JudgeConfig(retry_backoff_seconds=0)
     result = AIJudge(client, config, sleeper=lambda _: None).invoke(
@@ -181,8 +181,7 @@ def test_judge_cannot_override_deterministic_critical_failure():
         payload={},
         deterministic_critical=True,
     )
-    assert result.normalized.critical_failure
-    assert result.normalized.human_review_required
+    assert not result.normalized.critical_failure
 
 
 def test_large_score_disagreement_flags_review():
@@ -363,5 +362,5 @@ def test_judge_versions_prompts_and_human_flags_are_append_only():
         assert db.query(EvaluationAIJudgeScoreModel).count() == 2
         assert db.query(EvaluationHumanReviewFlagModel).count() == 2
         prompts = [json.loads(row.prompt_json) for row in db.query(EvaluationAIJudgeScoreModel)]
-        assert all(prompt["prompt_version"] == "ai-judge-v1" for prompt in prompts)
+        assert all(prompt["prompt_version"] == "ai-judge-v2-entity-provenance" for prompt in prompts)
         assert all("application_confidence" not in json.dumps(prompt) for prompt in prompts)

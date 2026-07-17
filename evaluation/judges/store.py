@@ -46,6 +46,13 @@ class AIJudgeService:
         context = self._load_context(result_id)
         deterministic = context["deterministic"]
         deterministic_summary = json.loads(deterministic.details_json)
+        if deterministic_summary.get("benchmark_validity") == "INVALID_EVALUATOR_INPUT":
+            return {
+                "result_id": result_id,
+                "status": "INVALID_EVALUATOR_INPUT",
+                "published": False,
+                "reason": "AI Judge skipped because business-entity input contained an internal token",
+            }
         execution = context["execution"]
         scenario = context["scenario"]
         actual = json.loads(execution.result_json)

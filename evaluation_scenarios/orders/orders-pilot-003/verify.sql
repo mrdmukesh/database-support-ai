@@ -1,2 +1,5 @@
-IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-ORDERS-003' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[sales_orders] WHERE Details='EVAL-ORDERS-003')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'SKU-8103' ExpectedEntity, 'EVAL-ORDERS-003' EvidenceValue;
+SET NOCOUNT ON;
+IF (SELECT COUNT(*) FROM eval.[products] WHERE BusinessKey=N'SKU-8103') <> 1 THROW 51021, 'Exact expected entity missing or duplicated', 1;
+IF NOT EXISTS (SELECT 1 FROM eval.[products] e JOIN eval.exceptions d ON d.CorrelationId=e.CorrelationId WHERE e.BusinessKey=N'SKU-8103' AND e.CorrelationId=N'EVAL-ORDERS-003' AND d.Status=N'Open') THROW 51022, 'Defect is not linked to expected entity', 1;
+SELECT N'ENTITY_FOUND' EntityStatus,N'eval.products' EntityTable,N'BusinessKey' EntityColumn,N'SKU-8103' ExpectedEntity,COUNT(*) ExactRowCount FROM eval.[products] WHERE BusinessKey=N'SKU-8103';
 GO

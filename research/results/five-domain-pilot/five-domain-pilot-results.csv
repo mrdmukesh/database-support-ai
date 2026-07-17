@@ -1,0 +1,6 @@
+Domain,Scenario ID,Database,Fixture Status,Canonical Entity,Evidence Gate,Application AI Invoked,Provenance,Deterministic Score,AI Judge Score,Human Review,Runtime Seconds,Application Token Usage,Failure Stage,Failure Classification
+Banking,banking-pilot-001,EvalBanking,INVALID_SEMANTIC_FIXTURE,TRF-3101,NOT_REACHED,false,INSUFFICIENT_DATABASE_EVIDENCE,,,N/A,9.1940689,0,entity_resolution,MISSING_TEST_DATA / FIXTURE_CONTRACT_MISMATCH
+Orders,orders-pilot-001,EvalOrders,NOT_RUN_HARD_STOP,,NOT_RUN,,NOT_RUN,,,N/A,,,not_started,BANKING_HARD_STOP
+Shipping,shipping-pilot-001,EvalShipping,VALID,SHP-5001,ACCEPTED,true,AI_ANSWERED,93.055,92.15,false,27.5758575,5890,,PASS
+Payroll,payroll-pilot-001,EvalPayroll,NOT_RUN_HARD_STOP,,NOT_RUN,,NOT_RUN,,,N/A,,,not_started,BANKING_HARD_STOP
+Clinic,clinic-pilot-001,EvalClinic,NOT_RUN_HARD_STOP,,NOT_RUN,,NOT_RUN,,,N/A,,,not_started,BANKING_HARD_STOP

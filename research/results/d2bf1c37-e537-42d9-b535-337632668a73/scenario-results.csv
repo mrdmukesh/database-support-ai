@@ -1,0 +1,194 @@
+﻿scenario_id,domain,difficulty,category,database_engine,question,expected_answer,application_answer,status,investigation_status,investigation_id,canonical_investigated_entity,evidence_linked_entities,entity_provenance,benchmark_validity,deterministic_pass,deterministic_score,unadjusted_score,classification,ai_judge_score,judge_explanation,confidence,latency_seconds,input_tokens,output_tokens,estimated_cost_usd,model_version,prompt_version,human_review_required,human_review_reasons,failure,persisted_result_row
+banking-benchmark-001,banking,easy,exact_entity_lookup,sqlserver,Investigate why payment BNK-2026-0001-A is marked Failed even though its request was accepted.,"{""scenario_id"": ""banking-benchmark-001"", ""domain"": ""banking"", ""database_engine"": ""sqlserver"", ""database_version"": ""Azure SQL Database / SQL Server 2022"", ""category"": ""exact_entity_lookup"", ""subcategory"": ""exact_entity_lookup"", ""difficulty"": ""easy"", ""question"": ""Investigate why payment BNK-2026-0001-A is marked Failed even though its request was accepted."", ""baseline_script"": ""evaluation_scenarios/banking/banking-benchmark-001/baseline_reset.sql"", ""setup_script"": ""evaluation_scenarios/banking/banking-benchmark-001/inject.sql"", ""verification_script"": ""evaluation_scenarios/banking/banking-benchmark-001/verify.sql"", ""cleanup_script"": ""evaluation_scenarios/banking/banking-benchmark-001/cleanup.sql"", ""expected_response_type"": ""confirmed_root_cause"", ""expected_entities"": [""BNK-2026-0001-A""], ""expected_root_cause_concepts"": [""the exact business key resolves to one failed record""], ""expected_tables"": [""transactions"", ""integration_messages"", ""exceptions"", ""audit_history""], ""expected_columns"": [""BusinessKey"", ""Status"", ""EventTime"", ""CorrelationId"", ""Details""], ""expected_database_objects"": [""eval.transactions"", ""eval.integration_messages"", ""eval.exceptions"", ""eval.audit_history""], ""required_evidence"": [""EVAL-BANKING-101"", ""BNK-2026-0001-A"", ""the exact business key resolves to one failed record""], ""acceptable_fix_concepts"": [""restore the record through the owning workflow after validating the request""], ""prohibited_claims"": [""objects or evidence not returned by the database"", ""production impact inferred from synthetic data""], ""critical_failure_rules"": [""fabricated_evidence"", ""invented_database_object"", ""wrong_business_entity_investigated"", ""confirmed_root_cause_without_supporting_evidence"", ""unsafe_remediation"", ""test_data_or_expected_answer_leaked_into_application_prompt""], ""scenario_version"": 1, ""active"": true, ""expected_procedures"": [""eval.usp_banking_workflow_1""], ""expected_functions"": [""eval.fn_banking_active_status""], ""expected_triggers"": [""eval.tr_accounts_audit""], ""expected_jobs"": [], ""business_description"": ""A synthetic banking production-support incident testing exact entity lookup without exposing ground truth to runtime code."", ""expected_relationships"": [""eval.transactions.CorrelationId -> eval.integration_messages.CorrelationId"", ""shared BusinessKey and timestamp sequence across operational evidence""], ""evidence_exclusions"": [""rows from another correlation"", ""expected-answer manifest content"", ""unrelated application framework tables""], ""required_business_objects"": [""eval.transactions""], ""required_workflow"": [""eval.usp_banking_workflow_1""], ""expected_recommendation"": [""restore the record through the owning workflow after validating the request""], ""unsafe_recommendations"": [""directly update production business rows"", ""disable constraints or triggers"", ""rerun without confirming idempotency""], ""expected_confidence_range"": [0.75, 0.98], ""expected_human_review"": false, ""human_review_conditions"": [""multiple candidates remain plausible"", ""required evidence cannot confirm one entity""], ""expected_ai_judge_category_scores"": {""root_cause"": 90, ""evidence"": 90, ""object_discovery"": 85, ""recommendation"": 85, ""citation"": 90, ""sql_safety"": 100, ""completeness"": 90}, ""expected_citations"": [""EVAL-BANKING-101"", ""eval.transactions""], ""estimated_duration_seconds"": 60, ""estimated_token_usage"": 2200, ""tags"": [""benchmark-v2"", ""banking"", ""exact_entity_lookup"", ""easy"", ""read-only-investigation""]}","Investigation Complete.
+
+Investigation ID: INV-20260717-033917-3923DB5C
+Investigation Mode: INVESTIGATION
+Detected Intent: GENERAL_DATABASE_QUESTION
+Response Type: multiple_possible_causes
+Extracted Entities: exact_id_or_code=BNK-2026-0001-A, business_identifier=BNK-2026-0001-A, possible_table_or_column=Investigate, possible_table_or_column=why, possible_table_or_column=payment, possible_column=BNK, possible_table_or_column=is, possible_table_or_column=marked, possible_table_or_column=even, possible_table_or_column=though, possible_table_or_column=its, possible_table_or_column=request, possible_table_or_column=was, possible_table_or_column=accepted
+AI-assisted reasoning: Enabled
+Reason: OpenAI LLM reasoning was applied after deterministic evidence collection.
+Evidence package sent: Yes
+LLM evidence validation: Passed
+Evidence citations: Passed
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: GENERAL_DATABASE_QUESTION
+- User Goal: Answer the user question with database evidence: Investigate why payment BNK-2026-0001-A is marked Failed even though its request was accepted.
+- Working Hypothesis: The database evidence should explain the reported behavior.
+
+## Stage 2 - Discover Context
+- Target Object: eval.payment_instructions
+- Target Reason: Selected from main problem phrase 'failed even though' (failed); parent and secondary-cause terms do not override the target.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: eval.transfers, eval.transactions, eval.loans, eval.loan_schedules, eval.fraud_alerts, eval.vw_banking_operations_1
+- Upstream Objects: eval.accounts
+- Downstream Objects: None discovered
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 90228294-4cd2-4b65-9ba4-331c8ea5dea1
+- database_name: EvalBanking
+- schema_name: default
+- database_engine: sql_server
+- connection_string_database: EvalBanking
+- metadata_cache_key: metadata-v2|678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|90228294-4cd2-4b65-9ba4-331c8ea5dea1|evalbanking||c5b3918125faba28e25360b36920d0139f1597824c167e95816191fed16841a8
+- Discovered tables: eval.account_balances, eval.accounts, eval.audit_history, eval.batch_runs, eval.beneficiaries, eval.cards, eval.compliance_cases, eval.customers, eval.evaluation_marker, eval.exceptions, eval.fraud_alerts, eval.integration_messages, eval.loan_schedules, eval.loans, eval.payment_instructions, eval.transactions, eval.transfers
+- Discovered procedures: eval.tr_accounts_audit
+- Selected candidates: table:eval.fraud_alerts (column name relevance=1.5; relationship relevance=1); table:eval.loan_schedules (column name relevance=1.5; relationship relevance=1); table:eval.loans (column name relevance=1.5; relationship relevance=1); table:eval.payment_instructions (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.transactions (column name relevance=1.5; relationship relevance=1); table:eval.transfers (column name relevance=1.5; relationship relevance=1)
+- Rejected candidates: table:eval.account_balances (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.accounts (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.audit_history (column name relevance=1.5; outside top scored metadata candidates); table:eval.batch_runs (column name relevance=1.5; outside top scored metadata candidates); table:eval.beneficiaries (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.cards (column name relevance=1.5; relationship relevance=1); table:eval.compliance_cases (column name relevance=1.5; relationship relevance=1); table:eval.customers (column name relevance=1.5; outside top scored metadata candidates); table:eval.evaluation_marker (column name relevance=1.5; outside top scored metadata candidates); table:eval.exceptions (column name relevance=1.5; outside top scored metadata candidates)
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: Relationship path eval.accounts -> eval.payment_instructions does not contain the expected related row or transition evidence. (48% initial)
+- H2: State or status values in eval.payment_instructions, eval.transfers, eval.transactions may be preventing the expected workflow transition. (42% initial)
+- H3: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Summarize analytical results in eval.payment_instructions: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.transfers: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.transactions: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.payment_instructions: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.transfers: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.transactions: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.payment_instructions: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.transfers: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Summarize analytical results in eval.payment_instructions: No rows returned
+- SQL Summarize analytical results in eval.transfers: No rows returned
+- SQL Summarize analytical results in eval.transactions: 1 row(s) returned
+- SQL Prove requested entity exists in eval.payment_instructions: No rows returned
+- SQL Prove requested entity exists in eval.transfers: No rows returned
+- SQL Prove requested entity exists in eval.transactions: 1 row(s) returned
+- SQL Inspect relevant rows in eval.payment_instructions: No rows returned
+- SQL Inspect relevant rows in eval.transfers: No rows returned
+
+## Evidence Gate
+- Gate Required: No
+- Issue Reproduced: Yes
+- Business Key Exists: Yes
+- Reported Condition Exists: Yes
+- Affected Rows Exist: No
+- Parent/Child Relationship Exists: Yes
+
+## Suggested Verification Checks
+- Pending: eval.payment_instructions is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Reported condition passes the evidence gate. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Recommended fix is consistent with collected evidence. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: eval.payment_instructions (25.35) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; selected from main problem phrase target; has foreign-key relationships; has indexes
+- table: eval.transfers (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.transactions (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.loans (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.loan_schedules (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.fraud_alerts (6.85) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- view: eval.vw_banking_operations_1 (0.8) - View name matched relevant tokens or retained for context
+- view: eval.vw_banking_operations_2 (0.8) - View name matched relevant tokens or retained for context
+
+## Stage 6 - Reason
+The payment identified by BNK-[MASKED_PHONE]-A is marked as Failed in the eval.transactions table, with no corresponding entries found in eval.payment_instructions or eval.transfers. This indicates that while the transaction record exists and shows failure, the related payment instruction and transfer records are missing, which may explain why the payment is marked Failed despite the request being accepted. Senior engineer explanation: The investigation shows a single transaction record with status 'Failed' for the payment BNK-[MASKED_PHONE]-A, but no matching records in the payment_instructions or transfers tables. This suggests a breakdown in the processing pipeline where the transaction was created but the subsequent steps to create payment instructions or transfers did not occur or were not recorded. Without these related records, the system likely defaults the payment status to Failed. Further investigation is needed to understand why these related records are missing, such as checking upstream processing logs or system integration points. Clearer report wording: The payment BNK-[MASKED_PHONE]-A is marked as Failed because its transaction record exists with a Failed status, but no corresponding payment instructions or transfer records were found. This indicates that while the payment request was accepted and a transaction was created, subsequent steps to process the payment did not complete successfully or were not recorded, leading to the failure status. Confidence note: Confidence is medium due to the absence of related records in payment_instructions and transfers, but presence of a failed transaction record. Additional evidence from logs or application-level processing is required to confirm the root cause. Recommended next questions: Are there any application logs or error messages indicating failure during the creation of payment instructions or transfers for BNK-[MASKED_PHONE]-A? Evidence: SQL-4, SQL-5. Is there any retry or compensation mechanism in place when payment instructions or transfers fail to be created? Evidence: SQL-1, SQL-2.
+
+## AI-assisted reasoning over collected evidence
+OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.
+
+## Root Cause Analysis
+- The payment failed because the transaction record exists with status 'Failed', but no corresponding payment instructions or transfer records were created or recorded. Evidence: SQL-1, SQL-2, SQL-3, SQL-4, SQL-5, SQL-6, SQL-7, SQL-8.
+
+## Diagnostic Hypotheses
+- Rank 1: H2 48% - State or status values in eval.payment_instructions, eval.transfers, eval.transactions may be preventing the expected workflow transition.; Supported by collected evidence.
+- Rank 2: H3 48% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 3: H1 34% - Relationship path eval.accounts -> eval.payment_instructions does not contain the expected related row or transition evidence.; Supported by collected evidence.
+
+## Confirmed Facts
+- Affected object: eval.payment_instructions.
+- Summarize analytical results in eval.transactions: 1 row(s) returned.
+- Prove requested entity exists in eval.transactions: 1 row(s) returned.
+
+## Inferred Findings
+- At least one read-only evidence query returned rows, so reasoning should prioritize observed data over metadata-only matches.
+
+## Hypotheses
+- Additional evidence is required before a root cause can be confirmed.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write eval.payment_instructions; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: State or status values in eval.payment_instructions, eval.transfers, eval.transactions may be preventing the expected workflow transition.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- SQL - Summarize analytical results in eval.payment_instructions: No rows returned
+- SQL - Summarize analytical results in eval.transfers: No rows returned
+- SQL - Summarize analytical results in eval.transactions: 1 row(s) returned
+- SQL - Prove requested entity exists in eval.payment_instructions: No rows returned
+- SQL - Prove requested entity exists in eval.transfers: No rows returned
+- SQL - Prove requested entity exists in eval.transactions: 1 row(s) returned
+- SQL - Inspect relevant rows in eval.payment_instructions: No rows returned
+- SQL - Inspect relevant rows in eval.transfers: No rows returned
+
+## Recommended Next SQL
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.payment_instructions WHERE LOWER(CAST(Status AS NVARCHAR(MAX))) LIKE '%fail%' GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.transfers WHERE LOWER(CAST(Status AS NVARCHAR(MAX))) LIKE '%fail%' GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.transactions WHERE LOWER(CAST(Status AS NVARCHAR(MAX))) LIKE '%fail%' GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT PaymentInstructionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.payment_instructions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'BNK-2026-0001-A' OR CAST(Status AS NVARCHAR(MAX)) = 'BNK-2026-0001-A')
+```
+
+```sql
+SELECT TransfersId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.transfers WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'BNK-2026-0001-A' OR CAST(Status AS NVARCHAR(MAX)) = 'BNK-2026-0001-A')
+```
+
+## Recommendation
+- Immediate Fix: Validate the top-ranked root cause with the recommended read-only SQL before making changes. Evidence: SQL - Summarize analytical results in eval.payment_instructions.
+- Permanent Fix: Apply the smallest approved schema/procedure/configuration change that directly addresses the confirmed cause. Evidence: SQL - Summarize analytical results in eval.payment_instructions.
+- Monitoring: Alert on recurrence of the failed condition and on increased duration/error count for related jobs.
+- Risk: Medium
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? eval.payment_instructions.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies eval.payment_instructions investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 60%
+- + 2 evidence query result(s) returned rows.
+- + 6 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: eval.payment_instructions.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Application or processing logs to verify if payment instructions and transfers were attempted or failed.
+- Stored procedure or business logic execution traces related to payment processing for BNK-[MASKED_PHONE]-A.
+- Status history or audit trail for the payment to understand state transitions.",completed,AI_ANSWERED,INV-20260717-033917-3923DB5C,BNK-2026-0001-A,"[""BNK-2026-0001-A""]","{""canonical_entities"": [{""canonical_investigated_entity"": ""BNK-2026-0001-A"", ""original_entity_text"": ""BNK-2026-0001-A"", ""normalized_entity_text"": ""BNK-2026-0001-A"", ""resolved_entity_value"": ""BNK-2026-0001-A"", ""resolved_entity_type"": ""business_identifier"", ""resolved_table"": ""eval.transactions"", ""resolved_column"": ""BusinessKey"", ""resolution_confidence"": 1.0, ""resolution_method"": ""exact"", ""supporting_evidence_ids"": [""ENTITY-1-EXACT-6""]}], ""canonical_investigated_entity"": ""BNK-2026-0001-A"", ""evidence_linked_entities"": [""BNK-2026-0001-A""], ""diagnostics"": [{""entity_type"": ""entity_resolution_diagnostic"", ""resolution_trace_id"": ""ENTITY-1-EXACT-6"", ""internal_match_id"": ""ENTITY-1-EXACT-6"", ""candidate_id"": """", ""resolver_rule_id"": ""exact"", ""extracted_value"": ""BNK-2026-0001-A"", ""matched_value"": ""BNK-2026-0001-A"", ""match_type"": ""exact"", ""confidence"": 1.0, ""evidence_id"": ""ENTITY-1-EXACT-6"", ""candidates"": [{""identifier"": ""BNK-2026-0001-A"", ""metadata"": {""Status"": ""Failed""}, ""evidence_id"": ""ENTITY-1-EXACT-6"", ""table"": ""eval.transactions"", ""column"": ""BusinessKey""}], ""reason"": ""Exact database evidence match."", ""resolved_table"": ""eval.transactions"", ""resolved_column"": ""BusinessKey""}], ""evaluator_input_defects"": []}",valid,True,77.579,77.579,pass,77.55,"The investigation correctly identified that the payment BNK-2026-0001-A is marked Failed because a transaction record with status 'Failed' exists, but no corresponding payment instructions or transfer records were found. This root cause is supported by multiple SQL evidence queries returning no rows for payment_instructions and transfers, but one failed transaction record. The evidence and citations are fully correct and consistent. Object discovery is strong but missing some expected objects (integration_messages, exceptions, audit_history). The recommended fix is only partially correct as it lacks concrete actionable steps and validation queries. Safety and completeness are high, though some missing evidence limits full confidence. No unsupported claims or critical failures were detected. Overall, the analysis is reliable but would benefit from additional evidence sources and a more detailed fix plan.",,30.733855200000107,23136,350,0.0,gpt-4.1-mini,ai-judge-v2-entity-provenance,True,"[""expected_response_type_disputed""]",,True

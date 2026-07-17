@@ -1,0 +1,35 @@
+{
+  "scenario_id": "shipping-pilot-001",
+  "domain": "shipping",
+  "status": "persistence_failed",
+  "investigation_id": "",
+  "investigation_status": "",
+  "raw_request": {
+    "organization_id": "d6996b41-5e41-491b-b34e-64870d0e84b9",
+    "workspace_id": "e22377ba-277c-4ea8-b132-4b1566ac4fc5",
+    "connection_id": "049d476c-3402-4c0b-af4b-4f8726612f63",
+    "user_id": "7fe6bde5-4e54-4a43-9003-2f53e3e19d9e",
+    "question": "Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?"
+  },
+  "raw_response": {},
+  "extracted_result": {
+    "setup_verification": {
+      "stdout": "ExpectedEntity EvidenceValue    \n-------------- -----------------\nSHP-5001       EVAL-SHIPPING-001\n\n(1 row affected)\n",
+      "verified": true
+    },
+    "cleanup_status": "passed"
+  },
+  "timings": {
+    "database_setup_seconds": 12.69880270000067,
+    "cleanup_seconds": 5.428552299999865,
+    "total_seconds": 47.09036970000125
+  },
+  "usage_cost": {},
+  "errors": [
+    "HTTP 500: Internal Server Error",
+    "Persistence failed: (sqlite3.OperationalError) database is locked\n[SQL: INSERT INTO evaluation_scenario_executions (evaluation_run_id, test_scenario_id, scenario_id, scenario_version, domain, database_version, attempt, status, investigation_id, investigation_status, raw_request_json, raw_response_json, result_json, timing_json, usage_cost_json, errors_json, retry_count, recovery_artifact, id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]\n[parameters: ('6d500326-5947-4166-a318-4a1e67440554', '97c45734-35eb-4257-bbcb-a3a51cb02ec8', 'shipping-pilot-001', 1, 'shipping', 'Azure SQL Database / SQL Server 2022', 1, 'api_submission_failed', '', '', '{\"organization_id\": \"d6996b41-5e41-491b-b34e-64870d0e84b9\", \"workspace_id\": \"e22377ba-277c-4ea8-b132-4b1566ac4fc5\", \"connection_id\": \"049d476c-3402-4 ... (28 characters truncated) ... r_id\": \"7fe6bde5-4e54-4a43-9003-2f53e3e19d9e\", \"question\": \"Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?\"}', '{}', '{\"setup_verification\": {\"stdout\": \"ExpectedEntity EvidenceValue    \\\\n-------------- -----------------\\\\nSHP-5001       EVAL-SHIPPING-001\\\\n\\\\n(1 row affected)\\\\n\", \"verified\": true}, \"cleanup_status\": \"passed\"}', '{\"database_setup_seconds\": 12.69880270000067, \"cleanup_seconds\": 5.428552299999865, \"total_seconds\": 47.09036970000125}', '{}', '[\"HTTP 500: Internal Server Error\"]', 3, '', 'b2095d8a-c3c1-4dc3-8660-e134f9d1de81', '2026-07-16 13:25:33.803948', '2026-07-16 13:25:33.803952')]\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  ],
+  "retries": 3,
+  "attempt": 1,
+  "recovery_artifact": ""
+}

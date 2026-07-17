@@ -1,0 +1,234 @@
+<!doctype html><html><head><meta charset='utf-8'><title>SQL Server Shipping Pilot</title><style>body{font:15px Arial;margin:40px;color:#0b2545}table{border-collapse:collapse;width:100%}th,td{padding:8px;border-bottom:1px solid #ccd5df}.good{color:#166534}.bad{color:#991b1b}pre{white-space:pre-wrap;background:#f8fafc;padding:12px}</style></head><body><h1>Native SQL Server Shipping Pilot</h1><p class=good>Fixture, schema, metadata, negative evidence, evidence gate, and application AI invocation passed.</p><p class=bad>Quality gate failed: deterministic 0 and Judge 0 due to an entity-validation critical override.</p><h2>Scores</h2><ul><li>Unadjusted deterministic: 92.778</li><li>Final deterministic: 0.0</li><li>AI Judge: 0.0</li><li>Provenance: AI_ANSWERED</li></ul><h2>Evidence</h2><table><tr><th>ID</th><th>Purpose</th><th>Rows</th></tr><tr><td>SQL-1</td><td>Verify upstream entity and current transition status</td><td>1</td></tr><tr><td>SQL-2</td><td>Check downstream records under expected or alternate identifiers</td><td>1</td></tr><tr><td>SQL-3</td><td>Confirmed Missing Related Record Candidates</td><td>1</td></tr><tr><td>SQL-4</td><td>Missing Related Record Summary by Issue Type</td><td>1</td></tr><tr><td>SQL-5</td><td>Inspect workflow exception, integration, audit, or batch evidence in eval.integration_messages</td><td>5</td></tr><tr><td>SQL-6</td><td>Inspect workflow exception, integration, audit, or batch evidence in eval.exceptions</td><td>1</td></tr><tr><td>SQL-7</td><td>Inspect workflow exception, integration, audit, or batch evidence in eval.batch_runs</td><td>0</td></tr><tr><td>SQL-8</td><td>Inspect workflow exception, integration, audit, or batch evidence in eval.audit_history</td><td>3</td></tr></table><h2>Remaining blocker</h2><p>Entity validation treated internal resolution token entity-1-exact-8 as the investigated business entity, causing a critical override despite correct root cause, evidence, objects, citations, and 92.778 unadjusted score.</p><h2>Application answer</h2><pre>Investigation Complete.
+
+Investigation ID: INV-20260717-001842-682DA085
+Investigation Mode: INVESTIGATION
+Detected Intent: MISSING_DATA
+Response Type: confirmed_root_cause
+Extracted Entities: exact_id_or_code=SHP-5001, business_identifier=SHP-5001, possible_table_or_column=Delivery, possible_table_or_column=is, possible_table_or_column=complete, possible_table_or_column=for, possible_table_or_column=shipment, possible_column=SHP, possible_table_or_column=why, possible_table_or_column=the, possible_table_or_column=empty, possible_table_or_column=return, possible_table_or_column=work, possible_table_or_column=order
+AI-assisted reasoning: Enabled
+Reason: OpenAI LLM reasoning was applied after deterministic evidence collection.
+Evidence package sent: Yes
+LLM evidence validation: Passed
+Evidence citations: Passed
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: MISSING_DATA
+- User Goal: Answer the user question with database evidence: Delivery is complete for shipment SHP-5001; why is the empty-return work order missing?
+- Working Hypothesis: A downstream record should have been generated but is missing.
+
+## Stage 2 - Discover Context
+- Target Object: eval.transport_work_orders
+- Target Reason: Selected from main problem phrase &#x27;work order missing&#x27; (missing); parent and secondary-cause terms do not override the target.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: eval.empty_return_instructions, eval.shipment_milestones, eval.shipments, eval.repair_orders, eval.truck_movements, eval.integration_messages
+- Upstream Objects: eval.shipments
+- Downstream Objects: eval.truck_movements
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 19eec4fd-2e15-4480-a2c4-27a764982d73
+- database_name: EvalShipping
+- schema_name: default
+- database_engine: sql_server
+- connection_string_database: EvalShipping
+- metadata_cache_key: metadata-v2|678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|19eec4fd-2e15-4480-a2c4-27a764982d73|evalshipping||9a1c02b74a83d69038e321fb6f8b8eefdf6ab33fb1071b415d237543cc58361a
+- Discovered tables: eval.audit_history, eval.batch_runs, eval.bills_of_lading, eval.bookings, eval.carrier_assignments, eval.container_assignments, eval.container_events, eval.container_master, eval.customers, eval.customs_holds, eval.customs_releases, eval.damage_reports, eval.dangerous_goods, eval.demurrage_detention, eval.depots, eval.empty_return_instructions, eval.equipment_interchange, eval.evaluation_marker, eval.exceptions, eval.gate_transactions, eval.integration_messages, eval.invoices, eval.ports, eval.rail_movements, eval.reefer_readings, eval.reefer_settings, eval.repair_orders, eval.shipment_milestones, eval.shipments, eval.terminals
+- Discovered procedures: eval.tr_bookings_audit
+- Selected candidates: table:eval.audit_history (column name relevance=1.5; outside top scored metadata candidates); table:eval.batch_runs (column name relevance=1.5; outside top scored metadata candidates); table:eval.empty_return_instructions (table name relevance=8; column name relevance=4.5; relationship relevance=1); table:eval.exceptions (column name relevance=1.5; outside top scored metadata candidates); table:eval.integration_messages (column name relevance=1.5; outside top scored metadata candidates); table:eval.repair_orders (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.shipment_milestones (table name relevance=4; column name relevance=4.5; relationship relevance=1); table:eval.shipments (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.transport_work_orders (table name relevance=8; column name relevance=6; relationship relevance=1); table:eval.truck_movements (column name relevance=4.5; relationship relevance=1)
+- Rejected candidates: table:eval.bills_of_lading (column name relevance=3; relationship relevance=1; outside top scored metadata candidates); table:eval.bookings (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.carrier_assignments (column name relevance=4.5; relationship relevance=1); table:eval.container_assignments (column name relevance=3; relationship relevance=1; outside top scored metadata candidates); table:eval.container_events (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.container_master (column name relevance=1.5; outside top scored metadata candidates); table:eval.customers (column name relevance=1.5; outside top scored metadata candidates); table:eval.customs_holds (column name relevance=3; relationship relevance=1; outside top scored metadata candidates); table:eval.customs_releases (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.damage_reports (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates)
+
+## Business Conclusion
+Read-only evidence found parent rows missing expected related child rows through discovered metadata relationships. Observed issue type(s): MISSING_RELATED_RECORD. Confirm the exact procedure, job, or status guard that should create the child row before applying a fix.
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: Relationship path eval.shipments -&gt; eval.transport_work_orders does not contain the expected related row or transition evidence. (48% initial)
+- H2: State or status values in eval.transport_work_orders, eval.empty_return_instructions, eval.shipment_milestones may be preventing the expected workflow transition. (42% initial)
+- H3: Operational history or error evidence in eval.batch_runs, eval.audit_history may identify the failed step. (38% initial)
+- H4: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Verify upstream entity and current transition status: expected read-only evidence from generated SQL
+- Check downstream records under expected or alternate identifiers: expected read-only evidence from generated SQL
+- Confirmed Missing Related Record Candidates: expected read-only evidence from generated SQL
+- Missing Related Record Summary by Issue Type: expected read-only evidence from generated SQL
+- Inspect workflow exception, integration, audit, or batch evidence in eval.integration_messages: expected read-only evidence from generated SQL
+- Inspect workflow exception, integration, audit, or batch evidence in eval.exceptions: expected read-only evidence from generated SQL
+- Inspect workflow exception, integration, audit, or batch evidence in eval.batch_runs: expected read-only evidence from generated SQL
+- Inspect workflow exception, integration, audit, or batch evidence in eval.audit_history: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Verify upstream entity and current transition status: 1 row(s) returned
+- SQL Check downstream records under expected or alternate identifiers: 1 row(s) returned
+- SQL Confirmed Missing Related Record Candidates: 1 row(s) returned
+- SQL Missing Related Record Summary by Issue Type: 1 row(s) returned
+- SQL Inspect workflow exception, integration, audit, or batch evidence in eval.integration_messages: 5 row(s) returned
+- SQL Inspect workflow exception, integration, audit, or batch evidence in eval.exceptions: 1 row(s) returned
+- SQL Inspect workflow exception, integration, audit, or batch evidence in eval.batch_runs: No rows returned
+- SQL Inspect workflow exception, integration, audit, or batch evidence in eval.audit_history: 3 row(s) returned
+
+## Evidence Gate
+- Gate Required: Yes
+- Issue Reproduced: Yes
+- Business Key Exists: Yes
+- Reported Condition Exists: Yes
+- Affected Rows Exist: Yes
+- Parent/Child Relationship Exists: Yes
+
+## Suggested Verification Checks
+- Pending: eval.transport_work_orders is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: shipments is the parent/supporting object for eval.transport_work_orders. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Reported condition passes the evidence gate. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Missing related record condition is reproduced by live database evidence. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Recommended fix is consistent with collected evidence. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: eval.transport_work_orders (34.55) - Matched 3 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; selected from main problem phrase target; has foreign-key relationships; has indexes
+- table: eval.empty_return_instructions (24.05) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; selected from main problem phrase parent; has foreign-key relationships; has indexes
+- table: eval.shipment_milestones (15.049999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.shipments (13.549999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.repair_orders (13.549999999999999) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.truck_movements (12.049999999999999) - Matched 2 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.integration_messages (6.2) - Matched 0 question/entity token(s); operational metadata signals: event, integration, message, status field, timestamp field; has indexes
+- table: eval.audit_history (6.2) - Matched 0 question/entity token(s); operational metadata signals: audit, event, history, status field, timestamp field; has indexes
+
+## Stage 6 - Reason
+The delivery for shipment SHP-5001 is marked as complete, but the expected empty-return work order is missing. Evidence shows the shipment status is &#x27;Delivered&#x27; and there is one active transport work order linked to the shipment, but it does not correspond to the empty-return work order. A detailed query confirms the absence of any transport work order related to &#x27;return&#x27; for this shipment. Workflow exception logs indicate an open exception specifically noting the absence of downstream empty-return creation. No batch run errors were found, suggesting the issue is isolated to the workflow step responsible for generating the empty-return work order. Senior engineer explanation: The investigation confirms that while the shipment SHP-5001 has been delivered successfully, the downstream process that should create the empty-return work order did not execute or failed silently. The presence of an open exception in the exceptions table explicitly referencing the missing empty-return creation supports this conclusion. The active transport work order found is unrelated to the empty-return task, indicating the workflow did not generate the required downstream record. The absence of batch run errors implies the failure is not systemic but localized to this workflow transition. To resolve this, the workflow logic or integration responsible for creating the empty-return work order must be reviewed and corrected to ensure it triggers properly after shipment delivery. Clearer report wording: Shipment SHP-5001 is delivered, but the expected empty-return transport work order is missing. Investigation confirms the shipment status and presence of unrelated active work orders, but no empty-return record exists. Workflow exception logs explicitly report the absence of downstream empty-return creation. No batch run errors were found, indicating the issue is isolated to the workflow step responsible for generating the empty-return work order. The root cause is likely a failure or missing trigger in the workflow after shipment delivery. Confidence note: Confidence is high due to multiple corroborating evidence points: the shipment status, the missing related record query results, and the explicit exception logged for missing empty-return creation. However, the lack of batch run errors means no systemic failure was detected, so the issue likely stems from a specific workflow condition or exception. Additional logs or workflow trace data could further confirm the exact failure point. Recommended next questions: Are there detailed workflow or integration logs available that show the execution path and any errors during the empty-return work order creation step? Evidence: SQL-6. Is there any possibility that the empty-return work order was created under a different identifier or correlation key not covered by current queries? Evidence: SQL-3. Have recent changes been made to the workflow or integration processes that could have introduced this failure? Evidence: SQL-8.
+
+## AI-assisted reasoning over collected evidence
+OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.
+
+## Root Cause Analysis
+- The downstream empty-return work order was not created due to a failure or missing trigger in the workflow after shipment delivery. Evidence: SQL-1, SQL-3, SQL-6.
+
+## Diagnostic Hypotheses
+- Rank 1: H1 97% - Relationship path eval.shipments -&gt; eval.transport_work_orders does not contain the expected related row or transition evidence.; Supported by collected evidence.
+- Rank 2: H2 72% - State or status values in eval.transport_work_orders, eval.empty_return_instructions, eval.shipment_milestones may be preventing the expected workflow transition.; Supported by collected evidence.
+- Rank 3: H4 60% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 4: H3 56% - Operational history or error evidence in eval.batch_runs, eval.audit_history may identify the failed step.; Supported by collected evidence.
+
+## Confirmed Facts
+- Affected object: eval.transport_work_orders.
+- Verify upstream entity and current transition status: 1 row(s) returned.
+- Check downstream records under expected or alternate identifiers: 1 row(s) returned.
+- Confirmed Missing Related Record Candidates: 1 row(s) returned.
+- Missing Related Record Summary by Issue Type: 1 row(s) returned.
+- Inspect workflow exception, integration, audit, or batch evidence in eval.integration_messages: 5 row(s) returned.
+- Inspect workflow exception, integration, audit, or batch evidence in eval.exceptions: 1 row(s) returned.
+- Inspect workflow exception, integration, audit, or batch evidence in eval.audit_history: 3 row(s) returned.
+
+## Inferred Findings
+- At least one read-only evidence query returned rows, so reasoning should prioritize observed data over metadata-only matches.
+
+## Hypotheses
+- Additional evidence is required before a root cause can be confirmed.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write eval.transport_work_orders; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: Relationship path eval.shipments -&gt; eval.transport_work_orders does not contain the expected related row or transition evidence.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- SQL - Verify upstream entity and current transition status: 1 row(s) returned
+- SQL - Check downstream records under expected or alternate identifiers: 1 row(s) returned
+- SQL - Confirmed Missing Related Record Candidates: 1 row(s) returned
+- SQL - Missing Related Record Summary by Issue Type: 1 row(s) returned
+- SQL - Inspect workflow exception, integration, audit, or batch evidence in eval.integration_messages: 5 row(s) returned
+- SQL - Inspect workflow exception, integration, audit, or batch evidence in eval.exceptions: 1 row(s) returned
+- SQL - Inspect workflow exception, integration, audit, or batch evidence in eval.batch_runs: No rows returned
+- SQL - Inspect workflow exception, integration, audit, or batch evidence in eval.audit_history: 3 row(s) returned
+- Confirmed Missing Related Record Candidates: 1 row(s) found; issue counts: MISSING_RELATED_RECORD=1.
+
+## Recommended Next SQL
+```sql
+SELECT ShipmentsId, BusinessKey, Status FROM eval.shipments WHERE BusinessKey = &#x27;SHP-5001&#x27;
+```
+
+```sql
+SELECT c.TransportWorkOrdersId, c.ShipmentsId, c.BusinessKey, c.Status, c.CorrelationId FROM eval.shipments p JOIN eval.transport_work_orders c ON c.ShipmentsId = p.ShipmentsId WHERE p.BusinessKey = &#x27;SHP-5001&#x27;
+```
+
+```sql
+SELECT
+    p.BusinessKey AS parent_reference,
+    p.Status AS parent_status,
+    NULL AS child_reference,
+    CASE
+        WHEN c.TransportWorkOrdersId IS NULL THEN &#x27;MISSING_RELATED_RECORD&#x27;
+        ELSE &#x27;OK&#x27;
+    END AS issue_type
+FROM eval.shipments p
+LEFT JOIN eval.transport_work_orders c ON c.ShipmentsId = p.ShipmentsId AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27;) AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27;) AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%return%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%return%&#x27;)
+WHERE c.TransportWorkOrdersId IS NULL AND p.BusinessKey = &#x27;SHP-5001&#x27;
+ORDER BY p.BusinessKey
+```
+
+```sql
+SELECT
+    issue_type,
+    COUNT(*) AS issue_count,
+    MIN(parent_reference) AS example_parent
+FROM (
+    SELECT
+        p.BusinessKey AS parent_reference,
+        CASE
+            WHEN c.TransportWorkOrdersId IS NULL THEN &#x27;MISSING_RELATED_RECORD&#x27;
+            ELSE &#x27;OK&#x27;
+        END AS issue_type
+    FROM eval.shipments p
+    LEFT JOIN eval.transport_work_orders c
+        ON c.ShipmentsId = p.ShipmentsId AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27;) AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27;) AND (LOWER(CAST(c.BusinessKey AS NVARCHAR(MAX))) LIKE &#x27;%return%&#x27; OR LOWER(CAST(c.Details AS NVARCHAR(MAX))) LIKE &#x27;%return%&#x27;)
+    WHERE c.TransportWorkOrdersId IS NULL AND p.BusinessKey = &#x27;SHP-5001&#x27;
+) missing_related_candidates
+GROUP BY issue_type
+ORDER BY issue_count DESC
+```
+
+```sql
+SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = &#x27;SHP-5001&#x27; OR CAST(CorrelationId AS NVARCHAR(MAX)) = &#x27;SHP-5001&#x27; OR LOWER(CAST(IntegrationMessagesId AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27; OR LOWER(CAST(IntegrationMessagesId AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27; OR LOWER(CAST(IntegrationMessagesId AS NVARCHAR(MAX))) LIKE &#x27;%missing%&#x27; OR LOWER(CAST(IntegrationMessagesId AS NVARCHAR(MAX))) LIKE &#x27;%absent%&#x27; OR LOWER(CAST(IntegrationMessagesId AS NVARCHAR(MAX))) LIKE &#x27;%failed%&#x27; OR LOWER(CAST(Details AS NVARCHAR(MAX))) LIKE &#x27;%work%&#x27; OR LOWER(CAST(Details AS NVARCHAR(MAX))) LIKE &#x27;%order%&#x27; OR LOWER(CAST(Details AS NVARCHAR(MAX))) LIKE &#x27;%missing%&#x27; OR LOWER(CAST(Details AS NVARCHAR(MAX))) LIKE &#x27;%absent%&#x27; OR LOWER(CAST(Details AS NVARCHAR(MAX))) LIKE &#x27;%failed%&#x27;
+```
+
+## Recommendation
+- Immediate Fix: Confirm the affected parent record, relationship columns, and missing child record using the generated read-only SQL. Evidence: SQL - Verify upstream entity and current transition status. Correct the evidenced workflow condition or exception, then complete the approved transactional workflow only after checking that no child exists under the expected key or another correlation identifier. Evidence: SQL - Verify upstream entity and current transition status. Do not manually insert business records; use the validated workflow after duplicate and idempotency checks.
+- Permanent Fix: Fix the procedure, job, or workflow branch that fails to create the expected related record. Evidence: SQL - Verify upstream entity and current transition status. Make replay/regeneration idempotent and add explicit logging when guard conditions block downstream record creation. Evidence: SQL - Verify upstream entity and current transition status.
+- Monitoring: Alert on recurrence of the failed condition and on increased duration/error count for related jobs. Alert on recurring missing-related-record candidates for the affected relationship. Evidence: SQL - Verify upstream entity and current transition status. Alert when source records remain in ready/complete states without downstream child records beyond the expected SLA. Evidence: SQL - Verify upstream entity and current transition status.
+- Risk: Medium
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? eval.transport_work_orders.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies eval.transport_work_orders investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 69%
+- + 7 evidence query result(s) returned rows.
+- + 1 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: eval.transport_work_orders.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Detailed workflow execution logs or traces to pinpoint why the empty-return work order creation step failed or was skipped.
+- Confirmation that no alternate identifiers or correlation keys were used for the missing empty-return work order.
+- Batch run logs or job history beyond the current query scope to rule out delayed or asynchronous failures.</pre></body></html>

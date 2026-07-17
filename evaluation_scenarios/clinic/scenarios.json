@@ -61,7 +61,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "appointment",
+    "expected_entity_value": "APT-2101",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "appointments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-001",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "APT-2101"
   },
   {
     "scenario_id": "clinic-pilot-002",
@@ -86,7 +99,8 @@
     "expected_tables": [
       "exceptions",
       "integration_messages",
-      "encounters"
+      "encounters",
+      "claims"
     ],
     "expected_columns": [
       "BusinessKey",
@@ -125,7 +139,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "claim",
+    "expected_entity_value": "CLM-3302",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "claims",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-002",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLM-3302"
   },
   {
     "scenario_id": "clinic-pilot-003",
@@ -150,7 +177,8 @@
     "expected_tables": [
       "exceptions",
       "integration_messages",
-      "diagnoses"
+      "diagnoses",
+      "lab_results"
     ],
     "expected_columns": [
       "BusinessKey",
@@ -189,7 +217,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "lab_result",
+    "expected_entity_value": "LAB-4403",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_results",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-003",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "LAB-4403"
   },
   {
     "scenario_id": "clinic-pilot-004",
@@ -214,7 +255,8 @@
     "expected_tables": [
       "exceptions",
       "integration_messages",
-      "procedures_performed"
+      "procedures_performed",
+      "encounters"
     ],
     "expected_columns": [
       "BusinessKey",
@@ -253,7 +295,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "encounter",
+    "expected_entity_value": "ENC-5504",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "encounters",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-004",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "ENC-5504"
   },
   {
     "scenario_id": "clinic-pilot-005",
@@ -276,7 +331,8 @@
     "expected_tables": [
       "exceptions",
       "integration_messages",
-      "prescriptions"
+      "prescriptions",
+      "patients"
     ],
     "expected_columns": [
       "BusinessKey",
@@ -315,7 +371,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "patient",
+    "expected_entity_value": "PAT-6605",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "patients",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-005",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "PAT-6605"
   },
   {
     "scenario_id": "clinic-benchmark-001",
@@ -442,7 +511,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0001-A",
+    "expected_entity_type": "exact_entity_lookup",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "appointments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-101",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0001-A"
   },
   {
     "scenario_id": "clinic-benchmark-002",
@@ -569,7 +651,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0002-A",
+    "expected_entity_type": "partial_entity_resolution",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "encounters",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-102",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0002"
   },
   {
     "scenario_id": "clinic-benchmark-003",
@@ -696,7 +791,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0003-A",
+    "expected_entity_type": "ambiguous_entity_resolution",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "claims",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "partial_ambiguous",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-103",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0003"
   },
   {
     "scenario_id": "clinic-benchmark-004",
@@ -823,7 +931,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0004-A",
+    "expected_entity_type": "missing_downstream_record",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-104",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0004-A"
   },
   {
     "scenario_id": "clinic-benchmark-005",
@@ -950,7 +1071,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0005-A",
+    "expected_entity_type": "duplicate_transaction",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_results",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-105",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0005-A"
   },
   {
     "scenario_id": "clinic-benchmark-006",
@@ -1077,7 +1211,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0006-A",
+    "expected_entity_type": "workflow_interruption",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "prescriptions",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-106",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0006-A"
   },
   {
     "scenario_id": "clinic-benchmark-007",
@@ -1204,7 +1351,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0007-A",
+    "expected_entity_type": "exception_handling",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "payments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-107",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0007-A"
   },
   {
     "scenario_id": "clinic-benchmark-008",
@@ -1331,7 +1491,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0008-A",
+    "expected_entity_type": "integration_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "procedures_performed",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-108",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0008-A"
   },
   {
     "scenario_id": "clinic-benchmark-009",
@@ -1458,7 +1631,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0009-A",
+    "expected_entity_type": "queue_backlog",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "appointments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-109",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0009-A"
   },
   {
     "scenario_id": "clinic-benchmark-010",
@@ -1585,7 +1771,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0010-A",
+    "expected_entity_type": "retry_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "encounters",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-110",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0010-A"
   },
   {
     "scenario_id": "clinic-benchmark-011",
@@ -1712,7 +1911,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0011-A",
+    "expected_entity_type": "audit_history_inconsistency",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "claims",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-111",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0011-A"
   },
   {
     "scenario_id": "clinic-benchmark-012",
@@ -1839,7 +2051,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0012-A",
+    "expected_entity_type": "missing_reference_data",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-112",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0012-A"
   },
   {
     "scenario_id": "clinic-benchmark-013",
@@ -1966,7 +2191,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0013-A",
+    "expected_entity_type": "stored_procedure_defect",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_results",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-113",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0013-A"
   },
   {
     "scenario_id": "clinic-benchmark-014",
@@ -2093,7 +2331,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0014-A",
+    "expected_entity_type": "trigger_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "prescriptions",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-114",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0014-A"
   },
   {
     "scenario_id": "clinic-benchmark-015",
@@ -2220,7 +2471,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0015-A",
+    "expected_entity_type": "batch_processing_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "payments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-115",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0015-A"
   },
   {
     "scenario_id": "clinic-benchmark-016",
@@ -2347,7 +2611,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0016-A",
+    "expected_entity_type": "concurrency_race_condition",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "procedures_performed",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-116",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0016-A"
   },
   {
     "scenario_id": "clinic-benchmark-017",
@@ -2474,7 +2751,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0017-A",
+    "expected_entity_type": "transaction_rollback",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "appointments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-117",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0017-A"
   },
   {
     "scenario_id": "clinic-benchmark-018",
@@ -2601,7 +2891,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0018-A",
+    "expected_entity_type": "idempotency_issue",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "encounters",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-118",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0018-A"
   },
   {
     "scenario_id": "clinic-benchmark-019",
@@ -2728,7 +3031,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0019-A",
+    "expected_entity_type": "incorrect_business_status",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "claims",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-119",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0019-A"
   },
   {
     "scenario_id": "clinic-benchmark-020",
@@ -2855,6 +3171,19 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "CLN-2026-0020-A",
+    "expected_entity_type": "multi_table_investigation",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "lab_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalClinic",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-CLINIC-120",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "CLN-2026-0020-A"
   }
 ]

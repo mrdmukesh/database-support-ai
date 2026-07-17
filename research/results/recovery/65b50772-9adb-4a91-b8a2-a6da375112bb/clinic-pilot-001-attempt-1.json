@@ -1,0 +1,74 @@
+{
+  "scenario_id": "clinic-pilot-001",
+  "domain": "clinic",
+  "status": "persistence_failed",
+  "investigation_id": "82bb3e7f-0f25-484a-bf99-554be01a4046",
+  "investigation_status": "",
+  "raw_request": {
+    "organization_id": "1a7a1e41-bae6-4091-9149-cd786c6deaee",
+    "workspace_id": "15eb449a-10b0-459d-97ed-2e23317a14ba",
+    "connection_id": "06786d11-6507-427b-8bd2-eb3c5a1313ed",
+    "user_id": "be9bc4ac-36b9-4525-98e1-c6edfb536445",
+    "question": "Why was appointment APT-2101 not converted into an encounter?"
+  },
+  "raw_response": {
+    "submission": {
+      "conversation": {
+        "id": "8b034223-233a-40f2-9d82-c276933ba967",
+        "organization_id": "1a7a1e41-bae6-4091-9149-cd786c6deaee",
+        "workspace_id": "15eb449a-10b0-459d-97ed-2e23317a14ba",
+        "user_id": "be9bc4ac-36b9-4525-98e1-c6edfb536445",
+        "title": "Why was appointment APT-2101 not converted into an encounter?"
+      },
+      "user_message": {
+        "id": "5e4c1fb4-ea15-44f1-b184-ac8ff4334496",
+        "conversation_id": "8b034223-233a-40f2-9d82-c276933ba967",
+        "role": "user",
+        "content": "Why was appointment APT-2101 not converted into an encounter?",
+        "confidence": null,
+        "source_count": 0,
+        "requires_human_review": false
+      },
+      "assistant_message": {
+        "id": "b8cf2ba8-6400-4442-8025-94d44e0c09f5",
+        "conversation_id": "8b034223-233a-40f2-9d82-c276933ba967",
+        "role": "assistant",
+        "content": "ENTITY_LOOKUP_BLOCKED: The read-only candidate lookup was blocked; the identifier was not confirmed.",
+        "confidence": 0.0,
+        "source_count": 1,
+        "requires_human_review": false
+      },
+      "findings": [],
+      "confidence": 0.0,
+      "requires_human_review": false,
+      "sources": [
+        "Eval Clinic"
+      ],
+      "report": null,
+      "investigation_id": "82bb3e7f-0f25-484a-bf99-554be01a4046",
+      "connection_id": "06786d11-6507-427b-8bd2-eb3c5a1313ed",
+      "connection_name": "Eval Clinic"
+    }
+  },
+  "extracted_result": {
+    "setup_verification": {
+      "stdout": "ExpectedEntity EvidenceValue  \n-------------- ---------------\nAPT-2101       EVAL-CLINIC-001\n\n(1 row affected)\n",
+      "verified": true
+    },
+    "cleanup_status": "passed"
+  },
+  "timings": {
+    "database_setup_seconds": 11.690704799999367,
+    "investigation_submission_seconds": 13.679460899991682,
+    "cleanup_seconds": 4.564564599990263,
+    "total_seconds": 269.75776370000676
+  },
+  "usage_cost": {},
+  "errors": [
+    "HTTP 500: Internal Server Error",
+    "Persistence failed: (psycopg.errors.ConnectionTimeout) connection timeout expired\n(Background on this error at: https://sqlalche.me/e/20/e3q8)"
+  ],
+  "retries": 3,
+  "attempt": 1,
+  "recovery_artifact": ""
+}

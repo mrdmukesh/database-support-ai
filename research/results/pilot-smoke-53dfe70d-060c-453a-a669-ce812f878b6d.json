@@ -1,0 +1,100 @@
+{
+  "run_id": "53dfe70d-060c-453a-a669-ce812f878b6d",
+  "run_name": "all-125-preflight-smoke",
+  "configuration_fingerprint": "0c5f1620eee37bf4515d27da8e328dc5c80a555b9d5e00269b93ee2600e22c77",
+  "passed": false,
+  "cleanup_failures": [],
+  "unexpected_connections": [],
+  "scenarios": [
+    {
+      "scenario_id": "payroll-pilot-001",
+      "domain": "payroll",
+      "setup_verification_result": {
+        "stdout": "ExpectedEntity EvidenceValue   \n-------------- ----------------\nEMP-1042       EVAL-PAYROLL-001\n\n(1 row affected)\n",
+        "verified": true
+      },
+      "selected_connection": "9f699b4b-a990-4dfc-b97a-4eae0e443936",
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 26.02842369999962,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "clinic-pilot-001",
+      "domain": "clinic",
+      "setup_verification_result": {
+        "stdout": "ExpectedEntity EvidenceValue  \n-------------- ---------------\nAPT-2101       EVAL-CLINIC-001\n\n(1 row affected)\n",
+        "verified": true
+      },
+      "selected_connection": "858ec93c-09a3-47e7-b344-c5ff6a4a38f5",
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 24.943542700000762,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "orders-pilot-001",
+      "domain": "orders",
+      "setup_verification_result": {
+        "stdout": "ExpectedEntity EvidenceValue  \n-------------- ---------------\nORD-7101       EVAL-ORDERS-001\n\n(1 row affected)\n",
+        "verified": true
+      },
+      "selected_connection": "d5d33f1e-19e4-4efa-aaf0-176378a51166",
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 25.377675399999134,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "banking-pilot-001",
+      "domain": "banking",
+      "setup_verification_result": {
+        "stdout": "ExpectedEntity EvidenceValue   \n-------------- ----------------\nTRF-3101       EVAL-BANKING-001\n\n(1 row affected)\n",
+        "verified": true
+      },
+      "selected_connection": "6fe3e99e-b584-460a-bd7d-50e17c2b5b16",
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 24.811503099999754,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "shipping-pilot-001",
+      "domain": "shipping",
+      "setup_verification_result": {
+        "stdout": "ExpectedEntity EvidenceValue    \n-------------- -----------------\nSHP-5001       EVAL-SHIPPING-001\n\n(1 row affected)\n",
+        "verified": true
+      },
+      "selected_connection": "049d476c-3402-4c0b-af4b-4f8726612f63",
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 24.67274069999985,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    }
+  ]
+}

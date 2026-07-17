@@ -1,0 +1,31 @@
+{
+  "name": "official-validation-25",
+  "selection_policy": "Five scenarios per domain, balanced across difficulty and incident category, including historical passes and failures without selecting for expected outcome.",
+  "scenarios": [
+    "banking-benchmark-002",
+    "banking-benchmark-005",
+    "banking-benchmark-010",
+    "banking-benchmark-011",
+    "banking-benchmark-016",
+    "orders-benchmark-001",
+    "orders-benchmark-004",
+    "orders-benchmark-007",
+    "orders-benchmark-010",
+    "orders-benchmark-018",
+    "shipping-benchmark-004",
+    "shipping-benchmark-005",
+    "shipping-benchmark-008",
+    "shipping-benchmark-010",
+    "shipping-benchmark-016",
+    "clinic-benchmark-001",
+    "clinic-benchmark-006",
+    "clinic-benchmark-007",
+    "clinic-benchmark-017",
+    "clinic-benchmark-018",
+    "payroll-benchmark-001",
+    "payroll-benchmark-004",
+    "payroll-benchmark-010",
+    "payroll-benchmark-011",
+    "payroll-benchmark-016"
+  ]
+}

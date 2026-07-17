@@ -19,7 +19,8 @@
   "expected_tables": [
     "exceptions",
     "integration_messages",
-    "loans"
+    "loans",
+    "transactions"
   ],
   "expected_columns": [
     "BusinessKey",
@@ -58,5 +59,18 @@
     "confirmed_root_cause_without_supporting_evidence"
   ],
   "scenario_version": 1,
-  "active": true
+  "active": true,
+  "expected_entity_type": "transaction",
+  "expected_entity_value": "TXN-3105",
+  "expected_entity_schema": "eval",
+  "expected_entity_table": "transactions",
+  "expected_entity_column": "BusinessKey",
+  "expected_entity_match_mode": "exact",
+  "expected_entity_database": "EvalBanking",
+  "expected_defect_table": "exceptions",
+  "expected_defect_column": "CorrelationId",
+  "expected_defect_value": "EVAL-BANKING-005",
+  "expected_defect_link_column": "CorrelationId",
+  "expected_entity_link_column": "CorrelationId",
+  "expected_entity_question_value": "TXN-3105"
 }

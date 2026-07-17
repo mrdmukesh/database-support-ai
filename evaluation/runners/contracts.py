@@ -37,6 +37,8 @@ class RunnerConfig:
     max_api_retries: int = 3
     retry_backoff_seconds: float = 1.0
     concurrency: int = 1
+    ai_enabled: bool = False
+    database_engine: str = ""
     recovery_root: Path = Path("research/results/recovery")
 
     def __post_init__(self) -> None:

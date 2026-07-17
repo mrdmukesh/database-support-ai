@@ -1,0 +1,190 @@
+﻿scenario_id,domain,difficulty,category,database_engine,question,expected_answer,application_answer,status,investigation_status,investigation_id,canonical_investigated_entity,evidence_linked_entities,entity_provenance,benchmark_validity,deterministic_pass,deterministic_score,unadjusted_score,classification,ai_judge_score,judge_explanation,confidence,latency_seconds,input_tokens,output_tokens,estimated_cost_usd,model_version,prompt_version,human_review_required,human_review_reasons,failure,persisted_result_row
+banking-pilot-001,banking,medium,root_cause,sqlserver,Why is transfer TRF-3101 completed without a matching balance movement?,"{""scenario_id"": ""banking-pilot-001"", ""domain"": ""banking"", ""database_engine"": ""sqlserver"", ""database_version"": ""Azure SQL Database / SQL Server 2022"", ""category"": ""root_cause"", ""subcategory"": ""missing_workflow_output"", ""difficulty"": ""medium"", ""question"": ""Why is transfer TRF-3101 completed without a matching balance movement?"", ""baseline_script"": ""evaluation_databases/banking/sql/02_seed.sql"", ""setup_script"": ""evaluation_scenarios/banking/banking-pilot-001/inject.sql"", ""verification_script"": ""evaluation_scenarios/banking/banking-pilot-001/verify.sql"", ""cleanup_script"": ""evaluation_scenarios/banking/banking-pilot-001/cleanup.sql"", ""expected_response_type"": ""confirmed_root_cause"", ""expected_entities"": [""TRF-3101""], ""expected_root_cause_concepts"": [""required downstream work item was not created after a completed upstream transition""], ""expected_tables"": [""exceptions"", ""integration_messages"", ""transactions""], ""expected_columns"": [""BusinessKey"", ""Status"", ""CorrelationId"", ""Details""], ""expected_database_objects"": [""eval.vw_banking_operations_1""], ""required_evidence"": [""EVAL-BANKING-001"", ""TRF-3101"", ""Exception""], ""acceptable_fix_concepts"": [""transactional workflow completion""], ""prohibited_claims"": [""objects or evidence not returned by the database"", ""production impact inferred from synthetic data""], ""critical_failure_rules"": [""fabricated_evidence"", ""invented_database_object"", ""confirmed_root_cause_without_supporting_evidence""], ""scenario_version"": 1, ""active"": true, ""expected_procedures"": [""eval.usp_banking_workflow_1""], ""expected_functions"": [""eval.fn_banking_active_status""], ""expected_triggers"": [""eval.tr_accounts_audit""], ""expected_jobs"": [], ""business_description"": ""Legacy evaluation scenario"", ""expected_relationships"": [], ""evidence_exclusions"": [], ""required_business_objects"": [], ""required_workflow"": [], ""expected_recommendation"": [], ""unsafe_recommendations"": [], ""expected_confidence_range"": [0.0, 1.0], ""expected_human_review"": false, ""human_review_conditions"": [], ""expected_ai_judge_category_scores"": {}, ""expected_citations"": [], ""estimated_duration_seconds"": 60, ""estimated_token_usage"": 2000, ""tags"": []}","Investigation Complete.
+
+Investigation ID: INV-20260717-011616-53B85E26
+Investigation Mode: INVESTIGATION
+Detected Intent: GENERAL_DATABASE_QUESTION
+Response Type: multiple_possible_causes
+Extracted Entities: exact_id_or_code=TRF-3101, business_identifier=TRF-3101, possible_table_or_column=Why, possible_table_or_column=is, possible_table_or_column=transfer, possible_column=TRF, possible_table_or_column=completed, possible_table_or_column=matching, possible_table_or_column=balance, possible_table_or_column=movement
+AI-assisted reasoning: Enabled
+Reason: OpenAI LLM reasoning was applied after deterministic evidence collection.
+Evidence package sent: Yes
+LLM evidence validation: Passed
+Evidence citations: Passed
+Professional report files have been generated for download.
+
+## Stage 1 - Understand the Question
+- Investigation Mode: INVESTIGATION
+- Mode Rationale: Question appears to require live evidence, metadata, safe SQL, evidence gate, and root-cause reasoning.
+- Investigation Goal: GENERAL_DATABASE_QUESTION
+- User Goal: Answer the user question with database evidence: Why is transfer TRF-3101 completed without a matching balance movement?
+- Working Hypothesis: The database evidence should explain the reported behavior.
+
+## Stage 2 - Discover Context
+- Target Object: eval.transfers
+- Target Reason: Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object.
+- Business Key: Not determined (No non-primary natural key column was identified.)
+- Supporting Objects: eval.account_balances, eval.transactions, eval.payment_instructions, eval.loans, eval.loan_schedules
+- Upstream Objects: eval.accounts
+- Downstream Objects: None discovered
+- Write Path: No write path confirmed
+- Read Path: No procedure read path confirmed
+- Documents Used: No matching uploaded documents found
+
+## Metadata Debug
+- workspace_id: 2f847a6a-9db2-4ae5-b144-71598ec8fb87
+- connection_id: 90228294-4cd2-4b65-9ba4-331c8ea5dea1
+- database_name: EvalBanking
+- schema_name: default
+- database_engine: sql_server
+- connection_string_database: EvalBanking
+- metadata_cache_key: metadata-v2|678264ff-8b4f-47a5-89dc-a90b9e371dde|2f847a6a-9db2-4ae5-b144-71598ec8fb87|90228294-4cd2-4b65-9ba4-331c8ea5dea1|evalbanking||c5b3918125faba28e25360b36920d0139f1597824c167e95816191fed16841a8
+- Discovered tables: eval.account_balances, eval.accounts, eval.audit_history, eval.batch_runs, eval.beneficiaries, eval.cards, eval.compliance_cases, eval.customers, eval.evaluation_marker, eval.exceptions, eval.fraud_alerts, eval.integration_messages, eval.loan_schedules, eval.loans, eval.payment_instructions, eval.transactions, eval.transfers
+- Discovered procedures: eval.tr_accounts_audit
+- Selected candidates: table:eval.account_balances (table name relevance=4; column name relevance=3; relationship relevance=1); table:eval.loan_schedules (column name relevance=1.5; relationship relevance=1); table:eval.loans (column name relevance=1.5; relationship relevance=1); table:eval.payment_instructions (column name relevance=1.5; relationship relevance=1); table:eval.transactions (column name relevance=1.5; relationship relevance=1); table:eval.transfers (table name relevance=4; column name relevance=3; relationship relevance=1)
+- Rejected candidates: table:eval.accounts (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.audit_history (column name relevance=1.5; outside top scored metadata candidates); table:eval.batch_runs (column name relevance=1.5; outside top scored metadata candidates); table:eval.beneficiaries (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.cards (column name relevance=1.5; relationship relevance=1; outside top scored metadata candidates); table:eval.compliance_cases (column name relevance=1.5; relationship relevance=1); table:eval.customers (column name relevance=1.5; outside top scored metadata candidates); table:eval.evaluation_marker (column name relevance=1.5; outside top scored metadata candidates); table:eval.exceptions (column name relevance=1.5; outside top scored metadata candidates); table:eval.fraud_alerts (column name relevance=1.5; relationship relevance=1)
+
+## Stage 3 - Generate Investigation Hypotheses
+- H1: Relationship path eval.accounts -> eval.transfers does not contain the expected related row or transition evidence. (48% initial)
+- H2: State or status values in eval.transfers, eval.account_balances, eval.transactions may be preventing the expected workflow transition. (42% initial)
+- H3: Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence. (30% initial)
+
+## Stage 4 - Plan Investigation
+- Summarize analytical results in eval.transfers: expected read-only evidence from generated SQL
+- Summarize analytical results in eval.account_balances: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.transfers: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.account_balances: expected read-only evidence from generated SQL
+- Prove requested entity exists in eval.transactions: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.transfers: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.account_balances: expected read-only evidence from generated SQL
+- Inspect relevant rows in eval.transactions: expected read-only evidence from generated SQL
+
+## Stage 5 - Collect Evidence
+- SQL Summarize analytical results in eval.transfers: Production scan protection rejected unrestricted table scan
+- SQL Summarize analytical results in eval.account_balances: Production scan protection rejected unrestricted table scan
+- SQL Prove requested entity exists in eval.transfers: 1 row(s) returned
+- SQL Prove requested entity exists in eval.account_balances: No rows returned
+- SQL Prove requested entity exists in eval.transactions: No rows returned
+- SQL Inspect relevant rows in eval.transfers: 1 row(s) returned
+- SQL Inspect relevant rows in eval.account_balances: No rows returned
+- SQL Inspect relevant rows in eval.transactions: No rows returned
+
+## Evidence Gate
+- Gate Required: No
+- Issue Reproduced: Yes
+- Business Key Exists: Yes
+- Reported Condition Exists: Yes
+- Affected Rows Exist: Yes
+- Parent/Child Relationship Exists: Yes
+
+## Suggested Verification Checks
+- Pending: eval.transfers is the affected object. | Source: metadata | Risk: Read-only | Expected: Rows returned
+- Pending: Reported condition passes the evidence gate. | Source: SQL evidence | Risk: Read-only | Expected: Rows returned
+- Pending: Proof and investigation SQL are valid read-only statements. | Source: metadata | Risk: Read-only | Expected: Rows returned
+
+## Relevant Objects Investigated
+- table: eval.transfers (12.35) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.account_balances (12.35) - Matched 1 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.transactions (5.85) - Matched 0 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.payment_instructions (5.85) - Matched 0 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.loans (5.85) - Matched 0 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+- table: eval.loan_schedules (5.85) - Matched 0 question/entity token(s); operational metadata signals: event, foreign-key relationship, status field, timestamp field; has foreign-key relationships; has indexes
+
+## Stage 6 - Reason
+The transfer with BusinessKey 'TRF-3101' exists in the eval.transfers table with a status of 'Exception', but there are no corresponding records in eval.account_balances or eval.transactions tables. This indicates that although the transfer record is present, the expected balance movement or transaction entries that should accompany a completed transfer are missing. The absence of these related records suggests a failure or exception occurred during the processing of the transfer, preventing the creation of balance movements and transactions. Senior engineer explanation: Upon investigation, the transfer identified by 'TRF-3101' is found in the transfers table but marked with an 'Exception' status, indicating an error state rather than a successful completion. The lack of matching entries in account_balances and transactions tables confirms that the transfer did not fully process through all stages, specifically the balance movement and transaction recording steps. This discrepancy likely stems from an error during the transfer workflow, which halted further processing. However, due to production scan protections, full table scans to analyze broader patterns were not possible, limiting deeper root cause analysis. Further investigation with appropriate privileges and detailed logs is recommended to pinpoint the exact failure point. Clearer report wording: The transfer record 'TRF-3101' exists but is marked as 'Exception' in the transfers table. No related balance movement or transaction records were found, indicating the transfer did not complete successfully. This suggests a processing error prevented the creation of necessary financial entries. Further investigation with full data access and error logs is required to identify and fix the root cause. Confidence note: Confidence in this conclusion is medium to high regarding the missing balance movement and transaction records for the transfer 'TRF-3101', supported by direct evidence queries returning no rows in those tables. However, confidence is limited by the inability to perform unrestricted scans on the involved tables, which restricts comprehensive analysis of related data and patterns. Recommended next questions: What error or exception caused the transfer 'TRF-3101' to have an 'Exception' status, and at which step in the processing workflow did it occur? Evidence: SQL-3, SQL-6. Are there any system or permission restrictions preventing full scans or access to eval.account_balances and eval.transactions tables? Evidence: SQL-1, SQL-2.
+
+## AI-assisted reasoning over collected evidence
+OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.
+
+## Root Cause Analysis
+- The transfer 'TRF-3101' is recorded with an 'Exception' status in eval.transfers, and no corresponding balance movement or transaction records exist, indicating a processing failure that prevented completion of related financial entries. Evidence: SQL-3, SQL-4, SQL-5, SQL-6, SQL-7, SQL-8.
+
+## Diagnostic Hypotheses
+- Rank 1: H2 48% - State or status values in eval.transfers, eval.account_balances, eval.transactions may be preventing the expected workflow transition.; Supported by collected evidence.
+- Rank 2: H3 48% - Uploaded documents or approved knowledge may describe a business rule or known incident that changes the interpretation of database evidence.; Supported by collected evidence.
+- Rank 3: H1 34% - Relationship path eval.accounts -> eval.transfers does not contain the expected related row or transition evidence.; Supported by collected evidence.
+
+## Confirmed Facts
+- Affected object: eval.transfers.
+- Prove requested entity exists in eval.transfers: 1 row(s) returned.
+- Inspect relevant rows in eval.transfers: 1 row(s) returned.
+
+## Inferred Findings
+- At least one read-only evidence query returned rows, so reasoning should prioritize observed data over metadata-only matches.
+
+## Hypotheses
+- Some evidence queries failed, so missing privileges or metadata gaps may hide a stronger explanation.
+
+## Write Path Ranking
+- No stored procedure write path was confirmed.
+
+## Why It Happened
+- User-reported condition was mapped to relevant database objects.
+- Read-only evidence was collected from ranked tables, procedures, logs, documents, or knowledge.
+- No procedure was confirmed to write eval.transfers; root-cause wording must stay at likely/unknown confidence.
+- Most likely explanation: State or status values in eval.transfers, eval.account_balances, eval.transactions may be preventing the expected workflow transition.
+- Conclusion remains bounded by the supporting and missing evidence listed for the hypothesis.
+
+## Supporting Evidence
+- SQL - Prove requested entity exists in eval.transfers: 1 row(s) returned
+- SQL - Prove requested entity exists in eval.account_balances: No rows returned
+- SQL - Prove requested entity exists in eval.transactions: No rows returned
+- SQL - Inspect relevant rows in eval.transfers: 1 row(s) returned
+- SQL - Inspect relevant rows in eval.account_balances: No rows returned
+- SQL - Inspect relevant rows in eval.transactions: No rows returned
+
+## Recommended Next SQL
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.transfers GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT Status, COUNT(*) AS result_count FROM eval.account_balances GROUP BY Status ORDER BY result_count DESC
+```
+
+```sql
+SELECT TransfersId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.transfers WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'TRF-3101' OR CAST(Status AS NVARCHAR(MAX)) = 'TRF-3101')
+```
+
+```sql
+SELECT AccountBalancesId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.account_balances WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'TRF-3101' OR CAST(Status AS NVARCHAR(MAX)) = 'TRF-3101')
+```
+
+```sql
+SELECT TransactionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.transactions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = 'TRF-3101' OR CAST(Status AS NVARCHAR(MAX)) = 'TRF-3101')
+```
+
+## Recommendation
+- Immediate Fix: Validate the top-ranked root cause with the recommended read-only SQL before making changes. Evidence: SQL - Prove requested entity exists in eval.transfers.
+- Permanent Fix: Apply the smallest approved schema/procedure/configuration change that directly addresses the confirmed cause. Evidence: SQL - Prove requested entity exists in eval.transfers.
+- Monitoring: Alert on recurrence of the failed condition and on increased duration/error count for related jobs.
+- Risk: Medium
+
+## Self Validation
+- What is the main problem phrase? Captured in Evidence-First Target Discovery reason.
+- What object is missing/duplicated/slow/failed? eval.transfers.
+- Which terms are only possible causes? Listed in target discovery when secondary cause markers are present.
+- Did I accidentally choose a secondary cause as the target? No if the affected object comes from the main problem phrase; review target reason.
+- Does the highest-ranked hypothesis explain observed evidence? Yes
+- Is another hypothesis stronger? Possible; no direct write path was confirmed
+- Was the procedure that directly modifies eval.transfers investigated? No direct modifier confirmed; continue investigation
+- Does the chosen root cause write the affected table? No
+- Does the error log support the chosen root cause? No; confidence remains lower until error-log evidence is found
+- Does the business process graph include the chosen procedure? No
+- Does procedure analysis match the report narrative? No direct write narrative allowed
+
+## Confidence Explanation
+- Overall confidence: 44%
+- + 2 evidence query result(s) returned rows.
+- + 4 read-only query result(s) returned no rows and ruled out alternatives.
+- + Affected object identified from question and evidence: eval.transfers.
+- - 2 evidence query result(s) failed or were unavailable.
+
+## Stage 7 - Dynamic Report
+- The downloadable report was generated from the reasoning bundle after evidence collection and hypothesis ranking.
+
+
+## Missing Information / Clarifying Questions
+- Summary analytical results from unrestricted scans of eval.transfers and eval.account_balances tables to identify systemic issues or patterns.
+- Detailed error logs or stored procedure execution traces related to the transfer processing workflow.
+- Verification of user privileges or system protections that prevented full data access.",completed,AI_ANSWERED,INV-20260717-011616-53B85E26,TRF-3101,"[""TRF-3101""]","{""canonical_entities"": [{""canonical_investigated_entity"": ""TRF-3101"", ""original_entity_text"": ""TRF-3101"", ""normalized_entity_text"": ""TRF-3101"", ""resolved_entity_value"": ""TRF-3101"", ""resolved_entity_type"": ""business_identifier"", ""resolved_table"": ""eval.transfers"", ""resolved_column"": ""BusinessKey"", ""resolution_confidence"": 1.0, ""resolution_method"": ""exact"", ""supporting_evidence_ids"": [""ENTITY-1-EXACT-2""]}], ""canonical_investigated_entity"": ""TRF-3101"", ""evidence_linked_entities"": [""TRF-3101""], ""diagnostics"": [{""entity_type"": ""entity_resolution_diagnostic"", ""resolution_trace_id"": ""ENTITY-1-EXACT-2"", ""internal_match_id"": ""ENTITY-1-EXACT-2"", ""candidate_id"": """", ""resolver_rule_id"": ""exact"", ""extracted_value"": ""TRF-3101"", ""matched_value"": ""TRF-3101"", ""match_type"": ""exact"", ""confidence"": 1.0, ""evidence_id"": ""ENTITY-1-EXACT-2"", ""candidates"": [{""identifier"": ""TRF-3101"", ""metadata"": {""Status"": ""Exception""}, ""evidence_id"": ""ENTITY-1-EXACT-2"", ""table"": ""eval.transfers"", ""column"": ""BusinessKey""}], ""reason"": ""Exact database evidence match."", ""resolved_table"": ""eval.transfers"", ""resolved_column"": ""BusinessKey""}], ""evaluator_input_defects"": []}",valid,True,81.349,81.349,pass,81.35,"The root cause is correctly identified as the transfer 'TRF-3101' having an 'Exception' status in eval.transfers with no matching balance movement or transaction records, indicating a processing failure. Evidence queries correctly confirm the presence of the transfer record and absence of related records, supporting the conclusion. The discovered database objects are relevant and well matched to the question. However, the fix correctness score is zero because no acceptable fix or remediation steps were explicitly provided in the answer. Citations are accurate and safety is ensured by read-only SQL usage. Completeness is good but limited by missing evidence from exceptions and integration_messages tables, which were expected but not returned. No unsupported claims or incorrect entities/objects are present. Overall, the answer is reliable and well supported but requires human review to define and validate a fix.",,23.927707399998326,21875,296,0.0,gpt-4.1-mini,ai-judge-v2-entity-provenance,False,[],,True

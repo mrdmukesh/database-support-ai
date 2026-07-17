@@ -1,4 +1,4 @@
 SET NOCOUNT ON;
-IF NOT EXISTS (SELECT 1 FROM eval.[inventory_movements] WHERE BusinessKey LIKE N'ORD-2026-0006%' AND CorrelationId=N'EVAL-ORDERS-106') THROW 51100, 'Benchmark defect missing', 1;
-SELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[inventory_movements] WHERE BusinessKey LIKE N'ORD-2026-0006%';
+IF (SELECT COUNT(*) FROM eval.[inventory_movements] e JOIN eval.exceptions d ON d.CorrelationId=e.CorrelationId WHERE e.BusinessKey=N'ORD-2026-0006-A' AND e.CorrelationId=N'EVAL-ORDERS-106') <> 1 THROW 51100, 'Benchmark entity/defect fixture invalid', 1;
+SELECT N'verified' verification_status,BusinessKey,Status,CorrelationId FROM eval.[inventory_movements] WHERE BusinessKey=N'ORD-2026-0006-A' AND CorrelationId=N'EVAL-ORDERS-106';
 GO

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import asdict, replace
 from datetime import datetime
@@ -57,7 +58,13 @@ from legacydb_copilot.services.evidence_correlation_service import correlate_evi
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
-from legacydb_copilot.services.entity_resolution_service import EntityResolutionResult, resolve_entities
+from legacydb_copilot.services.entity_resolution_service import (
+    EntityResolutionResult,
+    metadata_with_resolved_tables,
+    resolution_metadata_for_schema,
+    resolve_entities,
+)
+from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.investigation_reports import (
     generate_investigation_report_files,
     report_storage_references,
@@ -68,6 +75,7 @@ from legacydb_copilot.services.investigation_mode_service import (
     classify_investigation_mode,
 )
 from legacydb_copilot.services.llm_reasoning_service import (
+    AI_REASONING_PROMPT_VERSION,
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
@@ -113,7 +121,9 @@ def _definition_relevant_procedures(connector, procedure_names: list[str], relev
     return list(dict.fromkeys(matched))
 
 
-def _investigation_status(detected_intent: object) -> str:
+def _investigation_status(detected_intent: object, answer_provenance: object = None) -> str:
+    if answer_provenance:
+        return str(answer_provenance)
     return (
         "INSUFFICIENT_DATABASE_EVIDENCE"
         if str(detected_intent or "").startswith("INSUFFICIENT_DATABASE_EVIDENCE:")
@@ -335,7 +345,11 @@ def _load_and_validate_active_schema(connector, metadata_context: MetadataSearch
             actual_database=actual_database,
             connector_cache_key=metadata_context.connector_cache_key,
         )
-    metadata = connector.get_schema_metadata()
+    force_refresh = os.getenv("EVAL_FORCE_METADATA_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
+    try:
+        metadata = connector.get_schema_metadata(force_refresh=force_refresh)
+    except TypeError:  # compatibility for connector test doubles and older plugins
+        metadata = connector.get_schema_metadata()
     logger.info(
         "RCA metadata context workspace_id=%s connection_id=%s database=%s schema=%s engine=%s "
         "connection_string_database=%s metadata_cache_key=%s tables=%s procedures=%s",
@@ -600,6 +614,42 @@ def _empty_investigation_metadata() -> dict[str, Any]:
         "verification_checks": "[]",
         "ai_debug_trace": "",
     }
+
+
+def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]:
+    """Return a truthful, machine-readable AI trace for every persisted result."""
+    raw_trace = investigation_metadata.get("ai_debug_trace")
+    if isinstance(raw_trace, dict):
+        trace = dict(raw_trace)
+    else:
+        try:
+            parsed = json.loads(raw_trace) if raw_trace else {}
+            trace = dict(parsed) if isinstance(parsed, dict) else {}
+        except (TypeError, json.JSONDecodeError):
+            trace = {}
+
+    provenance = str(investigation_metadata.get("answer_provenance") or "")
+    detected_intent = str(investigation_metadata.get("detected_intent") or "")
+    if provenance == "AI_SKIPPED_BY_EVIDENCE_GATE":
+        trace.setdefault("ai_reasoning_invoked", False)
+        trace.setdefault("ai_skip_reason", "evidence_gate_not_reproduced")
+        trace.setdefault("ai_outcome", "evidence_gate")
+    elif provenance == "AI_INVOCATION_FAILED":
+        trace.setdefault("ai_reasoning_invoked", True)
+        trace.setdefault("ai_outcome", "provider_failure")
+    elif provenance == "AI_ANSWERED":
+        trace.setdefault("ai_reasoning_invoked", True)
+        trace.setdefault("ai_outcome", "success")
+    elif detected_intent.startswith("INSUFFICIENT_DATABASE_EVIDENCE:"):
+        reason = detected_intent.split(":", 1)[1].strip().lower()
+        trace.setdefault("ai_reasoning_invoked", False)
+        trace.setdefault("ai_skip_reason", reason or "insufficient_database_evidence")
+        trace.setdefault("ai_outcome", "insufficient_evidence")
+    else:
+        trace.setdefault("ai_reasoning_invoked", False)
+        trace.setdefault("ai_skip_reason", "application_terminal_path_before_ai")
+        trace.setdefault("ai_outcome", "other")
+    return trace
 
 
 def _approved_knowledge_context(db: Session, payload: ChatAskRequest) -> str:
@@ -1726,12 +1776,21 @@ def _run_dynamic_investigation(
             metadata_context=metadata_context,
             active_schema_metadata=active_schema_metadata,
         )
-    entity_resolution = resolve_entities(connector, context.metadata, entities)
+    resolution_metadata = resolution_metadata_for_schema(
+        connector, context.metadata, active_schema_metadata.tables
+    )
+    entity_resolution = resolve_entities(connector, resolution_metadata, entities)
     if entity_resolution.resolutions and not entity_resolution.can_continue:
         return _entity_resolution_blocked_answer(connection.name, entities, entity_resolution)
     entities = _apply_entity_resolutions(entities, entity_resolution)
+    context = replace(
+        context,
+        metadata=metadata_with_resolved_tables(
+            context.metadata, resolution_metadata, entity_resolution
+        ),
+    )
     target_missing, missing_target, _ = _target_object_not_found(payload.question, context.metadata, intent)
-    if target_missing:
+    if target_missing and not entity_resolution.can_continue:
         return _object_not_found_answer(
             db=db,
             payload=payload,
@@ -1747,6 +1806,21 @@ def _run_dynamic_investigation(
         intent=intent,
         entities=entities,
         metadata=context.metadata,
+    )
+    ranked_metadata = metadata_with_resolved_tables(
+        ranking.metadata, resolution_metadata, entity_resolution
+    )
+    ranked_names = {table.name.casefold() for table in ranked_metadata.tables}
+    diagnostic_tables = [
+        table for table in context.metadata.tables
+        if is_diagnostic_object(table.name) and table.name.casefold() not in ranked_names
+    ]
+    ranking = replace(
+        ranking,
+        metadata=replace(
+            ranked_metadata,
+            tables=[*ranked_metadata.tables[:8], *diagnostic_tables][:12],
+        ),
     )
     relevance_terms = query_relevance_terms(payload.question, entities)
     definition_procedures = _definition_relevant_procedures(
@@ -1839,6 +1913,17 @@ def _run_dynamic_investigation(
         reasoning = unreproduced_reasoning(evidence_gate)
         llm_configured = llm_reasoning_enabled()
         llm_used = False
+        settings = Settings.from_env()
+        ai_debug_trace = {
+            "ai_reasoning_invoked": False,
+            "ai_skip_reason": "evidence_gate_not_reproduced",
+            "ai_outcome": "evidence_gate",
+            "ai_skip_branch": "evidence_gate.required_and_not_reproduced",
+            "llm_model_name": settings.llm_model,
+            "prompt_version": AI_REASONING_PROMPT_VERSION,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        } if settings.ai_debug_trace_enabled else None
     else:
         reasoning = reason_about_evidence(
             payload.question,
@@ -1868,8 +1953,28 @@ def _run_dynamic_investigation(
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
-    if evidence_gate.required and not evidence_gate.reproduced:
-        ai_debug_trace = None
+    if ai_debug_trace is not None:
+        ai_debug_trace.update({
+            "metadata_cache": getattr(active_schema_metadata, "cache_diagnostics", {}),
+            "raw_metadata_objects": {
+                "tables": active_schema_metadata.tables,
+                "views": active_schema_metadata.views,
+                "procedures": active_schema_metadata.procedures,
+            },
+            "metadata_candidates": ranking.metadata.candidate_trace,
+            "entity_resolution": [asdict(item) for item in entity_resolution.resolutions],
+            "extracted_business_entities": [
+                asdict(item) for item in extract_entities(payload.question).entities
+                if item.entity_type in {"business_key", "business_identifier", "exact_id_or_code"}
+            ],
+            "ranked_objects": [asdict(item) for item in ranking.objects],
+            "sql_plan": [asdict(item) for item in plan],
+            "sql_evidence": [
+                {"evidence_id": item.evidence_id, "purpose": item.purpose, "sql": item.sql, "row_count": len(item.rows), "error": item.error}
+                for item in evidence
+            ],
+            "evidence_gate": asdict(evidence_gate),
+        })
     recommendation = recommend_actions(
         intent=intent.intent,
         reasoning=reasoning,
@@ -2117,6 +2222,17 @@ def _run_dynamic_investigation(
         + "\n\n## Missing Information / Clarifying Questions\n"
         + "\n".join(f"- {item}" for item in reasoning.missing_evidence)
     )
+    answer_provenance = (
+        "AI_SKIPPED_BY_EVIDENCE_GATE"
+        if evidence_gate.required and not evidence_gate.reproduced
+        else "AI_ANSWERED"
+        if llm_used
+        else "AI_INVOCATION_FAILED"
+        if ai_debug_trace and ai_debug_trace.get("ai_reasoning_invoked")
+        else "AI_SKIPPED_BY_POLICY"
+        if Settings.from_env().ai_reasoning_enabled
+        else "DETERMINISTIC_ANSWERED"
+    )
     investigation_metadata = {
         "investigation_id": report.cover.investigation_id,
         "detected_intent": intent.intent.value,
@@ -2128,7 +2244,29 @@ def _run_dynamic_investigation(
                 }
                 for entity in entities.entities
             ] + [
-                {"entity_type": "entity_resolution", **asdict(resolution)}
+                {
+                    "entity_type": "resolved_business_entity",
+                    "original_entity_text": resolution.extracted_value,
+                    "normalized_entity_text": resolution.extracted_value,
+                    "resolved_entity_value": resolution.matched_value,
+                    "resolved_entity_type": "business_identifier",
+                    "resolved_table": resolution.resolved_table,
+                    "resolved_column": resolution.resolved_column,
+                    "resolution_confidence": resolution.confidence,
+                    "resolution_method": resolution.match_type,
+                    "supporting_evidence_ids": [resolution.evidence_id] if resolution.evidence_id else [],
+                }
+                for resolution in entity_resolution.resolutions
+                if resolution.matched_value
+            ] + [
+                {
+                    "entity_type": "entity_resolution_diagnostic",
+                    "resolution_trace_id": resolution.evidence_id,
+                    "internal_match_id": resolution.evidence_id,
+                    "candidate_id": "",
+                    "resolver_rule_id": resolution.match_type,
+                    **asdict(resolution),
+                }
                 for resolution in entity_resolution.resolutions
             ],
             default=str,
@@ -2140,6 +2278,7 @@ def _run_dynamic_investigation(
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
         "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
+        "answer_provenance": answer_provenance,
         "structured_result": json.dumps({
             "ranked_objects": [asdict(item) for item in ranking.objects],
             "procedures": [asdict(item) for item in procedure_analysis],
@@ -2216,14 +2355,24 @@ def _expand_related_id_evidence(connector, metadata, evidence):
     for item in evidence:
         for row in item.rows:
             for key, value in row.items():
-                if key.endswith("_id") and value is not None:
+                normalized_key = re.sub(r"[^a-z0-9]", "", key.lower())
+                if normalized_key.endswith("id") and value not in (None, ""):
                     id_values.setdefault(key, set()).add(value)
-    for table in metadata.tables[:8]:
+    related_tables = sorted(
+        metadata.tables[:12],
+        key=lambda table: (not is_diagnostic_object(table.name), -table.score, table.name),
+    )
+    for table in related_tables:
         for column in table.columns:
             if column not in id_values:
                 continue
             values = list(id_values[column])[:5]
-            literals = ", ".join(str(int(value)) for value in values if isinstance(value, int))
+            literals = ", ".join(
+                str(value) if isinstance(value, int)
+                else "'" + str(value).replace("'", "''") + "'"
+                for value in values
+                if isinstance(value, (int, str))
+            )
             if not literals:
                 continue
             sql = f"SELECT {', '.join(table.columns[:8])} FROM {table.name} WHERE {column} IN ({literals})"
@@ -2237,7 +2386,11 @@ def _expand_related_id_evidence(connector, metadata, evidence):
 
                     related.append(
                         EvidenceResult(
-                            f"Inspect rows related by {column} in {table.name}",
+                            (
+                                f"Inspect duplicate correlated rows by {column} in {table.name}"
+                                if len(rows) > 1
+                                else f"Inspect correlated rows by {column} in {table.name}"
+                            ),
                             sql,
                             rows,
                             evidence_id=f"SQL-{len(evidence) + len(related) + 1}",
@@ -2329,7 +2482,11 @@ def ask_chat_question(
                 if key != "investigation_id" and isinstance(link, str)
             }
         )
-    investigation_status = _investigation_status(investigation_metadata.get("detected_intent"))
+    investigation_status = _investigation_status(
+        investigation_metadata.get("detected_intent"),
+        investigation_metadata.get("answer_provenance"),
+    )
+    terminal_ai_trace = _terminal_ai_trace(investigation_metadata)
     investigation = InvestigationModel(
         id=investigation_id,
         organization_id=payload.organization_id,
@@ -2348,7 +2505,7 @@ def ask_chat_question(
         report_path=investigation_metadata["report_path"],
         report_storage_json=investigation_metadata.get("report_storage", "{}"),
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
-        ai_debug_trace_json=investigation_metadata.get("ai_debug_trace", ""),
+        ai_debug_trace_json=json.dumps(sanitize_ai_trace(terminal_ai_trace), default=str),
         status=investigation_status,
     )
     db.add(investigation)

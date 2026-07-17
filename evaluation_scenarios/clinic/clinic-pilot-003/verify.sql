@@ -1,2 +1,5 @@
-IF NOT (EXISTS (SELECT 1 FROM eval.exceptions WHERE CorrelationId='EVAL-CLINIC-003' AND Status='Open') AND EXISTS (SELECT 1 FROM eval.[diagnoses] WHERE Details='EVAL-CLINIC-003')) THROW 51001, 'Scenario defect not reproducible', 1; SELECT 'LAB-4403' ExpectedEntity, 'EVAL-CLINIC-003' EvidenceValue;
+SET NOCOUNT ON;
+IF (SELECT COUNT(*) FROM eval.[lab_results] WHERE BusinessKey=N'LAB-4403') <> 1 THROW 51021, 'Exact expected entity missing or duplicated', 1;
+IF NOT EXISTS (SELECT 1 FROM eval.[lab_results] e JOIN eval.exceptions d ON d.CorrelationId=e.CorrelationId WHERE e.BusinessKey=N'LAB-4403' AND e.CorrelationId=N'EVAL-CLINIC-003' AND d.Status=N'Open') THROW 51022, 'Defect is not linked to expected entity', 1;
+SELECT N'ENTITY_FOUND' EntityStatus,N'eval.lab_results' EntityTable,N'BusinessKey' EntityColumn,N'LAB-4403' ExpectedEntity,COUNT(*) ExactRowCount FROM eval.[lab_results] WHERE BusinessKey=N'LAB-4403';
 GO

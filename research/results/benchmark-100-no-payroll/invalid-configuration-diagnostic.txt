@@ -1,0 +1,342 @@
+﻿====================================================================================================
+INVALID CONFIGURATION DIAGNOSTIC REPORT
+====================================================================================================
+Generated: 2026-07-17 23:34:25
+CSV invalid rows: 35
+JSON invalid records: 0
+
+====================================================================================================
+INVALID ROWS BY DOMAIN
+====================================================================================================
+shipping                15
+clinic                  13
+orders                   5
+banking                  2
+
+====================================================================================================
+DUPLICATE SCENARIOS ACROSS RUNS
+====================================================================================================
+
+====================================================================================================
+MISSING AI TRACE REASONS
+====================================================================================================
+No error messages were found in benchmark-summary.json.
+
+====================================================================================================
+INVALID SCENARIO DETAILS
+====================================================================================================
+
+Scenario:       banking-benchmark-002
+Domain:         banking
+Timestamp:      2026-07-17T03:33:46
+Run ID:         5af597e5-1970-4ad7-87a5-8b643baa58d9
+Investigation:  485f1ecc-c266-44be-95fa-77bca0a9d82b
+Entity:         BNK-2026-0002
+Classification: 
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       banking-benchmark-002
+Domain:         banking
+Timestamp:      2026-07-17T03:40:05
+Run ID:         11c9e21d-ff7c-4780-a8e2-65ed634d5817
+Investigation:  9a1c1818-f649-4d9c-bb79-3da76e5a9d6c
+Entity:         BNK-2026-0002
+Classification: 
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       orders-benchmark-010
+Domain:         orders
+Timestamp:      2026-07-17T21:00:58
+Run ID:         b4a00a90-6e49-4137-85f1-df9f4db80c4c
+Investigation:  INV-20260717-210039-9635D6D7
+Entity:         ORD-2026-0010-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       orders-benchmark-013
+Domain:         orders
+Timestamp:      2026-07-17T21:03:07
+Run ID:         ca02d5bf-c967-4ce5-8c5b-afc92afb4bdb
+Investigation:  INV-20260717-210257-146F3386
+Entity:         ORD-2026-0013-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       orders-benchmark-015
+Domain:         orders
+Timestamp:      2026-07-17T21:04:03
+Run ID:         f790fc23-fe59-4d02-aa1d-fac30e0d3da4
+Investigation:  INV-20260717-210354-EF590398
+Entity:         ORD-2026-0015-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       orders-benchmark-020
+Domain:         orders
+Timestamp:      2026-07-17T21:06:44
+Run ID:         f2a0bd9c-13ad-4701-a7ed-ee71bf577362
+Investigation:  44edf078-0a3b-431a-8463-2aed37f19991
+Entity:         ORD-2026-0020-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       orders-pilot-003
+Domain:         orders
+Timestamp:      2026-07-17T21:07:56
+Run ID:         a0a95075-17fd-4330-a1ef-e90ed2b4b575
+Investigation:  607b4721-abb0-4410-8931-07979e7bf91b
+Entity:         SKU-8103
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-002
+Domain:         shipping
+Timestamp:      2026-07-17T21:10:09
+Run ID:         ef7f325e-c36d-4a0c-b562-233da13a45b2
+Investigation:  5612dc22-afdc-47c2-930b-85ec82b4afaf
+Entity:         SHP-2026-0002
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-003
+Domain:         shipping
+Timestamp:      2026-07-17T21:10:17
+Run ID:         ab91d5b5-36b4-4192-a79f-ce3970a6fc80
+Investigation:  762c92b7-9a36-4484-b92c-733b61b2b65c
+Entity:         SHP-2026-0003
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-004
+Domain:         shipping
+Timestamp:      2026-07-17T21:10:25
+Run ID:         06df8d7c-4dd1-47b2-8a57-57bfd8c89ace
+Investigation:  94715316-415a-431d-aae7-b64c5dbb7bb2
+Entity:         SHP-2026-0004-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-005
+Domain:         shipping
+Timestamp:      2026-07-17T21:10:42
+Run ID:         e5fc1177-500a-4b37-9361-3b38fb72120d
+Investigation:  INV-20260717-211031-B8019027
+Entity:         SHP-2026-0005-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-007
+Domain:         shipping
+Timestamp:      2026-07-17T21:11:55
+Run ID:         2710ce10-1fed-429d-8273-89a04faa13d1
+Investigation:  INV-20260717-211143-38790C26
+Entity:         EX-SHP-2026-0007-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-008
+Domain:         shipping
+Timestamp:      2026-07-17T21:12:43
+Run ID:         e90d7ffd-ce38-4a34-a1ed-856698f617b9
+Investigation:  INV-20260717-211232-74E1F6A7
+Entity:         MSG-SHP-2026-0008-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-010
+Domain:         shipping
+Timestamp:      2026-07-17T21:13:34
+Run ID:         9267e1ef-72b5-4a37-a383-71d114ed71a1
+Investigation:  af49f460-0c0d-4f39-92d6-c0bac352cc83
+Entity:         SHP-2026-0010-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-012
+Domain:         shipping
+Timestamp:      2026-07-17T21:14:50
+Run ID:         b4cc54aa-fe82-4774-9b4c-9a6a90cf3b00
+Investigation:  78e9f82e-5087-44a8-b013-c62e7e4fba9f
+Entity:         SHP-2026-0012-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-013
+Domain:         shipping
+Timestamp:      2026-07-17T21:15:06
+Run ID:         82a4c285-e589-4c70-8bbb-ea5fa047abed
+Investigation:  INV-20260717-211455-471928E2
+Entity:         SHP-2026-0013-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-015
+Domain:         shipping
+Timestamp:      2026-07-17T21:16:15
+Run ID:         740c0215-5807-4e13-8e17-1b036006040a
+Investigation:  e77b2c34-cd9b-4e50-bfcd-d5d5e53fd1d2
+Entity:         SHP-2026-0015-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-016
+Domain:         shipping
+Timestamp:      2026-07-17T21:16:22
+Run ID:         a7b99759-e924-4377-b98f-dc1edd33211f
+Investigation:  8f89ab42-3da3-4e01-902b-e86120d65062
+Entity:         SHP-2026-0016-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-018
+Domain:         shipping
+Timestamp:      2026-07-17T21:17:14
+Run ID:         3be55876-4df8-4849-a517-beb0916a7ff5
+Investigation:  d706a5fa-a39b-4baa-8699-7c2b9661d990
+Entity:         SHP-2026-0018-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-benchmark-020
+Domain:         shipping
+Timestamp:      2026-07-17T21:18:00
+Run ID:         ca02faf1-a863-43fd-bafe-0cb24e448159
+Investigation:  89b85d74-c1e6-40fe-a48d-5646644172ad
+Entity:         SHP-2026-0020-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-pilot-002
+Domain:         shipping
+Timestamp:      2026-07-17T21:19:12
+Run ID:         8fc7cfdc-7517-43f9-9451-e84721cc372d
+Investigation:  INV-20260717-211902-9AE370F3
+Entity:         CONT-5002
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       shipping-pilot-003
+Domain:         shipping
+Timestamp:      2026-07-17T21:20:05
+Run ID:         9128a3a7-88ff-408a-9c3b-eb2a179fef0d
+Investigation:  INV-20260717-211948-8F8A77C1
+Entity:         WO-5003
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-002
+Domain:         clinic
+Timestamp:      2026-07-17T21:22:35
+Run ID:         a23b92bc-d537-4e03-a572-b34b950df236
+Investigation:  fad9b80f-5286-4ade-96b4-d37e820bd983
+Entity:         CLN-2026-0002
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-003
+Domain:         clinic
+Timestamp:      2026-07-17T21:22:41
+Run ID:         89a7b793-d841-4d49-8bfa-1e357013b58d
+Investigation:  6ecfef3d-fc77-48bd-97b4-77f62f16badc
+Entity:         CLN-2026-0003
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-004
+Domain:         clinic
+Timestamp:      2026-07-17T21:22:47
+Run ID:         6b30bbb8-2140-4432-a81f-1355a070700b
+Investigation:  bd65af25-4575-47cb-b11a-1c59afb72633
+Entity:         CLN-2026-0004-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-007
+Domain:         clinic
+Timestamp:      2026-07-17T21:24:15
+Run ID:         450bcd26-0533-4af6-9542-40d1685ce8e1
+Investigation:  INV-20260717-212406-62386974
+Entity:         CLN-2026-0007-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-010
+Domain:         clinic
+Timestamp:      2026-07-17T21:25:41
+Run ID:         d3e74f20-c5a3-47fc-805f-fa793262d57c
+Investigation:  e9f1b565-c5a0-46d2-b394-850842dff00a
+Entity:         CLN-2026-0010-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-011
+Domain:         clinic
+Timestamp:      2026-07-17T21:25:46
+Run ID:         9f7e0b6e-cde5-4241-a02c-6e04ddad9103
+Investigation:  4ca81eb3-684e-4864-a210-f91b1f4f0395
+Entity:         CLN-2026-0011-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-012
+Domain:         clinic
+Timestamp:      2026-07-17T21:25:52
+Run ID:         6b6b2f4f-ade2-457b-bfae-71ab6aa1d302
+Investigation:  12e573e7-7846-45bd-ba1b-3b417822daec
+Entity:         CLN-2026-0012-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-013
+Domain:         clinic
+Timestamp:      2026-07-17T21:26:05
+Run ID:         00404b74-fde1-45c5-89e2-682f3839868d
+Investigation:  INV-20260717-212556-7352BCE5
+Entity:         CLN-2026-0013-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-015
+Domain:         clinic
+Timestamp:      2026-07-17T21:26:59
+Run ID:         69be44e0-55fa-4224-af9b-acfd3cb1925c
+Investigation:  INV-20260717-212650-2C19CE74
+Entity:         CLN-2026-0015-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-017
+Domain:         clinic
+Timestamp:      2026-07-17T22:50:10
+Run ID:         0d190638-ec5b-4d3b-9893-a14766158fcb
+Investigation:  INV-20260717-224943-B67893A6
+Entity:         CLN-2026-0017-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-018
+Domain:         clinic
+Timestamp:      2026-07-17T22:50:18
+Run ID:         746fa752-0b42-497b-8039-91e7a91800c4
+Investigation:  3962bae4-4b03-4935-86a3-f96fce177e98
+Entity:         CLN-2026-0018-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-019
+Domain:         clinic
+Timestamp:      2026-07-17T22:50:27
+Run ID:         17bca876-f266-482f-8908-9720ddb7ad87
+Investigation:  74ac8af9-d479-4258-ab0a-d08c50c9746c
+Entity:         CLN-2026-0019-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.
+
+Scenario:       clinic-benchmark-020
+Domain:         clinic
+Timestamp:      2026-07-17T22:50:36
+Run ID:         9d096aae-b559-434e-a5e3-2bbfcac3c72a
+Investigation:  d8840e64-61d1-49cb-a5e4-c6f9304be534
+Entity:         CLN-2026-0020-A
+Classification: skipped_invalid_configuration
+Errors: No detailed errors located in summary JSON.

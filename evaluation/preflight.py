@@ -14,10 +14,15 @@ from sqlalchemy import create_engine, text
 
 from evaluation.framework.scenario_loader import load_scenarios
 from evaluation.runners.public_api import EvaluationServiceTokenProvider
+from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 
 DOMAINS = ("payroll", "clinic", "orders", "banking", "shipping")
-DATABASES = dict(zip(DOMAINS, ("EvalPayroll", "EvalClinic", "EvalOrders", "EvalBanking", "EvalShipping"), strict=True))
+DATABASES = (
+    {domain: f"eval_{domain}" for domain in DOMAINS}
+    if os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower() == "mysql"
+    else dict(zip(DOMAINS, ("EvalPayroll", "EvalClinic", "EvalOrders", "EvalBanking", "EvalShipping"), strict=True))
+)
 
 
 @dataclass(frozen=True)
@@ -57,7 +62,7 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     def add(name: str, ok: bool, detail: str, *, warning: bool = False) -> None:
         checks.append(Check(name, "PASS" if ok else ("WARNING" if warning else "FAIL"), detail))
 
-    database_url = os.getenv("DATABASE_URL", "")
+    database_url = os.getenv("EVAL_RESULTS_DATABASE_URL") or os.getenv("DATABASE_URL", "")
     if check_live and database_url:
         try:
             engine = create_engine(database_url)
@@ -73,6 +78,42 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     else:
         add("evaluation results database", False, "DATABASE_URL is missing" if not database_url else "live checks disabled")
         add("Alembic migration head", False, "requires evaluation results database")
+
+    application_url = os.getenv("DATABASE_URL", "")
+    if check_live and application_url:
+        try:
+            with create_engine(application_url, pool_pre_ping=True).connect() as connection:
+                connection.execute(text("SELECT 1"))
+            add("application metadata database", True, "connectivity verified")
+        except Exception as exc:
+            add("application metadata database", False, f"connection failed: {type(exc).__name__}")
+    else:
+        add("application metadata database", False, "DATABASE_URL is missing")
+
+    worker_pid_file = Path(".tmp/local-evaluation/worker.pid")
+    worker_ok = False
+    worker_detail = "worker pid file missing"
+    if worker_pid_file.is_file():
+        try:
+            worker_pid = int(worker_pid_file.read_text(encoding="utf-8").strip())
+            if os.name == "nt":
+                import ctypes
+
+                handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, worker_pid)
+                worker_ok = bool(handle)
+                if handle:
+                    ctypes.windll.kernel32.CloseHandle(handle)
+            else:
+                os.kill(worker_pid, 0)
+                worker_ok = True
+            worker_detail = (
+                f"process {worker_pid} is running"
+                if worker_ok
+                else f"process {worker_pid} is not running"
+            )
+        except (OSError, ValueError):
+            worker_detail = "worker process is not running"
+    add("investigation worker health", worker_ok, worker_detail)
 
     base_url = os.getenv("EVAL_API_BASE_URL", "").rstrip("/")
     token = os.getenv("EVAL_ACCESS_TOKEN", "")
@@ -147,16 +188,33 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
         artifact_ok = False
     add("writable artifact directory", artifact_ok, str(artifact_root.resolve()))
 
-    server = os.getenv("EVAL_SQL_SERVER", "")
-    allowed_hosts = _csv("EVAL_ALLOWED_SQL_HOSTS")
+    mysql_mode = os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower() == "mysql"
+    server = os.getenv("EVAL_MYSQL_HOST" if mysql_mode else "EVAL_SQL_SERVER", "")
+    allowed_hosts = _csv("EVAL_ALLOWED_MYSQL_HOSTS" if mysql_mode else "EVAL_ALLOWED_SQL_HOSTS")
     allowed_databases = _csv("EVAL_ALLOWED_DATABASES")
-    host = SqlCmdDatabaseLifecycle._host(server) if server else ""
+    host = server.lower() if mysql_mode else (SqlCmdDatabaseLifecycle._host(server) if server else "")
     safe_config = bool(host and host in {item.lower() for item in allowed_hosts} and not any(word in host for word in ("prod", "production")) and set(DATABASES.values()).issubset(allowed_databases))
     add("non-production SQL target allowlist", safe_config, f"host={host or 'missing'}; databases={','.join(sorted(allowed_databases)) or 'missing'}")
-    sql_auth = ["EVAL_SQL_SERVER", "EVAL_SQL_ADMIN", "EVAL_SQL_PASSWORD"]
+    sql_auth = (
+        ["EVAL_MYSQL_HOST", "EVAL_MYSQL_USER", "EVAL_MYSQL_PASSWORD"]
+        if mysql_mode
+        else ["EVAL_SQL_SERVER", "EVAL_SQL_ADMIN", "EVAL_SQL_PASSWORD"]
+    )
     missing_sql = [name for name in sql_auth if not os.getenv(name)]
     if check_live and not missing_sql and safe_config:
-        lifecycle = SqlCmdDatabaseLifecycle(server=server, username=os.environ["EVAL_SQL_ADMIN"], password=os.environ["EVAL_SQL_PASSWORD"], databases=DATABASES, allowed_hosts={item.lower() for item in allowed_hosts}, allowed_databases=allowed_databases)
+        lifecycle = (
+            MySQLDatabaseLifecycle(
+                host=server,
+                port=int(os.getenv("EVAL_MYSQL_PORT", "3306")),
+                username=os.environ["EVAL_MYSQL_USER"],
+                password=os.environ["EVAL_MYSQL_PASSWORD"],
+                databases=DATABASES,
+                allowed_hosts={item.lower() for item in allowed_hosts},
+                allowed_databases=allowed_databases,
+            )
+            if mysql_mode
+            else SqlCmdDatabaseLifecycle(server=server, username=os.environ["EVAL_SQL_ADMIN"], password=os.environ["EVAL_SQL_PASSWORD"], databases=DATABASES, allowed_hosts={item.lower() for item in allowed_hosts}, allowed_databases=allowed_databases)
+        )
         for domain in DOMAINS:
             try:
                 lifecycle.assert_safe_target(domain)

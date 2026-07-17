@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import threading
@@ -25,6 +26,11 @@ from evaluation.runners.contracts import (
 
 TERMINAL_STATUSES = {
     "AI_ANSWERED",
+    "INSUFFICIENT_DATABASE_EVIDENCE",
+    "AI_SKIPPED_BY_EVIDENCE_GATE",
+    "AI_SKIPPED_BY_POLICY",
+    "AI_INVOCATION_FAILED",
+    "DETERMINISTIC_ANSWERED",
     "DEVELOPER_REVIEW",
     "FIX_APPLIED",
     "PENDING_APPROVAL",
@@ -40,6 +46,8 @@ FAILED_STATUSES = {
     "persistence_failed",
     "cleanup_failed",
     "interrupted",
+    "invalid_configuration",
+    "unsupported_database_engine",
 }
 
 
@@ -93,7 +101,7 @@ class EvaluationRunner:
             "MAX_INVESTIGATION_ROWS",
             "ALLOW_FULL_TABLE_SCAN",
         )
-        return {
+        extracted = {
             "application_commit": commit,
             "application_version": app_version,
             "feature_flags": {name: os.getenv(name) for name in flag_names},
@@ -101,6 +109,7 @@ class EvaluationRunner:
             "llm_model": os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             "started_at": time.time(),
         }
+        return extracted
 
     def run_scenario(self, run_id: str, scenario: ScenarioContract) -> ExecutionResult:
         lock = self._lock_for(scenario.domain)
@@ -108,14 +117,30 @@ class EvaluationRunner:
             return self._run_locked(run_id, scenario)
 
     def run_many(self, run_id: str, scenarios: list[ScenarioContract]) -> list[ExecutionResult]:
+        # Manifests are loaded in domain-sized blocks. Interleave those blocks so a
+        # multi-worker run can use one worker per domain instead of parking workers
+        # behind the same-domain safety lock.
+        by_domain: dict[str, list[ScenarioContract]] = {}
+        for scenario in scenarios:
+            by_domain.setdefault(scenario.domain, []).append(scenario)
+        ordered: list[ScenarioContract] = []
+        while any(by_domain.values()):
+            for queue in by_domain.values():
+                if queue:
+                    ordered.append(queue.pop(0))
         with ThreadPoolExecutor(max_workers=self.config.concurrency) as executor:
             futures = [
-                executor.submit(self.run_scenario, run_id, scenario) for scenario in scenarios
+                executor.submit(self.run_scenario, run_id, scenario) for scenario in ordered
             ]
             return [future.result() for future in as_completed(futures)]
 
     def _run_locked(self, run_id: str, scenario: ScenarioContract) -> ExecutionResult:
         started = self.clock()
+        def progress(stage: str, **details: Any) -> None:
+            if os.getenv("EVAL_PROGRESS_ENABLED", "false").lower() in {"1", "true", "yes", "on"}:
+                payload = {"scenario_id": scenario.scenario_id, "stage": stage, **details}
+                print(json.dumps(payload, default=str), flush=True)
+
         result = ExecutionResult(
             scenario_id=scenario.scenario_id,
             domain=scenario.domain,
@@ -124,8 +149,17 @@ class EvaluationRunner:
         setup_started = self.clock()
         persistence_error: Exception | None = None
         try:
+            scenario_engine = scenario.database_engine.lower().replace(" ", "").replace("_", "")
+            target_engine = self.config.database_engine.lower().replace(" ", "").replace("_", "")
+            if target_engine and scenario_engine not in {target_engine, "sqlserver" if target_engine == "sqlserver" else target_engine}:
+                result.status = "unsupported_database_engine"
+                result.errors.append(f"Scenario requires {scenario.database_engine}; configured engine is {self.config.database_engine}")
+                return result
+            progress("database_reset_started")
             self.database.reset(scenario)
+            progress("defect_injection_started")
             self.database.inject(scenario)
+            progress("setup_verification_started")
             verification = self.database.verify(scenario)
             result.extracted_result["setup_verification"] = verification
             if not verification.get("verified"):
@@ -134,13 +168,16 @@ class EvaluationRunner:
             payload = self._request_payload(scenario)
             result.raw_request = payload
             submit_started = self.clock()
+            progress("investigation_submission_started")
             submission = self._retry(lambda: self.api.submit(payload), result)
             result.timings["investigation_submission_seconds"] = self.clock() - submit_started
             result.raw_response["submission"] = submission
             result.investigation_id = str(submission.get("investigation_id") or "")
+            progress("investigation_submitted", investigation_id=result.investigation_id)
             if not result.investigation_id:
                 result.status = "partial_application_response"
             else:
+                progress("investigation_polling_started", investigation_id=result.investigation_id)
                 detail = self._poll(result.investigation_id, result)
                 if self.result_reader:
                     context = self.config.context
@@ -154,8 +191,31 @@ class EvaluationRunner:
                 result.investigation_status = str(detail.get("status") or "")
                 result.extracted_result = {**result.extracted_result, **self._extract(submission, detail)}
                 self._capture_optional_metrics(result)
-                result.status = (
-                    "completed" if detail.get("ai_answer") else "partial_application_response"
+                if self.config.ai_enabled:
+                    trace = detail.get("debug_trace") if isinstance(detail.get("debug_trace"), dict) else {}
+                    result.extracted_result["ai_diagnostic_category"] = self._ai_diagnostic_category(
+                        trace, result.investigation_status
+                    )
+                    reasons = []
+                    if not trace.get("ai_reasoning_invoked"):
+                        reasons.append("application AI reasoning invocation was not recorded")
+                    if not trace.get("llm_model_name"):
+                        reasons.append("application AI model was not recorded")
+                    if not trace.get("prompt_version"):
+                        reasons.append("application AI prompt version was not recorded")
+                    if int(trace.get("input_tokens") or 0) <= 0 or int(trace.get("output_tokens") or 0) <= 0:
+                        reasons.append("application AI token usage was not recorded")
+                    if reasons:
+                        result.status = "invalid_configuration"
+                        result.errors.extend(reasons)
+                    else:
+                        result.status = "completed" if detail.get("ai_answer") else "partial_application_response"
+                else:
+                    result.status = "completed" if detail.get("ai_answer") else "partial_application_response"
+                progress(
+                    "investigation_terminal",
+                    investigation_id=result.investigation_id,
+                    application_status=result.investigation_status,
                 )
         except SetupFailedError as exc:
             result.status = "setup_failed"
@@ -175,6 +235,7 @@ class EvaluationRunner:
         finally:
             cleanup_started = self.clock()
             try:
+                progress("cleanup_started")
                 self.database.cleanup(scenario)
                 result.extracted_result["cleanup_status"] = "passed"
             except Exception as exc:
@@ -188,7 +249,9 @@ class EvaluationRunner:
             result.raw_response = redact(result.raw_response)
             result.errors = redact(result.errors)
             try:
+                progress("result_persistence_started", status=result.status)
                 self.store.persist(run_id, scenario, result)
+                progress("result_persisted", status=result.status)
             except Exception as exc:
                 persistence_error = exc
                 result.errors.append(f"Persistence failed: {redact(str(exc))}")
@@ -200,13 +263,14 @@ class EvaluationRunner:
 
     def _request_payload(self, scenario: ScenarioContract) -> dict[str, Any]:
         context = self.config.context
-        return {
+        extracted = {
             "organization_id": context.organization_id,
             "workspace_id": context.workspace_id,
             "connection_id": context.connection_ids[scenario.domain],
             "user_id": context.user_id,
             "question": scenario.question,
         }
+        return extracted
 
     def _retry(self, call, result: ExecutionResult) -> dict[str, Any]:
         for attempt in range(self.config.max_api_retries + 1):
@@ -256,7 +320,7 @@ class EvaluationRunner:
                 if item.get(key)
             ]
 
-        return {
+        extracted = {
             "identified_entities": combined.get(
                 "identified_entities", combined.get("extracted_entities", [])
             ),
@@ -287,6 +351,14 @@ class EvaluationRunner:
             "estimated_cost": combined.get("estimated_cost"),
             "report_snapshot": combined.get("report_snapshot", {}),
         }
+        from evaluation.framework.entity_provenance import canonicalize_entities
+
+        extracted["entity_provenance"] = canonicalize_entities(
+            extracted["identified_entities"], evidence
+        )
+        extracted["canonical_investigated_entity"] = extracted["entity_provenance"]["canonical_investigated_entity"]
+        extracted["evidence_linked_entities"] = extracted["entity_provenance"]["evidence_linked_entities"]
+        return extracted
 
     def _write_recovery(
         self, run_id: str, scenario: ScenarioContract, result: ExecutionResult
@@ -296,6 +368,25 @@ class EvaluationRunner:
         path = root / f"{scenario.scenario_id}-attempt-{result.attempt}.json"
         path.write_text(json.dumps(redact(asdict(result)), indent=2, default=str), encoding="utf-8")
         return str(path)
+
+    @staticmethod
+    def _ai_diagnostic_category(trace: dict[str, Any], investigation_status: str) -> str:
+        outcome = str(trace.get("ai_outcome") or "")
+        skip_reason = str(trace.get("ai_skip_reason") or "")
+        if outcome == "insufficient_evidence" or investigation_status == "INSUFFICIENT_DATABASE_EVIDENCE":
+            return "insufficient_evidence_before_ai"
+        if outcome == "evidence_gate" or skip_reason == "evidence_gate_not_reproduced":
+            return "evidence_gate_skipped_ai"
+        if outcome == "provider_failure" or investigation_status == "AI_INVOCATION_FAILED":
+            return "ai_invocation_failed"
+        if not trace or not any(
+            key in trace
+            for key in ("ai_reasoning_invoked", "ai_outcome", "ai_skip_reason")
+        ):
+            return "missing_ai_instrumentation"
+        if trace.get("ai_reasoning_invoked"):
+            return "ai_invoked"
+        return "other_ai_not_invoked"
 
     @staticmethod
     def _capture_optional_metrics(result: ExecutionResult) -> None:

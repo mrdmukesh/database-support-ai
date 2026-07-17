@@ -65,10 +65,13 @@ class MetadataSearchContext:
     def cache_key(self) -> str:
         return "|".join(
             [
+                "metadata-v2",
                 self.organization_id,
                 self.workspace_id,
                 self.connection_id,
                 self.database_name.lower(),
+                self.schema_name.lower(),
+                self.connector_cache_key,
             ]
         )
 
@@ -181,6 +184,14 @@ def _business_identifiers(entities: EntityExtractionResult) -> list[str]:
         for entity in entities.entities
         if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
     ]
+
+
+def _requires_diagnostic_objects(tokens: set[str]) -> bool:
+    return bool(tokens & {
+        "missing", "absent", "failed", "failure", "stuck", "blocked",
+        "rollback", "rolled", "retry", "retries", "rejected", "exception",
+        "duplicate", "duplicated", "twice",
+    })
 
 
 def _explicit_names(question: str, label: str) -> set[str]:
@@ -470,7 +481,7 @@ def search_metadata(
     views = [view for view in metadata.views if any(token in view.lower() for token in tokens)]
     if not views and not relevance_required:
         views = metadata.views[:10]
-    if tokens & {"missing", "absent", "failed", "failure", "stuck", "blocked"}:
+    if _requires_diagnostic_objects(tokens):
         selected_table_names = {table.name for table in tables}
         for table_name in metadata.tables:
             if table_name in selected_table_names or not is_diagnostic_object(table_name):
@@ -499,7 +510,7 @@ def search_metadata(
             item["reason"] += "; outside top scored metadata candidates"
     output_tables = tables[:8]
     output_names = {table.name for table in output_tables}
-    if tokens & {"missing", "absent", "failed", "failure", "stuck", "blocked"}:
+    if _requires_diagnostic_objects(tokens):
         for table in tables:
             if table.name not in output_names and is_diagnostic_object(table.name):
                 output_tables.append(table)

@@ -1,0 +1,372 @@
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "scenario_id": "banking-benchmark-002",
+      "before_status": "invalid_configuration",
+      "after_status": "completed",
+      "result_id": "4771cfa9-6f49-4791-a3ba-2e9981d7e6a9",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "BNK-[MASKED_PHONE]",
+      "extracted_entity": "BNK-[MASKED_PHONE]",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "BNK-[MASKED_PHONE]",
+      "candidate_entities": [
+        "BNK-[MASKED_PHONE]-A",
+        "AUD-BNK-[MASKED_PHONE]-A",
+        "EX-BNK-[MASKED_PHONE]-A",
+        "MSG-BNK-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary",
+        "related",
+        "related",
+        "related"
+      ],
+      "exact_match_found": false,
+      "partial_matches_found": 4,
+      "selected_canonical_entity": "BNK-2026-0002-A",
+      "selection_reason": "One direct canonical extension matched; prefixed related identifiers remained related evidence.",
+      "database_identifier": "BNK-2026-0002-A",
+      "sql_parameter": "BNK-2026-0002-A",
+      "tables_queried": [
+        "eval.audit_history",
+        "eval.exceptions",
+        "eval.integration_messages",
+        "eval.payment_instructions",
+        "eval.transactions",
+        "eval.transfers"
+      ],
+      "rows_returned": 7,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 4475,
+      "output_tokens": 1513,
+      "judge_classification": "pass",
+      "judge_score": 83.95,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "shipping-benchmark-004",
+      "before_status": "invalid_configuration",
+      "after_status": "completed",
+      "result_id": "ce5f19d5-d3e9-4dbb-9f4e-cafb956974e3",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "SHP-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "SHP-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "SHP-2026-0004-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "SHP-2026-0004-A",
+      "sql_parameter": "SHP-2026-0004-A",
+      "tables_queried": [
+        "eval.container_events",
+        "eval.shipment_milestones",
+        "eval.shipments"
+      ],
+      "rows_returned": 4,
+      "gate_required": true,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 3688,
+      "output_tokens": 1229,
+      "judge_classification": "fail",
+      "judge_score": 83.35,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "orders-benchmark-010",
+      "before_status": "invalid_configuration",
+      "after_status": "completed",
+      "result_id": "2de87182-956d-45ae-9489-daccadd1902c",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "ORD-[MASKED_PHONE]-A",
+      "extracted_entity": "ORD-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "ORD-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "ORD-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "ORD-2026-0010-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "ORD-2026-0010-A",
+      "sql_parameter": "ORD-2026-0010-A",
+      "tables_queried": [
+        "eval.audit_history",
+        "eval.exceptions",
+        "eval.integration_messages",
+        "eval.purchase_order_lines",
+        "eval.sales_order_lines",
+        "eval.sales_orders"
+      ],
+      "rows_returned": 7,
+      "gate_required": true,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 4589,
+      "output_tokens": 1494,
+      "judge_classification": "fail",
+      "judge_score": 76.65,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "shipping-benchmark-005",
+      "before_status": "invalid_configuration",
+      "after_status": "invalid_configuration",
+      "result_id": "2f86017a-570c-41a2-9dc5-692f276c3c75",
+      "investigation_status": "AI_SKIPPED_BY_EVIDENCE_GATE",
+      "question_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "SHP-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "SHP-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "SHP-2026-0005-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "SHP-2026-0005-A",
+      "sql_parameter": "SHP-2026-0005-A",
+      "tables_queried": [
+        "eval.integration_messages",
+        "eval.shipment_milestones",
+        "eval.shipments"
+      ],
+      "rows_returned": 5,
+      "gate_required": true,
+      "gate_result": false,
+      "gate_blockers": [
+        "Parent-child relationship was not confirmed by metadata or SQL join evidence.",
+        "Duplicate condition was not confirmed by returned rows."
+      ],
+      "ai_outcome": "evidence_gate",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "judge_classification": null,
+      "judge_score": null,
+      "remaining_failure": "application AI reasoning invocation was not recorded; application AI token usage was not recorded"
+    },
+    {
+      "scenario_id": "shipping-benchmark-008",
+      "before_status": "completed_wrong_entity",
+      "after_status": "invalid_configuration",
+      "result_id": "c54c4067-c41e-42dd-8fbd-d95dd4c48b7f",
+      "investigation_status": "AI_INVOCATION_FAILED",
+      "question_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity": "SHP-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "SHP-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "SHP-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "SHP-2026-0008-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "SHP-2026-0008-A",
+      "sql_parameter": "SHP-2026-0008-A",
+      "tables_queried": [
+        "eval.audit_history",
+        "eval.bills_of_lading",
+        "eval.exceptions",
+        "eval.integration_messages",
+        "eval.shipment_milestones",
+        "eval.shipments"
+      ],
+      "rows_returned": 7,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "provider_failure",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "judge_classification": null,
+      "judge_score": null,
+      "remaining_failure": "application AI token usage was not recorded"
+    },
+    {
+      "scenario_id": "clinic-benchmark-017",
+      "before_status": "completed_missing_evidence",
+      "after_status": "completed",
+      "result_id": "f3f124c0-adfa-4877-b02c-e351db33e2f5",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "CLN-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "CLN-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "CLN-2026-0017-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "CLN-2026-0017-A",
+      "sql_parameter": "CLN-2026-0017-A",
+      "tables_queried": [
+        "eval.appointments",
+        "eval.audit_history",
+        "eval.exceptions",
+        "eval.insurance_policies",
+        "eval.integration_messages",
+        "eval.patients"
+      ],
+      "rows_returned": 7,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 4560,
+      "output_tokens": 1137,
+      "judge_classification": "pass",
+      "judge_score": 81.802,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "shipping-pilot-003",
+      "before_status": "completed",
+      "after_status": "completed",
+      "result_id": "ca10349b-1d25-4138-8c03-234e06e03900",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "WO-5003",
+      "extracted_entity": "WO-5003",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "WO-5003",
+      "candidate_entities": [
+        "WO-5003"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "WO-5003",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "WO-5003",
+      "sql_parameter": "WO-5003",
+      "tables_queried": [
+        "eval.carrier_assignments",
+        "eval.repair_orders",
+        "eval.transport_work_orders"
+      ],
+      "rows_returned": 7,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 4507,
+      "output_tokens": 1184,
+      "judge_classification": "pass",
+      "judge_score": 92.55,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "clinic-benchmark-001",
+      "before_status": "completed",
+      "after_status": "completed",
+      "result_id": "0662a40a-0567-49c3-89a5-f0c5c70c8169",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "CLN-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "CLN-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "CLN-2026-0001-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "CLN-2026-0001-A",
+      "sql_parameter": "CLN-2026-0001-A",
+      "tables_queried": [
+        "eval.appointments",
+        "eval.audit_history",
+        "eval.exceptions",
+        "eval.insurance_policies",
+        "eval.integration_messages",
+        "eval.patients"
+      ],
+      "rows_returned": 8,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 4660,
+      "output_tokens": 1223,
+      "judge_classification": "pass",
+      "judge_score": 83.65,
+      "remaining_failure": ""
+    },
+    {
+      "scenario_id": "clinic-benchmark-006",
+      "before_status": "completed",
+      "after_status": "completed",
+      "result_id": "09996e9a-397e-4e74-aea3-a9f8329a7149",
+      "investigation_status": "AI_ANSWERED",
+      "question_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity": "CLN-[MASKED_PHONE]-A",
+      "extracted_entity_type": "exact_id_or_code",
+      "normalized_entity": "CLN-[MASKED_PHONE]-A",
+      "candidate_entities": [
+        "CLN-[MASKED_PHONE]-A"
+      ],
+      "candidate_types": [
+        "primary"
+      ],
+      "exact_match_found": true,
+      "partial_matches_found": 0,
+      "selected_canonical_entity": "CLN-2026-0006-A",
+      "selection_reason": "Exact database evidence match.",
+      "database_identifier": "CLN-2026-0006-A",
+      "sql_parameter": "CLN-2026-0006-A",
+      "tables_queried": [
+        "eval.appointments",
+        "eval.insurance_policies",
+        "eval.patients",
+        "eval.prescriptions"
+      ],
+      "rows_returned": 4,
+      "gate_required": false,
+      "gate_result": true,
+      "gate_blockers": [],
+      "ai_outcome": "success",
+      "input_tokens": 3619,
+      "output_tokens": 1227,
+      "judge_classification": "pass",
+      "judge_score": 76.541,
+      "remaining_failure": ""
+    }
+  ]
+}

@@ -1,0 +1,2755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Combined Benchmark Dashboard</title>
+<style>
+:root{--bg:#0f172a;--panel:#111827;--text:#e5e7eb;--muted:#94a3b8;--line:#334155;--accent:#38bdf8;--purple:#a78bfa;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0f172a,#111827);color:var(--text);font-family:Segoe UI,Arial,sans-serif}
+.wrap{max-width:1500px;margin:auto;padding:28px}
+h1{margin:0}
+.sub{color:var(--muted);margin:7px 0 22px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+.card,.panel{background:rgba(17,24,39,.95);border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 26px rgba(0,0,0,.18)}
+.kpi{padding:15px}
+.kpi span,.mini-grid span{display:block;color:var(--muted);font-size:12px}
+.kpi strong{display:block;font-size:26px;margin-top:5px}
+.domains{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+.domain-card{padding:15px}
+.domain-card h3{margin:0 0 10px}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mini-grid strong{font-size:18px}
+.panel{padding:17px;margin-bottom:18px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:1120px}
+th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}
+th{color:#cbd5e1;background:#111827;position:sticky;top:0}
+tr:hover{background:rgba(56,189,248,.05)}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.good{background:rgba(34,197,94,.15);color:#86efac}
+.warn{background:rgba(245,158,11,.15);color:#fcd34d}
+.bad{background:rgba(239,68,68,.15);color:#fca5a5}
+.neutral{background:rgba(148,163,184,.15);color:#cbd5e1}
+a{color:var(--accent);text-decoration:none}
+.bar-row{display:grid;grid-template-columns:220px 1fr 58px 1fr 58px;gap:9px;align-items:center;margin:8px 0}
+.bar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
+.track{height:12px;border-radius:999px;background:#0b1220;border:1px solid #22304a;overflow:hidden}
+.fill{height:100%}
+.det{background:var(--accent)}
+.judge{background:var(--purple)}
+.note{color:var(--muted);font-size:12px}
+@media(max-width:1100px){.kpis{grid-template-columns:repeat(3,1fr)}.domains{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Database Support AI - Combined Benchmark Dashboard</h1>
+<div class="sub">Latest persisted result for each scenario</div>
+
+<section class="kpis">
+<div class="card kpi"><span>Scenarios</span><strong>125</strong></div>
+<div class="card kpi"><span>Scored</span><strong>123</strong></div>
+<div class="card kpi"><span>Passes</span><strong>5</strong></div>
+<div class="card kpi"><span>Avg deterministic</span><strong>3.30</strong></div>
+<div class="card kpi"><span>Avg AI Judge</span><strong>5.14</strong></div>
+<div class="card kpi"><span>Human review</span><strong>0</strong></div>
+</section>
+
+<section class="domains">
+        <div class="card domain-card">
+          <h3>Banking</h3>
+          <div class="mini-grid">
+            <div><span>Scenarios</span><strong>25</strong></div>
+            <div><span>Scored</span><strong>24</strong></div>
+            <div><span>Passes</span><strong>2</strong></div>
+            <div><span>Avg deterministic</span><strong>6.62</strong></div>
+            <div><span>Avg AI Judge</span><strong>9.64</strong></div>
+            <div><span>Human review</span><strong>0</strong></div>
+          </div>
+        </div>
+        
+        <div class="card domain-card">
+          <h3>Orders</h3>
+          <div class="mini-grid">
+            <div><span>Scenarios</span><strong>25</strong></div>
+            <div><span>Scored</span><strong>25</strong></div>
+            <div><span>Passes</span><strong>1</strong></div>
+            <div><span>Avg deterministic</span><strong>2.90</strong></div>
+            <div><span>Avg AI Judge</span><strong>3.02</strong></div>
+            <div><span>Human review</span><strong>0</strong></div>
+          </div>
+        </div>
+        
+        <div class="card domain-card">
+          <h3>Shipping</h3>
+          <div class="mini-grid">
+            <div><span>Scenarios</span><strong>25</strong></div>
+            <div><span>Scored</span><strong>25</strong></div>
+            <div><span>Passes</span><strong>1</strong></div>
+            <div><span>Avg deterministic</span><strong>3.72</strong></div>
+            <div><span>Avg AI Judge</span><strong>3.84</strong></div>
+            <div><span>Human review</span><strong>0</strong></div>
+          </div>
+        </div>
+        
+        <div class="card domain-card">
+          <h3>Payroll</h3>
+          <div class="mini-grid">
+            <div><span>Scenarios</span><strong>25</strong></div>
+            <div><span>Scored</span><strong>24</strong></div>
+            <div><span>Passes</span><strong>0</strong></div>
+            <div><span>Avg deterministic</span><strong>0.00</strong></div>
+            <div><span>Avg AI Judge</span><strong>3.02</strong></div>
+            <div><span>Human review</span><strong>0</strong></div>
+          </div>
+        </div>
+        
+        <div class="card domain-card">
+          <h3>Clinic</h3>
+          <div class="mini-grid">
+            <div><span>Scenarios</span><strong>25</strong></div>
+            <div><span>Scored</span><strong>25</strong></div>
+            <div><span>Passes</span><strong>1</strong></div>
+            <div><span>Avg deterministic</span><strong>3.25</strong></div>
+            <div><span>Avg AI Judge</span><strong>6.15</strong></div>
+            <div><span>Human review</span><strong>0</strong></div>
+          </div>
+        </div>
+        </section>
+<section class="panel"><h2>Score comparison</h2>
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-001">banking-benchmark-001</div>
+          <div class="track"><div class="fill det" style="width:77.579%"></div></div>
+          <div>77.58</div>
+          <div class="track"><div class="fill judge" style="width:77.55%"></div></div>
+          <div>77.55</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-002">banking-benchmark-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>-</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>-</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-003">banking-benchmark-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-004">banking-benchmark-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-005">banking-benchmark-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-006">banking-benchmark-006</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-007">banking-benchmark-007</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-008">banking-benchmark-008</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-009">banking-benchmark-009</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-010">banking-benchmark-010</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-011">banking-benchmark-011</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-012">banking-benchmark-012</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-013">banking-benchmark-013</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-014">banking-benchmark-014</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:72.4%"></div></div>
+          <div>72.40</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-015">banking-benchmark-015</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-016">banking-benchmark-016</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-017">banking-benchmark-017</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-018">banking-benchmark-018</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-019">banking-benchmark-019</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-benchmark-020">banking-benchmark-020</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-pilot-001">banking-pilot-001</div>
+          <div class="track"><div class="fill det" style="width:81.349%"></div></div>
+          <div>81.35</div>
+          <div class="track"><div class="fill judge" style="width:81.35%"></div></div>
+          <div>81.35</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-pilot-002">banking-pilot-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-pilot-003">banking-pilot-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-pilot-004">banking-pilot-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="banking-pilot-005">banking-pilot-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-001">orders-benchmark-001</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-002">orders-benchmark-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-003">orders-benchmark-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-004">orders-benchmark-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-005">orders-benchmark-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-006">orders-benchmark-006</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-007">orders-benchmark-007</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-008">orders-benchmark-008</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-009">orders-benchmark-009</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-010">orders-benchmark-010</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-011">orders-benchmark-011</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-012">orders-benchmark-012</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-013">orders-benchmark-013</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>-</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-014">orders-benchmark-014</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-015">orders-benchmark-015</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-016">orders-benchmark-016</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-017">orders-benchmark-017</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-018">orders-benchmark-018</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-019">orders-benchmark-019</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-benchmark-020">orders-benchmark-020</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-pilot-001">orders-pilot-001</div>
+          <div class="track"><div class="fill det" style="width:72.46%"></div></div>
+          <div>72.46</div>
+          <div class="track"><div class="fill judge" style="width:72.55%"></div></div>
+          <div>72.55</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-pilot-002">orders-pilot-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-pilot-003">orders-pilot-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-pilot-004">orders-pilot-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="orders-pilot-005">orders-pilot-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-001">shipping-benchmark-001</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-002">shipping-benchmark-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-003">shipping-benchmark-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-004">shipping-benchmark-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-005">shipping-benchmark-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-006">shipping-benchmark-006</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-007">shipping-benchmark-007</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-008">shipping-benchmark-008</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-009">shipping-benchmark-009</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-010">shipping-benchmark-010</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-011">shipping-benchmark-011</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>-</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-012">shipping-benchmark-012</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-013">shipping-benchmark-013</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-014">shipping-benchmark-014</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-015">shipping-benchmark-015</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-016">shipping-benchmark-016</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-017">shipping-benchmark-017</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-018">shipping-benchmark-018</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-019">shipping-benchmark-019</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-benchmark-020">shipping-benchmark-020</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-pilot-001">shipping-pilot-001</div>
+          <div class="track"><div class="fill det" style="width:93.055%"></div></div>
+          <div>93.06</div>
+          <div class="track"><div class="fill judge" style="width:92.15%"></div></div>
+          <div>92.15</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-pilot-002">shipping-pilot-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-pilot-003">shipping-pilot-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-pilot-004">shipping-pilot-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="shipping-pilot-005">shipping-pilot-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-001">payroll-benchmark-001</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-002">payroll-benchmark-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-003">payroll-benchmark-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-004">payroll-benchmark-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-005">payroll-benchmark-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-006">payroll-benchmark-006</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-007">payroll-benchmark-007</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-008">payroll-benchmark-008</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-009">payroll-benchmark-009</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-010">payroll-benchmark-010</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-011">payroll-benchmark-011</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-012">payroll-benchmark-012</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-013">payroll-benchmark-013</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-014">payroll-benchmark-014</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:72.4%"></div></div>
+          <div>72.40</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-015">payroll-benchmark-015</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-016">payroll-benchmark-016</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-017">payroll-benchmark-017</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-018">payroll-benchmark-018</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-019">payroll-benchmark-019</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-benchmark-020">payroll-benchmark-020</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-pilot-001">payroll-pilot-001</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>-</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>-</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-pilot-002">payroll-pilot-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-pilot-003">payroll-pilot-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-pilot-004">payroll-pilot-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="payroll-pilot-005">payroll-pilot-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-001">clinic-benchmark-001</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-002">clinic-benchmark-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-003">clinic-benchmark-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-004">clinic-benchmark-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-005">clinic-benchmark-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-006">clinic-benchmark-006</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-007">clinic-benchmark-007</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-008">clinic-benchmark-008</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-009">clinic-benchmark-009</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-010">clinic-benchmark-010</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-011">clinic-benchmark-011</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-012">clinic-benchmark-012</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-013">clinic-benchmark-013</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-014">clinic-benchmark-014</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:72.4%"></div></div>
+          <div>72.40</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-015">clinic-benchmark-015</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-016">clinic-benchmark-016</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-017">clinic-benchmark-017</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-018">clinic-benchmark-018</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-019">clinic-benchmark-019</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-benchmark-020">clinic-benchmark-020</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-pilot-001">clinic-pilot-001</div>
+          <div class="track"><div class="fill det" style="width:81.349%"></div></div>
+          <div>81.35</div>
+          <div class="track"><div class="fill judge" style="width:81.35%"></div></div>
+          <div>81.35</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-pilot-002">clinic-pilot-002</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-pilot-003">clinic-pilot-003</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-pilot-004">clinic-pilot-004</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        
+        <div class="bar-row">
+          <div class="bar-label" title="clinic-pilot-005">clinic-pilot-005</div>
+          <div class="track"><div class="fill det" style="width:0%"></div></div>
+          <div>0.00</div>
+          <div class="track"><div class="fill judge" style="width:0%"></div></div>
+          <div>0.00</div>
+        </div>
+        <p class="note">Blue = deterministic; purple = AI Judge.</p></section>
+<section class="panel"><h2>Detailed results</h2>
+<table>
+<thead><tr><th>Domain</th><th>Scenario</th><th>Entity</th><th>Status</th><th>Deterministic</th><th>AI Judge</th><th>Human review</th><th>Latency</th><th>Investigation</th><th>Report</th></tr></thead>
+<tbody>
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-001</code></td>
+          <td>BNK-2026-0001-A</td>
+          <td><span class="badge good">PASS</span></td>
+          <td>77.58</td>
+          <td>77.55</td>
+          <td>No</td>
+          <td>30.73</td>
+          <td>INV-20260717-033917-3923DB5C</td>
+          <td title="The investigation correctly identified that the payment BNK-2026-0001-A is marked Failed because a transaction record with status &#x27;Failed&#x27; exists, but no corresponding payment instructions or transfer records were found. This root cause is supported by multiple SQL evidence queries returning no rows for payment_instructions and transfers, but one failed transaction record. The evidence and citations are fully correct and consistent. Object discovery is strong but missing some expected objects (integration_messages, exceptions, audit_history). The recommended fix is only partially correct as it lacks concrete actionable steps and validation queries. Safety and completeness are high, though some missing evidence limits full confidence. No unsupported claims or critical failures were detected. Overall, the analysis is reliable but would benefit from additional evidence sources and a more detailed fix plan."><a href="research/results/d2bf1c37-e537-42d9-b535-337632668a73/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-002</code></td>
+          <td>BNK-2026-0002</td>
+          <td><span class="badge bad">INVALID CONFIG</span></td>
+          <td>-</td>
+          <td>-</td>
+          <td>No</td>
+          <td>6.37</td>
+          <td>9a1c1818-f649-4d9c-bb79-3da76e5a9d6c</td>
+          <td title="-"><a href="research/results/11c9e21d-ff7c-4780-a8e2-65ed634d5817/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.19</td>
+          <td>bb667d11-a1d3-4f2e-b2cf-c54b9403a1dd</td>
+          <td title="The investigation failed to identify a unique business entity due to multiple plausible records matching the partial identifier BNK-2026-0003. No required evidence or database objects were provided to support the root cause. The critical failure is due to ambiguous entity resolution and lack of supporting evidence, necessitating human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.20</td>
+          <td>f9226862-afe3-43d8-b68b-50b0eaa1d410</td>
+          <td title="No database evidence or objects were found to support the investigation of payment BNK-2026-0004-A. The root cause could not be confirmed due to lack of matching records or correlated integration data. This absence of supporting evidence constitutes a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.17</td>
+          <td>a7cca38e-93c1-4c09-ab0b-88d9bc793f75</td>
+          <td title="The investigation failed due to ambiguous entity resolution for BNK-2026-0005-A with multiple plausible candidates and no supporting evidence found. No root cause or fix concepts were confirmed. Human review is required to select the correct entity and provide evidence before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-006</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.15</td>
+          <td>817cb02a-1f55-4070-a9c2-09287ea8c005</td>
+          <td title="No evidence or database objects were found or matched to confirm the root cause. The investigation failed to identify the payment BNK-2026-0006-A or any related workflow history, exceptions, or audit data. This lack of supporting evidence results in a critical failure due to confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-007</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.24</td>
+          <td>INV-20260716-225802-FF0F89B3</td>
+          <td title="The investigation failed critical validation due to analyzing an incorrect business entity (EX-BNK-2026-0007-A) and missing required database objects (cards, integration_messages, audit_history, and related schema objects). The root cause concept &#x27;the exception was recorded but no compensating transition ran&#x27; was not confirmed by evidence. No fix or root cause could be reliably established. The evidence collected did not reproduce the reported condition, and no direct write procedures or relationships were confirmed. Therefore, the response does not meet the expected criteria and is scored zero across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-008</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.00</td>
+          <td>INV-20260716-225815-6A8609D0</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated (MSG-BNK-2026-0008-A) and missing required database objects (fraud_alerts, exceptions, audit_history, and related schema objects). The root cause was not confirmed and the expected concept that the correlated integration message failed and blocked completion was not established. No acceptable fix was identified. The response does not meet the required schema or evidence standards, resulting in a final score of 0% and classification as a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-009</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.17</td>
+          <td>c162dde4-afbb-4dad-adce-f7d24cfbb11f</td>
+          <td title="-"><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-010</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.02</td>
+          <td>INV-20260716-225836-8FE4608C</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (BNK-2026-0010-A not found in any relevant tables). No evidence was found to confirm the reported issue or root cause. Required retry evidence and related database objects were missing. No stored procedures or triggers were identified or analyzed. The response type was insufficient evidence rather than confirmed root cause. No acceptable fix was proposed. The investigation is incomplete and requires human review to correct entity targeting and evidence collection before valid conclusions can be drawn."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-011</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.12</td>
+          <td>INV-20260716-225846-A96A2B76</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated (entity-1-exact-4). The root cause was not confirmed and no fix was proposed. Several required programmable objects were missing from the evidence. Although evidence and citations were correct, the fundamental entity mismatch invalidates the root cause and object discovery scores, resulting in a total failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-012</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.11</td>
+          <td>2a5b3f47-a151-4dda-adb6-718ab9b6a506</td>
+          <td title="The investigation failed to identify the correct business entity due to multiple ambiguous candidates for BNK-2026-0012-A, resulting in no confirmed root cause or supporting evidence. Required database objects and evidence were missing, and the root cause concept of absent required active reference data was not addressed. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-013</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.08</td>
+          <td>be28934e-f375-4e00-9706-bbc3cc2fb210</td>
+          <td title="The investigation failed due to ambiguous entity resolution with multiple plausible records for BNK-2026-0013-A, preventing identification of the correct business entity. No supporting evidence or database objects were discovered or verified. The root cause was not confirmed with evidence, and required evidence and objects were missing. Human review is required to select the correct entity before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-014</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>72.40</td>
+          <td>No</td>
+          <td>1.92</td>
+          <td>INV-20260716-225914-D6CB4C98</td>
+          <td title="The investigation correctly identified that trigger metadata is relevant but the expected correlated audit transition is absent, matching the root cause concept. Evidence queries returned valid data supporting the audit_history as the affected object. However, the investigation failed to correctly identify the exact business entity (used AUD-BNK-2026-0014-A instead of BNK-2026-0014-A) and did not include all expected tables and programmable objects, leading to a critical failure. The fix recommendations are minimal and incomplete. Due to the critical failure in entity correctness and incomplete object discovery, the final score is zero and human review is required."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-015</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.05</td>
+          <td>43d9d05a-0975-42ba-a877-b01dff56794a</td>
+          <td title="The investigation failed to isolate the single failed item due to ambiguous entity resolution with multiple plausible records matching BNK-2026-0015-A. No supporting evidence or database objects were identified to confirm the root cause or provide a fix. Human review is required to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-016</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.11</td>
+          <td>3259617b-3fc5-4d08-adf8-b70082b9bb3f</td>
+          <td title="No evidence or database objects were found to support the investigation of payment BNK-2026-0016-A. The root cause could not be confirmed due to lack of matching data or records. This constitutes a critical failure as a confirmed root cause was claimed without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-017</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.07</td>
+          <td>653ad716-dc2d-4513-8548-984a6f01a32f</td>
+          <td title="No evidence or database objects were found to support the confirmed root cause. The investigation failed to identify or verify the payment identifier or related audit and exception data, resulting in a critical failure due to unsupported claims."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-018</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.06</td>
+          <td>a6c7b9da-909c-46b6-8c54-73327a05056c</td>
+          <td title="No database evidence or objects were found to support the investigation of the replay issue for payment BNK-2026-0018-A. The root cause could not be confirmed due to lack of matching data or references. This is a critical failure as a confirmed root cause was claimed without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-019</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.03</td>
+          <td>INV-20260716-230002-133B4AE5</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated (entity BNK-2026-0019-A). The root cause was not confirmed and no acceptable fix was proposed. Required programmable objects were missing from the analysis. Evidence and object discovery were incomplete or incorrect, leading to a final score of 0%. The business status contradiction with failure evidence was identified as a concept but not resolved with correct entity or fix."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-benchmark-020</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.12</td>
+          <td>913e4002-ee80-428a-9526-085964cdeabd</td>
+          <td title="The investigation failed to identify a unique business entity due to multiple plausible matches for BNK-2026-0020-A, resulting in ambiguous entity resolution. No correlated multi-table evidence was provided to confirm the root cause. Required database objects and evidence were missing, preventing a valid conclusion. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-pilot-001</code></td>
+          <td>TRF-3101</td>
+          <td><span class="badge good">PASS</span></td>
+          <td>81.35</td>
+          <td>81.35</td>
+          <td>No</td>
+          <td>23.93</td>
+          <td>INV-20260717-011616-53B85E26</td>
+          <td title="The root cause is correctly identified as the transfer &#x27;TRF-3101&#x27; having an &#x27;Exception&#x27; status in eval.transfers with no matching balance movement or transaction records, indicating a processing failure. Evidence queries correctly confirm the presence of the transfer record and absence of related records, supporting the conclusion. The discovered database objects are relevant and well matched to the question. However, the fix correctness score is zero because no acceptable fix or remediation steps were explicitly provided in the answer. Citations are accurate and safety is ensured by read-only SQL usage. Completeness is good but limited by missing evidence from exceptions and integration_messages tables, which were expected but not returned. No unsupported claims or incorrect entities/objects are present. Overall, the answer is reliable and well supported but requires human review to define and validate a fix."><a href="research/results/cd3d592d-0e7c-49a9-8fba-30d61989c09d/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-pilot-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.29</td>
+          <td>97d861ef-9255-4276-a8ab-fc9be0f70273</td>
+          <td title="The investigation failed to find any matching database evidence or objects to support the root cause claim. No relevant data or entities related to payment instruction PMT-3102 or exceptions were identified. The confirmed root cause is unsupported by evidence, resulting in a critical failure and zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-pilot-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.36</td>
+          <td>3724627d-1c31-4208-a03b-04a385c8251e</td>
+          <td title="The investigation failed to identify or confirm any relevant database entities, evidence, or objects related to account ACC-3103. No root cause was supported by evidence, resulting in a critical failure due to confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-pilot-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.22</td>
+          <td>c1ea9f90-e4bf-4b1c-aff1-e9244d1974d2</td>
+          <td title="No evidence or database objects were found or matched to support the root cause claim. The confirmed root cause is unsupported by any data or references, resulting in a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Banking</td>
+          <td><code>banking-pilot-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.71</td>
+          <td>INV-20260716-225654-C177F526</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated (MSG-TXN-3105) and missing required evidence (EVAL-BANKING-005, absence of conclusive timestamps). Expected database objects including loans and specific procedures/functions/triggers were not found or used. The response type does not match the expected &#x27;insufficient_evidence&#x27; behavior. These issues mandate human review and prevent acceptance of the investigation as valid."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-001</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.18</td>
+          <td>INV-20260716-225706-B0FBADA4</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity for the order ORD-2026-0001-A. The exact business key did not resolve to one failed record as required. Expected database objects and procedures were not found or used. No confirmed root cause was determined automatically. The evidence and object discovery scores are zero because the required evidence and objects were missing or incorrect. The fix and citation correctness are also zero due to lack of proper evidence and references. Human review is required to correct the entity and re-investigate with the proper evidence and objects."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.34</td>
+          <td>f8c96562-892b-4baa-8cf6-69147a990393</td>
+          <td title="The investigation failed to safely resolve the partial identifier ORD-2026-0002 to a single record, resulting in ambiguity among multiple plausible candidates. No supporting evidence or database objects were identified or used. The root cause was not confirmed with evidence, and no acceptable fix was proposed. Human review is required to select the correct entity before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.32</td>
+          <td>0d887cba-58aa-428e-90aa-ead40762c8b6</td>
+          <td title="The investigation failed to identify the correct business entity due to multiple plausible matches for the partial identifier ORD-2026-0003. No supporting evidence was provided to confirm the root cause. Required evidence and expected database objects were missing. The investigation must stop and human review is required to select the correct candidate before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.17</td>
+          <td>1e32f3b9-0ead-4671-a7ca-e3a4e35d9e60</td>
+          <td title="No evidence or database objects were found or matched to support the confirmed root cause. The investigation failed to identify the upstream record or its correlated integration record, resulting in a critical failure due to unsupported claims."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.28</td>
+          <td>INV-20260716-225741-FC492440</td>
+          <td title="The investigation failed to confirm the root cause due to absence of any database rows for the supplied business key ORD-2026-0005-A in all relevant tables. No evidence was found to reproduce the reported duplicate processing messages condition. The investigation did not include required database objects and procedures, and did not produce any acceptable fix concept. A critical failure occurred because the wrong business entity was investigated, blocking valid root cause analysis. Human review is required to correct entity targeting and gather missing evidence before a valid conclusion can be drawn."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-006</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.22</td>
+          <td>f3e01fd3-53fe-44b4-8504-088b259a336f</td>
+          <td title="No evidence or database objects were found to support the investigation of order ORD-2026-0006-A. The root cause could not be confirmed due to lack of matching data or workflow history, resulting in a critical failure for confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-007</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.18</td>
+          <td>INV-20260716-225800-0508E3B5</td>
+          <td title="The investigation failed to reproduce the reported issue with the supplied business key ORD-2026-0007-A. No relevant rows were found in the expected tables, and the root cause concept &#x27;the exception was recorded but no compensating transition ran&#x27; was not supported by any evidence. Additionally, required database objects and evidence were missing from the investigation. The critical failure is due to investigating the wrong business entity, invalidating the root cause and evidence correctness. No fix or object discovery was correctly addressed. The response does not meet the expected schema or evidence requirements."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-008</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.21</td>
+          <td>INV-20260716-225812-4F811F4C</td>
+          <td title="The investigation failed the critical validation due to wrong business entity investigated and missing required evidence about the correlated integration message failure blocking completion. The reported order entity was not found in key tables, and required database objects and evidence were missing. No root cause was confirmed, and no acceptable fix was identified. The response does not meet the expected schema or evidence requirements."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-009</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.27</td>
+          <td>INV-20260716-225824-C1D4EC2C</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated and missing required database objects. No confirmed root cause or valid fix was established. Evidence correctly shows the order remains queued with status &#x27;Failed&#x27; and &#x27;queue backlog&#x27; details, but the entity was not found in related line tables, and key required objects were missing from the analysis. The response did not meet expected response type or object discovery requirements, resulting in a final score of 0%."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-010</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.14</td>
+          <td>INV-20260716-225834-07CC93CD</td>
+          <td title="The investigation failed to confirm the correct business entity and did not reproduce the reported issue with retries exhausted and entity pending. Expected database objects and evidence related to retries and terminal status were missing or not found. The root cause was not established, and no acceptable fix was recommended. The response lacks the required retry evidence and correct object usage, resulting in a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-011</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.12</td>
+          <td>INV-20260716-225843-97364DF6</td>
+          <td title="The investigation failed to confirm the root cause due to absence of evidence for the specified order ORD-2026-0011-A in the audit_history and related tables. No rows were returned for the key in audit_history, sales_order_lines, or purchase_order_lines, preventing validation of the business and audit state conflict. The investigation did not include or find evidence from required database objects and procedures. The critical failure is due to investigating the wrong business entity or missing the correct entity data, leading to zero confidence in root cause and evidence correctness. Human review is required to identify the correct entity and gather missing evidence before a valid root cause or fix can be proposed."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-012</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.32</td>
+          <td>da79add7-6475-445b-9543-79337d9e0e81</td>
+          <td title="The investigation failed due to ambiguous entity resolution with multiple plausible records for order ORD-2026-0012-A and no supporting evidence found for the root cause. Required database objects, evidence, and reference data were missing, preventing confirmation of the root cause. Human review is necessary to select the correct entity and provide valid evidence before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-013</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>-</td>
+          <td>No</td>
+          <td>2.24</td>
+          <td>INV-20260716-225901-9EF03096</td>
+          <td title="-"><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-014</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.31</td>
+          <td>INV-20260716-225912-325E0BE1</td>
+          <td title="Critical failure due to investigation on wrong business entity (AUD-ORD-2026-0014-A) instead of the expected ORD-2026-0014-A. This invalidates the root cause and object discovery scores. Evidence and citations are correct for the investigated entity but do not match the requested entity. Fix correctness is low as no approved fix concept was applied. Safety and completeness scores are zero due to missing required objects and incomplete evidence. No unsupported claims or missing evidence detected."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-015</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-225924-D13C295A</td>
+          <td title="The investigation failed to reproduce the reported issue for order ORD-2026-0015-A as no relevant rows were found in any inspected tables. The supplied business key was not found, blocking root cause analysis. The correlated batch or integration evidence isolating one failed item was missing. The root cause could not be confirmed, and no acceptable fix was identified. This constitutes a critical failure due to investigating the wrong business entity."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-016</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.05</td>
+          <td>INV-20260716-225931-8213FC55</td>
+          <td title="The investigation failed to confirm the correct business entity and did not provide the required root cause concept of &#x27;same-correlation events at overlapping timestamps show a lost-update race&#x27;. Expected database objects and evidence were missing. The root cause was not confirmed and the fix concept was not addressed. This constitutes a critical failure requiring human review."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-017</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-225941-3FA9F19C</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated and missing required evidence of exception and audit showing the unit of work rollback. Expected database objects and evidence were not found or used. The root cause was not confirmed and no acceptable fix was proposed. The response does not meet the required schema or concepts."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-018</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.26</td>
+          <td>INV-20260716-225951-1035234D</td>
+          <td title="The investigation failed critical validation because the wrong business entity was investigated, and the expected root cause concept &#x27;replay created a second correlated operation without an idempotency guard&#x27; was not confirmed. Key required database objects and procedures were missing from the analysis. The evidence did not support the expected root cause or fix concepts. Human review is required to correct entity targeting, include missing objects, and confirm root cause with appropriate evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-019</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-230000-3557D0F6</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (ORD-2026-0019-A not found in relevant tables). No rows were returned for the affected order in key tables, and required database objects were missing from the evidence. Consequently, no root cause could be confirmed, and no acceptable fix was identified. The report correctly avoided prohibited claims and maintained safety, but the lack of evidence and incorrect object/entity usage led to a total failure score."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-benchmark-020</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.22</td>
+          <td>d963beca-9ef0-48fd-83a5-1ee50f119434</td>
+          <td title="The investigation failed to identify the correct business entity unambiguously, resulting in ambiguous matches for order ORD-2026-0020-A. No correlated multi-table evidence was provided to confirm the root cause or support the failure analysis. Required database objects, evidence, and supporting data were missing, preventing a valid conclusion. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-pilot-001</code></td>
+          <td>ORD-7101</td>
+          <td><span class="badge good">PASS</span></td>
+          <td>72.46</td>
+          <td>72.55</td>
+          <td>No</td>
+          <td>22.37</td>
+          <td>INV-20260717-011653-9D04E0E4</td>
+          <td title="The root cause that order ORD-7101 was not allocated despite available inventory is well supported by evidence showing the order does not exist in key allocation-related tables (eval.sales_order_lines, eval.purchase_order_lines, eval.inventory_movements). This explains the failure to allocate. Evidence correctness is moderate due to production scan protections blocking broader data scans and no direct exception or integration message evidence was found, which limits completeness. The discovered database objects are appropriate and relevant. No fix was proposed or confirmed, so fix correctness is zero. Citation correctness and safety are fully met. Overall, the investigation correctly identifies the missing downstream work item (order data) as the root cause, but lacks some required evidence (exceptions, integration messages) to fully confirm the scenario. No unsupported or incorrect claims were made."><a href="research/results/b05c8189-b5c2-45d5-b7fa-ca8310f17c64/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-pilot-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.34</td>
+          <td>84cc493f-0e57-42c6-b8cc-c453f2ff9ae7</td>
+          <td title="No evidence or database objects were found to support the root cause or any part of the investigation. The confirmed root cause claim lacks any supporting data, resulting in a critical failure and zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-pilot-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.28</td>
+          <td>cda2d317-dbd6-446f-8622-62322e1a1e74</td>
+          <td title="No evidence or database objects were found or matched to support the root cause or investigation. The confirmed root cause is unsupported by any data, resulting in a critical failure and zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-pilot-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.26</td>
+          <td>f5bab8ea-ca50-4f86-bdcc-927dabf51253</td>
+          <td title="No evidence or database objects were found to support the root cause claim that integration failure prevented the terminal status transition for pick task PICK-9104. The supplied identifier PICK-9104 was not matched in the database, and no relevant exceptions or integration messages were discovered. This lack of supporting evidence constitutes a critical failure for confirming the root cause."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Orders</td>
+          <td><code>orders-pilot-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.29</td>
+          <td>a8333117-8341-421f-a090-8eb3db910967</td>
+          <td title="No evidence or database objects were found to confirm the identifier PO-1205 or to establish if the purchase order arrived late. The investigation lacks required timestamp evidence and relevant database object references. A critical failure occurred due to confirming a root cause without supporting evidence. Human review is necessary to address these gaps and collect additional timestamp evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-001</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.22</td>
+          <td>INV-20260716-225712-A7C88D62</td>
+          <td title="The investigation failed the critical validation rule &#x27;wrong_business_entity_investigated&#x27; indicating the exact business key did not resolve to one failed record as required. The root cause was not confirmed, and key expected database objects and procedures were missing from the analysis. Evidence and object discovery were incomplete, and no acceptable fix was proposed. The response does not meet the required schema or expected concepts, resulting in a final fail classification."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.25</td>
+          <td>0b1b7836-b35b-4840-8ddd-96cdfba4f8cc</td>
+          <td title="The investigation failed to resolve the partial identifier SHP-2026-0002 to a single record, resulting in ambiguous entity matches. No supporting evidence or database objects were identified to confirm a root cause or provide a fix. This constitutes a critical failure due to wrong business entity investigated and lack of supporting evidence, requiring human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.49</td>
+          <td>afee96d8-1c68-4a0d-90db-eeae9bc879f9</td>
+          <td title="-"><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.99</td>
+          <td>f9089811-51b0-4653-8ed6-1864dc922173</td>
+          <td title="No evidence or database objects were found or confirmed to support the root cause. The investigation failed to identify the upstream record or its correlated integration record, resulting in a critical failure due to confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.24</td>
+          <td>INV-20260716-225746-9106E75C</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated and missing expected database objects. No evidence was found in integration_messages for the supplied business key SHP-2026-0005-A, contradicting the investigation premise. Required tables and programmable objects were not analyzed or found. The root cause could not be confirmed or supported by evidence. The response type was insufficient evidence rather than confirmed root cause. Fix recommendations were not provided as the issue was not reproduced. Human review is required to correct entity targeting and include missing objects for a valid investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-006</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.08</td>
+          <td>INV-20260716-225754-8A6E81E8</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated (SHP-2026-0006-A). The root cause was not confirmed, and required database objects and procedures were missing from the evidence. The response did not meet the expected response type &#x27;confirmed_root_cause&#x27; and did not provide an acceptable fix. Evidence and object discovery were incomplete, resulting in a final score of 0% and a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-007</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.27</td>
+          <td>INV-20260716-225805-6C2C1E5F</td>
+          <td title="The investigation failed due to a critical failure: the wrong business entity was investigated (EX-SHP-2026-0007-A). The reported condition that the exception was recorded but no compensating transition ran was not confirmed by the evidence. Key expected database objects and procedures were missing from the investigation. No root cause or fix could be confirmed or recommended. All scores are zero due to failure to meet the required criteria."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-008</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.21</td>
+          <td>INV-20260716-225818-E2D4CB23</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated (MSG-SHP-2026-0008-A). The required root cause concept &#x27;the correlated integration message failed and blocked completion&#x27; was not confirmed. Expected tables and programmable objects were missing. No acceptable fix concept was provided. Evidence and citations were correct but incomplete. Overall, the investigation did not meet the required criteria and must be reviewed by a human."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-009</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.07</td>
+          <td>INV-20260716-225829-59CBED97</td>
+          <td title="The investigation failed due to a critical error: the wrong business entity was investigated (entity SHP-2026-0009-A). This caused all category scores to be zero. Additionally, multiple required database objects were missing from the evidence, including integration_messages, exceptions, audit_history, and related programmable objects. The evidence did confirm the concept that the queue shows the entity has not been consumed, but the root cause was not confirmed and the expected objects were not found. The response did not meet the expected response type of confirmed_root_cause and included no acceptable fix. The safety and citation requirements were met, but the fundamental error in entity selection invalidates the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-010</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.06</td>
+          <td>697c1558-fd4a-46fd-9a47-39967a96c8ef</td>
+          <td title="The investigation failed due to ambiguous identification of the business entity SHP-2026-0010-A with multiple plausible records and no supporting evidence found. Required evidence and database objects were missing, preventing confirmation of the root cause or recommendations. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-011</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>-</td>
+          <td>No</td>
+          <td>2.99</td>
+          <td>INV-20260716-225849-6C40CBCF</td>
+          <td title="-"><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-012</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.30</td>
+          <td>936af842-d4ff-4c99-8d19-a5ffb0ecc8d1</td>
+          <td title="The investigation failed to identify the correct business entity due to ambiguous matches and did not provide any supporting evidence or discovered database objects. The root cause was not confirmed with evidence, and required reference data was not found. Human review is necessary to resolve entity ambiguity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-013</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.05</td>
+          <td>INV-20260716-225906-0947AB6E</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity. The supplied business key SHP-2026-0013-A was not correctly matched to the expected database objects and procedures. No direct write procedure or workflow transition was confirmed. The reported issue could not be reproduced from the connected database evidence. Expected tables and programmable objects were missing from the evidence. Therefore, no root cause or fix could be confirmed, resulting in zero scores across all categories and a critical failure flag."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-014</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.64</td>
+          <td>INV-20260716-225918-42F92AFE</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (SHP-2026-0014-A) and missing required evidence (EVAL-SHIPPING-114). Expected database objects including integration_messages, exceptions, and specific programmable objects were not discovered or correctly referenced. The root cause and evidence scores are zero because the investigation did not confirm the expected correlated audit transition despite relevant trigger metadata. The fix and object discovery are also incorrect or incomplete. No prohibited claims were made, and safety was maintained, but the overall investigation is invalid due to these critical failures."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-015</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.16</td>
+          <td>c02b2443-1468-45e4-b893-db72ae18bfa5</td>
+          <td title="Investigation failed due to ambiguous identification of the shipment entity SHP-2026-0015-A with multiple conflicting records. No definitive root cause or supporting evidence was established. Human review is required to select the correct entity before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-016</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.11</td>
+          <td>474daf4f-934d-42af-a6ca-715ba5511653</td>
+          <td title="No evidence or database objects were found to support the investigation of shipment SHP-2026-0016-A. The root cause could not be confirmed due to lack of data, resulting in a critical failure for confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-017</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.17</td>
+          <td>INV-20260716-225945-BB982FD1</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (SHP-2026-0017-A) and missing required evidence of exception and audit logs showing the unit of work rollback. Expected database objects and evidence were not found or used. No root cause or fix correctness could be established. The response does not confirm the root cause that exception and audit evidence show the unit of work rolled back, nor does it use the required tables and procedures. Therefore, the overall evaluation score is zero and the critical failure flag is set."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-018</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.05</td>
+          <td>efaece71-ee23-40e9-8a6c-6f651fdcf8b6</td>
+          <td title="The investigation failed to confirm the root cause due to lack of any supporting evidence or database object discovery. The supplied shipment identifier was not found in the database, and no relevant evidence or objects were retrieved. This constitutes a critical failure as the confirmed root cause claim is unsupported by evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-019</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.06</td>
+          <td>INV-20260716-230005-8AE739FE</td>
+          <td title="The investigation failed due to a critical error: the wrong business entity was investigated (SHP-2026-0019-A). No relevant rows were found in the expected tables for this entity, and key required evidence and database objects were missing. The root cause could not be confirmed, and the response did not meet the expected schema or evidence requirements. No acceptable fix was proposed. The overall evaluation score is zero due to these fundamental issues."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-benchmark-020</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.07</td>
+          <td>29847ddd-c890-4aba-8948-046d6ad64a24</td>
+          <td title="The investigation failed to identify the correct business entity due to multiple ambiguous matches for SHP-2026-0020-A. No correlated multi-table evidence was provided to confirm the root cause. Required database objects and evidence were missing, preventing validation of the failure cause or fix. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-pilot-001</code></td>
+          <td>SHP-5001</td>
+          <td><span class="badge good">PASS</span></td>
+          <td>93.06</td>
+          <td>92.15</td>
+          <td>No</td>
+          <td>27.58</td>
+          <td>INV-20260717-003426-351906D4</td>
+          <td title="The root cause that the downstream workflow responsible for creating the empty-return work order after shipment delivery did not execute or was skipped is strongly supported by multiple SQL queries showing missing related records and an open exception. Evidence correctness and object discovery are fully met with relevant tables and columns identified and queried. Citation correctness is perfect with all claims supported by evidence. The fix correctness is partial due to lack of a confirmed write procedure or direct fix path, recommending workflow correction and idempotent replay rather than manual data insertion. Safety is fully ensured by read-only queries and no prohibited claims. Completeness is high with all required evidence present except detailed workflow logs. No unsupported claims or critical failures were found. No human review is required given the high confidence and evidence quality."><a href="research/results/ef9a60c2-08f7-44f1-b3cc-2d50d300a5f5/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-pilot-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.57</td>
+          <td>INV-20260716-225628-8A62B053</td>
+          <td title="The investigation failed the critical validation due to wrong business entity investigated (CONT-5002 not found in data). No evidence was found to confirm the duplicate terminal gate event. Required evidence and expected database objects were missing. The root cause concept of integration retry without idempotency guard was not addressed. No fix or correct root cause was established. Citations are correct but no supporting data was returned. Safety and read-only SQL compliance are met. Overall, the investigation is invalid and scored zero."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-pilot-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>4.27</td>
+          <td>INV-20260716-225637-FD927C8F</td>
+          <td title="The investigation failed to confirm the correct business entity (WO-5003) and did not identify the expected root cause that the selection used historical assignment instead of the active work item. Required database objects such as audit_history and specific procedures/functions were missing. No acceptable fix concept was provided. The evidence and object discovery were incomplete, leading to a critical failure and a final score of 0%."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-pilot-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>4.04</td>
+          <td>INV-20260716-225646-78EBE332</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated (SHP-5004). The root cause was not confirmed and required evidence for failure status was missing. Expected database objects and procedures were not found or used. No acceptable fix was proposed. Human review is required to correct entity targeting and provide missing evidence before any conclusions or fixes can be recommended."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Shipping</td>
+          <td><code>shipping-pilot-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>4.09</td>
+          <td>INV-20260716-225659-A0B17043</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated (CONT-5005). The response type does not match the expected &#x27;insufficient_evidence&#x27;. Required tables and objects were not fully addressed. Missing evidence includes planned SLA timestamp and related shipment milestones. No fix correctness or object discovery was achieved. Human review is required to correct entity targeting and evidence completeness."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-001</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.20</td>
+          <td>INV-20260716-225702-30DD6A9C</td>
+          <td title="The investigation failed the deterministic critical-failure check due to wrong business entity investigated. The exact business key PAY-2026-0001-A does not resolve to one failed record in the payroll_items table as required. The evidence shows no matching rows in payroll_items for the key, only in payroll_runs. Several expected database objects were not found or used. The root cause was not confirmed and no acceptable fix was proposed. All category scores are zero due to these failures."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.24</td>
+          <td>7a5c652c-554b-46a2-a487-fcca2e8757b3</td>
+          <td title="The investigation failed to resolve the partial identifier PAY-2026-0002 to a single record, resulting in ambiguity with multiple plausible candidates. No supporting evidence or database objects were provided to confirm the root cause or support a fix. This critical failure requires human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.25</td>
+          <td>23dc1aea-a1ad-49cc-a493-89acd12a4151</td>
+          <td title="The investigation failed to identify the correct business entity due to multiple plausible matches for the partial identifier PAY-2026-0003, requiring user selection or human review before proceeding. No supporting evidence or required database objects were provided, and the root cause was not confirmed with evidence. This constitutes a critical failure under the &#x27;wrong_business_entity_investigated&#x27; rule, necessitating human review to resolve ambiguity and continue investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.14</td>
+          <td>6ecc2163-3a5a-4b9d-9d77-ca51c684e744</td>
+          <td title="No evidence or database objects were found to support the confirmed root cause. The investigation failed to identify or verify the upstream completed record or its correlated integration record, resulting in a critical failure due to unsupported claims."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.18</td>
+          <td>INV-20260716-225735-A34E5238</td>
+          <td title="Critical failure due to investigation on incorrect business entity MSG-PAY-2026-0005-A instead of PAY-2026-0005-A. No evidence found for duplicates or multiple processing messages for the correct payroll item. Required tables and procedures were missing from evidence. No fix recommended without reproduced issue. Root cause not confirmed from database evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-006</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.22</td>
+          <td>ff63c3e2-800c-400e-bbd7-e24d30a5cc37</td>
+          <td title="No evidence or database objects were found or analyzed to confirm the root cause. The investigation failed to identify the workflow history or any exception related to payroll item PAY-2026-0006-A. The confirmed root cause is unsupported by any data, resulting in a critical failure and zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-007</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.18</td>
+          <td>INV-20260716-225756-891D6147</td>
+          <td title="The investigation failed to reproduce the reported issue with the supplied business key PAY-2026-0007-A; no relevant rows were found in key tables. The expected root cause concept &#x27;the exception was recorded but no compensating transition ran&#x27; was not confirmed by evidence. Several required database objects and evidence items were missing. The critical failure due to investigating the wrong business entity invalidates the root cause and evidence correctness. Human review is required to provide correct entity and evidence before further analysis."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-008</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-225808-D4BBFE25</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (MSG-PAY-2026-0008-A) and missing required evidence and objects, including the key evidence &#x27;the correlated integration message failed and blocked completion&#x27; and required tables and procedures. No confirmed root cause or acceptable fix was provided. The response does not meet the expected schema or content requirements."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-009</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.10</td>
+          <td>INV-20260716-225820-C18A7FBA</td>
+          <td title="The investigation failed the critical validation due to wrong business entity investigated, resulting in zero scores across all categories. The required database objects were not found or used, and the response type was incorrect. Although the evidence shows the entity has not been consumed (queue backlog), the root cause was not confirmed automatically and the investigation did not meet the expected schema requirements."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-010</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.96</td>
+          <td>INV-20260716-225831-78C9938E</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity. The reported issue could not be reproduced from connected database evidence. Key required evidence about retries exhausting attempts and the entity remaining pending was missing. Expected database objects and procedures were not found or used. No fix or root cause could be confirmed. The response lacks the required root cause confirmation and evidence linkage, resulting in zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-011</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.07</td>
+          <td>INV-20260716-225840-145B7E6B</td>
+          <td title="The investigation failed to confirm the root cause due to absence of any matching rows for the payroll item PAY-2026-0011-A in the key tables (payroll_items, audit_history, payroll_runs). The reported conflict between audit history and business record could not be validated or explained with the available database evidence. Additionally, required database objects (payments, integration_messages, exceptions, and related procedures/triggers) were missing from the investigation. The critical failure is due to investigating the wrong business entity and lack of expected evidence, resulting in zero scores across all categories. Human review is required to correct entity targeting, gather missing evidence, and properly reconcile the conflicting states."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-012</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.18</td>
+          <td>6fea73cb-d938-4159-90f3-3a9108d3da07</td>
+          <td title="The investigation failed due to ambiguous entity resolution for PAY-2026-0012-A with multiple plausible candidates and no supporting evidence found. Required reference data and database objects were not discovered or verified. The root cause was not confirmed with evidence, leading to a critical failure and the need for human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-013</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.23</td>
+          <td>9b12271f-47f4-41c2-a9e5-dd0f3ccb041c</td>
+          <td title="No evidence or database objects were found to support the confirmed root cause. The investigation failed to identify or verify the expected procedure behavior or related data, resulting in a critical failure due to unsupported claims."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-014</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>72.40</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-225908-A40D1605</td>
+          <td title="The investigation correctly identified the root cause concept that trigger metadata is relevant but the expected correlated audit transition is absent. Evidence correctness and citation correctness are high, with appropriate read-only SQL used. However, the investigation failed to include all expected tables and programmable objects, notably missing employees, integration_messages, exceptions, and related schema objects and procedures. The business entity investigated does not match the requested entity exactly, triggering a critical failure. The fix correctness is low due to lack of a confirmed fix recommendation. Due to the critical failure of investigating the wrong business entity and missing key objects, the overall final score is zero and human review is required."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-015</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.08</td>
+          <td>INV-20260716-225920-72E6AFAD</td>
+          <td title="The investigation failed to reproduce the reported issue for payroll item PAY-2026-0015-A; no rows were found in key tables for the supplied business key. The root cause could not be confirmed due to missing evidence, including the required correlated batch or integration evidence isolating the failed item. Several expected database objects were not discovered or used. The critical failure is due to investigating the wrong business entity, invalidating the root cause and evidence correctness. No acceptable fix was proposed. The response lacks the required concepts and evidence, resulting in a final score of 0%."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-016</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.32</td>
+          <td>e74ba7d2-7f19-458e-b54a-8d4f0b9d31e6</td>
+          <td title="No database evidence or objects were found to support the investigation of payroll item PAY-2026-0016-A. The root cause could not be confirmed due to lack of matching data or artifacts. Consequently, no fix or citations could be validated. The response fails to meet the required investigation criteria and is marked as a critical failure for confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-017</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.02</td>
+          <td>INV-20260716-225937-F7B0F96D</td>
+          <td title="The investigation failed to confirm the root cause as required; it lacks the necessary exception and audit evidence showing the unit of work rollback. Expected database objects related to exceptions, audit history, and integration messages were not found or used. The investigated entity does not match the required business entity, causing a critical failure. No acceptable fix concept was supported. Citations are correct but insufficient. Overall, the investigation does not meet the required criteria and must be redone with proper evidence and object usage."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-018</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.05</td>
+          <td>INV-20260716-225947-0F021740</td>
+          <td title="The investigation failed the critical validation due to incorrect business entity investigated and missing required root cause concept evidence. The expected root cause that replay created a second correlated operation without an idempotency guard was not confirmed or supported by the evidence. Several required database objects were not found or used. The response type and root cause correctness are not aligned with expectations. No acceptable fix concept was demonstrated. The evidence and citations are correct but incomplete. Due to the critical failure, the overall score is zero."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-019</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.12</td>
+          <td>INV-20260716-225956-EC710025</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (PAY-2026-0019-A) with no matching rows found in the relevant tables. No required evidence (EVAL-PAYROLL-119) or expected database objects (integration_messages, exceptions, audit_history, and related programmable objects) were found or used. The root cause could not be confirmed, and no fix was supported by evidence. The response does not meet the expected schema requirements and lacks sufficient evidence to confirm the root cause or provide a valid fix."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-benchmark-020</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.12</td>
+          <td>6538c7a8-91a8-42f5-ae15-031a2917e9aa</td>
+          <td title="The investigation failed due to ambiguous identification of the business entity PAY-2026-0020-A with multiple plausible records and no definitive selection. No correlated multi-table evidence or root cause was established. Critical failure arises from wrong business entity investigated and confirmed root cause without supporting evidence. Human review is required to resolve entity ambiguity before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-pilot-001</code></td>
+          <td>MSG-RUN-2026-07-A</td>
+          <td><span class="badge bad">INVALID CONFIG</span></td>
+          <td>-</td>
+          <td>-</td>
+          <td>No</td>
+          <td>6.13</td>
+          <td>INV-20260717-011710-5A4392F9</td>
+          <td title="-"><a href="research/results/392d5861-548e-4cf5-b8d3-5a7cda4feb87/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-pilot-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.49</td>
+          <td>4d536457-7d6e-4093-93e3-2850c10b4580</td>
+          <td title="The investigation failed to identify or confirm the business entity PAY-7003, resulting in no evidence or database objects found to support the root cause. The confirmed root cause is unsupported by evidence, and required evidence and objects are missing. This constitutes a critical failure due to wrong business entity investigated and lack of supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-pilot-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.44</td>
+          <td>47aa3f48-7681-4d71-a1e3-641567ab94b3</td>
+          <td title="The investigation failed due to incorrect business entity (TIME-8821) being investigated and confirmed root cause lacking supporting evidence. No relevant database objects, evidence, or citations were identified or matched to support the root cause. The response does not meet the required concepts or evidence standards."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-pilot-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.32</td>
+          <td>69902a5a-8162-46fd-9231-71eb8359557c</td>
+          <td title="The investigation failed to identify or confirm the correct payroll run RUN-2026-07-A in the database, resulting in no evidence or database objects found to support the root cause. The root cause &#x27;integration failure prevented the terminal status transition&#x27; was not confirmed with any evidence. This constitutes a critical failure due to wrong business entity investigated and confirmed root cause without supporting evidence. Human review is required."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Payroll</td>
+          <td><code>payroll-pilot-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.65</td>
+          <td>0c224f7b-3cdc-404b-8323-f27ebfb4f55e</td>
+          <td title="No evidence or database objects were found to confirm the identifier TAX-2026-07 or to establish if it was filed late. The investigation lacks required evidence and database object discovery, resulting in a critical failure due to confirmed root cause without supporting evidence. Human review is necessary to collect additional timestamp evidence and validate the claim."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-001</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.37</td>
+          <td>INV-20260716-225704-DAD37D57</td>
+          <td title="The investigation failed the critical validation due to analyzing the wrong business entity (CLN-2026-0001-A) which does not exist in the key affected tables (patients, insurance_policies). The exact business key did not resolve to one failed record as required. No confirmed root cause or acceptable fix was identified. Evidence and object discovery were incomplete or incorrect. Human review is required to correct entity resolution and re-investigate with proper evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.22</td>
+          <td>f33821bf-848d-4852-a683-3a5b8fe9baaa</td>
+          <td title="The investigation failed to resolve the partial identifier to a single record, resulting in ambiguous entity matches. No supporting evidence or database objects were provided to confirm the root cause. This constitutes a critical failure requiring human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.12</td>
+          <td>a407861c-2780-441a-a0a9-a29f4810c120</td>
+          <td title="The investigation failed to identify a unique business entity due to multiple plausible matches for the partial identifier. No supporting evidence or database objects were provided, and the root cause was not correctly established. This critical failure mandates human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.09</td>
+          <td>d8930ba3-ac0d-4a24-a121-1a5f7f730b73</td>
+          <td title="The investigation failed to find any database evidence or objects matching the supplied identifier CLN-2026-0004-A. No root cause was confirmed with supporting evidence, resulting in a critical failure due to confirmed root cause without evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>3.23</td>
+          <td>INV-20260716-225739-3D1B25B1</td>
+          <td title="The investigation incorrectly identified the business entity MSG-CLN-2026-0005-A as the root cause subject, violating the critical rule &#x27;wrong_business_entity_investigated&#x27;. Expected database objects including lab_results, exceptions, audit_history, and specific programmable objects were missing. The response did not confirm the root cause or provide an acceptable fix. Evidence and citations were present but insufficient due to incorrect entity focus. This results in a critical failure and zero scoring across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-006</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.16</td>
+          <td>592b4f3d-06b2-459a-9e51-1f53d91eeadd</td>
+          <td title="No matching database records or evidence were found for the identifier CLN-2026-0006-A. The investigation lacks any confirmed root cause, supporting evidence, or discovered database objects. The critical failure is due to a confirmed root cause claim without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-007</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.00</td>
+          <td>INV-20260716-225758-EFAEF24A</td>
+          <td title="The investigation failed critical validation due to analyzing the wrong business entity (EX-CLN-2026-0007-A) and missing required database objects (payments, integration_messages, audit_history, and related programmable objects). The reported root cause &#x27;the exception was recorded but no compensating transition ran&#x27; was not confirmed by evidence. No fix or root cause correctness could be established. The evidence and object discovery are incomplete and incorrect, leading to a final score of 0%. No unsupported claims or missing evidence were found beyond the critical failure. Human review is not required as the failure is deterministic and authoritative."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-008</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.19</td>
+          <td>INV-20260716-225810-A0EAE362</td>
+          <td title="The investigation failed critical validation due to incorrect business entity investigated and missing required root cause evidence. The correlated integration message failure blocking completion was not confirmed. Expected tables and procedures were not analyzed or included. No acceptable fix was proposed. The response does not confirm the root cause as required."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-009</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.04</td>
+          <td>INV-20260716-225822-87E23BF6</td>
+          <td title="The investigation failed the critical validation due to wrong business entity investigated, resulting in zero scores across all categories. The expected database objects were not properly discovered or used, and the response type was incorrect. Although some evidence was collected, it did not align with the required objects and procedures. No acceptable fix was proposed. The root cause was not confirmed, and the investigation did not fully meet the required schema or evidence standards."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-010</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.17</td>
+          <td>c4f8e8f9-c8b5-40f9-a95d-06d2a028f9be</td>
+          <td title="The investigation failed due to ambiguous entity resolution with multiple plausible candidates for CLN-2026-0010-A and no supporting evidence found. No database objects, evidence, or root cause concepts were identified or confirmed. This critical failure prevents valid conclusions and requires human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-011</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.11</td>
+          <td>e8bbae46-9de6-416c-8ac9-e04d998566cc</td>
+          <td title="The investigation failed due to incorrect business entity selection with multiple ambiguous candidates for CLN-2026-0011-A and no supporting evidence for the root cause. Required evidence and database objects were missing, preventing confirmation of the conflict between business and audit states. Human review is necessary to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-012</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.19</td>
+          <td>c9fd93ef-50c3-4401-bcb5-c0770a626e43</td>
+          <td title="The investigation failed due to ambiguous identification of the business entity CLN-2026-0012-A with multiple plausible candidates and no selection made. No evidence or database objects were discovered or verified to support the root cause. The confirmed root cause was not supported by evidence. Human review is required to resolve entity ambiguity before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-013</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.03</td>
+          <td>INV-20260716-225859-1BE37DD1</td>
+          <td title="The investigation failed due to a critical failure: the supplied business key CLN-2026-0013-A was not found in any returned database rows, preventing reproduction of the reported issue. No evidence was collected from the expected tables or procedures, and no root cause could be confirmed. The response did not meet the expected response type of confirmed_root_cause, nor did it provide evidence for the required concepts or objects. Consequently, all category scores are zero and the investigation is invalidated by the critical failure rule &#x27;wrong_business_entity_investigated&#x27;."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-014</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>72.40</td>
+          <td>No</td>
+          <td>2.09</td>
+          <td>INV-20260716-225910-9B83DA2F</td>
+          <td title="The investigation correctly identifies that trigger metadata is relevant but the expected correlated audit transition is absent, matching the required root cause concept. Evidence queries returned valid data supporting the audit_history as the affected object. However, the investigation incorrectly focused on the business entity AUD-CLN-2026-0014-A instead of the exact patient service CLN-2026-0014-A, leading to incorrect object and entity identification. Several required database objects and procedures were missing from the analysis, and the recommended fix concept was not fully addressed. Due to the critical failure of investigating the wrong business entity, the final score is zero and human review is required to correct entity focus and object discovery before confirming root cause or fix recommendations."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-015</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.14</td>
+          <td>990636de-57e6-450a-a65c-c93331638c0b</td>
+          <td title="The investigation failed due to ambiguous entity resolution for patient service CLN-2026-0015-A with multiple plausible records and no definitive evidence isolating the failed batch item. No relevant database objects, evidence, or root cause were identified, resulting in a critical failure and need for human review before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-016</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.05</td>
+          <td>0e1d1c2a-3160-4d81-85ec-2d58efc41678</td>
+          <td title="No evidence or database objects were found to support the investigation of patient service CLN-2026-0016-A. The root cause could not be confirmed due to lack of matching data, resulting in a critical failure for confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-017</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>2.20</td>
+          <td>INV-20260716-225939-7E3CE91D</td>
+          <td title="The investigation failed to confirm the root cause that exception and audit evidence show the unit of work was rolled back, as required. Key required evidence and database objects were missing, and the correct business entity was not properly verified. The response type was incorrect and did not confirm the root cause. This constitutes a critical failure requiring human review."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-018</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.11</td>
+          <td>71e77104-c11f-4852-b41a-b01b28ba19f0</td>
+          <td title="No evidence or database objects were found to support the confirmed root cause. The investigation failed to identify or verify the supplied patient service identifier or related data, resulting in a critical failure due to unsupported claims."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-019</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.15</td>
+          <td>529eb536-98b7-4b08-8d01-c50bc58219af</td>
+          <td title="Investigation failed due to ambiguous entity resolution with multiple plausible records matching the patient service ID. No confirmed root cause or supporting evidence was provided. Human review is required to select the correct entity and continue the investigation."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-benchmark-020</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.14</td>
+          <td>94e8676a-daaf-4f57-a543-21a851f9f8ea</td>
+          <td title="Investigation failed due to ambiguous identification of the business entity CLN-2026-0020-A with multiple plausible records. No correlated multi-table evidence or root cause was confirmed. Human review is required to select the correct candidate before proceeding."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-pilot-001</code></td>
+          <td>APT-2101</td>
+          <td><span class="badge good">PASS</span></td>
+          <td>81.35</td>
+          <td>81.35</td>
+          <td>No</td>
+          <td>20.77</td>
+          <td>INV-20260717-011745-078B7DE7</td>
+          <td title="The investigation correctly identifies that appointment APT-2101 was not converted into an encounter due to its &#x27;Exception&#x27; status, supported by direct SQL evidence showing no related encounter or procedure records. The evidence is valid and well-cited, and the relevant database objects were discovered with high confidence. However, the fix recommendation is incomplete as no direct fix was proposed, and some expected tables (exceptions, integration_messages) were missing from the evidence, limiting completeness. No prohibited claims or safety issues were found. Overall, the root cause and evidence are well supported, but further data access and error log analysis are needed to fully confirm and fix the issue."><a href="research/results/89b3f480-a1d8-4008-ac5e-74473f94301b/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-pilot-002</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.28</td>
+          <td>4356f864-d9d2-48ed-9d03-6f44a79c31e2</td>
+          <td title="The investigation failed to find any matching database entities or evidence to support the claim that the claim CLM-3302 was submitted twice due to integration retry without an idempotency guard. No relevant tables, columns, or objects were discovered or queried. The confirmed root cause was stated without supporting evidence, triggering a critical failure and resulting in zero scores across all categories."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-pilot-003</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.27</td>
+          <td>46b60dec-8019-47b2-96d1-3e75f55b47e5</td>
+          <td title="No evidence or database objects were found to support the root cause that selection used historical assignment instead of the active work item. The identifier LAB-4403 was not found in the database, and no relevant evidence or objects were discovered. This results in a critical failure due to confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-pilot-004</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.40</td>
+          <td>3b9efc9a-9d8e-4514-9e90-b2bf6d1f1ac9</td>
+          <td title="No evidence or database objects were found to support the root cause claim that integration failure prevented the terminal status transition for encounter ENC-5504. The investigation failed to identify or verify any relevant data, resulting in a critical failure due to confirmed root cause without supporting evidence."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        
+        <tr>
+          <td>Clinic</td>
+          <td><code>clinic-pilot-005</code></td>
+          <td>-</td>
+          <td><span class="badge warn">FAIL</span></td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>No</td>
+          <td>1.37</td>
+          <td>3af61e30-669c-46fc-85fb-08c49e78e88e</td>
+          <td title="No evidence was found in the database to confirm patient PAT-6605 missed an appointment. The identifier PAT-6605 was not matched to any records, and required evidence including timestamps and relevant database objects were missing. The investigation failed to meet the expected response type of insufficient evidence and confirmed a root cause without supporting evidence, resulting in a critical failure."><a href="research/results/3772275f-f219-4999-9c31-28f8dd5dc411/research-report.html">Open report</a></td>
+        </tr>
+        </tbody>
+</table>
+</section>
+<section class="panel"><p class="note">Invalid-configuration rows are included.</p></section>
+</div>
+</body>
+</html>

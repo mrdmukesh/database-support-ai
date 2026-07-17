@@ -1,0 +1,40 @@
+{
+  "scenario_count": 100,
+  "valid_count": 36,
+  "pass_count": 23,
+  "skipped_count": 63,
+  "invalid_configuration_count": 33,
+  "human_review_count": 99,
+  "overall_average_deterministic": 61.03369444444445,
+  "overall_average_ai_judge": 74.19284375,
+  "domains": {
+    "banking": {
+      "scenario_count": 25,
+      "pass_count": 1,
+      "average_deterministic": 77.579,
+      "average_ai_judge": 77.55,
+      "human_review_count": 24
+    },
+    "clinic": {
+      "scenario_count": 25,
+      "pass_count": 6,
+      "average_deterministic": 56.23891666666666,
+      "average_ai_judge": 75.61118181818182,
+      "human_review_count": 25
+    },
+    "orders": {
+      "scenario_count": 25,
+      "pass_count": 9,
+      "average_deterministic": 62.15223076923076,
+      "average_ai_judge": 70.11383333333333,
+      "human_review_count": 25
+    },
+    "shipping": {
+      "scenario_count": 25,
+      "pass_count": 7,
+      "average_deterministic": 63.6788,
+      "average_ai_judge": 77.9415,
+      "human_review_count": 25
+    }
+  }
+}

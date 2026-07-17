@@ -6,17 +6,33 @@ import json
 import os
 from pathlib import Path
 
+
+def _load_local_evaluation_env() -> None:
+    path = Path(os.getenv("EVAL_ENV_FILE", ".env.evaluation"))
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#") and "=" in line:
+            name, value = line.split("=", 1)
+            os.environ.setdefault(name.strip(), value.strip().strip('"').strip("'"))
+
+
+_load_local_evaluation_env()
+
 from evaluation.framework.scenario_loader import load_scenarios
 from evaluation.judges.ai_judge import AIJudge, JudgeConfig
 from evaluation.judges.openai_client import OpenAIJudgeClient
 from evaluation.judges.store import AIJudgeService
 from evaluation.runners.contracts import RunnerConfig, RunnerContext
 from evaluation.runners.investigation_reader import InvestigationPersistenceReader
+from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
 from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
 from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 from evaluation.runners.store import SQLAlchemyExecutionStore
 from evaluation.preflight import DATABASES, DOMAINS, print_report, run_preflight
+from evaluation.reporting.research_report import generate_research_report
 from evaluation.validators.store import DeterministicValidationService
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.session import create_session_factory
@@ -29,7 +45,8 @@ def all_scenarios():
 
 
 def build_store() -> SQLAlchemyExecutionStore:
-    return SQLAlchemyExecutionStore(create_session_factory(Settings.from_env().database_url))
+    results_url = os.getenv("EVAL_RESULTS_DATABASE_URL", Settings.from_env().database_url)
+    return SQLAlchemyExecutionStore(create_session_factory(results_url))
 
 
 def build_judge_service(store: SQLAlchemyExecutionStore) -> AIJudgeService:
@@ -100,22 +117,44 @@ def build_runner(args) -> EvaluationRunner:
         poll_interval_seconds=args.poll_interval,
         max_api_retries=args.api_retries,
         concurrency=args.concurrency,
+        ai_enabled=os.getenv("AI_REASONING_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
+        database_engine=os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower(),
     )
-    database = SqlCmdDatabaseLifecycle(
-        server=required_env("EVAL_SQL_SERVER"),
-        username=required_env("EVAL_SQL_ADMIN"),
-        password=required_env("EVAL_SQL_PASSWORD"),
-        databases=DATABASES,
-        allowed_hosts={item.strip().lower() for item in required_env("EVAL_ALLOWED_SQL_HOSTS").split(",") if item.strip()},
-        allowed_databases={item.strip() for item in required_env("EVAL_ALLOWED_DATABASES").split(",") if item.strip()},
-    )
-    session_factory = create_session_factory(Settings.from_env().database_url)
+    if os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower() == "mysql":
+        database = MySQLDatabaseLifecycle(
+            host=required_env("EVAL_MYSQL_HOST"),
+            port=int(os.getenv("EVAL_MYSQL_PORT", "3306")),
+            username=required_env("EVAL_MYSQL_USER"),
+            password=required_env("EVAL_MYSQL_PASSWORD"),
+            databases=DATABASES,
+            allowed_hosts={item.strip().lower() for item in required_env("EVAL_ALLOWED_MYSQL_HOSTS").split(",") if item.strip()},
+            allowed_databases={item.strip() for item in required_env("EVAL_ALLOWED_DATABASES").split(",") if item.strip()},
+        )
+    else:
+        database = SqlCmdDatabaseLifecycle(
+            server=required_env("EVAL_SQL_SERVER"),
+            username=required_env("EVAL_SQL_ADMIN"),
+            password=required_env("EVAL_SQL_PASSWORD"),
+            databases=DATABASES,
+            allowed_hosts={item.strip().lower() for item in required_env("EVAL_ALLOWED_SQL_HOSTS").split(",") if item.strip()},
+            allowed_databases={item.strip() for item in required_env("EVAL_ALLOWED_DATABASES").split(",") if item.strip()},
+            reader_username=os.getenv("EVAL_SQL_READER", "evalreader"),
+            reader_password=os.getenv("EVAL_SQL_READER_PASSWORD") or required_env("EVAL_SQL_PASSWORD"),
+        )
+    application_session_factory = create_session_factory(Settings.from_env().database_url)
+    results_url = os.getenv("EVAL_RESULTS_DATABASE_URL", Settings.from_env().database_url)
+    results_session_factory = create_session_factory(results_url)
     return EvaluationRunner(
         config=config,
         database=database,
-        api=PublicInvestigationAPI(config.api_base_url, config.access_token, token_provider=token_provider),
-        store=SQLAlchemyExecutionStore(session_factory),
-        result_reader=InvestigationPersistenceReader(session_factory),
+        api=PublicInvestigationAPI(
+            config.api_base_url,
+            config.access_token,
+            token_provider=token_provider,
+            request_timeout=config.timeout_seconds,
+        ),
+        store=SQLAlchemyExecutionStore(results_session_factory),
+        result_reader=InvestigationPersistenceReader(application_session_factory),
     )
 
 
@@ -148,7 +187,29 @@ def latest_statuses(rows: list[dict]) -> dict[str, dict]:
     return latest
 
 
+def suite_scenarios(name: str, scenarios: list) -> list:
+    if name == "smoke-1":
+        return [next(item for item in scenarios if item.scenario_id == "shipping-pilot-001")]
+    if name == "smoke-5":
+        return [
+            next(item for item in scenarios if item.scenario_id == f"{domain}-pilot-001")
+            for domain in DOMAINS
+        ]
+    if name == "research-25":
+        return [
+            item
+            for domain in DOMAINS
+            for item in [candidate for candidate in scenarios if candidate.domain == domain][:5]
+        ]
+    if name == "full-125":
+        return scenarios
+    raise SystemExit(f"Unknown suite: {name}")
+
+
 def execute(args) -> None:
+    if args.command == "report":
+        print(json.dumps(generate_research_report(args.run_id), indent=2, default=str))
+        return
     if args.command == "preflight":
         report = run_preflight()
         print_report(report)
@@ -197,6 +258,48 @@ def execute(args) -> None:
         return
     if args.command == "status":
         print(json.dumps(store.statuses(args.run_id), indent=2))
+        return
+    if args.command == "run":
+        report = run_preflight()
+        print_report(report)
+        if not report.passed:
+            raise SystemExit("Local suite execution blocked: preflight failed")
+        selected = suite_scenarios(args.suite, scenarios)
+        runner = build_runner(args)
+        run_id = runner.create_run(args.run_name or args.suite)
+        results = runner.run_many(run_id, selected)
+        statuses = {row["scenario_id"]: row for row in store.statuses(run_id)}
+        validator = DeterministicValidationService(store.session_factory)
+        judge = build_judge_service(store)
+        judged: list[dict] = []
+        for result in results:
+            row = statuses.get(result.scenario_id)
+            if not row or result.status not in {"completed", "partial_application_response"}:
+                continue
+            deterministic = validator.validate_result(row["result_id"])
+            semantic = judge.judge_result(row["result_id"])
+            judged.append({
+                "scenario_id": result.scenario_id,
+                "deterministic": deterministic,
+                "ai_judge": semantic,
+            })
+        passed = all(result.status == "completed" for result in results)
+        output = {
+            "run_id": run_id,
+            "suite": args.suite,
+            "passed": passed,
+            "completed": sum(result.status == "completed" for result in results),
+            "total": len(results),
+            "judged": judged,
+        }
+        root = Path(os.getenv("EVAL_ARTIFACT_ROOT", "research/results"))
+        root.mkdir(parents=True, exist_ok=True)
+        (root / f"suite-{args.suite}-{run_id}.json").write_text(
+            json.dumps(output, indent=2, default=str), encoding="utf-8"
+        )
+        print(json.dumps(output, indent=2, default=str))
+        if not passed and args.suite.startswith("smoke"):
+            raise SystemExit(1)
         return
     if args.command in {"run-all", "pilot-smoke"}:
         report = run_preflight()
@@ -294,6 +397,8 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--difficulty", required=True)
     commands.add_parser("run-all", parents=[common])
     commands.add_parser("pilot-smoke", parents=[common])
+    command = commands.add_parser("run", parents=[common])
+    command.add_argument("--suite", choices=("smoke-1", "smoke-5", "research-25", "full-125"), required=True)
     commands.add_parser("preflight")
     command = commands.add_parser("resume", parents=[common])
     command.add_argument("--run-id", required=True)
@@ -312,6 +417,8 @@ def parser() -> argparse.ArgumentParser:
     command = commands.add_parser("judge-result")
     command.add_argument("--result-id", required=True)
     command = commands.add_parser("list-human-review")
+    command.add_argument("--run-id", required=True)
+    command = commands.add_parser("report")
     command.add_argument("--run-id", required=True)
     return root
 

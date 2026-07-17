@@ -1,0 +1,561 @@
+2026-07-17 21:00:25Z [INFO] python -m evaluation.cli validate-result --result-id 1faed095-60fc-4500-ae24-42f21318a841
+2026-07-17 21:00:27Z [INFO] python -m evaluation.cli judge-result --result-id 1faed095-60fc-4500-ae24-42f21318a841
+2026-07-17 21:00:34Z [PASS] [34/100] Completed orders-benchmark-009: deterministic=81.791, judge=81.75, classification=pass
+2026-07-17 21:00:34Z [INFO] [35/100] Running orders-benchmark-010 (orders)
+2026-07-17 21:00:34Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-010 --timeout 600
+2026-07-17 21:00:58Z [WARN] [35/100] orders-benchmark-010 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:00:58Z [INFO] [36/100] Running orders-benchmark-011 (orders)
+2026-07-17 21:00:58Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-011 --timeout 600
+2026-07-17 21:01:40Z [INFO] python -m evaluation.cli validate-result --result-id 9bdeb792-8bf3-4550-8b22-7ff315e120bf
+2026-07-17 21:01:41Z [INFO] python -m evaluation.cli judge-result --result-id 9bdeb792-8bf3-4550-8b22-7ff315e120bf
+2026-07-17 21:02:10Z [PASS] [36/100] Completed orders-benchmark-011: deterministic=66.403, judge=, classification=fail
+2026-07-17 21:02:10Z [INFO] [37/100] Running orders-benchmark-012 (orders)
+2026-07-17 21:02:10Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-012 --timeout 600
+2026-07-17 21:02:46Z [INFO] python -m evaluation.cli validate-result --result-id f7b9c2bf-d6ff-4304-8bcb-a05a0f1f47d8
+2026-07-17 21:02:47Z [INFO] python -m evaluation.cli judge-result --result-id f7b9c2bf-d6ff-4304-8bcb-a05a0f1f47d8
+2026-07-17 21:02:54Z [PASS] [37/100] Completed orders-benchmark-012: deterministic=70.636, judge=70.55, classification=pass
+------------------------------------------------------------
+2026-07-17 21:02:46Z [INFO] python -m evaluation.cli validate-result --result-id f7b9c2bf-d6ff-4304-8bcb-a05a0f1f47d8
+2026-07-17 21:02:47Z [INFO] python -m evaluation.cli judge-result --result-id f7b9c2bf-d6ff-4304-8bcb-a05a0f1f47d8
+2026-07-17 21:02:54Z [PASS] [37/100] Completed orders-benchmark-012: deterministic=70.636, judge=70.55, classification=pass
+2026-07-17 21:02:54Z [INFO] [38/100] Running orders-benchmark-013 (orders)
+2026-07-17 21:02:54Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-013 --timeout 600
+2026-07-17 21:03:07Z [WARN] [38/100] orders-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:03:07Z [INFO] [39/100] Running orders-benchmark-014 (orders)
+2026-07-17 21:03:07Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-014 --timeout 600
+2026-07-17 21:03:43Z [INFO] python -m evaluation.cli validate-result --result-id bbaa53e0-000b-42e5-8967-7096ae4444f6
+2026-07-17 21:03:44Z [INFO] python -m evaluation.cli judge-result --result-id bbaa53e0-000b-42e5-8967-7096ae4444f6
+2026-07-17 21:03:50Z [PASS] [39/100] Completed orders-benchmark-014: deterministic=0.0, judge=83.9, classification=fail
+2026-07-17 21:03:50Z [INFO] [40/100] Running orders-benchmark-015 (orders)
+2026-07-17 21:03:50Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-015 --timeout 600
+2026-07-17 21:04:03Z [WARN] [40/100] orders-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:04:03Z [INFO] [41/100] Running orders-benchmark-016 (orders)
+2026-07-17 21:04:03Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-016 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:03:43Z [INFO] python -m evaluation.cli validate-result --result-id bbaa53e0-000b-42e5-8967-7096ae4444f6
+2026-07-17 21:03:44Z [INFO] python -m evaluation.cli judge-result --result-id bbaa53e0-000b-42e5-8967-7096ae4444f6
+2026-07-17 21:03:50Z [PASS] [39/100] Completed orders-benchmark-014: deterministic=0.0, judge=83.9, classification=fail
+2026-07-17 21:03:50Z [INFO] [40/100] Running orders-benchmark-015 (orders)
+2026-07-17 21:03:50Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-015 --timeout 600
+2026-07-17 21:04:03Z [WARN] [40/100] orders-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:04:03Z [INFO] [41/100] Running orders-benchmark-016 (orders)
+2026-07-17 21:04:03Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-016 --timeout 600
+2026-07-17 21:04:34Z [INFO] python -m evaluation.cli validate-result --result-id 76b7d9e0-310b-4ad0-9402-11d7fdbee5a4
+2026-07-17 21:04:35Z [INFO] python -m evaluation.cli judge-result --result-id 76b7d9e0-310b-4ad0-9402-11d7fdbee5a4
+2026-07-17 21:04:44Z [PASS] [41/100] Completed orders-benchmark-016: deterministic=62.127, judge=0.0, classification=fail
+2026-07-17 21:04:44Z [INFO] [42/100] Running orders-benchmark-017 (orders)
+2026-07-17 21:04:44Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-017 --timeout 600
+2026-07-17 21:05:13Z [INFO] python -m evaluation.cli validate-result --result-id 3ce79029-8b13-4147-b991-237adf2e469f
+2026-07-17 21:05:14Z [INFO] python -m evaluation.cli judge-result --result-id 3ce79029-8b13-4147-b991-237adf2e469f
+2026-07-17 21:05:24Z [PASS] [42/100] Completed orders-benchmark-017: deterministic=70.761, judge=70.85, classification=pass
+------------------------------------------------------------
+2026-07-17 21:06:32Z [INFO] python -m evaluation.cli validate-result --result-id 25b39315-c2f7-414f-b648-175c7c3171a1
+2026-07-17 21:06:33Z [INFO] python -m evaluation.cli judge-result --result-id 25b39315-c2f7-414f-b648-175c7c3171a1
+2026-07-17 21:06:38Z [PASS] [44/100] Completed orders-benchmark-019: deterministic=82.666, judge=82.666, classification=pass
+2026-07-17 21:06:38Z [INFO] [45/100] Running orders-benchmark-020 (orders)
+2026-07-17 21:06:38Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-benchmark-020 --timeout 600
+2026-07-17 21:06:44Z [WARN] [45/100] orders-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:06:44Z [INFO] [46/100] Running orders-pilot-001 (orders)
+2026-07-17 21:06:44Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-pilot-001 --timeout 600
+2026-07-17 21:07:09Z [INFO] python -m evaluation.cli validate-result --result-id 59642198-f335-4ec1-8e10-a7a9027cbdf2
+2026-07-17 21:07:10Z [INFO] python -m evaluation.cli judge-result --result-id 59642198-f335-4ec1-8e10-a7a9027cbdf2
+2026-07-17 21:07:17Z [PASS] [46/100] Completed orders-pilot-001: deterministic=72.46, judge=72.55, classification=pass
+2026-07-17 21:07:17Z [INFO] [47/100] Running orders-pilot-002 (orders)
+2026-07-17 21:07:17Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-pilot-002 --timeout 600
+2026-07-17 21:07:44Z [INFO] python -m evaluation.cli validate-result --result-id 2e3feb5f-297d-4a6d-8b5b-c2d17282662f
+2026-07-17 21:07:46Z [INFO] python -m evaluation.cli judge-result --result-id 2e3feb5f-297d-4a6d-8b5b-c2d17282662f
+2026-07-17 21:07:51Z [PASS] [47/100] Completed orders-pilot-002: deterministic=80.439, judge=80.45, classification=pass
+------------------------------------------------------------
+2026-07-17 21:07:44Z [INFO] python -m evaluation.cli validate-result --result-id 2e3feb5f-297d-4a6d-8b5b-c2d17282662f
+2026-07-17 21:07:46Z [INFO] python -m evaluation.cli judge-result --result-id 2e3feb5f-297d-4a6d-8b5b-c2d17282662f
+2026-07-17 21:07:51Z [PASS] [47/100] Completed orders-pilot-002: deterministic=80.439, judge=80.45, classification=pass
+2026-07-17 21:07:51Z [INFO] [48/100] Running orders-pilot-003 (orders)
+2026-07-17 21:07:51Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-pilot-003 --timeout 600
+2026-07-17 21:07:56Z [WARN] [48/100] orders-pilot-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:07:56Z [INFO] [49/100] Running orders-pilot-004 (orders)
+2026-07-17 21:07:56Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-pilot-004 --timeout 600
+2026-07-17 21:08:29Z [INFO] python -m evaluation.cli validate-result --result-id 013a57d1-3da3-456a-b57d-f0558aca4d71
+2026-07-17 21:08:31Z [INFO] python -m evaluation.cli judge-result --result-id 013a57d1-3da3-456a-b57d-f0558aca4d71
+2026-07-17 21:08:39Z [PASS] [49/100] Completed orders-pilot-004: deterministic=0.0, judge=77.7, classification=fail
+2026-07-17 21:08:39Z [INFO] [50/100] Running orders-pilot-005 (orders)
+2026-07-17 21:08:39Z [INFO] python -m evaluation.cli run-scenario --scenario-id orders-pilot-005 --timeout 600
+2026-07-17 21:09:13Z [INFO] python -m evaluation.cli validate-result --result-id 2ce0e0ce-4742-45ac-8674-019cf3be8c06
+2026-07-17 21:09:14Z [INFO] python -m evaluation.cli judge-result --result-id 2ce0e0ce-4742-45ac-8674-019cf3be8c06
+2026-07-17 21:09:20Z [PASS] [50/100] Completed orders-pilot-005: deterministic=76.274, judge=76.4, classification=pass
+------------------------------------------------------------
+2026-07-17 21:09:52Z [INFO] python -m evaluation.cli validate-result --result-id 14fe6c4d-040f-4176-913f-1367cdfef6e7
+2026-07-17 21:09:53Z [INFO] python -m evaluation.cli judge-result --result-id 14fe6c4d-040f-4176-913f-1367cdfef6e7
+2026-07-17 21:10:01Z [PASS] [51/100] Completed shipping-benchmark-001: deterministic=76.15, judge=76.15, classification=pass
+2026-07-17 21:10:01Z [INFO] [52/100] Running shipping-benchmark-002 (shipping)
+2026-07-17 21:10:01Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-002 --timeout 600
+2026-07-17 21:10:09Z [WARN] [52/100] shipping-benchmark-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:09Z [INFO] [53/100] Running shipping-benchmark-003 (shipping)
+2026-07-17 21:10:09Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-003 --timeout 600
+2026-07-17 21:10:17Z [WARN] [53/100] shipping-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:17Z [INFO] [54/100] Running shipping-benchmark-004 (shipping)
+2026-07-17 21:10:17Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-004 --timeout 600
+2026-07-17 21:10:25Z [WARN] [54/100] shipping-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:25Z [INFO] [55/100] Running shipping-benchmark-005 (shipping)
+2026-07-17 21:10:25Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-005 --timeout 600
+2026-07-17 21:10:42Z [WARN] [55/100] shipping-benchmark-005 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:42Z [INFO] [56/100] Running shipping-benchmark-006 (shipping)
+------------------------------------------------------------
+2026-07-17 21:10:01Z [INFO] [52/100] Running shipping-benchmark-002 (shipping)
+2026-07-17 21:10:01Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-002 --timeout 600
+2026-07-17 21:10:09Z [WARN] [52/100] shipping-benchmark-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:09Z [INFO] [53/100] Running shipping-benchmark-003 (shipping)
+2026-07-17 21:10:09Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-003 --timeout 600
+2026-07-17 21:10:17Z [WARN] [53/100] shipping-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:17Z [INFO] [54/100] Running shipping-benchmark-004 (shipping)
+2026-07-17 21:10:17Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-004 --timeout 600
+2026-07-17 21:10:25Z [WARN] [54/100] shipping-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:25Z [INFO] [55/100] Running shipping-benchmark-005 (shipping)
+2026-07-17 21:10:25Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-005 --timeout 600
+2026-07-17 21:10:42Z [WARN] [55/100] shipping-benchmark-005 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:42Z [INFO] [56/100] Running shipping-benchmark-006 (shipping)
+2026-07-17 21:10:42Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-006 --timeout 600
+2026-07-17 21:11:19Z [INFO] python -m evaluation.cli validate-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:20Z [INFO] python -m evaluation.cli judge-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+------------------------------------------------------------
+2026-07-17 21:10:09Z [INFO] [53/100] Running shipping-benchmark-003 (shipping)
+2026-07-17 21:10:09Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-003 --timeout 600
+2026-07-17 21:10:17Z [WARN] [53/100] shipping-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:17Z [INFO] [54/100] Running shipping-benchmark-004 (shipping)
+2026-07-17 21:10:17Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-004 --timeout 600
+2026-07-17 21:10:25Z [WARN] [54/100] shipping-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:25Z [INFO] [55/100] Running shipping-benchmark-005 (shipping)
+2026-07-17 21:10:25Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-005 --timeout 600
+2026-07-17 21:10:42Z [WARN] [55/100] shipping-benchmark-005 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:42Z [INFO] [56/100] Running shipping-benchmark-006 (shipping)
+2026-07-17 21:10:42Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-006 --timeout 600
+2026-07-17 21:11:19Z [INFO] python -m evaluation.cli validate-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:20Z [INFO] python -m evaluation.cli judge-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:37Z [PASS] [56/100] Completed shipping-benchmark-006: deterministic=76.541, judge=76.541, classification=pass
+2026-07-17 21:11:37Z [INFO] [57/100] Running shipping-benchmark-007 (shipping)
+2026-07-17 21:11:37Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-007 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:10:17Z [INFO] [54/100] Running shipping-benchmark-004 (shipping)
+2026-07-17 21:10:17Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-004 --timeout 600
+2026-07-17 21:10:25Z [WARN] [54/100] shipping-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:25Z [INFO] [55/100] Running shipping-benchmark-005 (shipping)
+2026-07-17 21:10:25Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-005 --timeout 600
+2026-07-17 21:10:42Z [WARN] [55/100] shipping-benchmark-005 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:10:42Z [INFO] [56/100] Running shipping-benchmark-006 (shipping)
+2026-07-17 21:10:42Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-006 --timeout 600
+2026-07-17 21:11:19Z [INFO] python -m evaluation.cli validate-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:20Z [INFO] python -m evaluation.cli judge-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:37Z [PASS] [56/100] Completed shipping-benchmark-006: deterministic=76.541, judge=76.541, classification=pass
+2026-07-17 21:11:37Z [INFO] [57/100] Running shipping-benchmark-007 (shipping)
+2026-07-17 21:11:37Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-007 --timeout 600
+2026-07-17 21:11:55Z [WARN] [57/100] shipping-benchmark-007 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:11:55Z [INFO] [58/100] Running shipping-benchmark-008 (shipping)
+2026-07-17 21:11:55Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-008 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:11:19Z [INFO] python -m evaluation.cli validate-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:20Z [INFO] python -m evaluation.cli judge-result --result-id 6839b8ec-f8d3-4308-9a9d-2244aac91f5f
+2026-07-17 21:11:37Z [PASS] [56/100] Completed shipping-benchmark-006: deterministic=76.541, judge=76.541, classification=pass
+2026-07-17 21:11:37Z [INFO] [57/100] Running shipping-benchmark-007 (shipping)
+2026-07-17 21:11:37Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-007 --timeout 600
+2026-07-17 21:11:55Z [WARN] [57/100] shipping-benchmark-007 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:11:55Z [INFO] [58/100] Running shipping-benchmark-008 (shipping)
+2026-07-17 21:11:55Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-008 --timeout 600
+2026-07-17 21:12:43Z [WARN] [58/100] shipping-benchmark-008 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:12:43Z [INFO] [59/100] Running shipping-benchmark-009 (shipping)
+2026-07-17 21:12:43Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-009 --timeout 600
+2026-07-17 21:13:19Z [INFO] python -m evaluation.cli validate-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:20Z [INFO] python -m evaluation.cli judge-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:26Z [PASS] [59/100] Completed shipping-benchmark-009: deterministic=84.041, judge=84.041, classification=pass
+2026-07-17 21:13:26Z [INFO] [60/100] Running shipping-benchmark-010 (shipping)
+2026-07-17 21:13:26Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-010 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:11:37Z [INFO] [57/100] Running shipping-benchmark-007 (shipping)
+2026-07-17 21:11:37Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-007 --timeout 600
+2026-07-17 21:11:55Z [WARN] [57/100] shipping-benchmark-007 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:11:55Z [INFO] [58/100] Running shipping-benchmark-008 (shipping)
+2026-07-17 21:11:55Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-008 --timeout 600
+2026-07-17 21:12:43Z [WARN] [58/100] shipping-benchmark-008 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:12:43Z [INFO] [59/100] Running shipping-benchmark-009 (shipping)
+2026-07-17 21:12:43Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-009 --timeout 600
+2026-07-17 21:13:19Z [INFO] python -m evaluation.cli validate-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:20Z [INFO] python -m evaluation.cli judge-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:26Z [PASS] [59/100] Completed shipping-benchmark-009: deterministic=84.041, judge=84.041, classification=pass
+2026-07-17 21:13:26Z [INFO] [60/100] Running shipping-benchmark-010 (shipping)
+2026-07-17 21:13:26Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-010 --timeout 600
+2026-07-17 21:13:34Z [WARN] [60/100] shipping-benchmark-010 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:13:34Z [INFO] [61/100] Running shipping-benchmark-011 (shipping)
+2026-07-17 21:13:34Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-011 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:13:19Z [INFO] python -m evaluation.cli validate-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:20Z [INFO] python -m evaluation.cli judge-result --result-id 69daad22-755b-4c7a-ab7d-f8a1be941470
+2026-07-17 21:13:26Z [PASS] [59/100] Completed shipping-benchmark-009: deterministic=84.041, judge=84.041, classification=pass
+2026-07-17 21:13:26Z [INFO] [60/100] Running shipping-benchmark-010 (shipping)
+2026-07-17 21:13:26Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-010 --timeout 600
+2026-07-17 21:13:34Z [WARN] [60/100] shipping-benchmark-010 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:13:34Z [INFO] [61/100] Running shipping-benchmark-011 (shipping)
+2026-07-17 21:13:34Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-011 --timeout 600
+2026-07-17 21:14:04Z [INFO] python -m evaluation.cli validate-result --result-id 9d0f0b5a-14be-4443-b4d3-0abc554d37d9
+2026-07-17 21:14:05Z [INFO] python -m evaluation.cli judge-result --result-id 9d0f0b5a-14be-4443-b4d3-0abc554d37d9
+2026-07-17 21:14:41Z [PASS] [61/100] Completed shipping-benchmark-011: deterministic=66.403, judge=, classification=fail
+2026-07-17 21:14:41Z [INFO] [62/100] Running shipping-benchmark-012 (shipping)
+2026-07-17 21:14:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-012 --timeout 600
+2026-07-17 21:14:50Z [WARN] [62/100] shipping-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:14:50Z [INFO] [63/100] Running shipping-benchmark-013 (shipping)
+2026-07-17 21:14:50Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-013 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:14:04Z [INFO] python -m evaluation.cli validate-result --result-id 9d0f0b5a-14be-4443-b4d3-0abc554d37d9
+2026-07-17 21:14:05Z [INFO] python -m evaluation.cli judge-result --result-id 9d0f0b5a-14be-4443-b4d3-0abc554d37d9
+2026-07-17 21:14:41Z [PASS] [61/100] Completed shipping-benchmark-011: deterministic=66.403, judge=, classification=fail
+2026-07-17 21:14:41Z [INFO] [62/100] Running shipping-benchmark-012 (shipping)
+2026-07-17 21:14:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-012 --timeout 600
+2026-07-17 21:14:50Z [WARN] [62/100] shipping-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:14:50Z [INFO] [63/100] Running shipping-benchmark-013 (shipping)
+2026-07-17 21:14:50Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-013 --timeout 600
+2026-07-17 21:15:06Z [WARN] [63/100] shipping-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:15:06Z [INFO] [64/100] Running shipping-benchmark-014 (shipping)
+2026-07-17 21:15:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-014 --timeout 600
+2026-07-17 21:15:53Z [INFO] python -m evaluation.cli validate-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:15:54Z [INFO] python -m evaluation.cli judge-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:16:06Z [PASS] [64/100] Completed shipping-benchmark-014: deterministic=0.0, judge=77.6, classification=fail
+2026-07-17 21:16:06Z [INFO] [65/100] Running shipping-benchmark-015 (shipping)
+2026-07-17 21:16:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-015 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:14:41Z [INFO] [62/100] Running shipping-benchmark-012 (shipping)
+2026-07-17 21:14:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-012 --timeout 600
+2026-07-17 21:14:50Z [WARN] [62/100] shipping-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:14:50Z [INFO] [63/100] Running shipping-benchmark-013 (shipping)
+2026-07-17 21:14:50Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-013 --timeout 600
+2026-07-17 21:15:06Z [WARN] [63/100] shipping-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:15:06Z [INFO] [64/100] Running shipping-benchmark-014 (shipping)
+2026-07-17 21:15:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-014 --timeout 600
+2026-07-17 21:15:53Z [INFO] python -m evaluation.cli validate-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:15:54Z [INFO] python -m evaluation.cli judge-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:16:06Z [PASS] [64/100] Completed shipping-benchmark-014: deterministic=0.0, judge=77.6, classification=fail
+2026-07-17 21:16:06Z [INFO] [65/100] Running shipping-benchmark-015 (shipping)
+2026-07-17 21:16:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-015 --timeout 600
+2026-07-17 21:16:15Z [WARN] [65/100] shipping-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:16:15Z [INFO] [66/100] Running shipping-benchmark-016 (shipping)
+2026-07-17 21:16:15Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-016 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:15:53Z [INFO] python -m evaluation.cli validate-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:15:54Z [INFO] python -m evaluation.cli judge-result --result-id 7f658cef-9bd3-4339-9cb6-cc78aace39e0
+2026-07-17 21:16:06Z [PASS] [64/100] Completed shipping-benchmark-014: deterministic=0.0, judge=77.6, classification=fail
+2026-07-17 21:16:06Z [INFO] [65/100] Running shipping-benchmark-015 (shipping)
+2026-07-17 21:16:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-015 --timeout 600
+2026-07-17 21:16:15Z [WARN] [65/100] shipping-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:16:15Z [INFO] [66/100] Running shipping-benchmark-016 (shipping)
+2026-07-17 21:16:15Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-016 --timeout 600
+2026-07-17 21:16:22Z [WARN] [66/100] shipping-benchmark-016 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:16:22Z [INFO] [67/100] Running shipping-benchmark-017 (shipping)
+2026-07-17 21:16:22Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-017 --timeout 600
+2026-07-17 21:16:53Z [INFO] python -m evaluation.cli validate-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:16:54Z [INFO] python -m evaluation.cli judge-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:17:06Z [PASS] [67/100] Completed shipping-benchmark-017: deterministic=0.0, judge=68.6, classification=fail
+2026-07-17 21:17:06Z [INFO] [68/100] Running shipping-benchmark-018 (shipping)
+2026-07-17 21:17:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-018 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:16:06Z [INFO] [65/100] Running shipping-benchmark-015 (shipping)
+2026-07-17 21:16:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-015 --timeout 600
+2026-07-17 21:16:15Z [WARN] [65/100] shipping-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:16:15Z [INFO] [66/100] Running shipping-benchmark-016 (shipping)
+2026-07-17 21:16:15Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-016 --timeout 600
+2026-07-17 21:16:22Z [WARN] [66/100] shipping-benchmark-016 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:16:22Z [INFO] [67/100] Running shipping-benchmark-017 (shipping)
+2026-07-17 21:16:22Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-017 --timeout 600
+2026-07-17 21:16:53Z [INFO] python -m evaluation.cli validate-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:16:54Z [INFO] python -m evaluation.cli judge-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:17:06Z [PASS] [67/100] Completed shipping-benchmark-017: deterministic=0.0, judge=68.6, classification=fail
+2026-07-17 21:17:06Z [INFO] [68/100] Running shipping-benchmark-018 (shipping)
+2026-07-17 21:17:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-018 --timeout 600
+2026-07-17 21:17:14Z [WARN] [68/100] shipping-benchmark-018 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:17:14Z [INFO] [69/100] Running shipping-benchmark-019 (shipping)
+2026-07-17 21:17:14Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-019 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:16:53Z [INFO] python -m evaluation.cli validate-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:16:54Z [INFO] python -m evaluation.cli judge-result --result-id 26b8ff38-91de-4796-91b3-9c794ed67850
+2026-07-17 21:17:06Z [PASS] [67/100] Completed shipping-benchmark-017: deterministic=0.0, judge=68.6, classification=fail
+2026-07-17 21:17:06Z [INFO] [68/100] Running shipping-benchmark-018 (shipping)
+2026-07-17 21:17:06Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-018 --timeout 600
+2026-07-17 21:17:14Z [WARN] [68/100] shipping-benchmark-018 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:17:14Z [INFO] [69/100] Running shipping-benchmark-019 (shipping)
+2026-07-17 21:17:14Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-019 --timeout 600
+2026-07-17 21:17:45Z [INFO] python -m evaluation.cli validate-result --result-id 1d8baec6-90be-4037-9662-581cec316b36
+2026-07-17 21:17:46Z [INFO] python -m evaluation.cli judge-result --result-id 1d8baec6-90be-4037-9662-581cec316b36
+2026-07-17 21:17:52Z [PASS] [69/100] Completed shipping-benchmark-019: deterministic=80.666, judge=80.65, classification=pass
+2026-07-17 21:17:52Z [INFO] [70/100] Running shipping-benchmark-020 (shipping)
+2026-07-17 21:17:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-020 --timeout 600
+2026-07-17 21:18:00Z [WARN] [70/100] shipping-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:18:00Z [INFO] [71/100] Running shipping-pilot-001 (shipping)
+2026-07-17 21:18:00Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-001 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:17:45Z [INFO] python -m evaluation.cli validate-result --result-id 1d8baec6-90be-4037-9662-581cec316b36
+2026-07-17 21:17:46Z [INFO] python -m evaluation.cli judge-result --result-id 1d8baec6-90be-4037-9662-581cec316b36
+2026-07-17 21:17:52Z [PASS] [69/100] Completed shipping-benchmark-019: deterministic=80.666, judge=80.65, classification=pass
+2026-07-17 21:17:52Z [INFO] [70/100] Running shipping-benchmark-020 (shipping)
+2026-07-17 21:17:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-benchmark-020 --timeout 600
+2026-07-17 21:18:00Z [WARN] [70/100] shipping-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:18:00Z [INFO] [71/100] Running shipping-pilot-001 (shipping)
+2026-07-17 21:18:00Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-001 --timeout 600
+2026-07-17 21:18:37Z [INFO] python -m evaluation.cli validate-result --result-id cb094908-78b0-40d1-b864-dc22a99c38e5
+2026-07-17 21:18:39Z [INFO] python -m evaluation.cli judge-result --result-id cb094908-78b0-40d1-b864-dc22a99c38e5
+2026-07-17 21:18:56Z [PASS] [71/100] Completed shipping-pilot-001: deterministic=93.055, judge=, classification=pass
+2026-07-17 21:18:56Z [INFO] [72/100] Running shipping-pilot-002 (shipping)
+2026-07-17 21:18:56Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-002 --timeout 600
+2026-07-17 21:19:12Z [WARN] [72/100] shipping-pilot-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:19:12Z [INFO] [73/100] Running shipping-pilot-003 (shipping)
+2026-07-17 21:19:12Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-003 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:18:37Z [INFO] python -m evaluation.cli validate-result --result-id cb094908-78b0-40d1-b864-dc22a99c38e5
+2026-07-17 21:18:39Z [INFO] python -m evaluation.cli judge-result --result-id cb094908-78b0-40d1-b864-dc22a99c38e5
+2026-07-17 21:18:56Z [PASS] [71/100] Completed shipping-pilot-001: deterministic=93.055, judge=, classification=pass
+2026-07-17 21:18:56Z [INFO] [72/100] Running shipping-pilot-002 (shipping)
+2026-07-17 21:18:56Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-002 --timeout 600
+2026-07-17 21:19:12Z [WARN] [72/100] shipping-pilot-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:19:12Z [INFO] [73/100] Running shipping-pilot-003 (shipping)
+2026-07-17 21:19:12Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-003 --timeout 600
+2026-07-17 21:20:05Z [WARN] [73/100] shipping-pilot-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:20:05Z [INFO] [74/100] Running shipping-pilot-004 (shipping)
+2026-07-17 21:20:05Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-004 --timeout 600
+2026-07-17 21:20:37Z [INFO] python -m evaluation.cli validate-result --result-id dce072e3-7525-4f2c-b84a-38e63e779ef0
+2026-07-17 21:20:38Z [INFO] python -m evaluation.cli judge-result --result-id dce072e3-7525-4f2c-b84a-38e63e779ef0
+2026-07-17 21:20:47Z [PASS] [74/100] Completed shipping-pilot-004: deterministic=75.452, judge=75.45, classification=pass
+2026-07-17 21:20:47Z [INFO] [75/100] Running shipping-pilot-005 (shipping)
+2026-07-17 21:20:47Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-005 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:18:56Z [INFO] [72/100] Running shipping-pilot-002 (shipping)
+2026-07-17 21:18:56Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-002 --timeout 600
+2026-07-17 21:19:12Z [WARN] [72/100] shipping-pilot-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:19:12Z [INFO] [73/100] Running shipping-pilot-003 (shipping)
+2026-07-17 21:19:12Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-003 --timeout 600
+2026-07-17 21:20:05Z [WARN] [73/100] shipping-pilot-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:20:05Z [INFO] [74/100] Running shipping-pilot-004 (shipping)
+2026-07-17 21:20:05Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-004 --timeout 600
+2026-07-17 21:20:37Z [INFO] python -m evaluation.cli validate-result --result-id dce072e3-7525-4f2c-b84a-38e63e779ef0
+2026-07-17 21:20:38Z [INFO] python -m evaluation.cli judge-result --result-id dce072e3-7525-4f2c-b84a-38e63e779ef0
+2026-07-17 21:20:47Z [PASS] [74/100] Completed shipping-pilot-004: deterministic=75.452, judge=75.45, classification=pass
+2026-07-17 21:20:47Z [INFO] [75/100] Running shipping-pilot-005 (shipping)
+2026-07-17 21:20:47Z [INFO] python -m evaluation.cli run-scenario --scenario-id shipping-pilot-005 --timeout 600
+2026-07-17 21:21:23Z [INFO] python -m evaluation.cli validate-result --result-id 744826ae-5438-4fa4-8ded-a7138d4a2bc0
+2026-07-17 21:21:24Z [INFO] python -m evaluation.cli judge-result --result-id 744826ae-5438-4fa4-8ded-a7138d4a2bc0
+2026-07-17 21:21:31Z [PASS] [75/100] Completed shipping-pilot-005: deterministic=84.48, judge=84.5, classification=pass
+------------------------------------------------------------
+2026-07-17 21:22:20Z [INFO] python -m evaluation.cli validate-result --result-id 8c5e2173-956e-439b-a129-715a62103da3
+2026-07-17 21:22:21Z [INFO] python -m evaluation.cli judge-result --result-id 8c5e2173-956e-439b-a129-715a62103da3
+2026-07-17 21:22:29Z [PASS] [76/100] Completed clinic-benchmark-001: deterministic=81.578, judge=81.578, classification=pass
+2026-07-17 21:22:29Z [INFO] [77/100] Running clinic-benchmark-002 (clinic)
+2026-07-17 21:22:29Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-002 --timeout 600
+2026-07-17 21:22:35Z [WARN] [77/100] clinic-benchmark-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:35Z [INFO] [78/100] Running clinic-benchmark-003 (clinic)
+2026-07-17 21:22:35Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-003 --timeout 600
+2026-07-17 21:22:41Z [WARN] [78/100] clinic-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:41Z [INFO] [79/100] Running clinic-benchmark-004 (clinic)
+2026-07-17 21:22:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-004 --timeout 600
+2026-07-17 21:22:47Z [WARN] [79/100] clinic-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:47Z [INFO] [80/100] Running clinic-benchmark-005 (clinic)
+2026-07-17 21:22:47Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-005 --timeout 600
+2026-07-17 21:23:18Z [INFO] python -m evaluation.cli validate-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+2026-07-17 21:23:19Z [INFO] python -m evaluation.cli judge-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+------------------------------------------------------------
+2026-07-17 21:22:29Z [INFO] [77/100] Running clinic-benchmark-002 (clinic)
+2026-07-17 21:22:29Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-002 --timeout 600
+2026-07-17 21:22:35Z [WARN] [77/100] clinic-benchmark-002 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:35Z [INFO] [78/100] Running clinic-benchmark-003 (clinic)
+2026-07-17 21:22:35Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-003 --timeout 600
+2026-07-17 21:22:41Z [WARN] [78/100] clinic-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:41Z [INFO] [79/100] Running clinic-benchmark-004 (clinic)
+2026-07-17 21:22:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-004 --timeout 600
+2026-07-17 21:22:47Z [WARN] [79/100] clinic-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:47Z [INFO] [80/100] Running clinic-benchmark-005 (clinic)
+2026-07-17 21:22:47Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-005 --timeout 600
+2026-07-17 21:23:18Z [INFO] python -m evaluation.cli validate-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+2026-07-17 21:23:19Z [INFO] python -m evaluation.cli judge-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+2026-07-17 21:23:28Z [PASS] [80/100] Completed clinic-benchmark-005: deterministic=0.0, judge=79.264, classification=fail
+2026-07-17 21:23:28Z [INFO] [81/100] Running clinic-benchmark-006 (clinic)
+2026-07-17 21:23:28Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-006 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:22:35Z [INFO] [78/100] Running clinic-benchmark-003 (clinic)
+2026-07-17 21:22:35Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-003 --timeout 600
+2026-07-17 21:22:41Z [WARN] [78/100] clinic-benchmark-003 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:41Z [INFO] [79/100] Running clinic-benchmark-004 (clinic)
+2026-07-17 21:22:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-004 --timeout 600
+2026-07-17 21:22:47Z [WARN] [79/100] clinic-benchmark-004 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:22:47Z [INFO] [80/100] Running clinic-benchmark-005 (clinic)
+2026-07-17 21:22:47Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-005 --timeout 600
+2026-07-17 21:23:18Z [INFO] python -m evaluation.cli validate-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+2026-07-17 21:23:19Z [INFO] python -m evaluation.cli judge-result --result-id 6e9ed568-821e-4a8d-ac54-9186e386899d
+2026-07-17 21:23:28Z [PASS] [80/100] Completed clinic-benchmark-005: deterministic=0.0, judge=79.264, classification=fail
+2026-07-17 21:23:28Z [INFO] [81/100] Running clinic-benchmark-006 (clinic)
+2026-07-17 21:23:28Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-006 --timeout 600
+2026-07-17 21:23:55Z [INFO] python -m evaluation.cli validate-result --result-id 7cb59bb8-9e06-4e84-b76d-6f9d73d06685
+2026-07-17 21:23:56Z [INFO] python -m evaluation.cli judge-result --result-id 7cb59bb8-9e06-4e84-b76d-6f9d73d06685
+2026-07-17 21:24:02Z [PASS] [81/100] Completed clinic-benchmark-006: deterministic=65.653, judge=65.66, classification=fail
+------------------------------------------------------------
+2026-07-17 21:23:55Z [INFO] python -m evaluation.cli validate-result --result-id 7cb59bb8-9e06-4e84-b76d-6f9d73d06685
+2026-07-17 21:23:56Z [INFO] python -m evaluation.cli judge-result --result-id 7cb59bb8-9e06-4e84-b76d-6f9d73d06685
+2026-07-17 21:24:02Z [PASS] [81/100] Completed clinic-benchmark-006: deterministic=65.653, judge=65.66, classification=fail
+2026-07-17 21:24:02Z [INFO] [82/100] Running clinic-benchmark-007 (clinic)
+2026-07-17 21:24:02Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-007 --timeout 600
+2026-07-17 21:24:15Z [WARN] [82/100] clinic-benchmark-007 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:24:15Z [INFO] [83/100] Running clinic-benchmark-008 (clinic)
+2026-07-17 21:24:15Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-008 --timeout 600
+2026-07-17 21:24:48Z [INFO] python -m evaluation.cli validate-result --result-id 3c10448b-e5aa-4613-bd68-e82f52b6c461
+2026-07-17 21:24:49Z [INFO] python -m evaluation.cli judge-result --result-id 3c10448b-e5aa-4613-bd68-e82f52b6c461
+2026-07-17 21:24:58Z [PASS] [83/100] Completed clinic-benchmark-008: deterministic=72.028, judge=72.15, classification=pass
+2026-07-17 21:24:58Z [INFO] [84/100] Running clinic-benchmark-009 (clinic)
+2026-07-17 21:24:58Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-009 --timeout 600
+2026-07-17 21:25:28Z [INFO] python -m evaluation.cli validate-result --result-id 9955af7d-43c6-44a4-a91c-fdc97e3bc04a
+2026-07-17 21:25:29Z [INFO] python -m evaluation.cli judge-result --result-id 9955af7d-43c6-44a4-a91c-fdc97e3bc04a
+2026-07-17 21:25:35Z [PASS] [84/100] Completed clinic-benchmark-009: deterministic=82.374, judge=82.15, classification=pass
+------------------------------------------------------------
+2026-07-17 21:25:28Z [INFO] python -m evaluation.cli validate-result --result-id 9955af7d-43c6-44a4-a91c-fdc97e3bc04a
+2026-07-17 21:25:29Z [INFO] python -m evaluation.cli judge-result --result-id 9955af7d-43c6-44a4-a91c-fdc97e3bc04a
+2026-07-17 21:25:35Z [PASS] [84/100] Completed clinic-benchmark-009: deterministic=82.374, judge=82.15, classification=pass
+2026-07-17 21:25:35Z [INFO] [85/100] Running clinic-benchmark-010 (clinic)
+2026-07-17 21:25:35Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-010 --timeout 600
+2026-07-17 21:25:41Z [WARN] [85/100] clinic-benchmark-010 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:41Z [INFO] [86/100] Running clinic-benchmark-011 (clinic)
+2026-07-17 21:25:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-011 --timeout 600
+2026-07-17 21:25:46Z [WARN] [86/100] clinic-benchmark-011 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:46Z [INFO] [87/100] Running clinic-benchmark-012 (clinic)
+2026-07-17 21:25:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-012 --timeout 600
+2026-07-17 21:25:52Z [WARN] [87/100] clinic-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:52Z [INFO] [88/100] Running clinic-benchmark-013 (clinic)
+2026-07-17 21:25:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-013 --timeout 600
+2026-07-17 21:26:05Z [WARN] [88/100] clinic-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:05Z [INFO] [89/100] Running clinic-benchmark-014 (clinic)
+------------------------------------------------------------
+2026-07-17 21:25:35Z [INFO] [85/100] Running clinic-benchmark-010 (clinic)
+2026-07-17 21:25:35Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-010 --timeout 600
+2026-07-17 21:25:41Z [WARN] [85/100] clinic-benchmark-010 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:41Z [INFO] [86/100] Running clinic-benchmark-011 (clinic)
+2026-07-17 21:25:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-011 --timeout 600
+2026-07-17 21:25:46Z [WARN] [86/100] clinic-benchmark-011 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:46Z [INFO] [87/100] Running clinic-benchmark-012 (clinic)
+2026-07-17 21:25:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-012 --timeout 600
+2026-07-17 21:25:52Z [WARN] [87/100] clinic-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:52Z [INFO] [88/100] Running clinic-benchmark-013 (clinic)
+2026-07-17 21:25:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-013 --timeout 600
+2026-07-17 21:26:05Z [WARN] [88/100] clinic-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:05Z [INFO] [89/100] Running clinic-benchmark-014 (clinic)
+2026-07-17 21:26:05Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-014 --timeout 600
+2026-07-17 21:26:34Z [INFO] python -m evaluation.cli validate-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:35Z [INFO] python -m evaluation.cli judge-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+------------------------------------------------------------
+2026-07-17 21:25:41Z [INFO] [86/100] Running clinic-benchmark-011 (clinic)
+2026-07-17 21:25:41Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-011 --timeout 600
+2026-07-17 21:25:46Z [WARN] [86/100] clinic-benchmark-011 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:46Z [INFO] [87/100] Running clinic-benchmark-012 (clinic)
+2026-07-17 21:25:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-012 --timeout 600
+2026-07-17 21:25:52Z [WARN] [87/100] clinic-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:52Z [INFO] [88/100] Running clinic-benchmark-013 (clinic)
+2026-07-17 21:25:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-013 --timeout 600
+2026-07-17 21:26:05Z [WARN] [88/100] clinic-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:05Z [INFO] [89/100] Running clinic-benchmark-014 (clinic)
+2026-07-17 21:26:05Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-014 --timeout 600
+2026-07-17 21:26:34Z [INFO] python -m evaluation.cli validate-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:35Z [INFO] python -m evaluation.cli judge-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:46Z [PASS] [89/100] Completed clinic-benchmark-014: deterministic=80.719, judge=80.55, classification=pass
+2026-07-17 21:26:46Z [INFO] [90/100] Running clinic-benchmark-015 (clinic)
+2026-07-17 21:26:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-015 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:25:46Z [INFO] [87/100] Running clinic-benchmark-012 (clinic)
+2026-07-17 21:25:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-012 --timeout 600
+2026-07-17 21:25:52Z [WARN] [87/100] clinic-benchmark-012 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:25:52Z [INFO] [88/100] Running clinic-benchmark-013 (clinic)
+2026-07-17 21:25:52Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-013 --timeout 600
+2026-07-17 21:26:05Z [WARN] [88/100] clinic-benchmark-013 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:05Z [INFO] [89/100] Running clinic-benchmark-014 (clinic)
+2026-07-17 21:26:05Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-014 --timeout 600
+2026-07-17 21:26:34Z [INFO] python -m evaluation.cli validate-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:35Z [INFO] python -m evaluation.cli judge-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:46Z [PASS] [89/100] Completed clinic-benchmark-014: deterministic=80.719, judge=80.55, classification=pass
+2026-07-17 21:26:46Z [INFO] [90/100] Running clinic-benchmark-015 (clinic)
+2026-07-17 21:26:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-015 --timeout 600
+2026-07-17 21:26:59Z [WARN] [90/100] clinic-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:59Z [INFO] [91/100] Running clinic-benchmark-016 (clinic)
+2026-07-17 21:26:59Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-016 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:26:34Z [INFO] python -m evaluation.cli validate-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:35Z [INFO] python -m evaluation.cli judge-result --result-id ce9b7c27-5f21-4853-a8a3-04b5ed3a1ef5
+2026-07-17 21:26:46Z [PASS] [89/100] Completed clinic-benchmark-014: deterministic=80.719, judge=80.55, classification=pass
+2026-07-17 21:26:46Z [INFO] [90/100] Running clinic-benchmark-015 (clinic)
+2026-07-17 21:26:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-015 --timeout 600
+2026-07-17 21:26:59Z [WARN] [90/100] clinic-benchmark-015 produced invalid_configuration. Recorded and continuing.
+2026-07-17 21:26:59Z [INFO] [91/100] Running clinic-benchmark-016 (clinic)
+2026-07-17 21:26:59Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-016 --timeout 600
+2026-07-17 21:27:28Z [INFO] python -m evaluation.cli validate-result --result-id 3ce00e7e-f899-4f73-a548-70d336949bae
+2026-07-17 21:27:29Z [INFO] python -m evaluation.cli judge-result --result-id 3ce00e7e-f899-4f73-a548-70d336949bae
+2026-07-17 21:27:46Z [PASS] [91/100] Completed clinic-benchmark-016: deterministic=0.0, judge=, classification=fail
+2026-07-17 21:27:46Z [INFO] [92/100] Running clinic-benchmark-017 (clinic)
+2026-07-17 21:27:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-017 --timeout 600
+2026-07-17 22:50:10Z [WARN] [92/100] clinic-benchmark-017 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:10Z [INFO] [93/100] Running clinic-benchmark-018 (clinic)
+2026-07-17 22:50:10Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-018 --timeout 600
+------------------------------------------------------------
+2026-07-17 21:27:28Z [INFO] python -m evaluation.cli validate-result --result-id 3ce00e7e-f899-4f73-a548-70d336949bae
+2026-07-17 21:27:29Z [INFO] python -m evaluation.cli judge-result --result-id 3ce00e7e-f899-4f73-a548-70d336949bae
+2026-07-17 21:27:46Z [PASS] [91/100] Completed clinic-benchmark-016: deterministic=0.0, judge=, classification=fail
+2026-07-17 21:27:46Z [INFO] [92/100] Running clinic-benchmark-017 (clinic)
+2026-07-17 21:27:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-017 --timeout 600
+2026-07-17 22:50:10Z [WARN] [92/100] clinic-benchmark-017 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:10Z [INFO] [93/100] Running clinic-benchmark-018 (clinic)
+2026-07-17 22:50:10Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-018 --timeout 600
+2026-07-17 22:50:18Z [WARN] [93/100] clinic-benchmark-018 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:18Z [INFO] [94/100] Running clinic-benchmark-019 (clinic)
+2026-07-17 22:50:18Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-019 --timeout 600
+2026-07-17 22:50:27Z [WARN] [94/100] clinic-benchmark-019 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:27Z [INFO] [95/100] Running clinic-benchmark-020 (clinic)
+2026-07-17 22:50:27Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-020 --timeout 600
+2026-07-17 22:50:36Z [WARN] [95/100] clinic-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:36Z [INFO] [96/100] Running clinic-pilot-001 (clinic)
+------------------------------------------------------------
+2026-07-17 21:27:46Z [INFO] [92/100] Running clinic-benchmark-017 (clinic)
+2026-07-17 21:27:46Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-017 --timeout 600
+2026-07-17 22:50:10Z [WARN] [92/100] clinic-benchmark-017 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:10Z [INFO] [93/100] Running clinic-benchmark-018 (clinic)
+2026-07-17 22:50:10Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-018 --timeout 600
+2026-07-17 22:50:18Z [WARN] [93/100] clinic-benchmark-018 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:18Z [INFO] [94/100] Running clinic-benchmark-019 (clinic)
+2026-07-17 22:50:18Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-019 --timeout 600
+2026-07-17 22:50:27Z [WARN] [94/100] clinic-benchmark-019 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:27Z [INFO] [95/100] Running clinic-benchmark-020 (clinic)
+2026-07-17 22:50:27Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-020 --timeout 600
+2026-07-17 22:50:36Z [WARN] [95/100] clinic-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:36Z [INFO] [96/100] Running clinic-pilot-001 (clinic)
+2026-07-17 22:50:36Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-pilot-001 --timeout 600
+2026-07-17 22:51:06Z [INFO] python -m evaluation.cli validate-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+2026-07-17 22:51:07Z [INFO] python -m evaluation.cli judge-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+------------------------------------------------------------
+2026-07-17 22:50:10Z [INFO] [93/100] Running clinic-benchmark-018 (clinic)
+2026-07-17 22:50:10Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-018 --timeout 600
+2026-07-17 22:50:18Z [WARN] [93/100] clinic-benchmark-018 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:18Z [INFO] [94/100] Running clinic-benchmark-019 (clinic)
+2026-07-17 22:50:18Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-019 --timeout 600
+2026-07-17 22:50:27Z [WARN] [94/100] clinic-benchmark-019 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:27Z [INFO] [95/100] Running clinic-benchmark-020 (clinic)
+2026-07-17 22:50:27Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-020 --timeout 600
+2026-07-17 22:50:36Z [WARN] [95/100] clinic-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:36Z [INFO] [96/100] Running clinic-pilot-001 (clinic)
+2026-07-17 22:50:36Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-pilot-001 --timeout 600
+2026-07-17 22:51:06Z [INFO] python -m evaluation.cli validate-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+2026-07-17 22:51:07Z [INFO] python -m evaluation.cli judge-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+2026-07-17 22:51:16Z [PASS] [96/100] Completed clinic-pilot-001: deterministic=0.0, judge=77.7, classification=fail
+2026-07-17 22:51:16Z [INFO] [97/100] Running clinic-pilot-002 (clinic)
+2026-07-17 22:51:16Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-pilot-002 --timeout 600
+------------------------------------------------------------
+2026-07-17 22:50:18Z [INFO] [94/100] Running clinic-benchmark-019 (clinic)
+2026-07-17 22:50:18Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-019 --timeout 600
+2026-07-17 22:50:27Z [WARN] [94/100] clinic-benchmark-019 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:27Z [INFO] [95/100] Running clinic-benchmark-020 (clinic)
+2026-07-17 22:50:27Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-benchmark-020 --timeout 600
+2026-07-17 22:50:36Z [WARN] [95/100] clinic-benchmark-020 produced invalid_configuration. Recorded and continuing.
+2026-07-17 22:50:36Z [INFO] [96/100] Running clinic-pilot-001 (clinic)
+2026-07-17 22:50:36Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-pilot-001 --timeout 600
+2026-07-17 22:51:06Z [INFO] python -m evaluation.cli validate-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+2026-07-17 22:51:07Z [INFO] python -m evaluation.cli judge-result --result-id f202fdc6-79b1-41aa-908a-59791bc519bf
+2026-07-17 22:51:16Z [PASS] [96/100] Completed clinic-pilot-001: deterministic=0.0, judge=77.7, classification=fail
+2026-07-17 22:51:16Z [INFO] [97/100] Running clinic-pilot-002 (clinic)
+2026-07-17 22:51:16Z [INFO] python -m evaluation.cli run-scenario --scenario-id clinic-pilot-002 --timeout 600
+2026-07-17 22:51:45Z [INFO] python -m evaluation.cli validate-result --result-id e525ea69-d4c0-4591-b8de-0024df34b8d2
+2026-07-17 22:51:46Z [INFO] python -m evaluation.cli judge-result --result-id e525ea69-d4c0-4591-b8de-0024df34b8d2
+2026-07-17 22:51:53Z [PASS] [97/100] Completed clinic-pilot-002: deterministic=67.571, judge=67.6, classification=fail
+------------------------------------------------------------

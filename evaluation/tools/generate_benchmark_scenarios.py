@@ -73,6 +73,19 @@ def generate(domain: str) -> None:
             "cleanup_script": f"evaluation_scenarios/{domain}/{scenario_id}/cleanup.sql",
             "expected_response_type": expected_response,
             "expected_entities": [partial] if human_review else [entity],
+            "expected_entity_value": entity,
+            "expected_entity_question_value": partial if category in {"partial_entity_resolution", "ambiguous_entity_resolution"} else entity,
+            "expected_entity_type": category,
+            "expected_entity_schema": "eval",
+            "expected_entity_table": target,
+            "expected_entity_column": "BusinessKey",
+            "expected_entity_match_mode": "partial_ambiguous" if human_review else "exact",
+            "expected_entity_database": f"Eval{domain.title()}",
+            "expected_defect_table": "exceptions",
+            "expected_defect_column": "CorrelationId",
+            "expected_defect_value": correlation,
+            "expected_entity_link_column": "CorrelationId",
+            "expected_defect_link_column": "CorrelationId",
             "expected_root_cause_concepts": [cause],
             "expected_tables": [target, "integration_messages", "exceptions", "audit_history"],
             "expected_columns": ["BusinessKey", "Status", "EventTime", "CorrelationId", "Details"],
@@ -118,7 +131,9 @@ def _scripts(domain: str, category: str, target: str, entity: str, partial: str,
     inject.append(f"INSERT eval.audit_history(BusinessKey,Status,Details,CorrelationId) VALUES (N'AUD-{entity}',N'Recorded',N'Observed workflow state',N'{correlation}');")
     inject.extend(["COMMIT;", "GO", ""])
     precondition = f"SET NOCOUNT ON;\nIF EXISTS (SELECT 1 FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%' OR CorrelationId=N'{correlation}') THROW 51101, 'Benchmark scenario contaminated before injection', 1;\nSELECT N'precondition_valid' AS validation_status;\nGO\n"
-    verify = f"SET NOCOUNT ON;\nIF NOT EXISTS (SELECT 1 FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%' AND CorrelationId=N'{correlation}') THROW 51100, 'Benchmark defect missing', 1;\nSELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[{target}] WHERE BusinessKey LIKE N'{partial}%';\nGO\n"
+    predicate = f"e.BusinessKey LIKE N'{partial}%'" if category == "ambiguous_entity_resolution" else f"e.BusinessKey=N'{entity}'"
+    invalid_count = "< 2" if category == "ambiguous_entity_resolution" else "<> 1"
+    verify = f"SET NOCOUNT ON;\nIF (SELECT COUNT(*) FROM eval.[{target}] e JOIN eval.exceptions d ON d.CorrelationId=e.CorrelationId WHERE {predicate} AND e.CorrelationId=N'{correlation}') {invalid_count} THROW 51100, 'Benchmark entity or linked defect missing', 1;\nSELECT N'verified' AS verification_status, e.BusinessKey, e.Status, e.CorrelationId FROM eval.[{target}] e WHERE {predicate} AND e.CorrelationId=N'{correlation}';\nGO\n"
     return {"baseline_reset.sql": "\n".join(clean), "inject.sql": "\n".join(inject), "precondition.sql": precondition, "verify.sql": verify, "cleanup.sql": "\n".join(cleanup)}
 
 

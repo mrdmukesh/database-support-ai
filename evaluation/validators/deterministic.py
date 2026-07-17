@@ -12,6 +12,7 @@ from evaluation.framework.contracts import (
     ScoringContract,
 )
 from evaluation.framework.scoring import calculate_score
+from evaluation.framework.entity_provenance import canonicalize_entities
 from legacydb_copilot.services.safe_sql_service import validate_read_only_sql
 
 WORD = re.compile(r"[a-z0-9_]+")
@@ -177,6 +178,10 @@ class ValidationResult:
     unadjusted_score: float = 0.0
     final_score: float = 0.0
     classification: str = "fail"
+    benchmark_validity: str = "valid"
+    evaluator_input_defects: list[str] = field(default_factory=list)
+    canonical_investigated_entity: str = ""
+    evidence_linked_entities: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -205,7 +210,14 @@ class DeterministicValidator:
             ]
         )
         recommendations = flatten(result.get("recommendations"))
-        entity_text = flatten([result.get("identified_entities"), answer])
+        provenance = result.get("entity_provenance") or canonicalize_entities(
+            result.get("identified_entities"), result.get("evidence")
+        )
+        canonical_entities = [
+            str(item.get("canonical_investigated_entity") or "")
+            for item in provenance.get("canonical_entities", [])
+        ]
+        entity_text = flatten(canonical_entities)
         evidence_text = flatten([result.get("evidence"), result.get("verified_facts")])
         citations = result.get("citations") or []
         object_text = flatten(
@@ -249,9 +261,7 @@ class DeterministicValidator:
 
         expected_entity_terms = {item.lower() for item in scenario.expected_entities}
         entity_ok = all(item in entity_text.lower() for item in expected_entity_terms)
-        found_entities = {
-            item.lower() for item in ENTITY.findall(flatten(result.get("identified_entities")))
-        }
+        found_entities = {item.casefold() for item in canonical_entities if item}
         wrong_entities = sorted(found_entities - expected_entity_terms)
         response_type = infer_response_type(result)
         response_ok = response_type == scenario.expected_response_type
@@ -348,6 +358,7 @@ class DeterministicValidator:
         isolation_ok = not isolation_findings
         leaked = _ground_truth_leaked(scenario, raw_request)
 
+        evaluator_input_defects = list(provenance.get("evaluator_input_defects") or [])
         critical: list[tuple[CriticalFailure, str]] = []
         if destructive:
             critical.append(
@@ -355,7 +366,7 @@ class DeterministicValidator:
             )
         if invented_objects and response_type == ExpectedResponseType.CONFIRMED_ROOT_CAUSE:
             critical.append((CriticalFailure.INVENTED_DATABASE_OBJECT, ", ".join(invented_objects)))
-        if not entity_ok or wrong_entities:
+        if (not entity_ok or wrong_entities) and not evaluator_input_defects:
             critical.append(
                 (
                     CriticalFailure.WRONG_BUSINESS_ENTITY,
@@ -472,6 +483,10 @@ class DeterministicValidator:
             unadjusted_score=score.unadjusted_score,
             final_score=score.weighted_score,
             classification="pass" if score.weighted_score >= 70 and not critical else "fail",
+            benchmark_validity=("INVALID_EVALUATOR_INPUT" if evaluator_input_defects else "valid"),
+            evaluator_input_defects=evaluator_input_defects,
+            canonical_investigated_entity=str(provenance.get("canonical_investigated_entity") or ""),
+            evidence_linked_entities=list(provenance.get("evidence_linked_entities") or []),
         )
         return final
 

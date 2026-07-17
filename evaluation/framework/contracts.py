@@ -77,6 +77,19 @@ class ScenarioContract:
     estimated_duration_seconds: int = 60
     estimated_token_usage: int = 2000
     tags: tuple[str, ...] = ()
+    expected_entity_value: str = ""
+    expected_entity_question_value: str = ""
+    expected_entity_type: str = "business_entity"
+    expected_entity_schema: str = "eval"
+    expected_entity_table: str = ""
+    expected_entity_column: str = "BusinessKey"
+    expected_entity_match_mode: str = "exact"
+    expected_entity_database: str = ""
+    expected_defect_table: str = "exceptions"
+    expected_defect_column: str = "CorrelationId"
+    expected_defect_value: str = ""
+    expected_entity_link_column: str = "CorrelationId"
+    expected_defect_link_column: str = "CorrelationId"
 
     def __post_init__(self) -> None:
         for name in (
@@ -113,6 +126,10 @@ class ScenarioContract:
             raise ValueError("scenario duration and token estimates must be positive")
         if any(not 0 <= score <= 100 for score in self.expected_ai_judge_category_scores.values()):
             raise ValueError("expected AI Judge category scores must be between 0 and 100")
+        if self.expected_entity_match_mode not in {"exact", "partial_ambiguous"}:
+            raise ValueError("expected_entity_match_mode must be exact or partial_ambiguous")
+        if self.expected_entity_value and not self.expected_entity_table:
+            raise ValueError("expected_entity_table is required with expected_entity_value")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -320,7 +320,14 @@ def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: Evidenc
     if not evidence_focus or evidence_focus.affected_object == "Not determined":
         return any(item.rows for item in evidence)
     affected = evidence_focus.affected_object.lower()
-    return any(item.rows and affected in f"{item.purpose} {item.sql}".lower() for item in evidence)
+    return any(
+        item.rows
+        and (
+            affected in f"{item.purpose} {item.sql}".lower()
+            or "prove requested entity exists" in item.purpose.lower()
+        )
+        for item in evidence
+    )
 
 
 def _relationship_exists(metadata: MetadataSearchResult, evidence: list[EvidenceResult], evidence_focus: EvidenceFocus | None) -> bool:
@@ -384,7 +391,15 @@ def _reported_condition_exists(
     Safety considerations:
         Report generation must describe supplied evidence and must not execute SQL.
     """
-    if intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
+    duplicate_reported = intent == InvestigationIntent.DUPLICATE_DATA or bool(
+        re.search(
+            r"\b(duplicate|duplicated|double|twice|multiple copies)\b"
+            r"|\b(?:two|multiple)\s+(?:\w+\s+){0,2}(?:messages?|records?|rows?|entries|copies|events?)\b",
+            question,
+            re.I,
+        )
+    )
+    if duplicate_reported:
         rows = [row for item in evidence if "duplicate" in item.purpose.lower() for row in item.rows]
         if not rows:
             return False
@@ -392,14 +407,28 @@ def _reported_condition_exists(
             return any(_row_has_open_status(row, documents, status_notes) for row in rows)
         if any(_duplicate_count(row) > 1 for row in rows):
             return True
-        return True
+        return _has_repeated_correlation(rows)
     if intent == InvestigationIntent.MISSING_DATA:
         return any(item.purpose == "Confirmed Missing Related Record Candidates" and item.rows for item in evidence)
     if intent == InvestigationIntent.PROCESS_FLOW_BREAK:
-        return _status_transition_reproduced(evidence, status_notes)
+        return _status_transition_reproduced(evidence, status_notes, question)
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
         return _has_explain_or_row_estimate(evidence)
     return any(item.rows for item in evidence)
+
+
+def _has_repeated_correlation(rows: list[dict[str, Any]]) -> bool:
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        for key, value in row.items():
+            normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+            if normalized not in {"correlationid", "businesskey", "requestid"} or value in (None, ""):
+                continue
+            marker = (normalized, str(value).casefold())
+            if marker in seen:
+                return True
+            seen.add(marker)
+    return False
 
 
 def _duplicate_count(row: dict[str, Any]) -> int:
@@ -413,7 +442,9 @@ def _duplicate_count(row: dict[str, Any]) -> int:
     return 0
 
 
-def _status_transition_reproduced(evidence: list[EvidenceResult], status_notes: list[str]) -> bool:
+def _status_transition_reproduced(
+    evidence: list[EvidenceResult], status_notes: list[str], question: str = ""
+) -> bool:
     status_rows = [
         row
         for item in evidence
@@ -428,7 +459,25 @@ def _status_transition_reproduced(evidence: list[EvidenceResult], status_notes: 
             return True
         if current:
             status_notes.append(f"Confirmed current status from returned evidence: {current}.")
-    return bool(status_rows)
+    if status_rows:
+        return True
+    question_l = question.lower()
+    condition_terms: set[str] = set()
+    if "retr" in question_l:
+        condition_terms.update({"retry", "retries", "exhaust", "failed", "failure"})
+    if "rollback" in question_l or "rolled back" in question_l:
+        condition_terms.update({"rollback", "rolled back", "failed", "failure"})
+    if "reject" in question_l:
+        condition_terms.update({"reject", "rejected", "failed", "failure"})
+    if "downstream" in question_l and any(term in question_l for term in ("missing", "no ", "has no")):
+        condition_terms.update({"missing", "absent", "failed", "failure"})
+    for item in evidence:
+        for row in item.rows:
+            row_text = " ".join(str(value).lower() for value in row.values() if value is not None)
+            if condition_terms and any(term in row_text for term in condition_terms):
+                status_notes.append("Confirmed the reported transition failure from correlated evidence.")
+                return True
+    return False
 
 
 def _row_has_open_status(row: dict[str, Any], documents: list[RetrievedDocument], status_notes: list[str]) -> bool:

@@ -13,7 +13,7 @@
   "cleanup_script": "evaluation_scenarios/payroll/payroll-pilot-004/cleanup.sql",
   "expected_response_type": "confirmed_root_cause",
   "expected_entities": [
-    "TIME-8821"
+    "RUN-2026-07-A"
   ],
   "expected_root_cause_concepts": [
     "integration failure prevented the terminal status transition"
@@ -21,7 +21,8 @@
   "expected_tables": [
     "exceptions",
     "integration_messages",
-    "leave_requests"
+    "leave_requests",
+    "payroll_runs"
   ],
   "expected_columns": [
     "BusinessKey",
@@ -44,7 +45,7 @@
   "expected_jobs": [],
   "required_evidence": [
     "EVAL-PAYROLL-004",
-    "TIME-8821",
+    "RUN-2026-07-A",
     "Exception"
   ],
   "acceptable_fix_concepts": [
@@ -60,5 +61,18 @@
     "confirmed_root_cause_without_supporting_evidence"
   ],
   "scenario_version": 1,
-  "active": true
+  "active": true,
+  "expected_entity_type": "payroll_run",
+  "expected_entity_value": "RUN-2026-07-A",
+  "expected_entity_schema": "eval",
+  "expected_entity_table": "payroll_runs",
+  "expected_entity_column": "BusinessKey",
+  "expected_entity_match_mode": "exact",
+  "expected_entity_database": "EvalPayroll",
+  "expected_defect_table": "exceptions",
+  "expected_defect_column": "CorrelationId",
+  "expected_defect_value": "EVAL-PAYROLL-004",
+  "expected_defect_link_column": "CorrelationId",
+  "expected_entity_link_column": "CorrelationId",
+  "expected_entity_question_value": "RUN-2026-07-A"
 }

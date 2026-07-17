@@ -1096,7 +1096,8 @@ def _missing_relationship_candidates(
     child_terms: list[str],
     resolved_child: TableMetadata | None,
 ) -> list[tuple[float, TableMetadata, TableMetadata, str, str]]:
-    candidates: list[tuple[float, TableMetadata, TableMetadata, str, str]] = []
+    declared: list[tuple[float, TableMetadata, TableMetadata, str, str]] = []
+    inferred: list[tuple[float, TableMetadata, TableMetadata, str, str]] = []
     table_lookup = {table.name.lower(): table for table in metadata.tables}
     for child in metadata.tables:
         for fk in child.foreign_keys or []:
@@ -1108,7 +1109,10 @@ def _missing_relationship_candidates(
                 continue
             phrase_score = _relationship_phrase_score(parent, child, parent_terms, child_terms, resolved_child)
             if phrase_score > 0:
-                candidates.append((phrase_score + 5.0, parent, child, str(parent_cols[0]), str(child_cols[0])))
+                declared.append((phrase_score + 100.0, parent, child, str(parent_cols[0]), str(child_cols[0])))
+    if declared:
+        declared.sort(key=lambda item: (item[0], item[2].score, item[1].score, item[2].name), reverse=True)
+        return declared
     for parent in metadata.tables:
         for child in metadata.tables:
             if parent.name == child.name:
@@ -1116,9 +1120,9 @@ def _missing_relationship_candidates(
             for parent_col, child_col in _shared_relationship_columns(parent, child):
                 phrase_score = _relationship_phrase_score(parent, child, parent_terms, child_terms, resolved_child)
                 if phrase_score > 0:
-                    candidates.append((phrase_score + 2.0, parent, child, parent_col, child_col))
-    candidates.sort(key=lambda item: (item[0], item[2].score, item[1].score, item[2].name), reverse=True)
-    return candidates
+                    inferred.append((phrase_score + 2.0, parent, child, parent_col, child_col))
+    inferred.sort(key=lambda item: (item[0], item[2].score, item[1].score, item[2].name), reverse=True)
+    return inferred
 
 
 def _relationship_phrase_score(
@@ -1157,24 +1161,33 @@ def _shared_relationship_columns(parent: TableMetadata, child: TableMetadata) ->
     parent_columns = {column.lower(): column for column in parent.columns}
     child_columns = {column.lower(): column for column in child.columns}
     shared: list[tuple[str, str]] = []
+    parent_primary = {column.lower() for column in parent.primary_key or []}
     for lowered, parent_col in parent_columns.items():
         child_col = child_columns.get(lowered)
-        if child_col and _looks_like_relationship_key(lowered):
+        if child_col and _looks_like_relationship_key(parent_col) and lowered in parent_primary:
             shared.append((parent_col, child_col))
     parent_name_tokens = _identifier_parts(parent.name)
     for child_lower, child_col in child_columns.items():
         if not _looks_like_relationship_key(child_lower):
             continue
-        child_tokens = _identifier_parts(child_lower)
-        if child_tokens & parent_name_tokens:
-            parent_id = _find_column(parent, ("id",)) or next((column for column in parent.columns if column.lower() == child_lower), None)
+        child_tokens = _identifier_parts(child_col)
+        if parent_name_tokens and parent_name_tokens <= child_tokens:
+            parent_id = next(iter(parent.primary_key or []), None) or _find_column(parent, ("id",))
             if parent_id:
                 shared.append((parent_id, child_col))
     return list(dict.fromkeys(shared))
 
 
 def _looks_like_relationship_key(column: str) -> bool:
-    return column == "id" or column.endswith("_id") or column.endswith("_key") or column.endswith("_ref")
+    lowered = column.lower()
+    if lowered.replace("_", "") in {"correlationid", "businesskey", "externalid", "referenceid"}:
+        return False
+    parts = _identifier_parts(column)
+    return (
+        lowered == "id"
+        or lowered.endswith(("_id", "_key", "_ref"))
+        or lowered.endswith("id")
+    )
 
 
 def _identity_column(table: TableMetadata, avoid: set[str] | None = None) -> str | None:

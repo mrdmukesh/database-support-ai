@@ -1,0 +1,402 @@
+﻿[
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-001"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-002"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-003"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-004"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-005"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-006"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-007"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-008"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-009"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-010"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-011"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-012"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-013"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-014"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-015"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-016"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-017"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-018"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-019"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-benchmark-020"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-pilot-001"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-pilot-002"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-pilot-003"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-pilot-004"
+  },
+  {
+    "domain": "banking",
+    "scenario_id": "banking-pilot-005"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-001"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-002"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-003"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-004"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-005"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-006"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-007"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-008"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-009"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-010"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-011"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-012"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-013"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-014"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-015"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-016"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-017"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-018"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-019"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-benchmark-020"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-pilot-001"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-pilot-002"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-pilot-003"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-pilot-004"
+  },
+  {
+    "domain": "orders",
+    "scenario_id": "orders-pilot-005"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-001"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-002"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-003"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-004"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-005"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-006"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-007"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-008"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-009"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-010"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-011"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-012"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-013"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-014"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-015"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-016"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-017"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-018"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-019"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-benchmark-020"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-pilot-001"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-pilot-002"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-pilot-003"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-pilot-004"
+  },
+  {
+    "domain": "shipping",
+    "scenario_id": "shipping-pilot-005"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-001"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-002"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-003"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-004"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-005"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-006"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-007"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-008"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-009"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-010"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-011"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-012"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-013"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-014"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-015"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-016"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-017"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-018"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-019"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-benchmark-020"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-pilot-001"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-pilot-002"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-pilot-003"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-pilot-004"
+  },
+  {
+    "domain": "clinic",
+    "scenario_id": "clinic-pilot-005"
+  }
+]

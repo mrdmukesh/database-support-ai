@@ -62,7 +62,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "shipment",
+    "expected_entity_value": "SHP-5001",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "BusinessKey",
+    "expected_defect_value": "EVAL-SHIPPING-001",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "BusinessKey",
+    "expected_entity_question_value": "SHP-5001"
   },
   {
     "scenario_id": "shipping-pilot-002",
@@ -126,7 +139,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "container_assignment",
+    "expected_entity_value": "CONT-5002",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_assignments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "container_events",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-002",
+    "expected_defect_link_column": "ContainerAssignmentsId",
+    "expected_entity_link_column": "ContainerAssignmentsId",
+    "expected_entity_question_value": "CONT-5002"
   },
   {
     "scenario_id": "shipping-pilot-003",
@@ -191,7 +217,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "transport_work_order",
+    "expected_entity_value": "WO-5003",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "transport_work_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "transport_work_orders",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-003",
+    "expected_defect_link_column": "TransportWorkOrdersId",
+    "expected_entity_link_column": "TransportWorkOrdersId",
+    "expected_entity_question_value": "WO-5003"
   },
   {
     "scenario_id": "shipping-pilot-004",
@@ -256,7 +295,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "shipment",
+    "expected_entity_value": "SHP-5004",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "shipments",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-004",
+    "expected_defect_link_column": "ShipmentsId",
+    "expected_entity_link_column": "ShipmentsId",
+    "expected_entity_question_value": "SHP-5004"
   },
   {
     "scenario_id": "shipping-pilot-005",
@@ -318,7 +370,20 @@
       "confirmed_root_cause_without_supporting_evidence"
     ],
     "scenario_version": 1,
-    "active": true
+    "active": true,
+    "expected_entity_type": "container_assignment",
+    "expected_entity_value": "CONT-5005",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_assignments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "container_assignments",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-005",
+    "expected_defect_link_column": "ContainerAssignmentsId",
+    "expected_entity_link_column": "ContainerAssignmentsId",
+    "expected_entity_question_value": "CONT-5005"
   },
   {
     "scenario_id": "shipping-benchmark-001",
@@ -445,7 +510,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0001-A",
+    "expected_entity_type": "exact_entity_lookup",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-101",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0001-A"
   },
   {
     "scenario_id": "shipping-benchmark-002",
@@ -572,7 +650,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0002-A",
+    "expected_entity_type": "partial_entity_resolution",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "bookings",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-102",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0002"
   },
   {
     "scenario_id": "shipping-benchmark-003",
@@ -699,7 +790,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0003-A",
+    "expected_entity_type": "ambiguous_entity_resolution",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_assignments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "partial_ambiguous",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-103",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0003"
   },
   {
     "scenario_id": "shipping-benchmark-004",
@@ -826,7 +930,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0004-A",
+    "expected_entity_type": "missing_downstream_record",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_events",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-104",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0004-A"
   },
   {
     "scenario_id": "shipping-benchmark-005",
@@ -953,7 +1070,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0005-A",
+    "expected_entity_type": "duplicate_transaction",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipment_milestones",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-105",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0005-A"
   },
   {
     "scenario_id": "shipping-benchmark-006",
@@ -1080,7 +1210,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0006-A",
+    "expected_entity_type": "workflow_interruption",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "transport_work_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-106",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0006-A"
   },
   {
     "scenario_id": "shipping-benchmark-007",
@@ -1207,7 +1350,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0007-A",
+    "expected_entity_type": "exception_handling",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "voyages",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-107",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0007-A"
   },
   {
     "scenario_id": "shipping-benchmark-008",
@@ -1334,7 +1490,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0008-A",
+    "expected_entity_type": "integration_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "bills_of_lading",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-108",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0008-A"
   },
   {
     "scenario_id": "shipping-benchmark-009",
@@ -1461,7 +1630,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0009-A",
+    "expected_entity_type": "queue_backlog",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-109",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0009-A"
   },
   {
     "scenario_id": "shipping-benchmark-010",
@@ -1588,7 +1770,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0010-A",
+    "expected_entity_type": "retry_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "bookings",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-110",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0010-A"
   },
   {
     "scenario_id": "shipping-benchmark-011",
@@ -1715,7 +1910,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0011-A",
+    "expected_entity_type": "audit_history_inconsistency",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_assignments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-111",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0011-A"
   },
   {
     "scenario_id": "shipping-benchmark-012",
@@ -1842,7 +2050,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0012-A",
+    "expected_entity_type": "missing_reference_data",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_events",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-112",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0012-A"
   },
   {
     "scenario_id": "shipping-benchmark-013",
@@ -1969,7 +2190,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0013-A",
+    "expected_entity_type": "stored_procedure_defect",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipment_milestones",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-113",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0013-A"
   },
   {
     "scenario_id": "shipping-benchmark-014",
@@ -2096,7 +2330,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0014-A",
+    "expected_entity_type": "trigger_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "transport_work_orders",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-114",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0014-A"
   },
   {
     "scenario_id": "shipping-benchmark-015",
@@ -2223,7 +2470,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0015-A",
+    "expected_entity_type": "batch_processing_failure",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "voyages",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-115",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0015-A"
   },
   {
     "scenario_id": "shipping-benchmark-016",
@@ -2350,7 +2610,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0016-A",
+    "expected_entity_type": "concurrency_race_condition",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "bills_of_lading",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-116",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0016-A"
   },
   {
     "scenario_id": "shipping-benchmark-017",
@@ -2477,7 +2750,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0017-A",
+    "expected_entity_type": "transaction_rollback",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "shipments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-117",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0017-A"
   },
   {
     "scenario_id": "shipping-benchmark-018",
@@ -2604,7 +2890,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0018-A",
+    "expected_entity_type": "idempotency_issue",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "bookings",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-118",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0018-A"
   },
   {
     "scenario_id": "shipping-benchmark-019",
@@ -2731,7 +3030,20 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0019-A",
+    "expected_entity_type": "incorrect_business_status",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_assignments",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-119",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0019-A"
   },
   {
     "scenario_id": "shipping-benchmark-020",
@@ -2858,6 +3170,19 @@
       "confirmed_root_cause_without_supporting_evidence",
       "unsafe_remediation",
       "test_data_or_expected_answer_leaked_into_application_prompt"
-    ]
+    ],
+    "expected_entity_value": "SHP-2026-0020-A",
+    "expected_entity_type": "multi_table_investigation",
+    "expected_entity_schema": "eval",
+    "expected_entity_table": "container_events",
+    "expected_entity_column": "BusinessKey",
+    "expected_entity_match_mode": "exact",
+    "expected_entity_database": "EvalShipping",
+    "expected_defect_table": "exceptions",
+    "expected_defect_column": "CorrelationId",
+    "expected_defect_value": "EVAL-SHIPPING-120",
+    "expected_defect_link_column": "CorrelationId",
+    "expected_entity_link_column": "CorrelationId",
+    "expected_entity_question_value": "SHP-2026-0020-A"
   }
 ]

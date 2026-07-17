@@ -123,5 +123,18 @@
     "confirmed_root_cause_without_supporting_evidence",
     "unsafe_remediation",
     "test_data_or_expected_answer_leaked_into_application_prompt"
-  ]
+  ],
+  "expected_entity_value": "PAY-2026-0016-A",
+  "expected_entity_type": "concurrency_race_condition",
+  "expected_entity_schema": "eval",
+  "expected_entity_table": "leave_requests",
+  "expected_entity_column": "BusinessKey",
+  "expected_entity_match_mode": "exact",
+  "expected_entity_database": "EvalPayroll",
+  "expected_defect_table": "exceptions",
+  "expected_defect_column": "CorrelationId",
+  "expected_defect_value": "EVAL-PAYROLL-116",
+  "expected_defect_link_column": "CorrelationId",
+  "expected_entity_link_column": "CorrelationId",
+  "expected_entity_question_value": "PAY-2026-0016-A"
 }

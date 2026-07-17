@@ -1,4 +1,4 @@
 SET NOCOUNT ON;
-IF NOT EXISTS (SELECT 1 FROM eval.[voyages] WHERE BusinessKey LIKE N'SHP-2026-0007%' AND CorrelationId=N'EVAL-SHIPPING-107') THROW 51100, 'Benchmark defect missing', 1;
-SELECT N'verified' AS verification_status, BusinessKey, Status, CorrelationId FROM eval.[voyages] WHERE BusinessKey LIKE N'SHP-2026-0007%';
+IF (SELECT COUNT(*) FROM eval.[voyages] e JOIN eval.exceptions d ON d.CorrelationId=e.CorrelationId WHERE e.BusinessKey=N'SHP-2026-0007-A' AND e.CorrelationId=N'EVAL-SHIPPING-107') <> 1 THROW 51100, 'Benchmark entity/defect fixture invalid', 1;
+SELECT N'verified' verification_status,BusinessKey,Status,CorrelationId FROM eval.[voyages] WHERE BusinessKey=N'SHP-2026-0007-A' AND CorrelationId=N'EVAL-SHIPPING-107';
 GO

@@ -1,0 +1,91 @@
+{
+  "run_id": "e01a1818-8ac0-469f-9971-6942515e8c0b",
+  "run_name": "azure-pilot-smoke-v1",
+  "configuration_fingerprint": "4ff1d9b609c4670f76b55d1a9081834e13f365733fd733621001bb4d07821d09",
+  "passed": false,
+  "cleanup_failures": [],
+  "unexpected_connections": [
+    "payroll-pilot-001",
+    "clinic-pilot-001",
+    "orders-pilot-001",
+    "banking-pilot-001",
+    "shipping-pilot-001"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "payroll-pilot-001",
+      "domain": "payroll",
+      "setup_verification_result": null,
+      "selected_connection": null,
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 18.442416100000628,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "clinic-pilot-001",
+      "domain": "clinic",
+      "setup_verification_result": null,
+      "selected_connection": null,
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 19.42360809999991,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "orders-pilot-001",
+      "domain": "orders",
+      "setup_verification_result": null,
+      "selected_connection": null,
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 19.147193000000698,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "banking-pilot-001",
+      "domain": "banking",
+      "setup_verification_result": null,
+      "selected_connection": null,
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 19.41978569999992,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    },
+    {
+      "scenario_id": "shipping-pilot-001",
+      "domain": "shipping",
+      "setup_verification_result": null,
+      "selected_connection": null,
+      "investigation_id": "",
+      "application_status": "",
+      "deterministic_score": null,
+      "ai_judge_score": null,
+      "human_review": null,
+      "total_duration_seconds": 21.627061099998173,
+      "token_usage": null,
+      "cost": null,
+      "cleanup_status": "passed"
+    }
+  ]
+}

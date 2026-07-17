@@ -1,0 +1,1 @@
+Approved runbook says duplicate retry needs idempotency.

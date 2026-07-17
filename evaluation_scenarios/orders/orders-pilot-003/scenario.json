@@ -21,7 +21,8 @@
   "expected_tables": [
     "exceptions",
     "integration_messages",
-    "sales_orders"
+    "sales_orders",
+    "products"
   ],
   "expected_columns": [
     "BusinessKey",
@@ -60,5 +61,18 @@
     "confirmed_root_cause_without_supporting_evidence"
   ],
   "scenario_version": 1,
-  "active": true
+  "active": true,
+  "expected_entity_type": "sku",
+  "expected_entity_value": "SKU-8103",
+  "expected_entity_schema": "eval",
+  "expected_entity_table": "products",
+  "expected_entity_column": "BusinessKey",
+  "expected_entity_match_mode": "exact",
+  "expected_entity_database": "EvalOrders",
+  "expected_defect_table": "exceptions",
+  "expected_defect_column": "CorrelationId",
+  "expected_defect_value": "EVAL-ORDERS-003",
+  "expected_defect_link_column": "CorrelationId",
+  "expected_entity_link_column": "CorrelationId",
+  "expected_entity_question_value": "SKU-8103"
 }

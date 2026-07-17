@@ -30,6 +30,7 @@ Rules:
 - You may improve wording, summarization, senior-engineer explanation, confidence explanation, and next investigative questions.
 - Return only valid JSON matching the requested schema.
 """
+AI_REASONING_PROMPT_VERSION = "evidence-grounded-v1"
 
 
 def convert_llm_claim_to_root_cause_claim(
@@ -141,6 +142,10 @@ def enhance_reasoning_with_llm(
                 "evidence_package_before_masking_summary": _payload_summary(raw_payload),
                 "evidence_package_after_masking": sanitize_ai_trace(payload),
                 "llm_model_name": settings.llm_model,
+                "prompt_version": AI_REASONING_PROMPT_VERSION,
+                "ai_reasoning_invoked": False,
+                "input_tokens": 0,
+                "output_tokens": 0,
                 "llm_response_raw": None,
                 "validated_citations": [],
                 "rejected_or_unsupported_claims": [],
@@ -148,13 +153,21 @@ def enhance_reasoning_with_llm(
             }
         )
     try:
-        llm_json = _call_openai_responses(settings, payload)
+        llm_json = _call_openai_responses(settings, payload, debug_trace=debug_trace)
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
         if debug_trace is not None:
             debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
             debug_trace["final_report_claims"] = enhanced.likely_root_causes
         return enhanced
-    except Exception:
+    except Exception as exc:
+        if debug_trace is not None:
+            debug_trace["ai_reasoning_error"] = type(exc).__name__
+            debug_trace["ai_outcome"] = "provider_failure"
+            debug_trace["failure_stage"] = "provider_request_or_response"
+            debug_trace["request_submitted"] = bool(debug_trace.get("ai_reasoning_invoked"))
+            debug_trace["provider"] = settings.llm_provider
+            debug_trace["model_requested"] = settings.llm_model
+            debug_trace["sanitized_error_reason"] = type(exc).__name__
         return deterministic_reasoning
 
 
@@ -308,7 +321,12 @@ def _build_llm_payload_unmasked(
     return payload
 
 
-def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any]) -> dict[str, Any]:
+def _call_openai_responses(
+    settings: Settings,
+    evidence_payload: dict[str, Any],
+    *,
+    debug_trace: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -348,8 +366,15 @@ def _call_openai_responses(settings: Settings, evidence_payload: dict[str, Any])
         },
         method="POST",
     )
+    if debug_trace is not None:
+        debug_trace["ai_reasoning_invoked"] = True
     with request.urlopen(http_request, timeout=30) as response:
         response_json = json.loads(response.read().decode("utf-8"))
+    if debug_trace is not None:
+        usage = response_json.get("usage") if isinstance(response_json.get("usage"), dict) else {}
+        debug_trace["input_tokens"] = int(usage.get("input_tokens") or 0)
+        debug_trace["output_tokens"] = int(usage.get("output_tokens") or 0)
+        debug_trace["response_id_present"] = bool(response_json.get("id"))
     output_text = _extract_response_text(response_json)
     return json.loads(output_text)
 

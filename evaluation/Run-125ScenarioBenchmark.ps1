@@ -14,6 +14,7 @@ Set-StrictMode -Version Latest
 $PSNativeCommandUseErrorActionPreference = $false
 
 Set-Location $ProjectRoot
+. (Join-Path $ProjectRoot "evaluation\Resolve-ScenarioInventory.ps1")
 
 $Python = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 if (-not (Test-Path $Python)) {
@@ -307,6 +308,9 @@ if (-not [string]::IsNullOrWhiteSpace($ScenarioListPath)) {
         throw "Scenario list was not found: $resolvedScenarioList"
     }
     $selectedManifest = Get-Content $resolvedScenarioList -Raw | ConvertFrom-Json
+    if ($null -eq $selectedManifest -or $null -eq $selectedManifest.PSObject.Properties['scenarios']) {
+        throw "Validation suite manifest must be a JSON object containing a 'scenarios' array."
+    }
     $selectedIds = @($selectedManifest.scenarios)
     if ($selectedIds.Count -lt 20 -or $selectedIds.Count -gt 25) {
         throw "A validation scenario list must contain 20 to 25 scenario IDs; found $($selectedIds.Count)."
@@ -365,9 +369,10 @@ if ($LASTEXITCODE -ne 0) {
 $scenarioJson = ($scenarioLines | ForEach-Object { [string]$_ }) -join [Environment]::NewLine
 }
 $scenarioJson | Set-Content -Path $ScenarioListJson -Encoding UTF8
-$Scenarios = @($scenarioJson | ConvertFrom-Json)
+$parsedScenarios = $scenarioJson | ConvertFrom-Json
+$Scenarios = @(ConvertTo-ValidatedScenarioInventory -InputObject $parsedScenarios)
 $ScenarioCount = $Scenarios.Count
-$IncludedDomains = @($Scenarios.domain | Sort-Object -Unique)
+$IncludedDomains = @(Get-ScenarioInventoryDomains -Scenarios $Scenarios)
 
 Write-Log "Scenario inventory confirmed: $ScenarioCount scenarios across $($IncludedDomains.Count) domains ($($IncludedDomains -join ', '))." "PASS"
 

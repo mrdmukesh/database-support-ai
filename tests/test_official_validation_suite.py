@@ -60,3 +60,14 @@ def test_shipping_duplicate_fixture_proves_two_correlated_messages() -> None:
     assert injection.count("INSERT eval.integration_messages") == 2
     assert "COUNT(*) FROM eval.integration_messages" in verification
     assert "<> 2" in verification
+
+
+def test_banking_duplicate_fixture_proves_two_correlated_messages() -> None:
+    fixture = ROOT / "evaluation_scenarios" / "banking" / "banking-benchmark-005"
+    injection = (fixture / "inject.sql").read_text(encoding="utf-8")
+    verification = (fixture / "verify.sql").read_text(encoding="utf-8")
+
+    assert injection.count("INSERT eval.integration_messages") == 2
+    assert "COUNT(*) FROM eval.integration_messages" in verification
+    assert "COUNT(DISTINCT BusinessKey)" in verification
+    assert "<> 2" in verification

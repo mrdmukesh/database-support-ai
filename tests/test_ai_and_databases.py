@@ -33,7 +33,11 @@ from legacydb_copilot.services.llm_reasoning_service import (
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
-from legacydb_copilot.routers.chat import _expand_related_id_evidence, _terminal_ai_trace
+from legacydb_copilot.routers.chat import (
+    _expand_related_id_evidence,
+    _metadata_with_active_diagnostics,
+    _terminal_ai_trace,
+)
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
@@ -2495,6 +2499,37 @@ def test_related_evidence_expands_string_correlation_ids() -> None:
     assert len(related) == 1
     assert "duplicate correlated" in related[0].purpose.lower()
     assert len(related[0].rows) == 2
+
+
+def test_evidence_scope_retains_unseen_active_schema_diagnostics() -> None:
+    ranked = MetadataSearchResult(
+        tables=[
+            TableMetadata("ops.work_units", ["work_key", "correlation_ref"], 9),
+            TableMetadata("ops.delivery_messages", ["message_key", "correlation_ref"], 7),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    active = MetadataSearchResult(
+        tables=[
+            *ranked.tables,
+            TableMetadata("ops.audit_journal", ["audit_key", "correlation_ref"], 0),
+            TableMetadata("ops.failure_records", ["failure_key", "correlation_ref"], 0),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+
+    expanded = _metadata_with_active_diagnostics(ranked, active)
+
+    assert [table.name for table in expanded.tables] == [
+        "ops.work_units",
+        "ops.delivery_messages",
+        "ops.audit_journal",
+        "ops.failure_records",
+    ]
 
 
 def test_production_retry_condition_does_not_require_duplicate_evidence() -> None:

@@ -1683,6 +1683,25 @@ def _regenerate_report_with_verification(db: Session, investigation: Investigati
     return generated.links()
 
 
+def _metadata_with_active_diagnostics(
+    ranked_metadata: MetadataSearchResult,
+    active_metadata: MetadataSearchResult,
+    *,
+    limit: int = 12,
+) -> MetadataSearchResult:
+    """Retain active-schema diagnostic tables for correlation evidence planning."""
+    ranked_names = {table.name.casefold() for table in ranked_metadata.tables}
+    diagnostics = [
+        table
+        for table in active_metadata.tables
+        if is_diagnostic_object(table.name) and table.name.casefold() not in ranked_names
+    ]
+    return replace(
+        ranked_metadata,
+        tables=[*ranked_metadata.tables[:8], *diagnostics][:limit],
+    )
+
+
 def _run_dynamic_investigation(
     db: Session,
     payload: ChatAskRequest,
@@ -1810,17 +1829,9 @@ def _run_dynamic_investigation(
     ranked_metadata = metadata_with_resolved_tables(
         ranking.metadata, resolution_metadata, entity_resolution
     )
-    ranked_names = {table.name.casefold() for table in ranked_metadata.tables}
-    diagnostic_tables = [
-        table for table in context.metadata.tables
-        if is_diagnostic_object(table.name) and table.name.casefold() not in ranked_names
-    ]
     ranking = replace(
         ranking,
-        metadata=replace(
-            ranked_metadata,
-            tables=[*ranked_metadata.tables[:8], *diagnostic_tables][:12],
-        ),
+        metadata=_metadata_with_active_diagnostics(ranked_metadata, resolution_metadata),
     )
     relevance_terms = query_relevance_terms(payload.question, entities)
     definition_procedures = _definition_relevant_procedures(

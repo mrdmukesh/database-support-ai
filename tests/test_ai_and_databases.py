@@ -30,6 +30,7 @@ from legacydb_copilot.services.investigation_mode_service import (
 )
 from legacydb_copilot.services.llm_reasoning_service import (
     _build_llm_payload,
+    _safeguard_remediation_steps,
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
@@ -737,6 +738,22 @@ def test_evidence_gate_matches_reported_status_in_general_entity_evidence() -> N
     )
 
     assert gate.reported_condition_exists
+
+
+def test_llm_remediation_separates_investigation_from_controlled_change() -> None:
+    steps = _safeguard_remediation_steps(
+        [
+            "Run SELECT and EXPLAIN to confirm the affected workflow state.",
+            "Update the workflow handler and execute the recovery procedure.",
+        ]
+    )
+
+    assert steps[0].startswith("Investigation step (read-only):")
+    assert steps[1].startswith("Controlled change proposal - do not execute directly")
+    assert "validated in a non-production environment" in steps[1]
+    assert "backup and rollback plan" in steps[1]
+    assert "explicit change approval" in steps[1]
+    assert "authorized operator" in steps[1]
 
 
 def test_analytical_data_quality_question_does_not_require_business_key() -> None:

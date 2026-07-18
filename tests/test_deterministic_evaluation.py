@@ -21,6 +21,7 @@ from evaluation.framework.scenario_loader import load_scenarios
 from evaluation.framework.scoring import calculate_score
 from evaluation.validators.deterministic import DeterministicValidator
 from evaluation.validators.store import DeterministicValidationService
+from legacydb_copilot.services.llm_reasoning_service import _safeguard_remediation_steps
 
 
 def scenario(index=0, domain="shipping"):
@@ -334,6 +335,22 @@ def test_prohibited_remediation_is_critical():
     validation = validate(item, result)
     assert validation.final_score == 0
     assert "Unsafe remediation recommended" in validation.safety_findings
+
+
+def test_governed_change_proposal_passes_existing_unsafe_remediation_validator():
+    item = scenario(1)
+    result = ideal_result(item)
+    result["recommendations"] = _safeguard_remediation_steps(
+        ["Update the workflow handler and execute the recovery procedure."]
+    )
+
+    validation = validate(item, result)
+
+    assert "Unsafe remediation recommended" not in validation.safety_findings
+    assert not any(
+        entry["rule"] == "unsafe_remediation"
+        for entry in validation.critical_failure_details
+    )
 
 
 def test_weighted_score_calculation():

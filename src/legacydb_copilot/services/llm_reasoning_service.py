@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import replace
 from typing import Any
 from urllib import request
@@ -26,11 +27,40 @@ Rules:
 - Never override SQL evidence, metadata evidence, stored procedure analysis, or evidence-gate results.
 - If the deterministic evidence contradicts a likely explanation, reject that explanation.
 - Every root-cause conclusion, recommendation, test case, and proof-of-fix step must cite evidence_refs.
+- Separate read-only investigation steps from controlled change proposals.
+- Never present a write, destructive, irreversible, or recovery action as a direct instruction.
+- A controlled change proposal must say not to execute it directly from the investigation and must require non-production validation, backup and rollback planning, explicit approval, and execution by an authorized operator.
 - If evidence is insufficient, say confidence is low and list the missing evidence.
 - You may improve wording, summarization, senior-engineer explanation, confidence explanation, and next investigative questions.
 - Return only valid JSON matching the requested schema.
 """
 AI_REASONING_PROMPT_VERSION = "evidence-grounded-v1"
+
+_CONTROLLED_CHANGE = re.compile(
+    r"\b(?:apply|implement|modify|change|fix|resolve|repair|"
+    r"insert|update|delete|drop|alter|truncate|merge|create|execute|exec|grant|revoke)\b",
+    re.I,
+)
+
+
+def _safeguard_remediation_steps(steps: list[str]) -> list[str]:
+    """Render model recommendations as read-only investigation or governed change proposals."""
+    safeguarded: list[str] = []
+    for raw_step in steps:
+        step = str(raw_step).strip()
+        if not step:
+            continue
+        if _CONTROLLED_CHANGE.search(step):
+            safeguarded.append(
+                "Controlled change proposal - do not execute directly from this investigation: "
+                f"{step} Before execution, the proposed change must be validated in a "
+                "non-production environment, have a verified backup and rollback plan, receive "
+                "explicit change approval, and be performed by an authorized operator through "
+                "the controlled change process."
+            )
+        else:
+            safeguarded.append(f"Investigation step (read-only): {step}")
+    return safeguarded
 
 
 def convert_llm_claim_to_root_cause_claim(
@@ -448,8 +478,12 @@ def _merge_llm_reasoning(
         for claim in [convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])]
         if claim is not None
     ]
-    fixes = _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
-    proof = _cited_items(llm_json.get("proof_of_fix"), "step", validation=validation)
+    fixes = _safeguard_remediation_steps(
+        _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
+    )
+    proof = _safeguard_remediation_steps(
+        _cited_items(llm_json.get("proof_of_fix"), "step", validation=validation)
+    )
     risks = _cited_items(llm_json.get("risks"), "risk", validation=validation)
     next_questions = _cited_items(llm_json.get("recommended_next_questions"), "question", validation=validation)
     test_cases = _cited_test_cases(llm_json.get("test_cases"), validation=validation)

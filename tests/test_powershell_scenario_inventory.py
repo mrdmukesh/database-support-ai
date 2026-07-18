@@ -10,7 +10,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / "evaluation" / "Resolve-ScenarioInventory.ps1"
-SHELLS = [path for name in ("powershell.exe", "pwsh.exe") if (path := shutil.which(name))]
+SHELLS = list(dict.fromkeys(
+    path
+    for name in ("powershell.exe", "pwsh.exe", "pwsh", "powershell")
+    if (path := shutil.which(name))
+))
 
 
 def invoke(shell: str, value) -> subprocess.CompletedProcess[str]:

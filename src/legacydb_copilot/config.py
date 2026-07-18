@@ -32,6 +32,10 @@ class Settings:
     llm_model: str = "gpt-4.1-mini"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
+    llm_request_timeout_seconds: float = 30.0
+    llm_retry_attempts: int = 2
+    llm_retry_backoff_seconds: float = 0.5
+    llm_total_timeout_seconds: float = 65.0
     ai_debug_trace_enabled: bool = False
     knowledge_retriever_backend: str = "local"
     embedding_provider: str = "local"
@@ -81,6 +85,10 @@ class Settings:
             llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+            llm_request_timeout_seconds=float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "30")),
+            llm_retry_attempts=max(1, int(os.getenv("LLM_RETRY_ATTEMPTS", "2"))),
+            llm_retry_backoff_seconds=max(0.0, float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5"))),
+            llm_total_timeout_seconds=max(0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "65"))),
             ai_debug_trace_enabled=os.getenv("AI_DEBUG_TRACE_ENABLED", "false").lower()
             in {"1", "true", "yes", "on"},
             knowledge_retriever_backend=os.getenv("KNOWLEDGE_RETRIEVER_BACKEND", "local").lower(),

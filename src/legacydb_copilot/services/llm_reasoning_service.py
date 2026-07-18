@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import replace
 from typing import Any
-from urllib import request
+from urllib import error, request
 
 from legacydb_copilot.agents.intent_agent import IntentResult
 from legacydb_copilot.agents.reasoning_agent import RootCauseClaim, ReasoningResult, evaluate_claim_support_status
@@ -396,10 +397,45 @@ def _call_openai_responses(
         },
         method="POST",
     )
+    attempts = max(1, settings.llm_retry_attempts)
+    deadline = time.monotonic() + settings.llm_total_timeout_seconds
+    response_json: dict[str, Any] | None = None
     if debug_trace is not None:
         debug_trace["ai_reasoning_invoked"] = True
-    with request.urlopen(http_request, timeout=30) as response:
-        response_json = json.loads(response.read().decode("utf-8"))
+        debug_trace["provider_attempt_count"] = 0
+        debug_trace["provider_retry_count"] = 0
+        debug_trace["provider_attempts"] = []
+    for attempt in range(1, attempts + 1):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("LLM provider total timeout exhausted")
+        request_timeout = min(settings.llm_request_timeout_seconds, remaining)
+        if debug_trace is not None:
+            debug_trace["provider_attempt_count"] = attempt
+        try:
+            with request.urlopen(http_request, timeout=request_timeout) as response:
+                response_json = json.loads(response.read().decode("utf-8"))
+            if debug_trace is not None:
+                debug_trace["provider_attempts"].append({"attempt": attempt, "outcome": "success"})
+            break
+        except Exception as exc:
+            retryable = _is_transient_provider_error(exc)
+            if debug_trace is not None:
+                debug_trace["provider_attempts"].append(
+                    {"attempt": attempt, "outcome": "failed", "error": type(exc).__name__, "retryable": retryable}
+                )
+            if not retryable or attempt >= attempts:
+                raise
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("LLM provider total timeout exhausted") from exc
+            backoff = min(settings.llm_retry_backoff_seconds * (2 ** (attempt - 1)), remaining)
+            if debug_trace is not None:
+                debug_trace["provider_retry_count"] = attempt
+            if backoff > 0:
+                time.sleep(backoff)
+    if response_json is None:
+        raise TimeoutError("LLM provider returned no response")
     if debug_trace is not None:
         usage = response_json.get("usage") if isinstance(response_json.get("usage"), dict) else {}
         debug_trace["input_tokens"] = int(usage.get("input_tokens") or 0)
@@ -407,6 +443,17 @@ def _call_openai_responses(
         debug_trace["response_id_present"] = bool(response_json.get("id"))
     output_text = _extract_response_text(response_json)
     return json.loads(output_text)
+
+
+def _is_transient_provider_error(exc: Exception) -> bool:
+    """Return true only for connection-level failures that are safe to retry."""
+    if isinstance(exc, error.HTTPError):
+        return False
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    if isinstance(exc, error.URLError):
+        return isinstance(exc.reason, (TimeoutError, ConnectionError, OSError))
+    return False
 
 
 def _extract_response_text(response_json: dict[str, Any]) -> str:

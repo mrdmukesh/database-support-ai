@@ -445,6 +445,20 @@ def _duplicate_count(row: dict[str, Any]) -> int:
 def _status_transition_reproduced(
     evidence: list[EvidenceResult], status_notes: list[str], question: str = ""
 ) -> bool:
+    normalized_question = re.sub(r"[^a-z0-9]", "", question.casefold())
+    for item in evidence:
+        for row in item.rows:
+            for key, value in row.items():
+                normalized_key = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+                if "status" not in normalized_key and "state" not in normalized_key:
+                    continue
+                normalized_value = re.sub(r"[^a-z0-9]", "", str(value).casefold())
+                if len(normalized_value) >= 3 and normalized_value in normalized_question:
+                    status_notes.append(
+                        f"Confirmed current status/state from {key} remains {value}, "
+                        "matching the reported condition."
+                    )
+                    return True
     status_rows = [
         row
         for item in evidence

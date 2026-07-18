@@ -699,6 +699,46 @@ def test_status_transition_query_and_gate_reproduce_stuck_status() -> None:
     assert any("current status" in item.lower() for item in gate.status_interpretation)
 
 
+def test_evidence_gate_matches_reported_status_in_general_entity_evidence() -> None:
+    question = "Why did work item WKI-91 remain In Progress after exception handling?"
+    entities = extract_entities(question)
+    metadata = MetadataSearchResult(
+        tables=[TableMetadata("ops.work_items", ["work_id", "work_code", "workflow_state"], 8)],
+        views=[],
+        procedures=[],
+        version="test",
+    )
+    evidence = [
+        EvidenceResult(
+            "Prove requested entity exists in ops.work_items",
+            "SELECT work_code, workflow_state FROM ops.work_items WHERE work_code = 'WKI-91'",
+            [{"work_code": "WKI-91", "workflow_state": "IN_PROGRESS"}],
+        )
+    ]
+    focus = build_evidence_focus(
+        question=question,
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+    )
+
+    gate = run_evidence_gate(
+        question=question,
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=focus,
+        documents=[],
+    )
+
+    assert gate.reported_condition_exists
+
+
 def test_analytical_data_quality_question_does_not_require_business_key() -> None:
     result = detect_intent("Which data quality rules failed today?")
     metadata = MetadataSearchResult(

@@ -1,0 +1,529 @@
+﻿{
+    "scenario_id":  "banking-benchmark-005",
+    "source_run":  "validation-25-ec657a0-20260718T130827Z",
+    "question":  "Investigate why payment BNK-2026-0005-A produced two processing messages for one business request.",
+    "question_claims":  [
+                            "one business request produced two processing messages"
+                        ],
+    "required_proof":  [
+                           "the primary business entity exists",
+                           "two distinct processing-message rows share the entity correlation identifier",
+                           "the primary-to-message relationship is established by the shared correlation"
+                       ],
+    "fixture_rows_available":  [
+                                   {
+                                       "table":  "eval.beneficiaries",
+                                       "count_after_injection":  2,
+                                       "note":  "baseline inserts Ready row and injection inserts a second Failed row with the same BusinessKey/correlation"
+                                   },
+                                   {
+                                       "table":  "eval.integration_messages",
+                                       "count_after_injection":  1,
+                                       "note":  "injection contains exactly one INSERT; therefore the claimed two messages do not exist"
+                                   },
+                                   {
+                                       "table":  "eval.exceptions",
+                                       "count_after_injection":  1
+                                   },
+                                   {
+                                       "table":  "eval.audit_history",
+                                       "count_after_injection":  1
+                                   }
+                               ],
+    "entity_provenance":  {
+                              "canonical_entities":  [
+                                                         {
+                                                             "canonical_investigated_entity":  "BNK-2026-0005-A",
+                                                             "original_entity_text":  "BNK-2026-0005-A",
+                                                             "normalized_entity_text":  "BNK-2026-0005-A",
+                                                             "resolved_entity_value":  "BNK-2026-0005-A",
+                                                             "resolved_entity_type":  "business_identifier",
+                                                             "resolved_table":  "eval.beneficiaries",
+                                                             "resolved_column":  "BusinessKey",
+                                                             "resolution_confidence":  1.0,
+                                                             "resolution_method":  "exact",
+                                                             "supporting_evidence_ids":  [
+                                                                                             "ENTITY-1-EXACT-26"
+                                                                                         ]
+                                                         }
+                                                     ],
+                              "canonical_investigated_entity":  "BNK-2026-0005-A",
+                              "evidence_linked_entities":  [
+                                                               "BNK-2026-0005-A"
+                                                           ],
+                              "diagnostics":  [
+                                                  {
+                                                      "entity_type":  "entity_resolution_diagnostic",
+                                                      "resolution_trace_id":  "ENTITY-1-EXACT-26",
+                                                      "internal_match_id":  "ENTITY-1-EXACT-26",
+                                                      "candidate_id":  "",
+                                                      "resolver_rule_id":  "exact",
+                                                      "extracted_value":  "BNK-2026-0005-A",
+                                                      "matched_value":  "BNK-2026-0005-A",
+                                                      "match_type":  "exact",
+                                                      "confidence":  1.0,
+                                                      "evidence_id":  "ENTITY-1-EXACT-26",
+                                                      "candidates":  [
+                                                                         {
+                                                                             "identifier":  "BNK-2026-0005-A",
+                                                                             "metadata":  {
+                                                                                              "Status":  "Failed"
+                                                                                          },
+                                                                             "evidence_id":  "ENTITY-1-EXACT-26",
+                                                                             "table":  "eval.beneficiaries",
+                                                                             "column":  "BusinessKey"
+                                                                         }
+                                                                     ],
+                                                      "reason":  "Exact database evidence match.",
+                                                      "resolved_table":  "eval.beneficiaries",
+                                                      "resolved_column":  "BusinessKey"
+                                                  }
+                                              ],
+                              "evaluator_input_defects":  [
+
+                                                          ]
+                          },
+    "primary_table":  "eval.beneficiaries",
+    "supporting_tables":  [
+                              "eval.integration_messages",
+                              "eval.exceptions",
+                              "eval.audit_history"
+                          ],
+    "executed_sql":  [
+                         {
+                             "evidence_id":  "SQL-1",
+                             "purpose":  "Prove requested entity exists in eval.beneficiaries",
+                             "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "BeneficiariesId":  2,
+                                                     "CustomersId":  null,
+                                                     "BusinessKey":  "BNK-2026-0005-A",
+                                                     "Status":  "Failed",
+                                                     "EventTime":  "2026-07-18 13:10:02.250000",
+                                                     "Details":  "duplicate transaction",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-2",
+                             "purpose":  "Prove requested entity exists in eval.integration_messages",
+                             "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE (CAST(IntegrationMessagesId AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-3",
+                             "purpose":  "Prove requested entity exists in eval.payment_instructions",
+                             "sql":  "SELECT PaymentInstructionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.payment_instructions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-4",
+                             "purpose":  "Inspect relevant rows in eval.beneficiaries",
+                             "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "BeneficiariesId":  2,
+                                                     "CustomersId":  null,
+                                                     "BusinessKey":  "BNK-2026-0005-A",
+                                                     "Status":  "Failed",
+                                                     "EventTime":  "2026-07-18 13:10:02.250000",
+                                                     "Details":  "duplicate transaction",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-5",
+                             "purpose":  "Inspect relevant rows in eval.integration_messages",
+                             "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE (CAST(IntegrationMessagesId AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-6",
+                             "purpose":  "Inspect relevant rows in eval.payment_instructions",
+                             "sql":  "SELECT PaymentInstructionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.payment_instructions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-7",
+                             "purpose":  "Find duplicate business keys in eval.integration_messages",
+                             "sql":  "SELECT BusinessKey, COUNT(*) AS duplicate_count FROM eval.integration_messages WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 GROUP BY BusinessKey HAVING COUNT(*) \u003e 1",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-8",
+                             "purpose":  "Inspect duplicate rows in eval.integration_messages",
+                             "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027",
+                             "row_count":  0,
+                             "sample_rows":  [
+
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-9",
+                             "purpose":  "Inspect correlated rows by CorrelationId in eval.integration_messages",
+                             "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "IntegrationMessagesId":  7,
+                                                     "BusinessKey":  "MSG-BNK-2026-0005-A",
+                                                     "Status":  "Failed",
+                                                     "EventTime":  "2026-07-18 13:10:02.254000",
+                                                     "Details":  "duplicate transaction evidence",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-10",
+                             "purpose":  "Inspect correlated rows by CorrelationId in eval.audit_history",
+                             "sql":  "SELECT AuditHistoryId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.audit_history WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "AuditHistoryId":  5,
+                                                     "BusinessKey":  "AUD-BNK-2026-0005-A",
+                                                     "Status":  "Recorded",
+                                                     "EventTime":  "2026-07-18 13:10:02.254000",
+                                                     "Details":  "Observed workflow state",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-11",
+                             "purpose":  "Inspect correlated rows by CorrelationId in eval.exceptions",
+                             "sql":  "SELECT ExceptionsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.exceptions WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "ExceptionsId":  2,
+                                                     "BusinessKey":  "EX-BNK-2026-0005-A",
+                                                     "Status":  "Open",
+                                                     "EventTime":  "2026-07-18 13:10:02.254000",
+                                                     "Details":  "Primary synthetic defect: duplicate transaction",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-12",
+                             "purpose":  "Inspect correlated rows by BeneficiariesId in eval.beneficiaries",
+                             "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE BeneficiariesId IN (2)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "BeneficiariesId":  2,
+                                                     "CustomersId":  null,
+                                                     "BusinessKey":  "BNK-2026-0005-A",
+                                                     "Status":  "Failed",
+                                                     "EventTime":  "2026-07-18 13:10:02.250000",
+                                                     "Details":  "duplicate transaction",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         },
+                         {
+                             "evidence_id":  "SQL-13",
+                             "purpose":  "Inspect correlated rows by CorrelationId in eval.beneficiaries",
+                             "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                             "row_count":  1,
+                             "sample_rows":  [
+                                                 {
+                                                     "BeneficiariesId":  2,
+                                                     "CustomersId":  null,
+                                                     "BusinessKey":  "BNK-2026-0005-A",
+                                                     "Status":  "Failed",
+                                                     "EventTime":  "2026-07-18 13:10:02.250000",
+                                                     "Details":  "duplicate transaction",
+                                                     "CorrelationId":  "EVAL-BANKING-105",
+                                                     "IsActive":  true
+                                                 }
+                                             ],
+                             "error":  null
+                         }
+                     ],
+    "correlations":  [
+                         {
+                             "correlation_id":  "EVAL-BANKING-105",
+                             "beneficiary_rows_returned":  1,
+                             "integration_message_rows_returned":  1,
+                             "exception_rows_returned":  1,
+                             "audit_rows_returned":  1
+                         }
+                     ],
+    "packaged_evidence":  [
+                              {
+                                  "evidence_id":  "SQL-1",
+                                  "purpose":  "Prove requested entity exists in eval.beneficiaries",
+                                  "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "BeneficiariesId":  2,
+                                                          "CustomersId":  null,
+                                                          "BusinessKey":  "BNK-2026-0005-A",
+                                                          "Status":  "Failed",
+                                                          "EventTime":  "2026-07-18 13:10:02.250000",
+                                                          "Details":  "duplicate transaction",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-2",
+                                  "purpose":  "Prove requested entity exists in eval.integration_messages",
+                                  "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE (CAST(IntegrationMessagesId AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-3",
+                                  "purpose":  "Prove requested entity exists in eval.payment_instructions",
+                                  "sql":  "SELECT PaymentInstructionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.payment_instructions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-4",
+                                  "purpose":  "Inspect relevant rows in eval.beneficiaries",
+                                  "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "BeneficiariesId":  2,
+                                                          "CustomersId":  null,
+                                                          "BusinessKey":  "BNK-2026-0005-A",
+                                                          "Status":  "Failed",
+                                                          "EventTime":  "2026-07-18 13:10:02.250000",
+                                                          "Details":  "duplicate transaction",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-5",
+                                  "purpose":  "Inspect relevant rows in eval.integration_messages",
+                                  "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE (CAST(IntegrationMessagesId AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-6",
+                                  "purpose":  "Inspect relevant rows in eval.payment_instructions",
+                                  "sql":  "SELECT PaymentInstructionsId, AccountsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.payment_instructions WHERE (CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(Status AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027)",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-7",
+                                  "purpose":  "Find duplicate business keys in eval.integration_messages",
+                                  "sql":  "SELECT BusinessKey, COUNT(*) AS duplicate_count FROM eval.integration_messages WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 GROUP BY BusinessKey HAVING COUNT(*) \u003e 1",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-8",
+                                  "purpose":  "Inspect duplicate rows in eval.integration_messages",
+                                  "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027 OR CAST(BusinessKey AS NVARCHAR(MAX)) = \u0027BNK-2026-0005-A\u0027",
+                                  "row_count":  0,
+                                  "sample_rows":  [
+
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-9",
+                                  "purpose":  "Inspect correlated rows by CorrelationId in eval.integration_messages",
+                                  "sql":  "SELECT IntegrationMessagesId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.integration_messages WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "IntegrationMessagesId":  7,
+                                                          "BusinessKey":  "MSG-BNK-2026-0005-A",
+                                                          "Status":  "Failed",
+                                                          "EventTime":  "2026-07-18 13:10:02.254000",
+                                                          "Details":  "duplicate transaction evidence",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-10",
+                                  "purpose":  "Inspect correlated rows by CorrelationId in eval.audit_history",
+                                  "sql":  "SELECT AuditHistoryId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.audit_history WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "AuditHistoryId":  5,
+                                                          "BusinessKey":  "AUD-BNK-2026-0005-A",
+                                                          "Status":  "Recorded",
+                                                          "EventTime":  "2026-07-18 13:10:02.254000",
+                                                          "Details":  "Observed workflow state",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-11",
+                                  "purpose":  "Inspect correlated rows by CorrelationId in eval.exceptions",
+                                  "sql":  "SELECT ExceptionsId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.exceptions WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "ExceptionsId":  2,
+                                                          "BusinessKey":  "EX-BNK-2026-0005-A",
+                                                          "Status":  "Open",
+                                                          "EventTime":  "2026-07-18 13:10:02.254000",
+                                                          "Details":  "Primary synthetic defect: duplicate transaction",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-12",
+                                  "purpose":  "Inspect correlated rows by BeneficiariesId in eval.beneficiaries",
+                                  "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE BeneficiariesId IN (2)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "BeneficiariesId":  2,
+                                                          "CustomersId":  null,
+                                                          "BusinessKey":  "BNK-2026-0005-A",
+                                                          "Status":  "Failed",
+                                                          "EventTime":  "2026-07-18 13:10:02.250000",
+                                                          "Details":  "duplicate transaction",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              },
+                              {
+                                  "evidence_id":  "SQL-13",
+                                  "purpose":  "Inspect correlated rows by CorrelationId in eval.beneficiaries",
+                                  "sql":  "SELECT BeneficiariesId, CustomersId, BusinessKey, Status, EventTime, Details, CorrelationId, IsActive FROM eval.beneficiaries WHERE CorrelationId IN (\u0027EVAL-BANKING-105\u0027)",
+                                  "row_count":  1,
+                                  "sample_rows":  [
+                                                      {
+                                                          "BeneficiariesId":  2,
+                                                          "CustomersId":  null,
+                                                          "BusinessKey":  "BNK-2026-0005-A",
+                                                          "Status":  "Failed",
+                                                          "EventTime":  "2026-07-18 13:10:02.250000",
+                                                          "Details":  "duplicate transaction",
+                                                          "CorrelationId":  "EVAL-BANKING-105",
+                                                          "IsActive":  true
+                                                      }
+                                                  ],
+                                  "error":  null
+                              }
+                          ],
+    "gate_inputs":  {
+                        "required":  true,
+                        "reproduced":  false,
+                        "business_key_exists":  true,
+                        "reported_condition_exists":  false,
+                        "affected_rows_exist":  true,
+                        "parent_child_relationship_exists":  true,
+                        "confirmed_facts":  [
+                                                "Supplied business key found in returned evidence: BNK-[MASKED_PHONE]-A.",
+                                                "Affected rows were returned by safe SQL evidence."
+                                            ],
+                        "blocking_reasons":  [
+                                                 "Parent-child relationship was not confirmed by metadata or SQL join evidence.",
+                                                 "Duplicate condition was not confirmed by returned rows."
+                                             ],
+                        "missing_evidence":  [
+                                                 "Parent-child relationship was not confirmed by metadata or SQL join evidence.",
+                                                 "Duplicate condition was not confirmed by returned rows."
+                                             ],
+                        "status_interpretation":  [
+
+                                                  ]
+                    },
+    "gate_decision":  {
+                          "reproduced":  false,
+                          "classification":  "EVIDENCE_INSUFFICIENT",
+                          "correct":  true,
+                          "reason":  "Only one correlated processing-message row exists, so the requested duplicate cannot be proven."
+                      },
+    "evidence_map":  [
+                         {
+                             "question_claim":  "two processing messages for one request",
+                             "required_proof":  "two correlated integration-message rows",
+                             "fixture_rows_available":  "one integration-message row",
+                             "sql_used":  [
+                                              "SQL-7",
+                                              "SQL-8",
+                                              "SQL-9"
+                                          ],
+                             "rows_returned":  "0 duplicate-key rows; 1 correlated message row",
+                             "evidence_packaged":  "SQL-7, SQL-8, and SQL-9 retained with row counts and sample rows",
+                             "evidence_gate_decision":  "blocked: duplicate condition not confirmed"
+                         }
+                     ]
+}

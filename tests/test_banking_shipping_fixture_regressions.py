@@ -6,6 +6,7 @@ from legacydb_copilot.agents.entity_extraction_agent import extract_entities
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
+from legacydb_copilot.services.evidence_gate_service import _shared_correlation_across_tables
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 
 
@@ -84,3 +85,32 @@ def test_database_proven_entity_table_precedes_generic_question_noun(
     )
 
     assert focus.affected_object == proven_table
+
+
+def test_shared_correlation_proves_relationship_without_foreign_key() -> None:
+    evidence = [
+        EvidenceResult(
+            "Prove requested entity exists in eval.batch_runs",
+            "SELECT CorrelationId FROM eval.batch_runs WHERE BusinessKey = 'BAT-3104'",
+            [{"CorrelationId": "corr-bat-3104"}],
+        ),
+        EvidenceResult(
+            "Inspect correlated exception",
+            "SELECT CorrelationId FROM eval.exceptions WHERE CorrelationId = 'corr-bat-3104'",
+            [{"CorrelationId": "corr-bat-3104"}],
+        ),
+    ]
+
+    assert _shared_correlation_across_tables(evidence)
+
+
+def test_repeated_correlation_in_one_table_does_not_invent_relationship() -> None:
+    evidence = [
+        EvidenceResult(
+            "Inspect retries",
+            "SELECT CorrelationId FROM eval.batch_runs",
+            [{"CorrelationId": "corr-1"}, {"CorrelationId": "corr-1"}],
+        )
+    ]
+
+    assert not _shared_correlation_across_tables(evidence)

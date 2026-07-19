@@ -353,6 +353,8 @@ def _relationship_exists(metadata: MetadataSearchResult, evidence: list[Evidence
     """
     if any(item.rows and " join " in f" {item.sql.lower()} " for item in evidence):
         return True
+    if _shared_correlation_across_tables(evidence):
+        return True
     affected = evidence_focus.affected_object.lower() if evidence_focus else ""
     if not affected:
         return bool(metadata.tables)
@@ -361,6 +363,28 @@ def _relationship_exists(metadata: MetadataSearchResult, evidence: list[Evidence
             referred = str(fk.get("referred_table") or "").lower()
             if table.name.lower() == affected or referred == affected:
                 return True
+    return False
+
+
+def _shared_correlation_across_tables(evidence: list[EvidenceResult]) -> bool:
+    """Accept correlation proof only when the same key/value occurs in distinct tables."""
+    locations: dict[tuple[str, str], set[str]] = {}
+    for item in evidence:
+        tables = {
+            match.group(1).strip("`[]\"").casefold()
+            for match in re.finditer(r"\b(?:from|join)\s+([`\"\[\]\w.]+)", item.sql, re.I)
+        }
+        if not tables:
+            continue
+        for row in item.rows:
+            for key, value in row.items():
+                normalized_key = re.sub(r"[^a-z0-9]", "", str(key).casefold())
+                if normalized_key not in {"correlationid", "requestid", "traceid"} or value in (None, ""):
+                    continue
+                marker = (normalized_key, str(value).casefold())
+                locations.setdefault(marker, set()).update(tables)
+                if len(locations[marker]) >= 2:
+                    return True
     return False
 
 

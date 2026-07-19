@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "release_candidate": "7983961",
+  "benchmark_folder": "research/results/official-validation-25-20260718",
+  "organization_id": "678264ff-8b4f-47a5-89dc-a90b9e371dde",
+  "workspace_id": "2f847a6a-9db2-4ae5-b144-71598ec8fb87",
+  "secrets_included": false,
+  "fixture_audit": {
+    "source": "fixture-audit.log",
+    "total": 125,
+    "valid": 125,
+    "invalid": 0,
+    "missing_entities": 0,
+    "missing_defect_evidence": 0,
+    "verification_query_failures": 0,
+    "fresh_rerun_status": "inconclusive_timeout; benchmark-run audit remains the evidence source"
+  },
+  "shared_runtime_flow": [
+    {"stage": "fixture baseline/injection/verification", "decision": "passed for each run; otherwise runner would stop before API submission", "source": "per-scenario run result/timings and fixture-audit.log"},
+    {"stage": "SQL validation", "decision": "passed for every generated query; no SQL-validation error recorded", "source": "debug_trace.sql_plan and executed_sql"},
+    {"stage": "cleanup", "decision": "passed for all 13", "source": "extracted_result.cleanup_status"},
+    {"stage": "AI judge", "decision": "skipped for all 13 because orchestration excludes invalid_configuration", "source": "benchmark-console.log and absence of judge logs"}
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "banking-benchmark-002", "domain": "banking", "difficulty": "easy", "connection_id": "90228294-4cd2-4b65-9ba4-331c8ea5dea1",
+      "question": "Investigate the failed payment reported as BNK-2026-0002; resolve the complete identifier before diagnosing it.",
+      "expected": {"entity": "BNK-2026-0002-A", "table": "eval.transfers", "ground_truth": "one safe partial candidate resolves to the complete identifier", "defect_correlation": "EVAL-BANKING-102"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/banking/banking-benchmark-002/baseline_reset.sql", "injection": "evaluation_scenarios/banking/banking-benchmark-002/inject.sql", "verification": "evaluation_scenarios/banking/banking-benchmark-002/verify.sql", "cleanup": "evaluation_scenarios/banking/banking-benchmark-002/cleanup.sql"},
+      "stages": {"intent": "entity resolution investigation", "extraction": "BNK-2026-0002", "resolution": "FAILED ambiguous; candidates included BNK-2026-0002-A plus AUD-/EX-/MSG- related identifiers", "metadata": "pre-resolution table set not retained", "relationships": "skipped", "target": "skipped", "sql_planning": "0 queries", "sql_execution": "0 queries", "evidence": "none", "gate": "not reached", "ai": "not invoked", "answer": "AMBIGUOUS_ENTITY", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_ENTITY_RESOLUTION_DEFECT", "secondary": null, "confidence": 0.98},
+      "divergence": "The verified unique direct canonical extension was not selected; related diagnostic identifiers competed as primary candidates.",
+      "source": {"file": "src/legacydb_copilot/services/entity_resolution_service.py", "functions": ["resolve_entities", "_resolve_one", "_is_direct_canonical_extension"], "runtime": "banking-benchmark-002-run.log"}
+    },
+    {
+      "scenario_id": "banking-benchmark-010", "domain": "banking", "difficulty": "hard", "connection_id": "90228294-4cd2-4b65-9ba4-331c8ea5dea1",
+      "question": "Investigate why all retries for payment BNK-2026-0010-A failed without a terminal status.",
+      "expected": {"entity": "BNK-2026-0010-A", "table": "eval.transfers", "ground_truth": "retry evidence records exhausted attempts while entity remained pending", "defect_correlation": "EVAL-BANKING-110"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/banking/banking-benchmark-010/baseline_reset.sql", "injection": "evaluation_scenarios/banking/banking-benchmark-010/inject.sql", "verification": "evaluation_scenarios/banking/banking-benchmark-010/verify.sql", "cleanup": "evaluation_scenarios/banking/banking-benchmark-010/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "BNK-2026-0010-A", "resolution": "exact", "metadata": "diagnostic tables discovered", "relationships": "parent-child true", "target": "eval.transfers", "sql_planning": "7 validated queries", "sql_execution": "7; 2 evidence items returned rows", "evidence": "entity rows only; retry condition absent", "gate": "rejected: reported condition not confirmed", "ai": "skipped by gate", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "secondary": null, "confidence": 0.97},
+      "divergence": "The plan proved the entity but omitted correlated retry/audit/exception evidence required to establish exhausted retries.",
+      "source": {"file": "src/legacydb_copilot/services/safe_sql_service.py", "functions": ["plan_safe_queries"], "runtime": "banking-benchmark-010-run.log"}
+    },
+    {
+      "scenario_id": "orders-benchmark-004", "domain": "orders", "difficulty": "medium", "connection_id": "7b15039d-cf52-4f04-a533-a921efd0cd9b",
+      "question": "Investigate why completed order ORD-2026-0004-A has no downstream processing record.",
+      "expected": {"entity": "ORD-2026-0004-A", "table": "eval.pick_tasks", "ground_truth": "completed upstream row has no correlated integration row", "defect_correlation": "EVAL-ORDERS-104"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/orders/orders-benchmark-004/baseline_reset.sql", "injection": "evaluation_scenarios/orders/orders-benchmark-004/inject.sql", "verification": "evaluation_scenarios/orders/orders-benchmark-004/verify.sql", "cleanup": "evaluation_scenarios/orders/orders-benchmark-004/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "explicit identifier present but no identified_entities persisted", "resolution": "not attempted", "metadata": "closest objects were generic order tables", "relationships": "skipped", "target": "FAILED; selected phrase 'downstream processing' as missing target", "sql_planning": "0", "sql_execution": "0", "evidence": "missing_target payload", "gate": "not reached", "ai": "not invoked", "answer": "INSUFFICIENT_DATABASE_EVIDENCE", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_TARGET_SELECTION_DEFECT", "secondary": null, "confidence": 0.99},
+      "divergence": "Generic downstream wording displaced the explicit business identifier and database-backed entity target.",
+      "source": {"file": "src/legacydb_copilot/routers/chat.py", "functions": ["_run_dynamic_investigation"], "runtime": "orders-benchmark-004-run.log"}
+    },
+    {
+      "scenario_id": "orders-benchmark-007", "domain": "orders", "difficulty": "medium", "connection_id": "7b15039d-cf52-4f04-a533-a921efd0cd9b",
+      "question": "Investigate why exception handling left order ORD-2026-0007-A in Processing.",
+      "expected": {"entity": "ORD-2026-0007-A", "table": "eval.receipts", "ground_truth": "exception recorded without compensating transition", "defect_correlation": "EVAL-ORDERS-107"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/orders/orders-benchmark-007/baseline_reset.sql", "injection": "evaluation_scenarios/orders/orders-benchmark-007/inject.sql", "verification": "evaluation_scenarios/orders/orders-benchmark-007/verify.sql", "cleanup": "evaluation_scenarios/orders/orders-benchmark-007/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "ORD-2026-0007-A", "resolution": "exact", "metadata": "generic order tables selected", "relationships": "metadata relationship true", "target": "purchase_order_lines rather than receipts", "sql_planning": "7 validated queries", "sql_execution": "7; all zero rows", "evidence": "empty package items", "gate": "rejected: key, rows and condition absent", "ai": "skipped by gate", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_TARGET_SELECTION_DEFECT", "secondary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "confidence": 0.99},
+      "divergence": "The exact entity was resolved, but the injected receipt table was not promoted as the primary target.",
+      "source": {"file": "src/legacydb_copilot/routers/chat.py", "functions": ["_run_dynamic_investigation"], "runtime": "orders-benchmark-007-run.log"}
+    },
+    {
+      "scenario_id": "orders-benchmark-010", "domain": "orders", "difficulty": "hard", "connection_id": "7b15039d-cf52-4f04-a533-a921efd0cd9b",
+      "question": "Investigate why all retries for order ORD-2026-0010-A failed without a terminal status.",
+      "expected": {"entity": "ORD-2026-0010-A", "table": "eval.sales_order_lines", "ground_truth": "retry evidence exhausted while entity remained pending", "defect_correlation": "EVAL-ORDERS-110"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/orders/orders-benchmark-010/baseline_reset.sql", "injection": "evaluation_scenarios/orders/orders-benchmark-010/inject.sql", "verification": "evaluation_scenarios/orders/orders-benchmark-010/verify.sql", "cleanup": "evaluation_scenarios/orders/orders-benchmark-010/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "ORD-2026-0010-A", "resolution": "exact", "metadata": "entity and diagnostic tables discovered", "relationships": "true", "target": "sales_order_lines", "sql_planning": "7", "sql_execution": "7; 2 returned entity rows", "evidence": "retry condition absent", "gate": "rejected: reported condition not confirmed", "ai": "skipped", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "secondary": null, "confidence": 0.97},
+      "divergence": "Entity proof succeeded but correlated retry evidence was not included.",
+      "source": {"file": "src/legacydb_copilot/services/safe_sql_service.py", "functions": ["plan_safe_queries"], "runtime": "orders-benchmark-010-run.log"}
+    },
+    {
+      "scenario_id": "shipping-benchmark-004", "domain": "shipping", "difficulty": "medium", "connection_id": "19eec4fd-2e15-4480-a2c4-27a764982d73",
+      "question": "Investigate why completed shipment SHP-2026-0004-A has no downstream processing record.",
+      "expected": {"entity": "SHP-2026-0004-A", "table": "eval.container_events", "ground_truth": "completed upstream row lacks integration row", "defect_correlation": "EVAL-SHIPPING-104"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/shipping/shipping-benchmark-004/baseline_reset.sql", "injection": "evaluation_scenarios/shipping/shipping-benchmark-004/inject.sql", "verification": "evaluation_scenarios/shipping/shipping-benchmark-004/verify.sql", "cleanup": "evaluation_scenarios/shipping/shipping-benchmark-004/cleanup.sql"},
+      "stages": {"intent": "ENTITY_NOT_FOUND terminal", "extraction": "SHP-2026-0004-A", "resolution": "FAILED not_found; zero candidates", "metadata": "pre-resolution state absent", "relationships": "skipped", "target": "skipped", "sql_planning": "0", "sql_execution": "0", "evidence": "none", "gate": "not reached", "ai": "not invoked", "answer": "ENTITY_NOT_FOUND", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_ENTITY_RESOLUTION_DEFECT", "secondary": null, "confidence": 0.96},
+      "divergence": "A fixture-verified exact entity produced no candidate.",
+      "source": {"file": "src/legacydb_copilot/services/entity_resolution_service.py", "functions": ["resolve_entities", "_resolve_one"], "runtime": "shipping-benchmark-004-run.log"}
+    },
+    {
+      "scenario_id": "shipping-benchmark-005", "domain": "shipping", "difficulty": "medium", "connection_id": "19eec4fd-2e15-4480-a2c4-27a764982d73",
+      "question": "Investigate why shipment SHP-2026-0005-A produced two processing messages for one business request.",
+      "expected": {"entity": "SHP-2026-0005-A", "table": "eval.shipment_milestones", "ground_truth": "two differently keyed messages share one correlation", "defect_correlation": "EVAL-SHIPPING-105"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/shipping/shipping-benchmark-005/baseline_reset.sql", "injection": "evaluation_scenarios/shipping/shipping-benchmark-005/inject.sql", "verification": "evaluation_scenarios/shipping/shipping-benchmark-005/verify.sql", "cleanup": "evaluation_scenarios/shipping/shipping-benchmark-005/cleanup.sql"},
+      "stages": {"intent": "duplicate investigation", "extraction": "SHP-2026-0005-A", "resolution": "exact", "metadata": "integration_messages and shipment_milestones discovered", "relationships": "correlation relationship not proven", "target": "shipment_milestones", "sql_planning": "8", "sql_execution": "8; only milestone proof returned rows", "evidence": "two integration messages absent from package", "gate": "rejected: no affected duplicate rows/relationship/condition", "ai": "skipped", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "secondary": "APPLICATION_RELATIONSHIP_DISCOVERY_DEFECT", "confidence": 0.99},
+      "divergence": "The plan searched duplicate BusinessKeys rather than expanding the primary row's CorrelationId to differently keyed messages.",
+      "source": {"file": "src/legacydb_copilot/routers/chat.py", "functions": ["_expand_related_id_evidence", "_run_dynamic_investigation"], "runtime": "shipping-benchmark-005-run.log"}
+    },
+    {
+      "scenario_id": "shipping-benchmark-010", "domain": "shipping", "difficulty": "hard", "connection_id": "19eec4fd-2e15-4480-a2c4-27a764982d73",
+      "question": "Investigate why all retries for shipment SHP-2026-0010-A failed without a terminal status.",
+      "expected": {"entity": "SHP-2026-0010-A", "table": "eval.bookings", "ground_truth": "retry exhaustion and pending entity", "defect_correlation": "EVAL-SHIPPING-110"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/shipping/shipping-benchmark-010/baseline_reset.sql", "injection": "evaluation_scenarios/shipping/shipping-benchmark-010/inject.sql", "verification": "evaluation_scenarios/shipping/shipping-benchmark-010/verify.sql", "cleanup": "evaluation_scenarios/shipping/shipping-benchmark-010/cleanup.sql"},
+      "stages": {"intent": "ENTITY_AMBIGUOUS terminal", "extraction": "SHP-2026-0010-A", "resolution": "FAILED ambiguous; candidates MSG-/EX-/AUD- only", "metadata": "pre-resolution state absent", "relationships": "skipped", "target": "skipped", "sql_planning": "0", "sql_execution": "0", "evidence": "candidate diagnostics only", "gate": "not reached", "ai": "not invoked", "answer": "AMBIGUOUS_ENTITY", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_ENTITY_RESOLUTION_DEFECT", "secondary": null, "confidence": 0.97},
+      "divergence": "The exact fixture-verified booking entity was not selected while related diagnostic identifiers became candidates.",
+      "source": {"file": "src/legacydb_copilot/services/entity_resolution_service.py", "functions": ["resolve_entities", "_resolve_one"], "runtime": "shipping-benchmark-010-run.log"}
+    },
+    {
+      "scenario_id": "shipping-benchmark-016", "domain": "shipping", "difficulty": "expert", "connection_id": "19eec4fd-2e15-4480-a2c4-27a764982d73",
+      "question": "Investigate intermittent competing updates for shipment SHP-2026-0016-A that produced inconsistent terminal states.",
+      "expected": {"entity": "SHP-2026-0016-A", "table": "eval.bills_of_lading", "ground_truth": "overlapping same-correlation events prove lost update", "defect_correlation": "EVAL-SHIPPING-116"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/shipping/shipping-benchmark-016/baseline_reset.sql", "injection": "evaluation_scenarios/shipping/shipping-benchmark-016/inject.sql", "verification": "evaluation_scenarios/shipping/shipping-benchmark-016/verify.sql", "cleanup": "evaluation_scenarios/shipping/shipping-benchmark-016/cleanup.sql"},
+      "stages": {"intent": "ENTITY_NOT_FOUND terminal", "extraction": "SHP-2026-0016-A", "resolution": "FAILED not_found; zero candidates", "metadata": "pre-resolution state absent", "relationships": "skipped", "target": "skipped", "sql_planning": "0", "sql_execution": "0", "evidence": "none", "gate": "not reached", "ai": "not invoked", "answer": "ENTITY_NOT_FOUND", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_ENTITY_RESOLUTION_DEFECT", "secondary": null, "confidence": 0.96},
+      "divergence": "A fixture-verified exact entity produced no candidate.",
+      "source": {"file": "src/legacydb_copilot/services/entity_resolution_service.py", "functions": ["resolve_entities", "_resolve_one"], "runtime": "shipping-benchmark-016-run.log"}
+    },
+    {
+      "scenario_id": "clinic-benchmark-007", "domain": "clinic", "difficulty": "medium", "connection_id": "5c43b992-e80b-4bc6-a80a-fb83d1832a8c",
+      "question": "Investigate why exception handling left patient service CLN-2026-0007-A in Processing.",
+      "expected": {"entity": "CLN-2026-0007-A", "table": "eval.payments", "ground_truth": "exception without compensating transition", "defect_correlation": "EVAL-CLINIC-107"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/clinic/clinic-benchmark-007/baseline_reset.sql", "injection": "evaluation_scenarios/clinic/clinic-benchmark-007/inject.sql", "verification": "evaluation_scenarios/clinic/clinic-benchmark-007/verify.sql", "cleanup": "evaluation_scenarios/clinic/clinic-benchmark-007/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "CLN-2026-0007-A", "resolution": "exact", "metadata": "exceptions/patients/insurance selected", "relationships": "not proven for evidence", "target": "exceptions rather than payments", "sql_planning": "7", "sql_execution": "7; zero rows", "evidence": "empty", "gate": "rejected on all proof checks", "ai": "skipped", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_TARGET_SELECTION_DEFECT", "secondary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "confidence": 0.99},
+      "divergence": "Exact resolution did not promote the fixture-backed payments table into the evidence plan.",
+      "source": {"file": "src/legacydb_copilot/routers/chat.py", "functions": ["_run_dynamic_investigation"], "runtime": "clinic-benchmark-007-run.log"}
+    },
+    {
+      "scenario_id": "clinic-benchmark-018", "domain": "clinic", "difficulty": "expert", "connection_id": "5c43b992-e80b-4bc6-a80a-fb83d1832a8c",
+      "question": "Investigate why replaying patient service CLN-2026-0018-A repeated a previously accepted operation.",
+      "expected": {"entity": "CLN-2026-0018-A", "table": "eval.encounters", "ground_truth": "second same-correlation operation without idempotency guard", "defect_correlation": "EVAL-CLINIC-118"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/clinic/clinic-benchmark-018/baseline_reset.sql", "injection": "evaluation_scenarios/clinic/clinic-benchmark-018/inject.sql", "verification": "evaluation_scenarios/clinic/clinic-benchmark-018/verify.sql", "cleanup": "evaluation_scenarios/clinic/clinic-benchmark-018/cleanup.sql"},
+      "stages": {"intent": "ENTITY_NOT_FOUND terminal", "extraction": "CLN-2026-0018-A", "resolution": "FAILED not_found", "metadata": "pre-resolution state absent", "relationships": "skipped", "target": "skipped", "sql_planning": "0", "sql_execution": "0", "evidence": "none", "gate": "not reached", "ai": "not invoked", "answer": "ENTITY_NOT_FOUND", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_ENTITY_RESOLUTION_DEFECT", "secondary": null, "confidence": 0.96},
+      "divergence": "A fixture-verified exact encounter entity produced no candidate.",
+      "source": {"file": "src/legacydb_copilot/services/entity_resolution_service.py", "functions": ["resolve_entities", "_resolve_one"], "runtime": "clinic-benchmark-018-run.log"}
+    },
+    {
+      "scenario_id": "payroll-benchmark-004", "domain": "payroll", "difficulty": "medium", "connection_id": "18d7ade7-7dd3-428b-b4b3-67cfba8fed58",
+      "question": "Investigate why completed payroll item PAY-2026-0004-A has no downstream processing record.",
+      "expected": {"entity": "PAY-2026-0004-A", "table": "eval.time_entries", "ground_truth": "completed upstream row lacks integration row", "defect_correlation": "EVAL-PAYROLL-104"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/payroll/payroll-benchmark-004/baseline_reset.sql", "injection": "evaluation_scenarios/payroll/payroll-benchmark-004/inject.sql", "verification": "evaluation_scenarios/payroll/payroll-benchmark-004/verify.sql", "cleanup": "evaluation_scenarios/payroll/payroll-benchmark-004/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "explicit identifier present but no identified_entities persisted", "resolution": "not attempted", "metadata": "generic payroll objects returned", "relationships": "skipped", "target": "FAILED; selected phrase 'downstream processing'", "sql_planning": "0", "sql_execution": "0", "evidence": "missing_target", "gate": "not reached", "ai": "not invoked", "answer": "INSUFFICIENT_DATABASE_EVIDENCE", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_TARGET_SELECTION_DEFECT", "secondary": null, "confidence": 0.99},
+      "divergence": "Generic downstream wording displaced the explicit business identifier and fixture-backed time_entries target.",
+      "source": {"file": "src/legacydb_copilot/routers/chat.py", "functions": ["_run_dynamic_investigation"], "runtime": "payroll-benchmark-004-run.log"}
+    },
+    {
+      "scenario_id": "payroll-benchmark-010", "domain": "payroll", "difficulty": "hard", "connection_id": "18d7ade7-7dd3-428b-b4b3-67cfba8fed58",
+      "question": "Investigate why all retries for payroll item PAY-2026-0010-A failed without a terminal status.",
+      "expected": {"entity": "PAY-2026-0010-A", "table": "eval.payroll_items", "ground_truth": "retry exhaustion and pending entity", "defect_correlation": "EVAL-PAYROLL-110"},
+      "fixture_scripts": {"baseline": "evaluation_scenarios/payroll/payroll-benchmark-010/baseline_reset.sql", "injection": "evaluation_scenarios/payroll/payroll-benchmark-010/inject.sql", "verification": "evaluation_scenarios/payroll/payroll-benchmark-010/verify.sql", "cleanup": "evaluation_scenarios/payroll/payroll-benchmark-010/cleanup.sql"},
+      "stages": {"intent": "PROCESS_FLOW_BREAK", "extraction": "PAY-2026-0010-A", "resolution": "exact", "metadata": "entity and diagnostic tables discovered", "relationships": "true", "target": "payroll_items", "sql_planning": "7", "sql_execution": "7; 2 entity rows", "evidence": "retry condition absent", "gate": "rejected: condition unconfirmed", "ai": "skipped", "answer": "insufficient_evidence", "judge": "not invoked"},
+      "classification": {"primary": "APPLICATION_EVIDENCE_PLANNING_DEFECT", "secondary": null, "confidence": 0.97},
+      "divergence": "The plan proved the entity but omitted the correlated retry/audit/exception evidence.",
+      "source": {"file": "src/legacydb_copilot/services/safe_sql_service.py", "functions": ["plan_safe_queries"], "runtime": "payroll-benchmark-010-run.log"}
+    }
+  ]
+}

@@ -326,6 +326,21 @@ def test_interrupted_run_resume_selection():
     assert selected == {"A", "B"}
 
 
+def test_resumed_scenario_resets_before_reinjection(tmp_path):
+    database = FakeDatabase()
+    app = runner(tmp_path, database=database)
+
+    first = app.run_scenario("RUN", scenario())
+    resumed = app.run_scenario("RUN", scenario())
+
+    assert first.attempt == 1
+    assert resumed.attempt == 2
+    assert database.calls == [
+        "reset", "inject", "verify", "cleanup",
+        "reset", "inject", "verify", "cleanup",
+    ]
+
+
 def test_rerun_failed_scenarios_only():
     latest = latest_statuses(
         [

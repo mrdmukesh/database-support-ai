@@ -33,11 +33,17 @@ def settings(**overrides) -> Settings:
         openai_api_key="test",
         llm_retry_attempts=2,
         llm_retry_backoff_seconds=0,
+        llm_retry_jitter_seconds=0,
         llm_request_timeout_seconds=3,
         llm_total_timeout_seconds=10,
     )
     values.update(overrides)
     return Settings(**values)
+
+
+@pytest.fixture(autouse=True)
+def reset_provider_circuit() -> None:
+    service._PROVIDER_CIRCUIT.reset()
 
 
 def success_payload() -> dict:
@@ -88,6 +94,106 @@ def test_non_retryable_provider_error_is_not_retried(monkeypatch) -> None:
     with pytest.raises(error.HTTPError):
         service._call_openai_responses(settings(), {})
     assert calls == 1
+
+
+@pytest.mark.parametrize("status", [429, 500, 502, 503])
+def test_transient_http_status_retries_then_succeeds(monkeypatch, status) -> None:
+    outcomes = [error.HTTPError("url", status, "temporary", {}, None), Response(success_payload())]
+    calls = 0
+
+    def urlopen(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    trace = {}
+    assert service._call_openai_responses(settings(), {}, debug_trace=trace) == {}
+    assert calls == 2
+    assert trace["provider_attempts"][0]["http_status"] == status
+    assert trace["provider_attempts"][0]["retryable"] is True
+
+
+def test_invalid_credentials_are_not_retried_and_status_is_audited(monkeypatch) -> None:
+    calls = 0
+
+    def urlopen(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise error.HTTPError("url", 401, "invalid credentials", {}, None)
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    trace = {}
+    with pytest.raises(error.HTTPError):
+        service._call_openai_responses(settings(), {}, debug_trace=trace)
+    assert calls == 1
+    assert trace["provider_http_status"] == 401
+    assert trace["provider_attempts"][0]["retryable"] is False
+
+
+def test_url_connection_error_retries(monkeypatch) -> None:
+    outcomes = [error.URLError(ConnectionError("reset")), Response(success_payload())]
+
+    def urlopen(*_args, **_kwargs):
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    assert service._call_openai_responses(settings(), {}) == {}
+
+
+def test_malformed_provider_response_is_not_retried(monkeypatch) -> None:
+    calls = 0
+
+    class Malformed(Response):
+        def __init__(self): self.body = BytesIO(b"not-json")
+
+    def urlopen(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        return Malformed()
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    with pytest.raises(json.JSONDecodeError):
+        service._call_openai_responses(settings(), {})
+    assert calls == 1
+
+
+def test_retry_exhaustion_preserves_status_and_attempt_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        service.request, "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(error.HTTPError("url", 503, "down", {}, None)),
+    )
+    trace = {}
+    with pytest.raises(error.HTTPError):
+        service._call_openai_responses(settings(), {}, debug_trace=trace)
+    assert trace["provider_attempt_count"] == 2
+    assert trace["provider_retry_count"] == 1
+    assert trace["provider_http_status"] == 503
+
+
+def test_circuit_breaker_fails_fast_after_threshold(monkeypatch) -> None:
+    calls = 0
+
+    def urlopen(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise error.HTTPError("url", 503, "down", {}, None)
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    configured = settings(llm_retry_attempts=1, llm_circuit_breaker_threshold=2)
+    with pytest.raises(error.HTTPError):
+        service._call_openai_responses(configured, {})
+    with pytest.raises(error.HTTPError):
+        service._call_openai_responses(configured, {})
+    with pytest.raises(service.ProviderCircuitOpenError):
+        service._call_openai_responses(configured, {})
+    assert calls == 2
 
 
 def test_success_is_consumed_once_without_duplicate_result(monkeypatch) -> None:

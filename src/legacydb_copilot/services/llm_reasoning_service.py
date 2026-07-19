@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import random
+import threading
 import time
 from dataclasses import replace
 from typing import Any
@@ -406,30 +408,54 @@ def _call_openai_responses(
         debug_trace["provider_retry_count"] = 0
         debug_trace["provider_attempts"] = []
     for attempt in range(1, attempts + 1):
-        remaining = deadline - time.monotonic()
+        now = time.monotonic()
+        _PROVIDER_CIRCUIT.before_call(
+            threshold=settings.llm_circuit_breaker_threshold,
+            cooldown=settings.llm_circuit_breaker_cooldown_seconds,
+            now=now,
+        )
+        remaining = deadline - now
         if remaining <= 0:
             raise TimeoutError("LLM provider total timeout exhausted")
         request_timeout = min(settings.llm_request_timeout_seconds, remaining)
         if debug_trace is not None:
             debug_trace["provider_attempt_count"] = attempt
+        attempt_started = time.monotonic()
         try:
             with request.urlopen(http_request, timeout=request_timeout) as response:
                 response_json = json.loads(response.read().decode("utf-8"))
+            _PROVIDER_CIRCUIT.success()
             if debug_trace is not None:
-                debug_trace["provider_attempts"].append({"attempt": attempt, "outcome": "success"})
+                debug_trace["provider_attempts"].append({
+                    "attempt": attempt, "outcome": "success",
+                    "duration_ms": int((time.monotonic() - attempt_started) * 1000),
+                })
             break
         except Exception as exc:
             retryable = _is_transient_provider_error(exc)
+            status_code = exc.code if isinstance(exc, error.HTTPError) else None
+            if retryable:
+                _PROVIDER_CIRCUIT.transient_failure(
+                    threshold=settings.llm_circuit_breaker_threshold,
+                    now=time.monotonic(),
+                )
             if debug_trace is not None:
                 debug_trace["provider_attempts"].append(
-                    {"attempt": attempt, "outcome": "failed", "error": type(exc).__name__, "retryable": retryable}
+                    {
+                        "attempt": attempt, "outcome": "failed", "error": type(exc).__name__,
+                        "http_status": status_code, "retryable": retryable,
+                        "duration_ms": int((time.monotonic() - attempt_started) * 1000),
+                    }
                 )
+                debug_trace["provider_error_type"] = type(exc).__name__
+                debug_trace["provider_http_status"] = status_code
             if not retryable or attempt >= attempts:
                 raise
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError("LLM provider total timeout exhausted") from exc
-            backoff = min(settings.llm_retry_backoff_seconds * (2 ** (attempt - 1)), remaining)
+            jitter = random.uniform(0.0, settings.llm_retry_jitter_seconds)
+            backoff = min(settings.llm_retry_backoff_seconds * (2 ** (attempt - 1)) + jitter, remaining)
             if debug_trace is not None:
                 debug_trace["provider_retry_count"] = attempt
             if backoff > 0:
@@ -448,7 +474,7 @@ def _call_openai_responses(
 def _is_transient_provider_error(exc: Exception) -> bool:
     """Return true only for connection-level failures that are safe to retry."""
     if isinstance(exc, error.HTTPError):
-        return False
+        return exc.code == 429 or 500 <= exc.code < 600
     if isinstance(exc, (TimeoutError, ConnectionError)):
         return True
     if isinstance(exc, error.URLError):
@@ -738,3 +764,41 @@ def _string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value if str(item).strip()]
+
+
+class ProviderCircuitOpenError(RuntimeError):
+    """Raised before submission while repeated transient failures cool down."""
+
+
+class _ProviderCircuitBreaker:
+    def __init__(self) -> None:
+        self.failures = 0
+        self.opened_at: float | None = None
+        self._lock = threading.Lock()
+
+    def before_call(self, *, threshold: int, cooldown: float, now: float) -> None:
+        with self._lock:
+            if self.opened_at is None:
+                return
+            if now - self.opened_at >= cooldown:
+                self.failures = 0
+                self.opened_at = None
+                return
+            raise ProviderCircuitOpenError("LLM provider circuit is open after repeated transient failures")
+
+    def success(self) -> None:
+        with self._lock:
+            self.failures = 0
+            self.opened_at = None
+
+    def transient_failure(self, *, threshold: int, now: float) -> None:
+        with self._lock:
+            self.failures += 1
+            if self.failures >= threshold:
+                self.opened_at = now
+
+    def reset(self) -> None:
+        self.success()
+
+
+_PROVIDER_CIRCUIT = _ProviderCircuitBreaker()

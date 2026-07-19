@@ -132,6 +132,9 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     explicit_write_target = _explicit_write_target(question, metadata)
     if explicit_write_target:
         return explicit_write_target.name, "Locked from explicit procedure write-target phrase such as update/insert into <object>; unrelated evidence rows cannot override it."
+    proven_entity_target = _proven_entity_target(metadata, evidence)
+    if proven_entity_target:
+        return proven_entity_target, "Selected from the unique table whose bounded entity-proof query returned the requested identifier; generic business nouns cannot override database-proven entity provenance."
     problem = parse_problem_phrase(question)
     phrase_target = resolve_table_from_terms(problem.target_terms, metadata)
     if phrase_target:
@@ -167,6 +170,32 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     if score <= 0:
         return selected, "Selected first available table because no stronger evidence identified a target."
     return selected, "Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object."
+
+
+def _proven_entity_target(
+    metadata: MetadataSearchResult, evidence: list[EvidenceResult]
+) -> str | None:
+    """Return a unique entity-proof table, failing closed when proof spans tables."""
+    known = {table.name.casefold(): table.name for table in metadata.tables}
+    leaves: dict[str, list[str]] = {}
+    for table in metadata.tables:
+        leaves.setdefault(table.name.casefold().split(".")[-1], []).append(table.name)
+    proven: set[str] = set()
+    for item in evidence:
+        purpose = item.purpose.casefold()
+        if not item.rows or not any(
+            marker in purpose
+            for marker in ("prove requested entity exists", "entity exact lookup")
+        ):
+            continue
+        for sql_table in _tables_in_sql(item.sql):
+            resolved = known.get(sql_table.casefold())
+            if resolved is None:
+                leaf_matches = leaves.get(sql_table.casefold(), [])
+                resolved = leaf_matches[0] if len(leaf_matches) == 1 else None
+            if resolved:
+                proven.add(resolved)
+    return next(iter(proven)) if len(proven) == 1 else None
 
 
 def _explicit_write_target(question: str, metadata: MetadataSearchResult) -> TableMetadata | None:

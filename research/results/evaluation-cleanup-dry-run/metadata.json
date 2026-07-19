@@ -1,0 +1,25 @@
+{
+  "generated_at": "2026-07-19T16:59:15.005263+00:00",
+  "mode": "dry-run",
+  "retained_run_id": "9fb0a20c-cf44-5a13-b194-c1d8641e559c",
+  "run_count": 502,
+  "keep_count": 1,
+  "delete_count": 501,
+  "before_table_counts": {
+    "ai_judge_results": 0,
+    "capability_results": 0,
+    "deterministic_validation_results": 0,
+    "evaluation_ai_judge_scores": 436,
+    "evaluation_artifacts": 5,
+    "evaluation_deterministic_scores": 493,
+    "evaluation_human_review_flags": 436,
+    "evaluation_jobs": 0,
+    "evaluation_metrics": 0,
+    "evaluation_runs": 502,
+    "evaluation_scenario_executions": 919,
+    "human_reviews": 0,
+    "investigation_evidence_snapshots": 0,
+    "investigation_results": 0,
+    "investigation_sql_snapshots": 0
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "scenario_count": 25,
+  "attempt_count": 25,
+  "unique_scenario_count": 25,
+  "invalid_attempt_count": 13,
+  "rerun_attempt_count": 0,
+  "valid_count": 12,
+  "pass_count": 6,
+  "skipped_count": 13,
+  "invalid_configuration_count": 13,
+  "human_review_count": 25,
+  "overall_average_deterministic": 54.47975,
+  "overall_average_ai_judge": 60.24427272727273,
+  "domains": {
+    "banking": {
+      "scenario_count": 5,
+      "pass_count": 1,
+      "average_deterministic": 46.681000000000004,
+      "average_ai_judge": 52.39333333333334,
+      "human_review_count": 5
+    },
+    "clinic": {
+      "scenario_count": 5,
+      "pass_count": 2,
+      "average_deterministic": 72.664,
+      "average_ai_judge": 65.714,
+      "human_review_count": 5
+    },
+    "orders": {
+      "scenario_count": 5,
+      "pass_count": 2,
+      "average_deterministic": 74.9865,
+      "average_ai_judge": 75.0395,
+      "human_review_count": 5
+    },
+    "payroll": {
+      "scenario_count": 5,
+      "pass_count": 1,
+      "average_deterministic": 48.583000000000006,
+      "average_ai_judge": 48.56666666666666,
+      "human_review_count": 5
+    },
+    "shipping": {
+      "scenario_count": 5,
+      "pass_count": 0,
+      "average_deterministic": 0.0,
+      "average_ai_judge": 78.3,
+      "human_review_count": 5
+    }
+  }
+}

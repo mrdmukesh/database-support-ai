@@ -1,0 +1,102 @@
+﻿[
+    {
+        "domain":  "banking",
+        "scenario_id":  "banking-benchmark-002"
+    },
+    {
+        "domain":  "banking",
+        "scenario_id":  "banking-benchmark-005"
+    },
+    {
+        "domain":  "banking",
+        "scenario_id":  "banking-benchmark-010"
+    },
+    {
+        "domain":  "banking",
+        "scenario_id":  "banking-benchmark-011"
+    },
+    {
+        "domain":  "banking",
+        "scenario_id":  "banking-benchmark-016"
+    },
+    {
+        "domain":  "orders",
+        "scenario_id":  "orders-benchmark-001"
+    },
+    {
+        "domain":  "orders",
+        "scenario_id":  "orders-benchmark-004"
+    },
+    {
+        "domain":  "orders",
+        "scenario_id":  "orders-benchmark-007"
+    },
+    {
+        "domain":  "orders",
+        "scenario_id":  "orders-benchmark-010"
+    },
+    {
+        "domain":  "orders",
+        "scenario_id":  "orders-benchmark-018"
+    },
+    {
+        "domain":  "shipping",
+        "scenario_id":  "shipping-benchmark-004"
+    },
+    {
+        "domain":  "shipping",
+        "scenario_id":  "shipping-benchmark-005"
+    },
+    {
+        "domain":  "shipping",
+        "scenario_id":  "shipping-benchmark-008"
+    },
+    {
+        "domain":  "shipping",
+        "scenario_id":  "shipping-benchmark-010"
+    },
+    {
+        "domain":  "shipping",
+        "scenario_id":  "shipping-benchmark-016"
+    },
+    {
+        "domain":  "clinic",
+        "scenario_id":  "clinic-benchmark-001"
+    },
+    {
+        "domain":  "clinic",
+        "scenario_id":  "clinic-benchmark-006"
+    },
+    {
+        "domain":  "clinic",
+        "scenario_id":  "clinic-benchmark-007"
+    },
+    {
+        "domain":  "clinic",
+        "scenario_id":  "clinic-benchmark-017"
+    },
+    {
+        "domain":  "clinic",
+        "scenario_id":  "clinic-benchmark-018"
+    },
+    {
+        "domain":  "payroll",
+        "scenario_id":  "payroll-benchmark-001"
+    },
+    {
+        "domain":  "payroll",
+        "scenario_id":  "payroll-benchmark-004"
+    },
+    {
+        "domain":  "payroll",
+        "scenario_id":  "payroll-benchmark-010"
+    },
+    {
+        "domain":  "payroll",
+        "scenario_id":  "payroll-benchmark-011"
+    },
+    {
+        "domain":  "payroll",
+        "scenario_id":  "payroll-benchmark-016"
+    }
+]

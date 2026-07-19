@@ -54,4 +54,6 @@ The existing orchestration already performs a bounded correlation follow-up afte
 
 ## Current validation state
 
-The read-only preflight passed both Banking and Shipping database markers and target allowlisting, but failed because the investigation worker was stopped and the application API was unreachable. Consequently no failed scenario was rerun and no “now passing” claim is made. The CSV uses `NOT_RERUN_PREFLIGHT_BLOCKED`, not a synthetic pass/fail result.
+The worker/API were restored and preflight passed in full. Focused runs completed 23/25 Banking and 23/25 Shipping application investigations; all 46 completed investigations passed deterministic validation and all 50 fixture cleanups passed. The remaining four application outcomes are the known benchmark-003 ambiguity stops and benchmark-013 evidence-gate/procedure mismatches.
+
+Shipping run `6cba0fef-f02a-41b4-95a7-b35963f5e5b6` initially produced 16 completed and 7 failed Judge invocations because the provider returned HTTP 429 `insufficient_quota`. Only those seven persisted results were rescored; no application scenario or fixture lifecycle was rerun. Judge version 2 completed for all seven. Selecting the latest Judge version per Shipping execution now yields **23 completed of 23 eligible evaluations**, with an average weighted score of **84.156**.

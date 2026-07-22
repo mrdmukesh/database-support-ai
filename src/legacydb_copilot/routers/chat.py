@@ -658,13 +658,20 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         trace.setdefault("ai_outcome", "other")
 
     # Persist transfer normalization and target-selection trace in an existing DB JSON column.
-    trace.setdefault("raw_extracted_entity", investigation_metadata.get("raw_extracted_entity"))
-    trace.setdefault("normalized_entity", investigation_metadata.get("normalized_entity"))
-    trace.setdefault("entity_type", investigation_metadata.get("entity_type"))
-    trace.setdefault("normalization_rule_used", investigation_metadata.get("normalization_rule_used"))
-    trace.setdefault("selected_primary_object", investigation_metadata.get("selected_primary_object"))
-    trace.setdefault("selected_business_key", investigation_metadata.get("selected_business_key"))
-    trace.setdefault("evidence_gate_reason", investigation_metadata.get("evidence_gate_reason"))
+    # Keep output compact by omitting absent values, which also preserves historical exact-trace tests.
+    trace_fields = (
+        "raw_extracted_entity",
+        "normalized_entity",
+        "entity_type",
+        "normalization_rule_used",
+        "selected_primary_object",
+        "selected_business_key",
+        "evidence_gate_reason",
+    )
+    for key in trace_fields:
+        value = investigation_metadata.get(key)
+        if value is not None:
+            trace.setdefault(key, value)
     return trace
 
 

@@ -2244,6 +2244,15 @@ def _run_dynamic_investigation(
         if Settings.from_env().ai_reasoning_enabled
         else "DETERMINISTIC_ANSWERED"
     )
+    relationship_proof = [
+        item for item in evidence_gate.confirmed_facts
+        if "relationship" in item.lower() or "parent-child" in item.lower()
+    ]
+    evidence_gate_reason = (
+        "Issue reproduced from connected database evidence."
+        if evidence_gate.reproduced
+        else "; ".join(evidence_gate.blocking_reasons)
+    )
     investigation_metadata = {
         "investigation_id": report.cover.investigation_id,
         "detected_intent": intent.intent.value,
@@ -2290,6 +2299,16 @@ def _run_dynamic_investigation(
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
         "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
         "answer_provenance": answer_provenance,
+        "primary_entity": json.dumps({
+            "table": evidence_focus.affected_object,
+            "reason": evidence_focus.affected_object_reason,
+        }, default=str),
+        "selected_business_key": json.dumps({
+            "value": evidence_focus.selected_business_key_value,
+            "reason": evidence_focus.business_key_reason,
+        }, default=str),
+        "relationship_proof": json.dumps(relationship_proof, default=str),
+        "evidence_gate_reason": evidence_gate_reason,
         "structured_result": json.dumps({
             "ranked_objects": [asdict(item) for item in ranking.objects],
             "procedures": [asdict(item) for item in procedure_analysis],
@@ -2297,6 +2316,16 @@ def _run_dynamic_investigation(
             "recommended_fix": reasoning.recommended_fix,
             "response_type": reasoning.response_type,
             "confidence": confidence,
+            "primary_entity": {
+                "table": evidence_focus.affected_object,
+                "reason": evidence_focus.affected_object_reason,
+            },
+            "selected_business_key": {
+                "value": evidence_focus.selected_business_key_value,
+                "reason": evidence_focus.business_key_reason,
+            },
+            "relationship_proof": relationship_proof,
+            "evidence_gate_reason": evidence_gate_reason,
         }, default=str),
     }
     return answer, list(dict.fromkeys(source_names)), confidence, generated_report.links(), investigation_metadata

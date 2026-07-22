@@ -607,6 +607,12 @@ def _empty_investigation_metadata() -> dict[str, Any]:
     return {
         "investigation_id": None,
         "detected_intent": "UNKNOWN",
+        "raw_extracted_entity": None,
+        "normalized_entity": None,
+        "entity_type": None,
+        "normalization_rule_used": None,
+        "selected_primary_object": None,
+        "selected_business_key": None,
         "extracted_entities": "[]",
         "evidence": "[]",
         "sql_queries": "[]",
@@ -650,6 +656,15 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         trace.setdefault("ai_reasoning_invoked", False)
         trace.setdefault("ai_skip_reason", "application_terminal_path_before_ai")
         trace.setdefault("ai_outcome", "other")
+
+    # Persist transfer normalization and target-selection trace in an existing DB JSON column.
+    trace.setdefault("raw_extracted_entity", investigation_metadata.get("raw_extracted_entity"))
+    trace.setdefault("normalized_entity", investigation_metadata.get("normalized_entity"))
+    trace.setdefault("entity_type", investigation_metadata.get("entity_type"))
+    trace.setdefault("normalization_rule_used", investigation_metadata.get("normalization_rule_used"))
+    trace.setdefault("selected_primary_object", investigation_metadata.get("selected_primary_object"))
+    trace.setdefault("selected_business_key", investigation_metadata.get("selected_business_key"))
+    trace.setdefault("evidence_gate_reason", investigation_metadata.get("evidence_gate_reason"))
     return trace
 
 

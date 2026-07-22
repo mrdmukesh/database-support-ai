@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from typing import Any
 
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from evaluation.framework.models import (
@@ -14,6 +15,7 @@ from evaluation.framework.models import (
     EvaluationScenarioExecutionModel,
     TestScenarioModel,
 )
+from legacydb_copilot.db.models import EvaluationJobModel
 
 
 def _json(value: str, fallback: Any) -> Any:
@@ -45,6 +47,7 @@ class EvaluationDashboardService:
                 continue
             completed = sum(item.status == "completed" for item in executions)
             metadata = _json(run.configuration_json, {})
+            protected_reason = self._protected_reason(run, metadata)
             output.append({
                 "id": run.id,
                 "name": metadata.get("run_name") or run.id,
@@ -54,8 +57,53 @@ class EvaluationDashboardService:
                 "application_version": run.application_version,
                 "scenario_count": len(executions),
                 "completed_count": completed,
+                "is_protected": bool(protected_reason),
+                "protection_reason": protected_reason,
             })
         return output
+
+    def delete_runs(self, run_ids: list[str]) -> dict[str, Any]:
+        requested = list(dict.fromkeys(run_ids))
+        if not requested:
+            return {"deleted": [], "protected": [], "missing": [], "requested_count": 0}
+
+        visible_runs = {run["id"]: run for run in self.runs()}
+        protected: list[dict[str, str]] = []
+        missing: list[str] = []
+        deletable_ids: list[str] = []
+
+        for run_id in requested:
+            row = visible_runs.get(run_id)
+            if row is None:
+                missing.append(run_id)
+                continue
+            if row.get("is_protected"):
+                protected.append({
+                    "id": run_id,
+                    "name": str(row.get("name") or run_id),
+                    "reason": str(row.get("protection_reason") or "Protected run"),
+                })
+                continue
+            deletable_ids.append(run_id)
+
+        deleted: list[dict[str, str]] = []
+        if deletable_ids:
+            run_rows = self.db.query(EvaluationRunModel).filter(EvaluationRunModel.id.in_(deletable_ids)).all()
+            deleted = [{"id": row.id, "name": self._run_name(row)} for row in run_rows]
+            try:
+                self.db.query(EvaluationJobModel).filter(EvaluationJobModel.evaluation_run_id.in_(deletable_ids)).update({"evaluation_run_id": None}, synchronize_session=False)
+                self.db.execute(delete(EvaluationRunModel).where(EvaluationRunModel.id.in_(deletable_ids)))
+                self.db.commit()
+            except Exception:
+                self.db.rollback()
+                raise
+
+        return {
+            "requested_count": len(requested),
+            "deleted": deleted,
+            "protected": protected,
+            "missing": missing,
+        }
 
     def summary(self, run_id: str) -> dict[str, Any]:
         rows = self.scenarios(run_id)
@@ -202,3 +250,31 @@ class EvaluationDashboardService:
             "total_tokens": total_tokens + judge_tokens,
             "cost_usd": _number(usage.get("estimated_cost")) + (_number(judge.estimated_cost_usd) if judge else 0),
         }
+
+    def _run_name(self, run: EvaluationRunModel) -> str:
+        return str(_json(run.configuration_json, {}).get("run_name") or run.id)
+
+    def _protected_reason(self, run: EvaluationRunModel, metadata: dict[str, Any]) -> str | None:
+        name = self._run_name(run).lower()
+        suite = str(metadata.get("suite") or "").lower()
+        if bool(metadata.get("protected_final_benchmark")):
+            return "Protected final benchmark"
+        if bool(metadata.get("imported_from_frozen_evidence")):
+            return "Imported frozen benchmark"
+        if bool(metadata.get("official")):
+            return "Official run"
+        if bool(metadata.get("frozen")):
+            return "Frozen run"
+        if bool(metadata.get("release_benchmark")):
+            return "Release benchmark"
+        if suite == "full-125":
+            return "Release benchmark suite"
+        if "frozen" in name:
+            return "Frozen run"
+        if "official" in name:
+            return "Official run"
+        if "release benchmark" in name:
+            return "Release benchmark"
+        if "benchmark-125" in name:
+            return "Release benchmark"
+        return None

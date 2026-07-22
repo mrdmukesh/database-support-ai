@@ -1,8 +1,56 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../api/evaluation-api";
 import { EvaluationDashboardPage } from "./EvaluationDashboardPage";
+
 vi.mock("../../api/evaluation-api");
 vi.mock("./EvaluationJobControl",()=>({EvaluationJobControl:()=>null}));
-describe("EvaluationDashboardPage",()=>{beforeEach(()=>vi.clearAllMocks());it("shows a professional empty state without fake metrics",async()=>{vi.mocked(api.listEvaluationRuns).mockResolvedValue([]);render(<MemoryRouter><EvaluationDashboardPage/></MemoryRouter>);expect(await screen.findByText("No completed evaluation runs yet")).toBeInTheDocument();expect(screen.queryByText("Deterministic score")).not.toBeInTheDocument();expect(screen.queryByText(/accuracy/i)).not.toBeInTheDocument();});it("renders persisted summary and scenario results",async()=>{vi.mocked(api.listEvaluationRuns).mockResolvedValue([{id:"R1",name:"pilot-v1",status:"completed",created_at:"2026-01-01",application_commit:"abc",application_version:".1",scenario_count:1,completed_count:1}]);vi.mocked(api.getEvaluationSummary).mockResolvedValue({run_id:"R1",scenario_count:1,completed_count:1,passed_count:1,failed_count:0,human_review_count:0,critical_failure_count:0,deterministic_average:88,ai_judge_average:84,total_duration_seconds:12,total_tokens:100,total_cost_usd:.02,domains:{payroll:1},statuses:{completed:1}});vi.mocked(api.listEvaluationScenarios).mockResolvedValue([{result_id:"X1",scenario_id:"payroll-pilot-001",scenario_version:1,domain:"payroll",attempt:1,execution_status:"completed",investigation_id:"I1",deterministic_score:88,classification:"pass",critical_failure:false,ai_judge_score:84,score_difference:4,human_review_required:false,human_review_reasons:[],duration_seconds:12,total_tokens:100,cost_usd:.02}]);vi.mocked(api.listHumanReviews).mockResolvedValue([]);render(<MemoryRouter><EvaluationDashboardPage/></MemoryRouter>);expect(await screen.findByText("payroll-pilot-001")).toBeInTheDocument();expect(screen.getAllByText("88.0")).toHaveLength(2);expect(screen.getAllByText("84.0")).toHaveLength(2);await waitFor(()=>expect(api.getEvaluationSummary).toHaveBeenCalledWith("R1",expect.any(AbortSignal)));});});
+
+describe("EvaluationDashboardPage", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		vi.mocked(api.deleteEvaluationRuns).mockResolvedValue({ requested_count: 0, deleted: [], protected: [], missing: [] });
+		vi.spyOn(window, "confirm").mockReturnValue(true);
+	});
+
+	it("shows empty state without synthetic metrics", async () => {
+		vi.mocked(api.listEvaluationRuns).mockResolvedValue([]);
+		render(<MemoryRouter><EvaluationDashboardPage /></MemoryRouter>);
+		expect(await screen.findByText("No completed evaluation runs yet")).toBeInTheDocument();
+		expect(screen.queryByText("Deterministic score")).not.toBeInTheDocument();
+		expect(screen.queryByText(/accuracy/i)).not.toBeInTheDocument();
+	});
+
+	it("renders persisted summary and scenario results", async () => {
+		vi.mocked(api.listEvaluationRuns).mockResolvedValue([{ id: "R1", name: "pilot-v1", status: "completed", created_at: "2026-01-01", application_commit: "abc", application_version: ".1", scenario_count: 1, completed_count: 1, is_protected: false }]);
+		vi.mocked(api.getEvaluationSummary).mockResolvedValue({ run_id: "R1", scenario_count: 1, completed_count: 1, passed_count: 1, failed_count: 0, human_review_count: 0, critical_failure_count: 0, deterministic_average: 88, ai_judge_average: 84, total_duration_seconds: 12, total_tokens: 100, total_cost_usd: .02, domains: { payroll: 1 }, statuses: { completed: 1 } });
+		vi.mocked(api.listEvaluationScenarios).mockResolvedValue([{ result_id: "X1", scenario_id: "payroll-pilot-001", scenario_version: 1, domain: "payroll", attempt: 1, execution_status: "completed", investigation_id: "I1", deterministic_score: 88, classification: "pass", critical_failure: false, ai_judge_score: 84, score_difference: 4, human_review_required: false, human_review_reasons: [], duration_seconds: 12, total_tokens: 100, cost_usd: .02 }]);
+		vi.mocked(api.listHumanReviews).mockResolvedValue([]);
+		render(<MemoryRouter><EvaluationDashboardPage /></MemoryRouter>);
+		expect(await screen.findByText("payroll-pilot-001")).toBeInTheDocument();
+		expect(screen.getAllByText("88.0")).toHaveLength(2);
+		expect(screen.getAllByText("84.0")).toHaveLength(2);
+		await waitFor(() => expect(api.getEvaluationSummary).toHaveBeenCalledWith("R1", expect.any(AbortSignal)));
+	});
+
+	it("deletes only selected unprotected runs", async () => {
+		vi.mocked(api.listEvaluationRuns).mockResolvedValue([
+			{ id: "R1", name: "custom-1", status: "completed", created_at: "2026-01-01", application_commit: "abc", application_version: ".1", scenario_count: 3, completed_count: 3, is_protected: false },
+			{ id: "R2", name: "release benchmark", status: "completed", created_at: "2026-01-01", application_commit: "def", application_version: ".1", scenario_count: 125, completed_count: 125, is_protected: true, protection_reason: "Protected final benchmark" },
+		]);
+		vi.mocked(api.getEvaluationSummary).mockResolvedValue({ run_id: "R1", scenario_count: 1, completed_count: 1, passed_count: 1, failed_count: 0, human_review_count: 0, critical_failure_count: 0, deterministic_average: 88, ai_judge_average: 84, total_duration_seconds: 12, total_tokens: 100, total_cost_usd: .02, domains: { payroll: 1 }, statuses: { completed: 1 } });
+		vi.mocked(api.listEvaluationScenarios).mockResolvedValue([]);
+		vi.mocked(api.listHumanReviews).mockResolvedValue([]);
+		vi.mocked(api.deleteEvaluationRuns).mockResolvedValue({ requested_count: 1, deleted: [{ id: "R1", name: "custom-1" }], protected: [], missing: [] });
+
+		render(<MemoryRouter><EvaluationDashboardPage /></MemoryRouter>);
+		await screen.findByText("Manage persisted runs");
+		fireEvent.click(screen.getAllByRole("checkbox")[0]);
+		fireEvent.click(screen.getByRole("button", { name: /Delete Selected/i }));
+
+		await waitFor(() => expect(api.deleteEvaluationRuns).toHaveBeenCalledWith(["R1"]));
+		expect(screen.getByText("Deleted 1 run(s).")).toBeInTheDocument();
+		expect(screen.getByText("Protected")).toBeInTheDocument();
+	});
+});

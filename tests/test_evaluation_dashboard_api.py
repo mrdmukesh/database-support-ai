@@ -68,3 +68,169 @@ def test_dashboard_returns_only_organization_results(dashboard_client):
     assert detail["judge_report"]["invocations"][0]["model"]=="judge-model"
     assert detail["judge_report"]["invocations"][0]["result"]["missing_evidence"]==["lock evidence"]
     assert "raw_request" not in detail and "expected_root_cause_concepts" not in detail
+
+
+def test_dashboard_delete_selected_runs_removes_only_unprotected_runs(dashboard_client):
+    client, factory = dashboard_client
+    org_id, headers = signup(client, suffix="delete")
+    with factory() as db:
+        scenario = ScenarioRecord(
+            scenario_id="payroll-pilot-001",
+            scenario_version=1,
+            domain="payroll",
+            database_engine="sqlserver",
+            database_version="2022",
+            category="root_cause",
+            subcategory="missing",
+            difficulty="medium",
+            question="Why?",
+            scripts_json="{}",
+            expectations_json="{}",
+            expected_response_type="confirmed_root_cause",
+            active=True,
+        )
+        db.add(scenario)
+        db.flush()
+
+        deletable_run = EvaluationRunModel(
+            application_commit="abc",
+            application_version="0.1",
+            status="completed",
+            configuration_json=json.dumps({"run_name": "team-regression-1", "suite": "benchmark-100"}),
+            timing_cost_json="{}",
+        )
+        protected_run = EvaluationRunModel(
+            application_commit="def",
+            application_version="0.1",
+            status="completed",
+            configuration_json=json.dumps({"run_name": "release benchmark 125", "protected_final_benchmark": True, "suite": "full-125"}),
+            timing_cost_json="{}",
+        )
+        db.add_all([deletable_run, protected_run])
+        db.flush()
+
+        db.add_all(
+            [
+                EvaluationScenarioExecutionModel(
+                    evaluation_run_id=deletable_run.id,
+                    test_scenario_id=scenario.id,
+                    scenario_id=scenario.scenario_id,
+                    scenario_version=1,
+                    domain="payroll",
+                    database_version="2022",
+                    attempt=1,
+                    status="completed",
+                    investigation_id="INV-A",
+                    investigation_status="AI_ANSWERED",
+                    raw_request_json=json.dumps({"organization_id": org_id}),
+                    raw_response_json="{}",
+                    result_json="{}",
+                    timing_json="{}",
+                    usage_cost_json="{}",
+                    errors_json="[]",
+                    retry_count=0,
+                    recovery_artifact="",
+                ),
+                EvaluationScenarioExecutionModel(
+                    evaluation_run_id=protected_run.id,
+                    test_scenario_id=scenario.id,
+                    scenario_id=scenario.scenario_id,
+                    scenario_version=1,
+                    domain="payroll",
+                    database_version="2022",
+                    attempt=2,
+                    status="completed",
+                    investigation_id="INV-B",
+                    investigation_status="AI_ANSWERED",
+                    raw_request_json=json.dumps({"organization_id": org_id}),
+                    raw_response_json="{}",
+                    result_json="{}",
+                    timing_json="{}",
+                    usage_cost_json="{}",
+                    errors_json="[]",
+                    retry_count=0,
+                    recovery_artifact="",
+                ),
+            ]
+        )
+        db.commit()
+        delete_id = deletable_run.id
+        keep_id = protected_run.id
+
+    response = client.post(
+        "/evaluation-dashboard/runs/delete",
+        headers=headers,
+        json={"run_ids": [delete_id, keep_id]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["id"] for item in body["deleted"]] == [delete_id]
+    assert [item["id"] for item in body["protected"]] == [keep_id]
+
+    runs = client.get("/evaluation-dashboard/runs", headers=headers).json()
+    run_ids = {row["id"] for row in runs}
+    assert delete_id not in run_ids
+    assert keep_id in run_ids
+
+
+def test_dashboard_delete_requires_evaluation_admin_privilege(dashboard_client):
+    client, factory = dashboard_client
+    org_id, admin_headers = signup(client, suffix="admin-delete")
+    _, reader_headers = signup(client, role="read_only_user", suffix="reader-delete")
+
+    with factory() as db:
+        run = EvaluationRunModel(
+            application_commit="abc",
+            application_version="0.1",
+            status="completed",
+            configuration_json=json.dumps({"run_name": "team-regression-2"}),
+            timing_cost_json="{}",
+        )
+        scenario = ScenarioRecord(
+            scenario_id="orders-pilot-001",
+            scenario_version=1,
+            domain="orders",
+            database_engine="sqlserver",
+            database_version="2022",
+            category="root_cause",
+            subcategory="missing",
+            difficulty="medium",
+            question="Why?",
+            scripts_json="{}",
+            expectations_json="{}",
+            expected_response_type="confirmed_root_cause",
+            active=True,
+        )
+        db.add_all([run, scenario])
+        db.flush()
+        db.add(
+            EvaluationScenarioExecutionModel(
+                evaluation_run_id=run.id,
+                test_scenario_id=scenario.id,
+                scenario_id=scenario.scenario_id,
+                scenario_version=1,
+                domain="orders",
+                database_version="2022",
+                attempt=1,
+                status="completed",
+                investigation_id="INV-R",
+                investigation_status="AI_ANSWERED",
+                raw_request_json=json.dumps({"organization_id": org_id}),
+                raw_response_json="{}",
+                result_json="{}",
+                timing_json="{}",
+                usage_cost_json="{}",
+                errors_json="[]",
+                retry_count=0,
+                recovery_artifact="",
+            )
+        )
+        db.commit()
+        run_id = run.id
+
+    forbidden = client.post("/evaluation-dashboard/runs/delete", headers=reader_headers, json={"run_ids": [run_id]})
+    assert forbidden.status_code == 403
+
+    allowed = client.post("/evaluation-dashboard/runs/delete", headers=admin_headers, json={"run_ids": [run_id]})
+    assert allowed.status_code == 200
+    assert [item["id"] for item in allowed.json()["deleted"]] == [run_id]

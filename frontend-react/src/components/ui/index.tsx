@@ -44,5 +44,7 @@ export function EvidenceTable({ rows }: { rows: EvidenceRow[] }) {
   if (!rows.length) return <EmptyState title="No confirmed evidence" message="No structured evidence was returned for this investigation." />;
   return <div className="ui-table-wrap"><table className="ui-table"><thead><tr><th>Evidence ID</th><th>Source object</th><th>Finding</th><th>Verification</th><th>Confidence impact</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><code>{row.id}</code></td><td>{row.source}</td><td>{row.details ? <details><summary>{row.finding}</summary><p>{row.details}</p></details> : row.finding}</td><td><StatusBadge status={row.state || "confirmed"} /></td><td>{row.contribution || "Supporting"}</td></tr>)}</tbody></table></div>;
 }
-export function SqlCodeBlock({ sql, label = "Read-only SQL" }: { sql: string; label?: string }) { return <div className="ui-sql"><div><span>{label}</span><span>Read only</span></div><pre><code>{sql || "No SQL was recorded."}</code></pre></div>; }
+export function SqlCodeBlock({ sql, label = "Read-only SQL" }: { sql: string; label?: string }) {
+  return <div className="ui-sql" role="region" aria-label={label}><div className="ui-sql-header"><span>{label}</span><span>Read only</span></div><pre><code>{sql || "No SQL was recorded."}</code></pre></div>;
+}
 export function EmptyState({ title = "Nothing to show", message }: { title?: string; message: string }) { return <div className="ui-empty"><strong>{title}</strong><p>{message}</p></div>; }

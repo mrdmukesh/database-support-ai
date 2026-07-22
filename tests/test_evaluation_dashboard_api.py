@@ -70,7 +70,7 @@ def test_dashboard_returns_only_organization_results(dashboard_client):
     assert "raw_request" not in detail and "expected_root_cause_concepts" not in detail
 
 
-def test_dashboard_delete_selected_runs_removes_only_unprotected_runs(dashboard_client):
+def test_dashboard_delete_selected_runs_blocks_when_any_run_is_protected(dashboard_client):
     client, factory = dashboard_client
     org_id, headers = signup(client, suffix="delete")
     with factory() as db:
@@ -162,15 +162,83 @@ def test_dashboard_delete_selected_runs_removes_only_unprotected_runs(dashboard_
         headers=headers,
         json={"run_ids": [delete_id, keep_id]},
     )
-    assert response.status_code == 200
+    assert response.status_code == 403
     body = response.json()
-    assert [item["id"] for item in body["deleted"]] == [delete_id]
-    assert [item["id"] for item in body["protected"]] == [keep_id]
+    assert body["detail"]["message"].startswith("Deletion blocked")
+    assert [item["id"] for item in body["detail"]["protected"]] == [keep_id]
 
     runs = client.get("/evaluation-dashboard/runs", headers=headers).json()
     run_ids = {row["id"] for row in runs}
-    assert delete_id not in run_ids
+    assert delete_id in run_ids
     assert keep_id in run_ids
+
+
+def test_dashboard_delete_blocks_protected_name_patterns(dashboard_client):
+    client, factory = dashboard_client
+    org_id, headers = signup(client, suffix="protected-pattern")
+    with factory() as db:
+        scenario = ScenarioRecord(
+            scenario_id="shipping-pilot-001",
+            scenario_version=1,
+            domain="shipping",
+            database_engine="sqlserver",
+            database_version="2022",
+            category="root_cause",
+            subcategory="missing",
+            difficulty="medium",
+            question="Why?",
+            scripts_json="{}",
+            expectations_json="{}",
+            expected_response_type="confirmed_root_cause",
+            active=True,
+        )
+        db.add(scenario)
+        db.flush()
+
+        protected_by_name = EvaluationRunModel(
+            application_commit="ghi",
+            application_version="0.1",
+            status="completed",
+            configuration_json=json.dumps({"run_name": "published-all-125-ai-judge", "suite": "benchmark-100"}),
+            timing_cost_json="{}",
+        )
+        db.add(protected_by_name)
+        db.flush()
+
+        db.add(
+            EvaluationScenarioExecutionModel(
+                evaluation_run_id=protected_by_name.id,
+                test_scenario_id=scenario.id,
+                scenario_id=scenario.scenario_id,
+                scenario_version=1,
+                domain="shipping",
+                database_version="2022",
+                attempt=1,
+                status="completed",
+                investigation_id="INV-C",
+                investigation_status="AI_ANSWERED",
+                raw_request_json=json.dumps({"organization_id": org_id}),
+                raw_response_json="{}",
+                result_json="{}",
+                timing_json="{}",
+                usage_cost_json="{}",
+                errors_json="[]",
+                retry_count=0,
+                recovery_artifact="",
+            )
+        )
+        db.commit()
+        run_id = protected_by_name.id
+
+    runs = client.get("/evaluation-dashboard/runs", headers=headers)
+    assert runs.status_code == 200
+    protected_row = next(item for item in runs.json() if item["id"] == run_id)
+    assert protected_row["is_protected"] is True
+    assert "all-125" in protected_row["protection_reason"].lower() or "published" in protected_row["protection_reason"].lower()
+
+    response = client.post("/evaluation-dashboard/runs/delete", headers=headers, json={"run_ids": [run_id]})
+    assert response.status_code == 403
+    assert response.json()["detail"]["protected"][0]["id"] == run_id
 
 
 def test_dashboard_delete_requires_evaluation_admin_privilege(dashboard_client):

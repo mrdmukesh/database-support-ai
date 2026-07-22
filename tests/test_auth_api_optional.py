@@ -349,6 +349,9 @@ def test_feedback_requires_approval_before_knowledge_creation(client: TestClient
     )
     assert feedback_response.status_code == 201
     feedback = feedback_response.json()
+    assert feedback["organization_id"] == org["id"]
+    assert feedback["workspace_id"] == workspace["id"]
+    assert feedback["investigation_id"] == investigation_id
     assert feedback["status"] == "PENDING_APPROVAL"
     investigation_after_feedback = client.get(
         f"/learning/investigations/{investigation_id}", headers=headers
@@ -435,6 +438,28 @@ def test_user_without_feedback_permission_cannot_submit_investigation_feedback(c
     )
     assert response.status_code == 403
     assert client.get(f"/learning/investigations/{investigation_id}", headers=headers).json()["status"] == "AI_ANSWERED"
+
+
+def test_feedback_submission_validates_required_fields(client: TestClient) -> None:
+    org, user, workspace, connection, headers = _create_chat_fixture(client)
+    investigation_id = client.post(
+        "/chat/ask",
+        json={
+            "organization_id": org["id"],
+            "workspace_id": workspace["id"],
+            "connection_id": connection["id"],
+            "user_id": user["id"],
+            "question": "Why did the payroll export fail?",
+        },
+        headers=headers,
+    ).json()["investigation_id"]
+
+    response = client.post(
+        f"/learning/investigations/{investigation_id}/feedback",
+        json={"notes": "missing rating"},
+        headers=headers,
+    )
+    assert response.status_code == 422
 
 
 def test_failed_feedback_commit_does_not_change_investigation_status(

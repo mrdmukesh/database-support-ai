@@ -46,7 +46,10 @@ describe("EvaluationDashboardPage", () => {
 
 		render(<MemoryRouter><EvaluationDashboardPage /></MemoryRouter>);
 		await screen.findByText("Manage persisted runs");
-		fireEvent.click(screen.getAllByRole("checkbox")[0]);
+		const runCheckboxes = screen.getAllByRole("checkbox");
+		expect(runCheckboxes[1]).toBeDisabled();
+		expect(runCheckboxes[1].closest("label")).toHaveAttribute("title", "Protected final benchmark");
+		fireEvent.click(runCheckboxes[0]);
 		fireEvent.click(screen.getByRole("button", { name: /Delete Selected/i }));
 
 		await waitFor(() => expect(api.deleteEvaluationRuns).toHaveBeenCalledWith(["R1"]));

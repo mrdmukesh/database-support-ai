@@ -35,6 +35,18 @@ def _number(value: Any) -> float:
 class EvaluationDashboardService:
     """Read-only projections over immutable evaluation records."""
 
+    _PROTECTED_NAME_RULES: tuple[tuple[str, str], ...] = (
+        ("protected", "Protected run"),
+        ("official", "Official run"),
+        ("frozen", "Frozen run"),
+        ("release", "Release benchmark"),
+        ("published", "Published benchmark"),
+        ("final", "Final benchmark"),
+        ("benchmark-125", "Benchmark-125 release run"),
+        ("all-125", "All-125 release run"),
+        ("rc-", "Release-candidate run"),
+    )
+
     def __init__(self, db: Session, *, organization_id: str | None):
         self.db = db
         self.organization_id = organization_id
@@ -65,7 +77,7 @@ class EvaluationDashboardService:
     def delete_runs(self, run_ids: list[str]) -> dict[str, Any]:
         requested = list(dict.fromkeys(run_ids))
         if not requested:
-            return {"deleted": [], "protected": [], "missing": [], "requested_count": 0}
+            return {"deleted": [], "protected": [], "missing": [], "requested_count": 0, "blocked": False}
 
         visible_runs = {run["id"]: run for run in self.runs()}
         protected: list[dict[str, str]] = []
@@ -87,7 +99,8 @@ class EvaluationDashboardService:
             deletable_ids.append(run_id)
 
         deleted: list[dict[str, str]] = []
-        if deletable_ids:
+        blocked = bool(protected)
+        if deletable_ids and not blocked:
             run_rows = self.db.query(EvaluationRunModel).filter(EvaluationRunModel.id.in_(deletable_ids)).all()
             deleted = [{"id": row.id, "name": self._run_name(row)} for row in run_rows]
             try:
@@ -103,6 +116,7 @@ class EvaluationDashboardService:
             "deleted": deleted,
             "protected": protected,
             "missing": missing,
+            "blocked": blocked,
         }
 
     def summary(self, run_id: str) -> dict[str, Any]:
@@ -255,26 +269,45 @@ class EvaluationDashboardService:
         return str(_json(run.configuration_json, {}).get("run_name") or run.id)
 
     def _protected_reason(self, run: EvaluationRunModel, metadata: dict[str, Any]) -> str | None:
-        name = self._run_name(run).lower()
-        suite = str(metadata.get("suite") or "").lower()
-        if bool(metadata.get("protected_final_benchmark")):
+        name = self._run_name(run)
+        suite = str(metadata.get("suite") or "")
+        metadata_reason = self._metadata_protection_reason(metadata)
+        if metadata_reason:
+            return metadata_reason
+        normalized_text = f"{name} {suite}".lower()
+        for token, reason in self._PROTECTED_NAME_RULES:
+            if token in normalized_text:
+                return reason
+        return None
+
+    def _metadata_protection_reason(self, metadata: dict[str, Any]) -> str | None:
+        if self._is_truthy(metadata.get("protected_final_benchmark")):
             return "Protected final benchmark"
-        if bool(metadata.get("imported_from_frozen_evidence")):
+        if self._is_truthy(metadata.get("imported_from_frozen_evidence")):
             return "Imported frozen benchmark"
-        if bool(metadata.get("official")):
+        if self._is_truthy(metadata.get("official")) or self._is_truthy(metadata.get("is_official")):
             return "Official run"
-        if bool(metadata.get("frozen")):
+        if self._is_truthy(metadata.get("frozen")) or self._is_truthy(metadata.get("is_frozen")):
             return "Frozen run"
-        if bool(metadata.get("release_benchmark")):
+        if self._is_truthy(metadata.get("release_benchmark")) or self._is_truthy(metadata.get("is_release")):
             return "Release benchmark"
+        if self._is_truthy(metadata.get("protected")) or self._is_truthy(metadata.get("is_protected")):
+            return "Protected run"
+        if self._is_truthy(metadata.get("published")):
+            return "Published benchmark"
+        if self._is_truthy(metadata.get("final")):
+            return "Final benchmark"
+        suite = str(metadata.get("suite") or "").lower()
         if suite == "full-125":
             return "Release benchmark suite"
-        if "frozen" in name:
-            return "Frozen run"
-        if "official" in name:
-            return "Official run"
-        if "release benchmark" in name:
-            return "Release benchmark"
-        if "benchmark-125" in name:
-            return "Release benchmark"
         return None
+
+    @staticmethod
+    def _is_truthy(value: Any) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return value != 0
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+        return False

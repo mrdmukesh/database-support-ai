@@ -72,6 +72,26 @@ def delete_runs(payload: DeleteRunsRequest, db: Annotated[Session, Depends(get_d
     if not may_manage_evaluations(user):
         raise HTTPException(status_code=403, detail="Evaluation administrator permission required")
     result = service(db, user).delete_runs(payload.run_ids)
+    if result.get("blocked"):
+        for row in result["protected"]:
+            record_audit_event(
+                db,
+                organization_id=user.organization_id,
+                user_id=user.id,
+                action="evaluation.run.delete_blocked",
+                resource_type="evaluation_run",
+                resource_id=row["id"],
+                status="blocked",
+                metadata={"run_name": row["name"], "reason": row["reason"]},
+            )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Deletion blocked: one or more selected runs are protected by policy.",
+                "protected": result["protected"],
+                "missing": result["missing"],
+            },
+        )
     for row in result["deleted"]:
         record_audit_event(
             db,

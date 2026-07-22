@@ -39,6 +39,7 @@ class EvidenceFocus:
     inferred_findings: list[str]
     hypotheses: list[str]
     self_validation: list[str]
+    selected_business_key_value: str | None = None
 
 
 def build_evidence_focus(
@@ -73,7 +74,7 @@ def build_evidence_focus(
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
     affected_object, affected_reason = _identify_affected_object(question, metadata, evidence)
-    business_key, business_key_reason = _infer_business_key(intent, affected_object, metadata, evidence)
+    business_key, business_key_reason = _infer_business_key(intent, affected_object, entities, metadata, evidence)
     write_graph = _write_path_graph(affected_object, procedure_analysis)
     ranked_procedures = _rank_procedures(
         affected_object=affected_object,
@@ -99,6 +100,7 @@ def build_evidence_focus(
         inferred_findings=inferred,
         hypotheses=hypotheses,
         self_validation=validation,
+        selected_business_key_value=_selected_business_key_value(entities, affected_object),
     )
 
 
@@ -129,6 +131,9 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     for table in metadata.tables:
         leaf_lookup.setdefault(table.name.lower().split(".")[-1], []).append(table.name)
     question_l = question.lower()
+    transfer_target = _explicit_transfer_target(question, metadata, evidence)
+    if transfer_target:
+        return transfer_target, "Selected from exact TRF-<digits> identifier evidence on transfers; diagnostic integration records remain supporting evidence only."
     explicit_write_target = _explicit_write_target(question, metadata)
     if explicit_write_target:
         return explicit_write_target.name, "Locked from explicit procedure write-target phrase such as update/insert into <object>; unrelated evidence rows cannot override it."
@@ -170,6 +175,25 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     if score <= 0:
         return selected, "Selected first available table because no stronger evidence identified a target."
     return selected, "Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object."
+
+
+def _explicit_transfer_target(question: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> str | None:
+    match = re.search(r"\bTRF-\d+\b", question)
+    if not match:
+        return None
+    transfer_id = match.group(0)
+    transfer_tables = [table.name for table in metadata.tables if table.name.lower().split(".")[-1] == "transfers"]
+    if not transfer_tables:
+        transfer_tables = [table.name for table in metadata.tables if "transfer" in table.name.lower().split(".")[-1]]
+    if not transfer_tables:
+        return None
+    for table_name in transfer_tables:
+        for item in evidence:
+            if f" in {table_name}" not in item.purpose:
+                continue
+            if transfer_id.casefold() in item.sql.casefold() and item.rows:
+                return table_name
+    return None
 
 
 def _proven_entity_target(
@@ -215,7 +239,7 @@ def _explicit_write_target(question: str, metadata: MetadataSearchResult) -> Tab
     return None
 
 
-def _infer_business_key(intent: InvestigationIntent, affected_object: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str | None, str]:
+def _infer_business_key(intent: InvestigationIntent, affected_object: str, entities: EntityExtractionResult, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str | None, str]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -239,6 +263,9 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, metad
     table = _table(metadata, affected_object)
     if table is None:
         return None, "No affected table metadata available."
+    transfer_id = _selected_business_key_value(entities, affected_object)
+    if transfer_id:
+        return transfer_id, "Preserved exact typed transfer identifier from the request; prompt words were not converted into SQL filters."
     parent_key = _parent_business_key_from_duplicate_evidence(evidence)
     if parent_key and intent in {InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.PRODUCTION_INVESTIGATION}:
         return parent_key, "Inferred from parent-child duplicate evidence; supplied business key belongs to the parent object, not the duplicated child object."
@@ -257,6 +284,16 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, metad
     if natural_cols:
         return natural_cols[0], "Inferred from natural-key column naming."
     return None, "No non-primary natural key column was identified."
+
+
+def _selected_business_key_value(entities: EntityExtractionResult, affected_object: str) -> str | None:
+    leaf = affected_object.lower().split(".")[-1]
+    if "transfer" not in leaf:
+        return None
+    for entity in entities.entities:
+        if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"} and re.fullmatch(r"TRF-\d+", entity.value):
+            return entity.value
+    return None
 
 
 def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult]) -> str | None:

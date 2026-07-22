@@ -528,7 +528,7 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
     business_values = [
         entity.value
         for entity in entities.entities
-        if entity.entity_type in {"business_key", "exact_id_or_code", "status_or_code"}
+        if entity.entity_type in {"business_key", "exact_id_or_code", "business_identifier"}
     ]
     for value in business_values:
         escaped = value.replace("'", "''")
@@ -538,7 +538,7 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
             if (
                 column_l == "id"
                 or column_l.endswith("_id")
-                or any(term in column_l for term in ("number", "code", "status", "key", "reference", "name", "message"))
+                or any(term in column_l for term in ("number", "code", "key", "reference"))
             ):
                 column_filters.append(f"{_cast_to_text(column, engine_type)} = '{escaped}'")
         if column_filters:
@@ -641,6 +641,139 @@ def _business_key_values(entities: EntityExtractionResult) -> list[str]:
     ]
 
 
+def _typed_transfer_identifier(entities: EntityExtractionResult) -> str | None:
+    for value in _business_key_values(entities):
+        if re.fullmatch(r"TRF-\d+", value):
+            return value
+    return None
+
+
+def _looks_like_transfer_table(table: TableMetadata) -> bool:
+    lowered = table.name.lower()
+    leaf = lowered.split(".")[-1]
+    return leaf == "transfers" or leaf.endswith("_transfers") or "transfer" in leaf
+
+
+def _exact_business_key_column(table: TableMetadata) -> str | None:
+    preferred = [
+        "BusinessKey",
+        "business_key",
+        "transfer_number",
+        "transfer_code",
+        "reference_key",
+    ]
+    by_fold = {column.casefold(): column for column in table.columns}
+    for name in preferred:
+        match = by_fold.get(name.casefold())
+        if match:
+            return match
+    for column in table.columns:
+        lowered = column.lower()
+        if "transfer" in lowered and any(marker in lowered for marker in ("number", "code", "key", "reference")):
+            return column
+    for column in _natural_key_columns(table):
+        lowered = column.lower()
+        if all(marker not in lowered for marker in ("status", "state", "message", "detail", "description", "reason")):
+            return column
+    return None
+
+
+def _transfer_primary_query(metadata: MetadataSearchResult, entities: EntityExtractionResult) -> PlannedQuery | None:
+    transfer_id = _typed_transfer_identifier(entities)
+    if not transfer_id:
+        return None
+    transfer_tables = [table for table in metadata.tables if _looks_like_transfer_table(table)]
+    if not transfer_tables:
+        return None
+    transfer_table = sorted(transfer_tables, key=lambda item: (item.score, _header_rank(item), len(item.name)), reverse=True)[0]
+    key_column = _exact_business_key_column(transfer_table)
+    if not key_column:
+        return None
+    escaped = transfer_id.replace("'", "''")
+    columns = ", ".join(transfer_table.columns[:8]) if transfer_table.columns else "*"
+    return PlannedQuery(
+        purpose=f"Prove requested entity exists in {transfer_table.name}",
+        sql=f"SELECT {columns} FROM {transfer_table.name} WHERE {_cast_to_text(key_column, metadata.engine_type)} = '{escaped}'",
+    )
+
+
+def _supporting_transfer_relationship_queries(
+    metadata: MetadataSearchResult,
+    entities: EntityExtractionResult,
+) -> list[PlannedQuery]:
+    transfer_id = _typed_transfer_identifier(entities)
+    if not transfer_id:
+        return []
+    transfer_tables = [table for table in metadata.tables if _looks_like_transfer_table(table)]
+    if not transfer_tables:
+        return []
+    transfer_table = sorted(transfer_tables, key=lambda item: (item.score, _header_rank(item), len(item.name)), reverse=True)[0]
+    transfer_key = _exact_business_key_column(transfer_table)
+    if not transfer_key:
+        return []
+    escaped = transfer_id.replace("'", "''")
+    families = ("account", "transaction", "fraud", "audit", "payment", "settlement", "integration_message")
+    supporting: list[PlannedQuery] = []
+    for table in metadata.tables:
+        if table.name == transfer_table.name:
+            continue
+        lowered = table.name.lower()
+        if not any(marker in lowered for marker in families):
+            continue
+        role = "supporting"
+        if "integration_message" in lowered or lowered.endswith(".integration_messages"):
+            role = "diagnostic support"
+        joined = False
+        for fk in table.foreign_keys or []:
+            referred = str(fk.get("referred_table") or "").casefold()
+            if referred != transfer_table.name.casefold():
+                continue
+            fk_columns = [column for column in fk.get("columns", []) if column in table.columns]
+            ref_columns = [column for column in fk.get("referred_columns", []) if column in transfer_table.columns]
+            if not fk_columns or not ref_columns:
+                continue
+            child_col = fk_columns[0]
+            parent_col = ref_columns[0]
+            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            supporting.append(
+                PlannedQuery(
+                    purpose=f"Inspect {role} relationship evidence in {table.name}",
+                    sql=(
+                        f"SELECT {columns} FROM {transfer_table.name} t "
+                        f"JOIN {table.name} s ON s.{child_col} = t.{parent_col} "
+                        f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                    ),
+                )
+            )
+            joined = True
+            break
+        if joined:
+            continue
+        for fk in transfer_table.foreign_keys or []:
+            referred = str(fk.get("referred_table") or "").casefold()
+            if referred != table.name.casefold():
+                continue
+            fk_columns = [column for column in fk.get("columns", []) if column in transfer_table.columns]
+            ref_columns = [column for column in fk.get("referred_columns", []) if column in table.columns]
+            if not fk_columns or not ref_columns:
+                continue
+            transfer_fk = fk_columns[0]
+            related_pk = ref_columns[0]
+            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            supporting.append(
+                PlannedQuery(
+                    purpose=f"Inspect {role} relationship evidence in {table.name}",
+                    sql=(
+                        f"SELECT {columns} FROM {transfer_table.name} t "
+                        f"JOIN {table.name} s ON s.{related_pk} = t.{transfer_fk} "
+                        f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                    ),
+                )
+            )
+            break
+    return supporting[:8]
+
+
 def _identifier_parts(value: str) -> set[str]:
     raw = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value).lower()
     parts = {part for part in re.split(r"[^a-z0-9]+", raw) if len(part) >= 2}
@@ -686,13 +819,27 @@ def _entity_and_condition_queries(metadata: MetadataSearchResult, entities: Enti
     if not key_values:
         return []
     planned: list[PlannedQuery] = []
-    for table in metadata.tables[:3]:
+    candidate_tables = list(metadata.tables[:3])
+    if _typed_transfer_identifier(entities):
+        candidate_tables.sort(
+            key=lambda table: (
+                not _looks_like_transfer_table(table),
+                is_diagnostic_object(table.name),
+                -table.score,
+            )
+        )
+    for index, table in enumerate(candidate_tables):
         where_clause = _where_for_table(table, entities, metadata.engine_type)
         if where_clause:
             columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            purpose = (
+                f"Prove requested entity exists in {table.name}"
+                if index == 0
+                else f"Inspect supporting rows in {table.name}"
+            )
             planned.append(
                 PlannedQuery(
-                    purpose=f"Prove requested entity exists in {table.name}",
+                    purpose=purpose,
                     sql=f"SELECT {columns} FROM {table.name}{where_clause}",
                 )
             )
@@ -1714,6 +1861,10 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
     """
 
     planned: list[PlannedQuery] = []
+    transfer_primary = _transfer_primary_query(metadata, entities)
+    if transfer_primary:
+        planned.append(transfer_primary)
+    max_queries = 12 if transfer_primary else 8
     missing_child_flow = _infer_missing_child_flow(metadata, entities) if intent == InvestigationIntent.MISSING_DATA else None
     duplicate_child_flow = _infer_duplicate_child_flow(metadata, entities) if _duplicate_like_investigation(intent, entities) else None
     if intent in {InvestigationIntent.PROCESS_FLOW_BREAK, InvestigationIntent.PRODUCTION_INVESTIGATION}:
@@ -1743,6 +1894,7 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         )
         planned.extend(_missing_flow_diagnostic_queries(metadata, entities, missing_child_flow))
     planned.extend(_entity_and_condition_queries(metadata, entities))
+    planned.extend(_supporting_transfer_relationship_queries(metadata, entities))
     if duplicate_child_flow:
         planned.extend(
             [
@@ -1832,7 +1984,7 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         except ValueError:
             continue
         safe.append(PlannedQuery(query.purpose, sql, query.risk))
-    return safe[:8]
+    return safe[:max_queries]
 
 
 def _cast_to_text(expression: str, engine_type: str | None) -> str:

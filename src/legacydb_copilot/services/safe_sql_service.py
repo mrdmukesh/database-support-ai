@@ -8,6 +8,7 @@ from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms, terms_match_table
+from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
 
 
 @dataclass(frozen=True)
@@ -642,10 +643,7 @@ def _business_key_values(entities: EntityExtractionResult) -> list[str]:
 
 
 def _typed_transfer_identifier(entities: EntityExtractionResult) -> str | None:
-    for value in _business_key_values(entities):
-        if re.fullmatch(r"TRF-\d+", value):
-            return value
-    return None
+    return typed_transfer_identifier(entities)
 
 
 def _looks_like_transfer_table(table: TableMetadata) -> bool:

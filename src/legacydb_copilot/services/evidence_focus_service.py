@@ -12,6 +12,7 @@ from legacydb_copilot.services.metadata_search_service import MetadataSearchResu
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
+from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,7 @@ def build_evidence_focus(
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
-    affected_object, affected_reason = _identify_affected_object(question, metadata, evidence)
+    affected_object, affected_reason = _identify_affected_object(question, entities, metadata, evidence)
     business_key, business_key_reason = _infer_business_key(intent, affected_object, entities, metadata, evidence)
     write_graph = _write_path_graph(affected_object, procedure_analysis)
     ranked_procedures = _rank_procedures(
@@ -104,7 +105,12 @@ def build_evidence_focus(
     )
 
 
-def _identify_affected_object(question: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> tuple[str, str]:
+def _identify_affected_object(
+    question: str,
+    entities: EntityExtractionResult,
+    metadata: MetadataSearchResult,
+    evidence: list[EvidenceResult],
+) -> tuple[str, str]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -131,7 +137,7 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     for table in metadata.tables:
         leaf_lookup.setdefault(table.name.lower().split(".")[-1], []).append(table.name)
     question_l = question.lower()
-    transfer_target = _explicit_transfer_target(question, metadata, evidence)
+    transfer_target = _explicit_transfer_target(question, entities, metadata, evidence)
     if transfer_target:
         return transfer_target, "Selected from exact TRF-<digits> identifier evidence on transfers; diagnostic integration records remain supporting evidence only."
     explicit_write_target = _explicit_write_target(question, metadata)
@@ -177,11 +183,18 @@ def _identify_affected_object(question: str, metadata: MetadataSearchResult, evi
     return selected, "Selected from metadata/question matches plus SQL evidence on those matched candidates; returned rows alone cannot select an affected object."
 
 
-def _explicit_transfer_target(question: str, metadata: MetadataSearchResult, evidence: list[EvidenceResult]) -> str | None:
-    match = re.search(r"\bTRF-\d+\b", question)
-    if not match:
-        return None
-    transfer_id = match.group(0)
+def _explicit_transfer_target(
+    question: str,
+    entities: EntityExtractionResult,
+    metadata: MetadataSearchResult,
+    evidence: list[EvidenceResult],
+) -> str | None:
+    transfer_id = typed_transfer_identifier(entities)
+    if not transfer_id:
+        match = re.search(r"\bTRF-\d+\b", question, re.IGNORECASE)
+        if not match:
+            return None
+        transfer_id = match.group(0).upper()
     transfer_tables = [table.name for table in metadata.tables if table.name.lower().split(".")[-1] == "transfers"]
     if not transfer_tables:
         transfer_tables = [table.name for table in metadata.tables if "transfer" in table.name.lower().split(".")[-1]]
@@ -290,10 +303,7 @@ def _selected_business_key_value(entities: EntityExtractionResult, affected_obje
     leaf = affected_object.lower().split(".")[-1]
     if "transfer" not in leaf:
         return None
-    for entity in entities.entities:
-        if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"} and re.fullmatch(r"TRF-\d+", entity.value):
-            return entity.value
-    return None
+    return typed_transfer_identifier(entities)
 
 
 def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult]) -> str | None:

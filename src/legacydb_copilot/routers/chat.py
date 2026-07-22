@@ -99,6 +99,7 @@ from legacydb_copilot.services.report_generator import (
 )
 from legacydb_copilot.services.report_snapshot_service import report_from_dict, report_to_dict
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
+from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -1802,6 +1803,7 @@ def _run_dynamic_investigation(
     if entity_resolution.resolutions and not entity_resolution.can_continue:
         return _entity_resolution_blocked_answer(connection.name, entities, entity_resolution)
     entities = _apply_entity_resolutions(entities, entity_resolution)
+    entities, transfer_normalization_trace = normalize_transfer_entities(entities)
     context = replace(
         context,
         metadata=metadata_with_resolved_tables(
@@ -1974,6 +1976,7 @@ def _run_dynamic_investigation(
             },
             "metadata_candidates": ranking.metadata.candidate_trace,
             "entity_resolution": [asdict(item) for item in entity_resolution.resolutions],
+            "transfer_identifier_normalization": asdict(transfer_normalization_trace),
             "extracted_business_entities": [
                 asdict(item) for item in extract_entities(payload.question).entities
                 if item.entity_type in {"business_key", "business_identifier", "exact_id_or_code"}
@@ -2256,6 +2259,11 @@ def _run_dynamic_investigation(
     investigation_metadata = {
         "investigation_id": report.cover.investigation_id,
         "detected_intent": intent.intent.value,
+        "raw_extracted_entity": transfer_normalization_trace.raw_extracted_entity,
+        "normalized_entity": transfer_normalization_trace.normalized_entity,
+        "entity_type": transfer_normalization_trace.entity_type,
+        "normalization_rule_used": transfer_normalization_trace.normalization_rule_used,
+        "selected_primary_object": evidence_focus.affected_object,
         "extracted_entities": json.dumps(
             [
                 {
@@ -2316,6 +2324,12 @@ def _run_dynamic_investigation(
             "recommended_fix": reasoning.recommended_fix,
             "response_type": reasoning.response_type,
             "confidence": confidence,
+            "raw_extracted_entity": transfer_normalization_trace.raw_extracted_entity,
+            "normalized_entity": transfer_normalization_trace.normalized_entity,
+            "entity_type": transfer_normalization_trace.entity_type,
+            "normalization_rule_used": transfer_normalization_trace.normalization_rule_used,
+            "selected_primary_object": evidence_focus.affected_object,
+            "selected_business_key": evidence_focus.selected_business_key_value,
             "primary_entity": {
                 "table": evidence_focus.affected_object,
                 "reason": evidence_focus.affected_object_reason,

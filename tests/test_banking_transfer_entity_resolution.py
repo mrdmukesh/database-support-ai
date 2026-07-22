@@ -7,6 +7,7 @@ from legacydb_copilot.services.evidence_focus_service import build_evidence_focu
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.safe_sql_service import plan_safe_queries
+from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
 
 
 def _metadata() -> MetadataSearchResult:
@@ -94,6 +95,64 @@ def test_extracts_typed_transfer_identifier_exactly() -> None:
     assert "TRF-3101" in identifiers
 
 
+def test_msg_wrapped_transfer_identifier_normalizes_to_typed_key() -> None:
+    entities = extract_entities("Investigate transfer MSG-TRF-3101 for missing settlement")
+
+    normalized, trace = normalize_transfer_entities(entities)
+    identifiers = {
+        item.value
+        for item in normalized.entities
+        if item.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    }
+
+    assert "TRF-3101" in identifiers
+    assert trace.raw_extracted_entity == "MSG-TRF-3101"
+    assert trace.normalized_entity == "TRF-3101"
+    assert trace.normalization_rule_used == "msg_wrapped_transfer_key"
+
+
+def test_lowercase_transfer_identifier_is_supported() -> None:
+    entities = extract_entities("Investigate transfer trf-3101 for missing settlement")
+
+    normalized, trace = normalize_transfer_entities(entities)
+    identifiers = {
+        item.value
+        for item in normalized.entities
+        if item.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    }
+
+    assert "TRF-3101" in identifiers
+    assert trace.normalized_entity == "TRF-3101"
+
+
+def test_invalid_msg_wrapped_identifier_does_not_normalize_to_transfer() -> None:
+    entities = extract_entities("Investigate transfer MSG-TRF-ABC for missing settlement")
+
+    normalized, trace = normalize_transfer_entities(entities)
+    identifiers = {
+        item.value
+        for item in normalized.entities
+        if item.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    }
+
+    assert "TRF-ABC" not in identifiers
+    assert trace.normalized_entity is None
+
+
+def test_unrelated_msg_identifier_does_not_normalize_to_transfer() -> None:
+    entities = extract_entities("Investigate message MSG-9001 timeout in gateway")
+
+    normalized, trace = normalize_transfer_entities(entities)
+    identifiers = {
+        item.value
+        for item in normalized.entities
+        if item.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
+    }
+
+    assert "TRF-9001" not in identifiers
+    assert trace.normalized_entity is None
+
+
 def test_transfer_primary_lookup_is_first_and_exact() -> None:
     metadata = _metadata()
     entities = extract_entities(
@@ -108,6 +167,19 @@ def test_transfer_primary_lookup_is_first_and_exact() -> None:
     assert "BusinessKey" in queries[0].sql
     assert "= 'TRF-3101'" in queries[0].sql
     assert "COMPLETED" not in queries[0].sql.upper()
+
+
+def test_msg_wrapped_transfer_primary_lookup_is_first_and_exact() -> None:
+    metadata = _metadata()
+    entities = extract_entities("Investigate transfer MSG-TRF-3101 completed without a matching balance movement")
+
+    queries = plan_safe_queries(InvestigationIntent.PRODUCTION_INVESTIGATION, metadata, entities)
+
+    assert queries
+    assert queries[0].purpose == "Prove requested entity exists in eval.transfers"
+    assert "FROM eval.transfers" in queries[0].sql
+    assert "BusinessKey" in queries[0].sql
+    assert "= 'TRF-3101'" in queries[0].sql
 
 
 def test_transfer_relationship_queries_include_supporting_objects_and_keep_integration_supporting() -> None:
@@ -150,6 +222,43 @@ def test_transfer_focus_remains_primary_over_integration_messages() -> None:
         question=question,
         intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
         entities=extract_entities(question),
+        metadata=metadata,
+        evidence=evidence,
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+    )
+
+    assert focus.affected_object == "eval.transfers"
+    assert focus.inferred_business_key == "TRF-3101"
+    assert focus.selected_business_key_value == "TRF-3101"
+
+
+def test_msg_wrapped_transfer_keeps_transfers_primary_over_integration_messages() -> None:
+    metadata = _metadata()
+    question = "Investigate transfer MSG-TRF-3101 completed without a matching balance movement"
+    entities = extract_entities(question)
+    normalized_entities, _ = normalize_transfer_entities(entities)
+    evidence = [
+        EvidenceResult(
+            "Prove requested entity exists in eval.transfers",
+            "SELECT transfer_id, BusinessKey, Status FROM eval.transfers WHERE BusinessKey = 'TRF-3101'",
+            [{"transfer_id": 3101, "BusinessKey": "TRF-3101", "Status": "Completed"}],
+        ),
+        EvidenceResult(
+            "Inspect diagnostic support relationship evidence in eval.integration_messages",
+            "SELECT message_id, transfer_id, message FROM eval.transfers t JOIN eval.integration_messages s ON s.transfer_id = t.transfer_id WHERE t.BusinessKey = 'TRF-3101'",
+            [
+                {"message_id": 1, "transfer_id": 3101, "message": "settlement lag"},
+                {"message_id": 2, "transfer_id": 3101, "message": "retry ack delayed"},
+            ],
+        ),
+    ]
+
+    focus = build_evidence_focus(
+        question=question,
+        intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
+        entities=normalized_entities,
         metadata=metadata,
         evidence=evidence,
         correlated_evidence=[],

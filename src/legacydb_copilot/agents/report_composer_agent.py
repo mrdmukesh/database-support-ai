@@ -580,18 +580,67 @@ def _write_path_likely_procedure_section(bundle: DynamicInvestigationBundle) -> 
 def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     status = bundle.ai_reasoning_status or {}
     trace = bundle.ai_debug_trace or {}
-    generated = len(trace.get("validated_citations") or []) + len(trace.get("rejected_or_unsupported_claims") or [])
-    accepted = len(trace.get("validated_citations") or [])
-    rejected = len(trace.get("rejected_or_unsupported_claims") or [])
+    generated = int(trace.get("generated_claim_count") or 0)
+    accepted = int(trace.get("verified_claim_count") or 0)
+    rejected = int(trace.get("rejected_claim_count") or 0)
+    evidence_valid = bool(trace.get("evidence_package_valid"))
+    invocation_status = str(trace.get("invocation_status") or "not_available")
+    skip_reason = str(trace.get("skip_reason") or "none")
     rows = [
         {"Item": "AI Reasoning", "Value": status.get("ai_assisted_reasoning", "Disabled")},
-        {"Item": "Evidence Package", "Value": "Validated" if status.get("llm_evidence_validation") == "Passed" else status.get("llm_evidence_validation", "Not applicable")},
+        {"Item": "Evidence Package", "Value": "Validated" if evidence_valid else "Blocked or insufficient"},
         {"Item": "LLM Claims", "Value": f"{generated} generated, {accepted} verified, {rejected} rejected"},
-        {"Item": "Trace", "Value": "Full prompt available in Audit Trace." if trace else "Trace disabled or not available."},
+        {"Item": "Invocation", "Value": f"{invocation_status} (reason: {skip_reason})"},
+        {"Item": "Trace", "Value": "Full prompt available in Audit Trace." if trace.get("system_prompt") else "Minimal machine trace available." if trace else "Trace disabled or not available."},
     ]
     return ReportSection(
         title="AI Status",
         tables=[ReportTable(title="AI Reasoning Summary", columns=["Item", "Value"], rows=rows)],
+    )
+
+
+def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]:
+    trace = bundle.ai_debug_trace or {}
+    ai_enabled = bool(trace.get("ai_enabled"))
+    evidence_valid = bool(trace.get("evidence_package_valid"))
+    llm_invoked = bool(trace.get("llm_invoked"))
+    generated = int(trace.get("generated_claim_count") or 0)
+    verified = int(trace.get("verified_claim_count") or 0)
+    skip_reason = str(trace.get("skip_reason") or "none")
+
+    claims = bundle.reasoning.likely_root_causes
+    if ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0):
+        business_key = bundle.evidence_focus.inferred_business_key if bundle.evidence_focus and bundle.evidence_focus.inferred_business_key else "the investigated transfer"
+        return [
+            (
+                "Insufficient evidence to confirm the root cause. "
+                f"Transfer {business_key} is confirmed to have status 'Exception' and is associated with an open correlated exception record. "
+                "However, the collected evidence does not identify the exact processing step, validation rule, procedure, or system component that caused the failure."
+            )
+        ]
+
+    if claims:
+        return claims[:3]
+    return [
+        f"{item.hypothesis_id} ({int(item.confidence * 100)}%): {item.description} - {item.reason}"
+        for item in bundle.hypothesis_reasoning.ranked_root_causes
+    ][:3]
+
+
+def _possible_investigation_hypothesis_section(bundle: DynamicInvestigationBundle) -> ReportSection | None:
+    trace = bundle.ai_debug_trace or {}
+    ai_enabled = bool(trace.get("ai_enabled"))
+    evidence_valid = bool(trace.get("evidence_package_valid"))
+    llm_invoked = bool(trace.get("llm_invoked"))
+    generated = int(trace.get("generated_claim_count") or 0)
+    verified = int(trace.get("verified_claim_count") or 0)
+    if not (ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0)):
+        return None
+    return ReportSection(
+        title="Possible Investigation Hypothesis",
+        items=[
+            "A processing or validation failure may have occurred, but this is not confirmed by the available evidence."
+        ],
     )
 
 
@@ -838,10 +887,7 @@ def compose_report(
     fact_rows = [{"Type": "Confirmed Fact", "Finding": item} for item in (bundle.reasoning.confirmed_facts or [])]
     fact_rows.extend({"Type": "Inferred Finding", "Finding": item} for item in (bundle.reasoning.inferred_findings or []))
     fact_rows.extend({"Type": "Hypothesis", "Finding": item} for item in (bundle.reasoning.hypotheses or []))
-    final_root_cause_items = bundle.reasoning.likely_root_causes or [
-        f"{item.hypothesis_id} ({int(item.confidence * 100)}%): {item.description} - {item.reason}"
-        for item in bundle.hypothesis_reasoning.ranked_root_causes
-    ]
+    final_root_cause_items = _executive_root_cause_items(bundle)
     confidence_items = [f"Overall confidence: {int(bundle.confidence * 100)}%"]
     confidence_items.extend(bundle.confidence_factors or ["Based on available evidence; no unsupported objects were fabricated."])
     recommended_fix_section = ReportSection(title="Recommended Fix", items=[
@@ -861,7 +907,8 @@ def compose_report(
         _executive_key_findings_section(bundle),
         _executive_evidence_summary_section(bundle),
         _write_path_likely_procedure_section(bundle),
-        ReportSection(title="Root Cause", items=final_root_cause_items[:3]),
+        ReportSection(title="Root Cause", items=final_root_cause_items),
+        *([section] if (section := _possible_investigation_hypothesis_section(bundle)) else []),
         ReportSection(title="Confidence Score", items=confidence_items),
         _executive_fix_section(bundle),
         _executive_tests_section(bundle),

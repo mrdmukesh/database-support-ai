@@ -733,6 +733,11 @@ def _supporting_transfer_relationship_queries(
     escaped = transfer_id.replace("'", "''")
     families = ("account", "transaction", "fraud", "audit", "payment", "settlement", "integration_message")
     supporting: list[PlannedQuery] = []
+
+    def _qualified_columns(columns: list[str], alias: str, prefix: str, limit: int = 8) -> list[str]:
+        selected = columns[:limit]
+        return [f"{alias}.{column} AS {prefix}{column}" for column in selected]
+
     for table in metadata.tables:
         if table.name == transfer_table.name:
             continue
@@ -753,12 +758,14 @@ def _supporting_transfer_relationship_queries(
                 continue
             child_col = fk_columns[0]
             parent_col = ref_columns[0]
-            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            transfer_projection = _qualified_columns(transfer_table.columns, "t", "Transfer") if transfer_table.columns else ["t.*"]
+            related_projection = _qualified_columns(table.columns, "s", "Related") if table.columns else ["s.*"]
+            projection = ", ".join([*transfer_projection, *related_projection])
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
                     sql=(
-                        f"SELECT {columns} FROM {transfer_table.name} t "
+                        f"SELECT {projection} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{child_col} = t.{parent_col} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
                     ),
@@ -778,12 +785,14 @@ def _supporting_transfer_relationship_queries(
                 continue
             transfer_fk = fk_columns[0]
             related_pk = ref_columns[0]
-            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            transfer_projection = _qualified_columns(transfer_table.columns, "t", "Transfer") if transfer_table.columns else ["t.*"]
+            related_projection = _qualified_columns(table.columns, "s", "Related") if table.columns else ["s.*"]
+            projection = ", ".join([*transfer_projection, *related_projection])
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
                     sql=(
-                        f"SELECT {columns} FROM {transfer_table.name} t "
+                        f"SELECT {projection} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{related_pk} = t.{transfer_fk} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
                     ),

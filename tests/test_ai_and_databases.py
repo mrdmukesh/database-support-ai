@@ -45,6 +45,11 @@ from legacydb_copilot.services.metadata_search_service import MetadataSearchCont
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
+from legacydb_copilot.agents.report_composer_agent import (
+    _executive_root_cause_items,
+    _possible_investigation_hypothesis_section,
+    compose_report,
+)
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
 from legacydb_copilot.services.report_generator import (
@@ -2369,11 +2374,11 @@ def test_terminal_ai_trace_classifies_early_insufficient_evidence_truthfully() -
         "detected_intent": "INSUFFICIENT_DATABASE_EVIDENCE:RELEVANT_SCHEMA_OBJECTS_NOT_DISCOVERED",
         "ai_debug_trace": "",
     })
-    assert trace == {
-        "ai_reasoning_invoked": False,
-        "ai_skip_reason": "relevant_schema_objects_not_discovered",
-        "ai_outcome": "insufficient_evidence",
-    }
+    assert trace["ai_reasoning_invoked"] is False
+    assert trace["ai_skip_reason"] == "relevant_schema_objects_not_discovered"
+    assert trace["ai_outcome"] == "insufficient_evidence"
+    assert trace["llm_invoked"] is False
+    assert trace["generated_claim_count"] == 0
 
 
 def test_terminal_ai_trace_preserves_successful_provider_values() -> None:
@@ -2392,6 +2397,46 @@ def test_terminal_ai_trace_preserves_successful_provider_values() -> None:
     assert trace["input_tokens"] == 11
     assert trace["output_tokens"] == 7
     assert trace["ai_outcome"] == "success"
+
+
+def test_terminal_ai_trace_includes_required_machine_fields() -> None:
+    trace = _terminal_ai_trace(
+        {
+            "answer_provenance": "AI_INVOCATION_FAILED",
+            "detected_intent": "PROCESS_FLOW_BREAK",
+            "ai_debug_trace": json.dumps(
+                {
+                    "ai_enabled": True,
+                    "evidence_package_valid": True,
+                    "ai_reasoning_invoked": True,
+                    "provider": "openai",
+                    "model": "gpt-4.1-mini",
+                    "generated_claim_count": 0,
+                    "verified_claim_count": 0,
+                    "rejected_claim_count": 0,
+                    "ai_reasoning_error": "TimeoutError",
+                }
+            ),
+        }
+    )
+    required = {
+        "ai_enabled",
+        "evidence_package_valid",
+        "llm_invoked",
+        "provider",
+        "model",
+        "invocation_status",
+        "skip_reason",
+        "generated_claim_count",
+        "verified_claim_count",
+        "rejected_claim_count",
+        "verification_status",
+        "error_category",
+    }
+    assert required.issubset(trace.keys())
+    assert trace["llm_invoked"] is True
+    assert trace["invocation_status"] == "provider_failure"
+    assert trace["error_category"] == "TimeoutError"
 
 
 def test_empty_validated_evidence_plan_is_classified_as_planning_failed() -> None:
@@ -2511,7 +2556,13 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
         correlated_evidence=[],
         procedure_analysis=[],
         documents=[],
-        settings=Settings(environment=Environment.DEVELOPMENT, ai_reasoning_enabled=True, llm_enabled=True, openai_api_key="sk-test"),
+        settings=Settings(
+            environment=Environment.DEVELOPMENT,
+            ai_reasoning_enabled=True,
+            llm_enabled=True,
+            openai_api_key="sk-test",
+            ai_debug_trace_enabled=True,
+        ),
         debug_trace=trace,
     )
 
@@ -2519,6 +2570,192 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
     assert "jane@example.com" not in trace["user_prompt"]
     assert trace["validated_citations"][0]["claim"] == "Supported claim"
     assert trace["rejected_or_unsupported_claims"][0]["claim"] == "Unsupported claim"
+
+
+def test_llm_zero_claims_records_trace_and_keeps_deterministic_reasoning(monkeypatch) -> None:
+    def fake_call(settings, payload, *, debug_trace=None):
+        if debug_trace is not None:
+            debug_trace.update({"ai_reasoning_invoked": True, "input_tokens": 8, "output_tokens": 3})
+        return {
+            "summary": "No claims could be formed.",
+            "likely_root_causes": [],
+            "recommended_fix": [],
+            "proof_of_fix": [],
+            "risks": [],
+            "test_cases": [],
+        }
+
+    import legacydb_copilot.services.llm_reasoning_service as llm_service
+
+    monkeypatch.setattr(llm_service, "_call_openai_responses", fake_call)
+    base = ReasoningResult(
+        summary="base",
+        likely_root_causes=["deterministic cause"],
+        supporting_evidence=[],
+        missing_evidence=[],
+        recommended_fix=[],
+        test_cases=[],
+        proof_of_fix=[],
+        rollback_plan=[],
+        risks=[],
+    )
+    trace: dict[str, object] = {
+        "ai_enabled": True,
+        "evidence_package_valid": True,
+        "provider": "openai",
+        "model": "gpt-4.1-mini",
+    }
+    result = enhance_reasoning_with_llm(
+        question="Why did transfer TRF-3101 fail?",
+        intent=IntentResult(InvestigationIntent.PROCESS_FLOW_BREAK, 0.9, "test"),
+        deterministic_reasoning=base,
+        evidence=[EvidenceResult("entity", "SELECT 1", [{"id": 1}])],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+        settings=Settings(environment=Environment.DEVELOPMENT, ai_reasoning_enabled=True, llm_enabled=True, openai_api_key="sk-test"),
+        debug_trace=trace,
+    )
+
+    assert result is base
+    assert trace["llm_invoked"] is True
+    assert trace["generated_claim_count"] == 0
+    assert trace["verified_claim_count"] == 0
+    assert trace["invocation_status"] == "completed_zero_claims"
+    assert trace["skip_reason"] == "llm_returned_zero_claims"
+
+
+def test_executive_report_avoids_confirmed_root_cause_when_llm_not_invoked() -> None:
+    bundle = SimpleNamespace(
+        question="Why did transfer TRF-3101 enter Exception?",
+        intent=IntentResult(InvestigationIntent.PROCESS_FLOW_BREAK, 0.9, "test"),
+        entities=[],
+        ranked_objects=[],
+        metadata=MetadataSearchResult(tables=[], views=[], procedures=[], version="test"),
+        evidence=[],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        hypothesis_reasoning=SimpleNamespace(
+            understanding=SimpleNamespace(user_goal="goal", user_hypothesis="hypothesis"),
+            process_graph=[],
+            hypotheses=[],
+            ranked_root_causes=[],
+        ),
+        documents=[],
+        reasoning=ReasoningResult(
+            summary="summary",
+            likely_root_causes=["The transfer entered an Exception status due to a process flow failure or validation error."],
+            supporting_evidence=[],
+            missing_evidence=["Need write-path evidence"],
+            recommended_fix=[],
+            test_cases=[],
+            proof_of_fix=[],
+            rollback_plan=[],
+            risks=[],
+            confirmed_facts=[],
+            inferred_findings=[],
+            hypotheses=[],
+        ),
+        evidence_focus=SimpleNamespace(inferred_business_key="TRF-3101"),
+        ai_debug_trace={
+            "ai_enabled": True,
+            "evidence_package_valid": True,
+            "llm_invoked": False,
+            "skip_reason": "provider_not_configured",
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "rejected_claim_count": 0,
+            "invocation_status": "skipped",
+            "verification_status": "no_claims",
+        },
+    )
+    root_cause_items = _executive_root_cause_items(bundle)
+    assert root_cause_items == [
+        "Insufficient evidence to confirm the root cause. Transfer TRF-3101 is confirmed to have status 'Exception' and is associated with an open correlated exception record. However, the collected evidence does not identify the exact processing step, validation rule, procedure, or system component that caused the failure."
+    ]
+    hypothesis = _possible_investigation_hypothesis_section(bundle)
+    assert hypothesis is not None
+    assert hypothesis.title == "Possible Investigation Hypothesis"
+    assert hypothesis.items == [
+        "A processing or validation failure may have occurred, but this is not confirmed by the available evidence."
+    ]
+
+
+@pytest.mark.parametrize(
+    ("generated", "verified"),
+    [
+        (0, 0),
+        (2, 0),
+    ],
+)
+def test_unconfirmed_root_cause_avoids_unsupported_causal_phrases(generated: int, verified: int) -> None:
+    bundle = SimpleNamespace(
+        evidence_focus=SimpleNamespace(inferred_business_key="TRF-3101"),
+        reasoning=ReasoningResult(
+            summary="summary",
+            likely_root_causes=["The transfer entered an Exception status due to a process flow failure or validation error."],
+            supporting_evidence=[],
+            missing_evidence=["Need deterministic causal evidence"],
+            recommended_fix=[],
+            test_cases=[],
+            proof_of_fix=[],
+            rollback_plan=[],
+            risks=[],
+            confirmed_facts=[],
+            inferred_findings=[],
+            hypotheses=[],
+        ),
+        ai_debug_trace={
+            "ai_enabled": True,
+            "evidence_package_valid": True,
+            "llm_invoked": True,
+            "generated_claim_count": generated,
+            "verified_claim_count": verified,
+            "rejected_claim_count": max(generated - verified, 0),
+            "skip_reason": "llm_returned_zero_claims" if generated == 0 else "llm_claims_unverified_or_missing_citations",
+        },
+    )
+    text = " ".join(str(item).lower() for item in _executive_root_cause_items(bundle))
+    forbidden = [
+        "due to",
+        "caused by",
+        "root cause is",
+        "process flow failure",
+        "validation error",
+    ]
+    assert all(phrase not in text for phrase in forbidden)
+
+
+def test_transfer_relationship_query_qualifies_columns_for_joined_account_evidence() -> None:
+    metadata = MetadataSearchResult(
+        tables=[
+            TableMetadata(
+                "eval.transfers",
+                ["AccountsId", "CustomersId", "BusinessKey", "Status", "EventTime", "Details", "CorrelationId", "IsActive"],
+                10,
+                foreign_keys=[
+                    {
+                        "columns": ["AccountsId"],
+                        "referred_table": "eval.accounts",
+                        "referred_columns": ["AccountsId"],
+                    }
+                ],
+            ),
+            TableMetadata("eval.accounts", ["AccountsId", "BusinessKey", "Status"], 9),
+        ],
+        views=[],
+        procedures=[],
+        version="test",
+        engine_type="sql_server",
+    )
+    entities = extract_entities("Why is transfer TRF-3101 in exception state?")
+    queries = plan_safe_queries(InvestigationIntent.PROCESS_FLOW_BREAK, metadata, entities)
+    rel = next(
+        query for query in queries if query.purpose == "Inspect supporting relationship evidence in eval.accounts"
+    )
+    assert "SELECT t.AccountsId AS TransferAccountsId" in rel.sql
+    assert "s.AccountsId AS RelatedAccountsId" in rel.sql
+    assert "WHERE CAST(t.BusinessKey AS NVARCHAR(MAX)) = 'TRF-3101'" in rel.sql
 
 
 def test_llm_invocation_failure_records_sanitized_diagnostics(monkeypatch) -> None:

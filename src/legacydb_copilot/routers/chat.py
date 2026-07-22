@@ -657,6 +657,43 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         trace.setdefault("ai_skip_reason", "application_terminal_path_before_ai")
         trace.setdefault("ai_outcome", "other")
 
+    generated_from_legacy = len(trace.get("validated_citations") or []) + len(trace.get("rejected_or_unsupported_claims") or [])
+    verified_from_legacy = len(trace.get("validated_citations") or [])
+    rejected_from_legacy = len(trace.get("rejected_or_unsupported_claims") or [])
+    llm_invoked = bool(trace.get("llm_invoked", trace.get("ai_reasoning_invoked", False)))
+
+    trace.setdefault("ai_enabled", bool(trace.get("ai_enabled", True)))
+    trace.setdefault("evidence_package_valid", not detected_intent.startswith("INSUFFICIENT_DATABASE_EVIDENCE:"))
+    trace["llm_invoked"] = llm_invoked
+    trace.setdefault("provider", trace.get("provider") or trace.get("llm_provider") or "openai")
+    trace.setdefault("model", trace.get("model") or trace.get("llm_model_name") or "")
+    trace.setdefault("generated_claim_count", generated_from_legacy)
+    trace.setdefault("verified_claim_count", verified_from_legacy)
+    trace.setdefault("rejected_claim_count", rejected_from_legacy)
+    trace.setdefault("skip_reason", trace.get("ai_skip_reason") or "none")
+    trace.setdefault("error_category", trace.get("ai_reasoning_error") or trace.get("provider_error_type"))
+
+    if not llm_invoked:
+        trace.setdefault("invocation_status", "skipped")
+    elif trace.get("error_category"):
+        trace.setdefault("invocation_status", "provider_failure")
+    elif int(trace.get("generated_claim_count") or 0) == 0:
+        trace.setdefault("invocation_status", "completed_zero_claims")
+    else:
+        trace.setdefault("invocation_status", "completed")
+
+    verified = int(trace.get("verified_claim_count") or 0)
+    generated = int(trace.get("generated_claim_count") or 0)
+    rejected = int(trace.get("rejected_claim_count") or 0)
+    if generated == 0:
+        trace.setdefault("verification_status", "no_claims")
+    elif verified == 0:
+        trace.setdefault("verification_status", "none_verified")
+    elif rejected > 0:
+        trace.setdefault("verification_status", "partial")
+    else:
+        trace.setdefault("verification_status", "verified")
+
     # Persist transfer normalization and target-selection trace in an existing DB JSON column.
     # Omit null-valued keys so legacy exact-trace assertions remain stable.
     trace_fields = (
@@ -1981,6 +2018,18 @@ def _run_dynamic_investigation(
         llm_used = False
         settings = Settings.from_env()
         ai_debug_trace = {
+            "ai_enabled": bool(settings.ai_reasoning_enabled),
+            "evidence_package_valid": False,
+            "llm_invoked": False,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model,
+            "invocation_status": "skipped_by_evidence_gate",
+            "skip_reason": "evidence_gate_not_reproduced",
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "rejected_claim_count": 0,
+            "verification_status": "not_applicable",
+            "error_category": None,
             "ai_reasoning_invoked": False,
             "ai_skip_reason": "evidence_gate_not_reproduced",
             "ai_outcome": "evidence_gate",
@@ -1989,7 +2038,7 @@ def _run_dynamic_investigation(
             "prompt_version": AI_REASONING_PROMPT_VERSION,
             "input_tokens": 0,
             "output_tokens": 0,
-        } if settings.ai_debug_trace_enabled else None
+        }
     else:
         reasoning = reason_about_evidence(
             payload.question,
@@ -2004,7 +2053,20 @@ def _run_dynamic_investigation(
         )
         settings = Settings.from_env()
         llm_configured = llm_reasoning_enabled(settings)
-        ai_debug_trace = {} if settings.ai_debug_trace_enabled else None
+        ai_debug_trace = {
+            "ai_enabled": bool(settings.ai_reasoning_enabled),
+            "evidence_package_valid": True,
+            "llm_invoked": False,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model,
+            "invocation_status": "pending",
+            "skip_reason": "awaiting_provider_response" if llm_configured else "llm_not_configured",
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "rejected_claim_count": 0,
+            "verification_status": "not_applicable",
+            "error_category": None,
+        }
         enhanced_reasoning = enhance_reasoning_with_llm(
             question=payload.question,
             intent=intent,
@@ -2019,7 +2081,7 @@ def _run_dynamic_investigation(
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
-    if ai_debug_trace is not None:
+    if settings.ai_debug_trace_enabled and ai_debug_trace is not None:
         ai_debug_trace.update({
             "metadata_cache": getattr(active_schema_metadata, "cache_diagnostics", {}),
             "raw_metadata_objects": {

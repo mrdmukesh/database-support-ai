@@ -10,7 +10,12 @@ from typing import Any
 from urllib import error, request
 
 from legacydb_copilot.agents.intent_agent import IntentResult
-from legacydb_copilot.agents.reasoning_agent import RootCauseClaim, ReasoningResult, evaluate_claim_support_status
+from legacydb_copilot.agents.reasoning_agent import (
+    RootCauseClaim,
+    RootCauseSupportStatus,
+    ReasoningResult,
+    evaluate_claim_support_status,
+)
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
@@ -153,7 +158,29 @@ def enhance_reasoning_with_llm(
     """
 
     settings = settings or Settings.from_env()
+    if debug_trace is not None:
+        debug_trace.setdefault("ai_enabled", bool(settings.ai_reasoning_enabled))
+        debug_trace.setdefault("provider", settings.llm_provider)
+        debug_trace.setdefault("model", settings.llm_model)
+        debug_trace.setdefault("llm_invoked", False)
+        debug_trace.setdefault("invocation_status", "not_invoked")
+        debug_trace.setdefault("generated_claim_count", 0)
+        debug_trace.setdefault("verified_claim_count", 0)
+        debug_trace.setdefault("rejected_claim_count", 0)
+        debug_trace.setdefault("verification_status", "not_applicable")
+        debug_trace.setdefault("skip_reason", "llm_not_configured")
+        debug_trace.setdefault("error_category", None)
     if not llm_reasoning_enabled(settings):
+        if debug_trace is not None:
+            if not settings.ai_reasoning_enabled:
+                debug_trace["skip_reason"] = "ai_reasoning_disabled"
+            elif settings.llm_provider != "openai":
+                debug_trace["skip_reason"] = "provider_not_supported"
+            elif not settings.openai_api_key:
+                debug_trace["skip_reason"] = "missing_openai_api_key"
+            else:
+                debug_trace["skip_reason"] = "llm_not_configured"
+            debug_trace["invocation_status"] = "skipped"
         return deterministic_reasoning
 
     raw_payload = _build_llm_payload_unmasked(
@@ -170,26 +197,35 @@ def enhance_reasoning_with_llm(
     if debug_trace is not None:
         debug_trace.update(
             {
-                "system_prompt": SYSTEM_PROMPT,
-                "user_prompt": json.dumps(sanitize_ai_trace(payload), default=str),
-                "evidence_package_before_masking_summary": _payload_summary(raw_payload),
-                "evidence_package_after_masking": sanitize_ai_trace(payload),
                 "llm_model_name": settings.llm_model,
                 "prompt_version": AI_REASONING_PROMPT_VERSION,
                 "ai_reasoning_invoked": False,
                 "input_tokens": 0,
                 "output_tokens": 0,
-                "llm_response_raw": None,
                 "validated_citations": [],
                 "rejected_or_unsupported_claims": [],
                 "final_report_claims": deterministic_reasoning.likely_root_causes,
+                "llm_invoked": False,
+                "invocation_status": "pending",
+                "skip_reason": "awaiting_provider_response",
             }
         )
+        if settings.ai_debug_trace_enabled:
+            debug_trace.update(
+                {
+                    "system_prompt": SYSTEM_PROMPT,
+                    "user_prompt": json.dumps(sanitize_ai_trace(payload), default=str),
+                    "evidence_package_before_masking_summary": _payload_summary(raw_payload),
+                    "evidence_package_after_masking": sanitize_ai_trace(payload),
+                    "llm_response_raw": None,
+                }
+            )
     try:
         llm_json = _call_openai_responses(settings, payload, debug_trace=debug_trace)
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
         if debug_trace is not None:
-            debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
+            if settings.ai_debug_trace_enabled:
+                debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
             debug_trace["final_report_claims"] = enhanced.likely_root_causes
         return enhanced
     except Exception as exc:
@@ -201,6 +237,11 @@ def enhance_reasoning_with_llm(
             debug_trace["provider"] = settings.llm_provider
             debug_trace["model_requested"] = settings.llm_model
             debug_trace["sanitized_error_reason"] = type(exc).__name__
+            debug_trace["llm_invoked"] = bool(debug_trace.get("ai_reasoning_invoked"))
+            debug_trace["invocation_status"] = "provider_failure"
+            debug_trace["skip_reason"] = "provider_error"
+            debug_trace["verification_status"] = "failed"
+            debug_trace["error_category"] = type(exc).__name__
         return deterministic_reasoning
 
 
@@ -544,6 +585,13 @@ def _merge_llm_reasoning(
     validation: dict[str, list[Any]] = {"accepted": [], "rejected": []}
     cited_root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion", validation=validation)
     raw_root_causes = llm_json.get("likely_root_causes")
+    generated_claim_count = len(
+        [
+            item
+            for item in (raw_root_causes if isinstance(raw_root_causes, list) else [])
+            if isinstance(item, dict) and str(item.get("conclusion") or "").strip()
+        ]
+    )
     root_causes = [
         claim
         for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else [])
@@ -551,6 +599,8 @@ def _merge_llm_reasoning(
         for claim in [convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])]
         if claim is not None
     ]
+    verified_claim_count = len([claim for claim in root_causes if claim.status == RootCauseSupportStatus.VERIFIED])
+    rejected_claim_count = max(generated_claim_count - verified_claim_count, 0)
     fixes = _safeguard_remediation_steps(
         _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
     )
@@ -563,6 +613,27 @@ def _merge_llm_reasoning(
     if debug_trace is not None:
         debug_trace["validated_citations"] = validation["accepted"]
         debug_trace["rejected_or_unsupported_claims"] = validation["rejected"]
+        debug_trace["llm_invoked"] = bool(debug_trace.get("ai_reasoning_invoked"))
+        debug_trace["generated_claim_count"] = generated_claim_count
+        debug_trace["verified_claim_count"] = verified_claim_count
+        debug_trace["rejected_claim_count"] = rejected_claim_count
+        debug_trace["error_category"] = None
+        if generated_claim_count == 0:
+            debug_trace["invocation_status"] = "completed_zero_claims"
+            debug_trace["skip_reason"] = "llm_returned_zero_claims"
+            debug_trace["verification_status"] = "no_claims"
+        elif verified_claim_count == 0:
+            debug_trace["invocation_status"] = "completed_no_verified_claims"
+            debug_trace["skip_reason"] = "llm_claims_unverified_or_missing_citations"
+            debug_trace["verification_status"] = "none_verified"
+        elif rejected_claim_count > 0:
+            debug_trace["invocation_status"] = "completed_with_partial_verification"
+            debug_trace["skip_reason"] = "none"
+            debug_trace["verification_status"] = "partial"
+        else:
+            debug_trace["invocation_status"] = "completed"
+            debug_trace["skip_reason"] = "none"
+            debug_trace["verification_status"] = "verified"
     if not cited_root_causes or not root_causes:
         return base
     summary_parts = [str(llm_json.get("summary") or base.summary)]

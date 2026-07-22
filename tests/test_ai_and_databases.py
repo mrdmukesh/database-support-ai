@@ -35,6 +35,7 @@ from legacydb_copilot.services.llm_reasoning_service import (
     llm_reasoning_enabled,
 )
 from legacydb_copilot.routers.chat import (
+    _detected_intent_with_planning_status,
     _expand_related_id_evidence,
     _metadata_with_active_diagnostics,
     _terminal_ai_trace,
@@ -2391,6 +2392,17 @@ def test_terminal_ai_trace_preserves_successful_provider_values() -> None:
     assert trace["input_tokens"] == 11
     assert trace["output_tokens"] == 7
     assert trace["ai_outcome"] == "success"
+
+
+def test_empty_validated_evidence_plan_is_classified_as_planning_failed() -> None:
+    detected = _detected_intent_with_planning_status(
+        "PROCESS_FLOW_BREAK",
+        [
+            {"status": "planned"},
+            {"status": "rejected", "reason": "validator_rejected:Unsafe SQL command rejected"},
+        ],
+    )
+    assert detected == "EVIDENCE_PLANNING_FAILED"
 
 
 def test_ai_reasoning_requires_explicit_switch_and_openai_key() -> None:

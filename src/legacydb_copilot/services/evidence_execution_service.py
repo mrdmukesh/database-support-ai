@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from itertools import count
@@ -10,6 +11,7 @@ from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionR
 
 
 _evidence_id_sequence = count(1)
+logger = logging.getLogger(__name__)
 
 
 def _next_evidence_id() -> str:
@@ -27,7 +29,11 @@ class EvidenceResult:
     evidence_id: str = field(default_factory=_next_evidence_id)
 
 
-def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceResult]:
+def execute_evidence_plan(
+    connector,
+    plan: list[PlannedQuery],
+    plan_statuses: list[dict[str, Any]] | None = None,
+) -> list[EvidenceResult]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -62,6 +68,18 @@ def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceR
             validate_read_only_sql(query.sql)
             safe_read = validator.validate(query.sql)
             rows = connector.execute_read_only_query(safe_read.sql, limit=settings.max_investigation_rows)
+            if plan_statuses is not None:
+                plan_statuses.append(
+                    {
+                        "query_id": query.query_id or f"Q-{index}",
+                        "purpose": query.purpose,
+                        "status": "executed",
+                        "reason": safe_read.reason or "executed_successfully",
+                        "row_count": len(rows),
+                        "sql": safe_read.sql,
+                    }
+                )
+            logger.info("evidence_plan executed %s rows=%s", query.query_id or f"Q-{index}", len(rows))
             evidence.append(
                 EvidenceResult(
                     query.purpose,
@@ -73,6 +91,18 @@ def execute_evidence_plan(connector, plan: list[PlannedQuery]) -> list[EvidenceR
                 )
             )
         except Exception as exc:
+            if plan_statuses is not None:
+                plan_statuses.append(
+                    {
+                        "query_id": query.query_id or f"Q-{index}",
+                        "purpose": query.purpose,
+                        "status": "failed",
+                        "reason": str(exc),
+                        "row_count": 0,
+                        "sql": query.sql,
+                    }
+                )
+            logger.warning("evidence_plan failed %s %s", query.query_id or f"Q-{index}", exc)
             evidence.append(EvidenceResult(query.purpose, query.sql, [], str(exc), evidence_id=f"SQL-{index}"))
     return evidence
 

@@ -658,14 +658,27 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         trace.setdefault("ai_outcome", "other")
 
     # Persist transfer normalization and target-selection trace in an existing DB JSON column.
-    trace.setdefault("raw_extracted_entity", investigation_metadata.get("raw_extracted_entity"))
-    trace.setdefault("normalized_entity", investigation_metadata.get("normalized_entity"))
-    trace.setdefault("entity_type", investigation_metadata.get("entity_type"))
-    trace.setdefault("normalization_rule_used", investigation_metadata.get("normalization_rule_used"))
-    trace.setdefault("selected_primary_object", investigation_metadata.get("selected_primary_object"))
-    trace.setdefault("selected_business_key", investigation_metadata.get("selected_business_key"))
-    trace.setdefault("evidence_gate_reason", investigation_metadata.get("evidence_gate_reason"))
+    # Omit null-valued keys so legacy exact-trace assertions remain stable.
+    trace_fields = (
+        "raw_extracted_entity",
+        "normalized_entity",
+        "entity_type",
+        "normalization_rule_used",
+        "selected_primary_object",
+        "selected_business_key",
+        "evidence_gate_reason",
+    )
+    for key in trace_fields:
+        value = investigation_metadata.get(key)
+        if value is not None:
+            trace.setdefault(key, value)
     return trace
+
+
+def _detected_intent_with_planning_status(base_intent: str, plan_statuses: list[dict[str, Any]]) -> str:
+    """Classify empty validated evidence plans as a planning failure for truthful reporting."""
+    has_validated = any(item.get("status") == "validated" for item in plan_statuses)
+    return base_intent if has_validated else "EVIDENCE_PLANNING_FAILED"
 
 
 def _approved_knowledge_context(db: Session, payload: ChatAskRequest) -> str:
@@ -1878,12 +1891,37 @@ def _run_dynamic_investigation(
         )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
     planning_warning = ""
+    evidence_plan_statuses: list[dict[str, Any]] = []
     try:
-        plan = build_investigation_plan(intent.intent, ranking.metadata, entities)
+        plan = build_investigation_plan(
+            intent.intent,
+            ranking.metadata,
+            entities,
+            debug_events=evidence_plan_statuses,
+        )
     except Exception as exc:
         plan = []
         planning_warning = f"Evidence SQL planning was skipped because generated SQL did not pass safety validation: {exc}"
-    evidence = execute_evidence_plan(connector, plan)
+        evidence_plan_statuses.append(
+            {
+                "query_id": "PLAN",
+                "purpose": "build_investigation_plan",
+                "status": "failed",
+                "reason": str(exc),
+                "sql": "",
+            }
+        )
+    if not plan:
+        evidence_plan_statuses.append(
+            {
+                "query_id": "PLAN",
+                "purpose": "build_investigation_plan",
+                "status": "failed",
+                "reason": "EVIDENCE_PLANNING_FAILED:empty_validated_plan",
+                "sql": "",
+            }
+        )
+    evidence = execute_evidence_plan(connector, plan, plan_statuses=evidence_plan_statuses)
     for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:
             continue
@@ -2266,14 +2304,25 @@ def _run_dynamic_investigation(
         item for item in evidence_gate.confirmed_facts
         if "relationship" in item.lower() or "parent-child" in item.lower()
     ]
+    executed_any_query = any(item.get("status") == "executed" for item in evidence_plan_statuses)
     evidence_gate_reason = (
         "Issue reproduced from connected database evidence."
         if evidence_gate.reproduced
         else "; ".join(evidence_gate.blocking_reasons)
     )
+    ai_debug_trace_payload = sanitize_ai_trace(ai_debug_trace or {})
+    ai_debug_trace_payload["evidence_plan_statuses"] = evidence_plan_statuses
+    ai_debug_trace_payload["evidence_plan_summary"] = {
+        "planned": sum(1 for item in evidence_plan_statuses if item.get("status") == "planned"),
+        "validated": sum(1 for item in evidence_plan_statuses if item.get("status") == "validated"),
+        "executed": sum(1 for item in evidence_plan_statuses if item.get("status") == "executed"),
+        "rejected": sum(1 for item in evidence_plan_statuses if item.get("status") == "rejected"),
+        "failed": sum(1 for item in evidence_plan_statuses if item.get("status") == "failed"),
+        "executed_any_query": executed_any_query,
+    }
     investigation_metadata = {
         "investigation_id": report.cover.investigation_id,
-        "detected_intent": intent.intent.value,
+        "detected_intent": _detected_intent_with_planning_status(intent.intent.value, evidence_plan_statuses),
         "raw_extracted_entity": transfer_normalization_trace.raw_extracted_entity,
         "normalized_entity": transfer_normalization_trace.normalized_entity,
         "entity_type": transfer_normalization_trace.entity_type,
@@ -2320,7 +2369,7 @@ def _run_dynamic_investigation(
         "report_storage": json.dumps(report_storage_references(generated_report), default=str),
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
-        "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
+        "ai_debug_trace": json.dumps(ai_debug_trace_payload, default=str),
         "answer_provenance": answer_provenance,
         "primary_entity": json.dumps({
             "table": evidence_focus.affected_object,

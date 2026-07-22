@@ -3,10 +3,11 @@ import pytest
 from legacydb_copilot.agents.entity_extraction_agent import extract_entities
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
+from legacydb_copilot.services.evidence_execution_service import execute_evidence_plan
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.safe_sql_service import plan_safe_queries
+from legacydb_copilot.services.safe_sql_service import PlannedQuery, plan_safe_queries
 from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
 
 
@@ -305,4 +306,103 @@ def test_transfer_evidence_gate_fails_with_precise_reason_when_key_not_found() -
 
     assert not gate.reproduced
     assert any("Supplied business key not found" in reason for reason in gate.blocking_reasons)
+
+
+def test_primary_transfer_lookup_survives_child_query_rejection(monkeypatch: pytest.MonkeyPatch) -> None:
+    metadata = _metadata()
+    entities = extract_entities("Investigate transfer TRF-3101 across accounts and transactions")
+
+    original_validate = __import__(
+        "legacydb_copilot.services.safe_sql_service",
+        fromlist=["validate_read_only_sql"],
+    ).validate_read_only_sql
+
+    def reject_join_only(sql: str) -> None:
+        if " join " in sql.lower():
+            raise ValueError("Ambiguous join projection")
+        original_validate(sql)
+
+    monkeypatch.setattr(
+        "legacydb_copilot.services.safe_sql_service.validate_read_only_sql",
+        reject_join_only,
+    )
+
+    plan_statuses: list[dict] = []
+    queries = plan_safe_queries(
+        InvestigationIntent.PRODUCTION_INVESTIGATION,
+        metadata,
+        entities,
+        debug_events=plan_statuses,
+    )
+
+    assert queries
+    assert any("FROM eval.transfers" in query.sql and "BusinessKey" in query.sql for query in queries)
+    assert any(item["status"] == "rejected" and "validator_rejected" in item["reason"] for item in plan_statuses)
+    assert any(item["status"] == "validated" and "eval.transfers" in item["sql"] for item in plan_statuses)
+
+
+def test_single_invalid_join_does_not_remove_valid_primary_query(monkeypatch: pytest.MonkeyPatch) -> None:
+    metadata = _metadata()
+    entities = extract_entities("Investigate transfer TRF-3101")
+
+    original_supporting = __import__(
+        "legacydb_copilot.services.safe_sql_service",
+        fromlist=["_supporting_transfer_relationship_queries"],
+    )._supporting_transfer_relationship_queries
+
+    def supporting_with_invalid_join(md, ent, debug_events=None):
+        return [
+            PlannedQuery(
+                purpose="Invalid child join",
+                sql="SELECT * FROM eval.transfers t JOIN eval.accounts s ON s.account_id = t.account_id; DELETE FROM eval.accounts",
+            ),
+            *original_supporting(md, ent, debug_events=debug_events),
+        ]
+
+    monkeypatch.setattr(
+        "legacydb_copilot.services.safe_sql_service._supporting_transfer_relationship_queries",
+        supporting_with_invalid_join,
+    )
+
+    plan_statuses: list[dict] = []
+    queries = plan_safe_queries(
+        InvestigationIntent.PRODUCTION_INVESTIGATION,
+        metadata,
+        entities,
+        debug_events=plan_statuses,
+    )
+
+    assert any("FROM eval.transfers" in query.sql and "BusinessKey" in query.sql for query in queries)
+    assert any(item["status"] == "rejected" and "Invalid child join" in item["purpose"] for item in plan_statuses)
+    assert any(item["status"] == "validated" and "Prove requested entity exists in eval.transfers" == item["purpose"] for item in plan_statuses)
+
+
+def test_trf_primary_lookup_executes_and_returns_transfer_row() -> None:
+    class FakeConnector:
+        engine_type = "sql_server"
+
+        def estimate_table_rows(self, _table_name: str) -> int:
+            return 10
+
+        def execute_read_only_query(self, sql: str, limit: int = 100):
+            if "FROM eval.transfers" in sql and "TRF-3101" in sql:
+                return [{"TransfersId": 3101, "BusinessKey": "TRF-3101", "Status": "Completed"}]
+            return []
+
+    evidence_statuses: list[dict] = []
+    evidence = execute_evidence_plan(
+        FakeConnector(),
+        [
+            PlannedQuery(
+                purpose="Prove requested entity exists in eval.transfers",
+                sql="SELECT TransfersId, BusinessKey, Status FROM eval.transfers WHERE CAST(BusinessKey AS NVARCHAR(MAX)) = 'TRF-3101'",
+                query_id="Q-PRIMARY",
+            )
+        ],
+        plan_statuses=evidence_statuses,
+    )
+
+    assert evidence and evidence[0].rows
+    assert evidence[0].rows[0]["BusinessKey"] == "TRF-3101"
+    assert any(item["status"] == "executed" and item["query_id"] == "Q-PRIMARY" for item in evidence_statuses)
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
@@ -11,11 +13,29 @@ from legacydb_copilot.services.problem_phrase_service import parse_problem_phras
 from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass(frozen=True)
 class PlannedQuery:
     purpose: str
     sql: str
     risk: str = "Read-only"
+    query_id: str = ""
+
+
+def _record_plan_event(events: list[dict[str, Any]] | None, *, query: PlannedQuery, status: str, reason: str = "") -> None:
+    if events is None:
+        return
+    events.append(
+        {
+            "query_id": query.query_id,
+            "purpose": query.purpose,
+            "status": status,
+            "reason": reason,
+            "sql": query.sql,
+        }
+    )
 
 
 @dataclass(frozen=True)
@@ -698,6 +718,7 @@ def _transfer_primary_query(metadata: MetadataSearchResult, entities: EntityExtr
 def _supporting_transfer_relationship_queries(
     metadata: MetadataSearchResult,
     entities: EntityExtractionResult,
+    debug_events: list[dict[str, Any]] | None = None,
 ) -> list[PlannedQuery]:
     transfer_id = _typed_transfer_identifier(entities)
     if not transfer_id:
@@ -769,6 +790,18 @@ def _supporting_transfer_relationship_queries(
                 )
             )
             break
+        if not joined:
+            candidate = PlannedQuery(
+                purpose=f"Inspect {role} relationship evidence in {table.name}",
+                sql=f"SELECT * FROM {table.name}",
+                query_id=f"REL-FILTER-{table.name}",
+            )
+            _record_plan_event(
+                debug_events,
+                query=candidate,
+                status="rejected",
+                reason="relationship_filtering:no_join_path_discovered",
+            )
     return supporting[:8]
 
 
@@ -1835,7 +1868,12 @@ def _duplicate_like_investigation(intent: InvestigationIntent, entities: EntityE
     return any(term in text for term in ("duplicate", "duplicated", "two", "multiple", "double", "created twice"))
 
 
-def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResult, entities: EntityExtractionResult) -> list[PlannedQuery]:
+def plan_safe_queries(
+    intent: InvestigationIntent,
+    metadata: MetadataSearchResult,
+    entities: EntityExtractionResult,
+    debug_events: list[dict[str, Any]] | None = None,
+) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -1892,7 +1930,7 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
         )
         planned.extend(_missing_flow_diagnostic_queries(metadata, entities, missing_child_flow))
     planned.extend(_entity_and_condition_queries(metadata, entities))
-    planned.extend(_supporting_transfer_relationship_queries(metadata, entities))
+    planned.extend(_supporting_transfer_relationship_queries(metadata, entities, debug_events=debug_events))
     if duplicate_child_flow:
         planned.extend(
             [
@@ -1974,15 +2012,65 @@ def plan_safe_queries(intent: InvestigationIntent, metadata: MetadataSearchResul
                         sql=f"SELECT {', '.join(table.columns[:8])} FROM {table.name}{where}",
                     )
                 )
-    safe: list[PlannedQuery] = []
-    for query in planned:
-        sql = ensure_limit(query.sql)
-        try:
-            validate_read_only_sql(sql)
-        except ValueError:
+    staged: list[PlannedQuery] = []
+    for index, query in enumerate(planned, start=1):
+        staged_query = PlannedQuery(
+            purpose=query.purpose,
+            sql=query.sql,
+            risk=query.risk,
+            query_id=f"Q-{index}",
+        )
+        _record_plan_event(debug_events, query=staged_query, status="planned", reason="candidate_created")
+        logger.info("evidence_plan planned %s %s", staged_query.query_id, staged_query.purpose)
+        sql = ensure_limit(staged_query.sql)
+        if sql != staged_query.sql:
+            _record_plan_event(debug_events, query=staged_query, status="planned", reason="normalized_sql")
+            staged_query = PlannedQuery(
+                purpose=staged_query.purpose,
+                sql=sql,
+                risk=staged_query.risk,
+                query_id=staged_query.query_id,
+            )
+        staged.append(staged_query)
+
+    validated: list[PlannedQuery] = []
+    seen_sql: set[str] = set()
+    for query in staged:
+        dedup_key = re.sub(r"\s+", " ", query.sql.strip()).lower()
+        if dedup_key in seen_sql:
+            _record_plan_event(
+                debug_events,
+                query=query,
+                status="rejected",
+                reason="deduplication:duplicate_sql_after_normalization",
+            )
+            logger.info("evidence_plan rejected %s duplicate_sql_after_normalization", query.query_id)
             continue
-        safe.append(PlannedQuery(query.purpose, sql, query.risk))
-    return safe[:max_queries]
+        seen_sql.add(dedup_key)
+        try:
+            validate_read_only_sql(query.sql)
+        except ValueError as exc:
+            _record_plan_event(
+                debug_events,
+                query=query,
+                status="rejected",
+                reason=f"validator_rejected:{exc}",
+            )
+            logger.warning("evidence_plan rejected %s %s", query.query_id, exc)
+            continue
+        _record_plan_event(debug_events, query=query, status="validated", reason="read_only_validator_passed")
+        validated.append(query)
+
+    safe = validated[:max_queries]
+    for dropped in validated[max_queries:]:
+        _record_plan_event(
+            debug_events,
+            query=dropped,
+            status="rejected",
+            reason="relationship_filtering:max_query_limit",
+        )
+        logger.info("evidence_plan rejected %s max_query_limit", dropped.query_id)
+    return safe
 
 
 def _cast_to_text(expression: str, engine_type: str | None) -> str:

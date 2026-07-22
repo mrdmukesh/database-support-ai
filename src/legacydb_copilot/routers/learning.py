@@ -35,6 +35,27 @@ from legacydb_copilot.services.report_snapshot_service import report_from_dict
 router = APIRouter(prefix="/learning", tags=["learning"])
 
 
+def _persisted_trace_fields(investigation: InvestigationModel) -> dict[str, object]:
+    """Return stable trace fields stored in ai_debug_trace_json for evidence/audit retrieval."""
+    try:
+        trace = json.loads(investigation.ai_debug_trace_json or "{}")
+        if not isinstance(trace, dict):
+            trace = {}
+    except (TypeError, json.JSONDecodeError):
+        trace = {}
+    keys = [
+        "raw_extracted_entity",
+        "normalized_entity",
+        "entity_type",
+        "normalization_rule_used",
+        "selected_primary_object",
+        "selected_business_key",
+        "evidence_gate_reason",
+        "ai_outcome",
+    ]
+    return {key: trace.get(key) for key in keys}
+
+
 def _get_investigation(db: Session, investigation_id: str) -> InvestigationModel:
     """
     Owner: Mukesh Dabi
@@ -287,6 +308,7 @@ def get_investigation(
         "status": investigation.status,
         "created_at": investigation.created_at,
         "report": _report_links_for_investigation(investigation),
+        "trace": _persisted_trace_fields(investigation),
     }
 
 

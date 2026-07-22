@@ -297,6 +297,7 @@ jobs:
                 --resource-group "$AZURE_RESOURCE_GROUP" \
                 --image "$IMAGE" \
                 --set-env-vars \
+                  "APPLICATION_COMMIT=${{ github.sha }}" \
                   "APP_ENV=production" \
                   "DATABASE_URL=secretref:database-url" \
                   "JWT_SECRET=secretref:jwt-secret" \
@@ -329,6 +330,7 @@ jobs:
                   "storage-connection-string=$STORAGE_CONNECTION_STRING" \
                   "${OPENAI_SECRET_ARGS[@]}" \
                 --env-vars \
+                  "APPLICATION_COMMIT=${{ github.sha }}" \
                   "APP_ENV=production" \
                   "DATABASE_URL=secretref:database-url" \
                   "JWT_SECRET=secretref:jwt-secret" \

@@ -732,7 +732,9 @@ def _supporting_transfer_relationship_queries(
                 continue
             child_col = fk_columns[0]
             parent_col = ref_columns[0]
-            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            columns = ", ".join(f"s.{column}" for column in table.columns[:8]) if table.columns else "s.*"
+            order_col = table.columns[0] if table.columns else None
+            order_by = f" ORDER BY s.{order_col}" if order_col else ""
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
@@ -740,6 +742,7 @@ def _supporting_transfer_relationship_queries(
                         f"SELECT {columns} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{child_col} = t.{parent_col} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                        f"{order_by}"
                     ),
                 )
             )
@@ -757,7 +760,9 @@ def _supporting_transfer_relationship_queries(
                 continue
             transfer_fk = fk_columns[0]
             related_pk = ref_columns[0]
-            columns = ", ".join(table.columns[:8]) if table.columns else "*"
+            columns = ", ".join(f"s.{column}" for column in table.columns[:8]) if table.columns else "s.*"
+            order_col = table.columns[0] if table.columns else None
+            order_by = f" ORDER BY s.{order_col}" if order_col else ""
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
@@ -765,6 +770,7 @@ def _supporting_transfer_relationship_queries(
                         f"SELECT {columns} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{related_pk} = t.{transfer_fk} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                        f"{order_by}"
                     ),
                 )
             )

@@ -9,6 +9,7 @@ from sqlalchemy.engine import Engine
 
 from legacydb_copilot.common import DomainError
 from legacydb_copilot.databases import DatabaseEngine
+from legacydb_copilot.services.sql_dialect_service import apply_row_limit, resolve_sql_dialect
 
 
 class BaseDatabaseAdapter(ABC):
@@ -362,11 +363,7 @@ class BaseDatabaseAdapter(ABC):
         Safety considerations:
             Must preserve read-only investigation behavior and avoid modifying customer databases.
         """
-        stripped = sql.strip().rstrip(";")
-        lowered = stripped.lower()
-        if not lowered.startswith("select") or _has_limit_clause(lowered):
-            return stripped
-        return f"{stripped} LIMIT {limit}"
+        return apply_row_limit(sql, limit, resolve_sql_dialect(self.engine_type))
 
 
 class MySQLAdapter(BaseDatabaseAdapter):
@@ -858,11 +855,7 @@ class SQLServerAdapter(BaseDatabaseAdapter):
         Safety considerations:
             Must preserve read-only investigation behavior and avoid modifying customer databases.
         """
-        stripped = sql.strip().rstrip(";")
-        lowered = stripped.lower()
-        if not lowered.startswith("select") or _has_limit_clause(lowered):
-            return stripped
-        return re.sub(r"^\s*select\b", f"SELECT TOP {limit}", stripped, count=1, flags=re.I)
+        return apply_row_limit(sql, limit, resolve_sql_dialect(self.engine_type))
 
 
 class SQLiteAdapter(BaseDatabaseAdapter):
@@ -969,11 +962,7 @@ class OracleAdapter(BaseDatabaseAdapter):
         Safety considerations:
             Must preserve read-only investigation behavior and avoid modifying customer databases.
         """
-        stripped = sql.strip().rstrip(";")
-        lowered = stripped.lower()
-        if not lowered.startswith("select") or _has_limit_clause(lowered):
-            return stripped
-        return f"{stripped} FETCH FIRST {limit} ROWS ONLY"
+        return apply_row_limit(sql, limit, resolve_sql_dialect(self.engine_type))
 
 
 def adapter_for(engine_type: DatabaseEngine, engine: Engine) -> BaseDatabaseAdapter:

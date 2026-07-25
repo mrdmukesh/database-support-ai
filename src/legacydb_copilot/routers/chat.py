@@ -1999,6 +1999,7 @@ def _run_dynamic_investigation(
             ranking.metadata,
             entities,
             debug_events=evidence_plan_statuses,
+            provider=connection.engine,
         )
     except Exception as exc:
         plan = []
@@ -2022,7 +2023,12 @@ def _run_dynamic_investigation(
                 "sql": "",
             }
         )
-    evidence = execute_evidence_plan(connector, plan, plan_statuses=evidence_plan_statuses)
+    evidence = execute_evidence_plan(
+        connector,
+        plan,
+        plan_statuses=evidence_plan_statuses,
+        provider=connection.engine,
+    )
     for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:
             continue

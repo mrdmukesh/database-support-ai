@@ -11,6 +11,12 @@ from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_ob
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms, terms_match_table
 from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
+from legacydb_copilot.services.sql_dialect_service import (
+    SqlDialect,
+    apply_row_limit,
+    resolve_sql_dialect,
+    validate_sql_dialect,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -98,7 +104,7 @@ class ProductionReadSafetyValidator:
         self.max_rows = max_rows
         self.allow_full_table_scan = allow_full_table_scan
         self.row_estimates = {key.lower(): value for key, value in (row_estimates or {}).items()}
-        self.engine_type = (engine_type or "").lower()
+        self.dialect = resolve_sql_dialect(engine_type) if engine_type else None
 
     def validate(self, sql: str) -> ProductionReadSafetyResult:
         """
@@ -143,7 +149,13 @@ class ProductionReadSafetyValidator:
             return ProductionReadSafetyResult(stripped)
         if self._can_auto_limit(table_name):
             return ProductionReadSafetyResult(
-                _add_exploration_limit(stripped, self.max_rows, self.engine_type),
+                apply_row_limit(
+                    stripped,
+                    self.max_rows,
+                    self.dialect
+                    if self.dialect is not None
+                    else resolve_sql_dialect(None),
+                ),
                 changed=True,
                 reason="Production scan protection: added investigation row limit.",
             )
@@ -452,11 +464,7 @@ def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None)
     Safety considerations:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
-    if _has_limit_clause(sql):
-        return sql
-    if (engine_type or "").lower() == "sql_server":
-        return re.sub(r"^\s*select\b", f"SELECT TOP {limit}", sql, count=1, flags=re.I)
-    return f"{sql} LIMIT {limit}"
+    return apply_row_limit(sql, limit, resolve_sql_dialect(engine_type))
 
 
 def validate_read_only_sql(sql: str) -> None:
@@ -1888,6 +1896,8 @@ def plan_safe_queries(
     metadata: MetadataSearchResult,
     entities: EntityExtractionResult,
     debug_events: list[dict[str, Any]] | None = None,
+    *,
+    provider: Any | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -1911,6 +1921,8 @@ def plan_safe_queries(
         Unsafe candidates are discarded before returning the plan.
     """
 
+    dialect_source = provider if provider is not None else metadata.engine_type
+    dialect = resolve_sql_dialect(dialect_source) if dialect_source else None
     planned: list[PlannedQuery] = []
     transfer_primary = _transfer_primary_query(metadata, entities)
     if transfer_primary:
@@ -2063,6 +2075,13 @@ def plan_safe_queries(
             continue
         seen_sql.add(dedup_key)
         try:
+            if dialect is not None:
+                validate_sql_dialect(
+                    query.sql,
+                    dialect,
+                    planner_step="safe_sql_planner",
+                    query_id=query.query_id,
+                )
             validate_read_only_sql(query.sql)
         except ValueError as exc:
             _record_plan_event(

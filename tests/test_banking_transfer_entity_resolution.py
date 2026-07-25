@@ -379,7 +379,7 @@ def test_single_invalid_join_does_not_remove_valid_primary_query(monkeypatch: py
 
 def test_trf_primary_lookup_executes_and_returns_transfer_row() -> None:
     class FakeConnector:
-        engine_type = "sql_server"
+        database_engine = "sql_server"
 
         def estimate_table_rows(self, _table_name: str) -> int:
             return 10

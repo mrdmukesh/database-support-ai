@@ -303,7 +303,7 @@ def test_production_read_safety_allows_count_discovery() -> None:
 
 
 def test_production_read_safety_auto_limits_small_lookup_tables() -> None:
-    result = ProductionReadSafetyValidator(max_rows=100).validate("SELECT * FROM small_lookup_table")
+    result = ProductionReadSafetyValidator(max_rows=100, engine_type="postgresql").validate("SELECT * FROM small_lookup_table")
 
     assert result.sql == "SELECT * FROM small_lookup_table LIMIT 100"
     assert result.changed is True
@@ -319,6 +319,8 @@ def test_production_read_safety_blocks_large_row_estimate_without_filter() -> No
 
 def test_evidence_execution_reports_sql_modified_for_production_safety(monkeypatch) -> None:
     class FakeConnector:
+        database_engine = "postgresql"
+
         def execute_read_only_query(self, sql: str, limit: int = 100):
             assert sql == "SELECT * FROM small_lookup_table LIMIT 100"
             return [{"code": "ACTIVE"}]

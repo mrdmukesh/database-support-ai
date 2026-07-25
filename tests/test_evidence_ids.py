@@ -7,6 +7,8 @@ from legacydb_copilot.services.safe_sql_service import PlannedQuery
 
 
 class FakeConnector:
+    database_engine = "sqlite"
+
     def execute_read_only_query(self, sql: str, limit: int = 100):
         return [{"value": sql}]
 

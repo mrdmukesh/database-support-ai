@@ -8,6 +8,7 @@ from typing import Any
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, validate_read_only_sql
+from legacydb_copilot.services.sql_dialect_service import resolve_sql_dialect, validate_sql_dialect
 
 
 _evidence_id_sequence = count(1)
@@ -33,6 +34,8 @@ def execute_evidence_plan(
     connector,
     plan: list[PlannedQuery],
     plan_statuses: list[dict[str, Any]] | None = None,
+    *,
+    provider: Any | None = None,
 ) -> list[EvidenceResult]:
     """
     Owner: Mukesh Dabi
@@ -57,16 +60,37 @@ def execute_evidence_plan(
 
     evidence: list[EvidenceResult] = []
     settings = Settings.from_env()
+    trusted_provider = (
+        provider
+        if provider is not None
+        else (
+            getattr(connector, "database_engine", None)
+            or getattr(connector, "engine_type", None)
+        )
+    )
+    dialect = resolve_sql_dialect(trusted_provider)
     validator = ProductionReadSafetyValidator(
         max_rows=settings.max_investigation_rows,
         allow_full_table_scan=settings.allow_full_table_scan,
         row_estimates=_row_estimates_for_plan(connector, plan),
-        engine_type=str(getattr(connector, "engine_type", "") or getattr(connector, "engine", "") or ""),
+        engine_type=dialect.value,
     )
     for index, query in enumerate(plan, start=1):
         try:
+            validate_sql_dialect(
+                query.sql,
+                dialect,
+                planner_step="evidence_execution_preflight",
+                query_id=query.query_id or f"Q-{index}",
+            )
             validate_read_only_sql(query.sql)
             safe_read = validator.validate(query.sql)
+            validate_sql_dialect(
+                safe_read.sql,
+                dialect,
+                planner_step="production_read_safety",
+                query_id=query.query_id or f"Q-{index}",
+            )
             rows = connector.execute_read_only_query(safe_read.sql, limit=settings.max_investigation_rows)
             if plan_statuses is not None:
                 plan_statuses.append(

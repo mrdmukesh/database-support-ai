@@ -13,6 +13,8 @@ def build_investigation_plan(
     metadata: MetadataSearchResult,
     entities: EntityExtractionResult,
     debug_events: list[dict[str, Any]] | None = None,
+    *,
+    provider: Any | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -34,4 +36,10 @@ def build_investigation_plan(
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    return plan_safe_queries(intent, metadata, entities, debug_events=debug_events)
+    return plan_safe_queries(
+        intent,
+        metadata,
+        entities,
+        debug_events=debug_events,
+        provider=provider,
+    )

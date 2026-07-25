@@ -1,0 +1,36 @@
+{
+  "status": "PASS",
+  "package_path": "C:\\Users\\Admin\\Downloads\\EvaluationDatabasePack_v2.0\\EvaluationDatabasePack_v2.0",
+  "legacy_name_occurrences": 0,
+  "json_files_valid": true,
+  "workbooks": {
+    "GroundTruthAnswers.xlsx": {
+      "zip_parse": "PASS",
+      "sheet_name": "Ground Truth",
+      "rows": 502,
+      "expected_replacement_cells": 500,
+      "logical_value_mismatches": 0,
+      "unexpected_nonblank_cells": 0,
+      "formula_count": 0
+    },
+    "InvestigationQuestions.xlsx": {
+      "zip_parse": "PASS",
+      "sheet_name": "Investigation Questions",
+      "rows": 502,
+      "expected_replacement_cells": 500,
+      "logical_value_mismatches": 0,
+      "unexpected_nonblank_cells": 0,
+      "formula_count": 0
+    }
+  },
+  "installation_order": [
+    "Tables.sql",
+    "ForeignKeys.sql",
+    "SeedData.sql",
+    "Views.sql",
+    "StoredProcedures.sql",
+    "Functions.sql",
+    "Triggers.sql"
+  ],
+  "destructive_create_scripts_excluded": true
+}

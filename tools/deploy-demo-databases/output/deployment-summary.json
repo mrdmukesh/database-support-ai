@@ -1,0 +1,30 @@
+﻿{
+    "timestamp":  "2026-07-25T17:01:08.9877504Z",
+    "subscription_id":  "56ab486d-2488-4367-8b76-10e5aced04b7",
+    "subscription_name":  "MRDMUKESH",
+    "resource_group":  "rg-database-support-ai-dev",
+    "server":  "sql-dsai-eval-56ab486d",
+    "environment":  "Demo",
+    "results":  [
+                    {
+                        "database":  "DemoBankingV2",
+                        "status":  "CREATED_AND_INSTALLED"
+                    },
+                    {
+                        "database":  "DemoPayrollV2",
+                        "status":  "CREATED_AND_INSTALLED"
+                    },
+                    {
+                        "database":  "DemoOrdersV2",
+                        "status":  "CREATED_AND_INSTALLED"
+                    },
+                    {
+                        "database":  "DemoShippingV2",
+                        "status":  "CREATED_AND_INSTALLED"
+                    },
+                    {
+                        "database":  "DemoClinicV2",
+                        "status":  "CREATED_AND_INSTALLED"
+                    }
+                ]
+}

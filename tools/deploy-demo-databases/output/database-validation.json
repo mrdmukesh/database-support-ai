@@ -1,0 +1,72 @@
+﻿[
+    {
+        "database":  "DemoBankingV2",
+        "status":  "PASS",
+        "output":  [
+                       "database_name,table_count,primary_key_count,foreign_key_count,index_count,view_count,procedure_count,function_count,trigger_count",
+                       "-------------,-----------,-----------------,-----------------,-----------,----------,---------------,--------------,-------------",
+                       "DemoBankingV2,18,18,11,252,4,3,2,1",
+                       "",
+                       "seed_row_count",
+                       "--------------",
+                       "9542",
+                       ""
+                   ]
+    },
+    {
+        "database":  "DemoPayrollV2",
+        "status":  "PASS",
+        "output":  [
+                       "database_name,table_count,primary_key_count,foreign_key_count,index_count,view_count,procedure_count,function_count,trigger_count",
+                       "-------------,-----------,-----------------,-----------------,-----------,----------,---------------,--------------,-------------",
+                       "DemoPayrollV2,18,18,8,252,4,3,2,1",
+                       "",
+                       "seed_row_count",
+                       "--------------",
+                       "9145",
+                       ""
+                   ]
+    },
+    {
+        "database":  "DemoOrdersV2",
+        "status":  "PASS",
+        "output":  [
+                       "database_name,table_count,primary_key_count,foreign_key_count,index_count,view_count,procedure_count,function_count,trigger_count",
+                       "-------------,-----------,-----------------,-----------------,-----------,----------,---------------,--------------,-------------",
+                       "DemoOrdersV2,18,18,9,252,4,3,2,1",
+                       "",
+                       "seed_row_count",
+                       "--------------",
+                       "9505",
+                       ""
+                   ]
+    },
+    {
+        "database":  "DemoShippingV2",
+        "status":  "PASS",
+        "output":  [
+                       "database_name,table_count,primary_key_count,foreign_key_count,index_count,view_count,procedure_count,function_count,trigger_count",
+                       "-------------,-----------,-----------------,-----------------,-----------,----------,---------------,--------------,-------------",
+                       "DemoShippingV2,18,18,10,252,4,3,2,1",
+                       "",
+                       "seed_row_count",
+                       "--------------",
+                       "9199",
+                       ""
+                   ]
+    },
+    {
+        "database":  "DemoClinicV2",
+        "status":  "PASS",
+        "output":  [
+                       "database_name,table_count,primary_key_count,foreign_key_count,index_count,view_count,procedure_count,function_count,trigger_count",
+                       "-------------,-----------,-----------------,-----------------,-----------,----------,---------------,--------------,-------------",
+                       "DemoClinicV2,18,18,10,252,4,3,2,1",
+                       "",
+                       "seed_row_count",
+                       "--------------",
+                       "9098",
+                       ""
+                   ]
+    }
+]

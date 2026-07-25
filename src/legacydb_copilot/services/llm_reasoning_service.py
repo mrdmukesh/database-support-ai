@@ -204,6 +204,14 @@ def enhance_reasoning_with_llm(
             settings, payload, debug_trace=debug_trace, **audit_kwargs,
         )
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
+        if deterministic_reasoning.response_type == "insufficient_evidence":
+            enhanced = replace(
+                enhanced,
+                likely_root_causes=deterministic_reasoning.likely_root_causes,
+                recommended_fix=deterministic_reasoning.recommended_fix,
+                proof_of_fix=deterministic_reasoning.proof_of_fix,
+                response_type="evidence_summary_not_reproduced",
+            )
         if debug_trace is not None:
             debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
             debug_trace["final_report_claims"] = enhanced.likely_root_causes
@@ -320,8 +328,15 @@ def _build_llm_payload_unmasked(
         }
         for index, item in enumerate(correlated_evidence[:20], start=1)
     ]
+    summary_only = deterministic_reasoning.response_type == "insufficient_evidence"
     payload = {
-        "task": "Improve the database investigation reasoning using only this evidence. Do not create new SQL or facts.",
+        "reasoning_mode": "evidence_summary_not_reproduced" if summary_only else "root_cause_analysis",
+        "task": (
+            "Summarize only the verified evidence and factual timeline. State clearly that the reported defect "
+            "was not reproduced. Do not infer or recommend a root cause, and do not create new SQL or facts."
+            if summary_only
+            else "Improve the database investigation reasoning using only this evidence. Do not create new SQL or facts."
+        ),
         "question": question,
         "detected_intent": intent.intent.value,
         "intent_confidence": intent.confidence,

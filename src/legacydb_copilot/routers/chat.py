@@ -645,9 +645,14 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
     elif provenance == "AI_INVOCATION_FAILED":
         trace.setdefault("ai_reasoning_invoked", True)
         trace.setdefault("ai_outcome", "provider_failure")
-    elif provenance == "AI_ANSWERED":
+    elif provenance in {"AI_ANSWERED", "AI_SUMMARIZED_NOT_REPRODUCED"}:
         trace.setdefault("ai_reasoning_invoked", True)
-        trace.setdefault("ai_outcome", "success")
+        trace.setdefault(
+            "ai_outcome",
+            "evidence_summary_not_reproduced"
+            if provenance == "AI_SUMMARIZED_NOT_REPRODUCED"
+            else "success",
+        )
     elif detected_intent.startswith("INSUFFICIENT_DATABASE_EVIDENCE:"):
         reason = detected_intent.split(":", 1)[1].strip().lower()
         trace.setdefault("ai_reasoning_invoked", False)
@@ -1465,7 +1470,12 @@ def _self_validation_lines(*, target_context: dict[str, str], evidence, hypothes
     ]
 
 
-def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, str]:
+def _ai_reasoning_status(
+    *,
+    llm_configured: bool,
+    llm_used: bool,
+    evidence_gate=None,
+) -> dict[str, str]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -1496,6 +1506,20 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
             "evidence_citations": "Passed",
             "pii_masking": "Applied",
             "pii_masking_scope": "Names, emails, phone numbers, insurance/account identifiers were masked in the LLM evidence package.",
+        }
+    if evidence_gate is not None and evidence_gate.required and not evidence_gate.reproduced:
+        return {
+            "ai_assisted_reasoning": "Enabled (not invoked)",
+            "reason": (
+                f"Evidence gate blocked provider reasoning at {evidence_gate.failed_rule or 'an unspecified rule'}: "
+                f"expected {evidence_gate.expected_value or 'reproduction evidence'}; "
+                f"actual {evidence_gate.actual_value or 'not confirmed'}."
+            ),
+            "evidence_package_sent": "No",
+            "llm_evidence_validation": "Blocked before provider request",
+            "evidence_citations": "Not applicable",
+            "pii_masking": "Ready",
+            "pii_masking_scope": "No provider request occurred.",
         }
     if not settings.openai_api_key:
         return {
@@ -1545,9 +1569,13 @@ def _llm_audit_outcome(status: str, trace: dict[str, Any]) -> tuple[str, str]:
             return "PROVIDER_FAILED", str(trace.get("sanitized_error_reason") or "Provider request failed.")
         return "PROVIDER_INVOKED", "At least one provider request was submitted."
     if status == "AI_SKIPPED_BY_EVIDENCE_GATE":
-        return "AI_SKIPPED_BY_EVIDENCE_GATE", str(
-            trace.get("ai_skip_reason") or "The evidence gate did not permit LLM reasoning."
-        )
+        gate = trace.get("evidence_gate") if isinstance(trace.get("evidence_gate"), dict) else {}
+        rule = str(gate.get("failed_rule") or "").strip()
+        actual = str(gate.get("actual_value") or "").strip()
+        reason = str(trace.get("ai_skip_reason") or "The evidence gate did not permit LLM reasoning.")
+        if rule:
+            reason = f"{reason}; failed_rule={rule}; actual={actual or 'not confirmed'}"
+        return "AI_SKIPPED_BY_EVIDENCE_GATE", reason
     if trace.get("ai_skip_reason") == "entity_resolution_failed":
         return "ENTITY_RESOLUTION_FAILED", "Required entities could not be resolved."
     settings = Settings.from_env()
@@ -1939,7 +1967,14 @@ def _run_dynamic_investigation(
                 evidence_id=f"PROC-{index}",
             )
         )
-    evidence.extend(_expand_related_id_evidence(connector, ranking.metadata, evidence))
+    evidence.extend(
+        _expand_related_id_evidence(
+            connector,
+            ranking.metadata,
+            evidence,
+            active_metadata=resolution_metadata,
+        )
+    )
     correlated_evidence = correlate_evidence(
         evidence=evidence,
         procedure_analysis=procedure_analysis,
@@ -1976,21 +2011,59 @@ def _run_dynamic_investigation(
         documents=context.documents,
         evidence_focus=evidence_focus,
     )
+    summary_mode = (
+        evidence_gate.required
+        and not evidence_gate.reproduced
+        and evidence_gate.summary_mode_eligible
+    )
     if evidence_gate.required and not evidence_gate.reproduced:
         reasoning = unreproduced_reasoning(evidence_gate)
         llm_configured = llm_reasoning_enabled()
-        llm_used = False
         settings = Settings.from_env()
         ai_debug_trace = {
             "ai_reasoning_invoked": False,
             "ai_skip_reason": "evidence_gate_not_reproduced",
             "ai_outcome": "evidence_gate",
             "ai_skip_branch": "evidence_gate.required_and_not_reproduced",
+            "reasoning_mode": (
+                "evidence_summary_not_reproduced"
+                if summary_mode
+                else "blocked_not_reproduced"
+            ),
             "llm_model_name": settings.llm_model,
             "prompt_version": AI_REASONING_PROMPT_VERSION,
             "input_tokens": 0,
             "output_tokens": 0,
-        } if settings.ai_debug_trace_enabled else None
+        }
+        if summary_mode:
+            enhanced_reasoning = enhance_reasoning_with_llm(
+                question=payload.question,
+                intent=intent,
+                deterministic_reasoning=reasoning,
+                evidence=evidence,
+                correlated_evidence=correlated_evidence,
+                procedure_analysis=procedure_analysis,
+                documents=context.documents,
+                evidence_focus=evidence_focus,
+                settings=settings,
+                debug_trace=ai_debug_trace,
+                audit_db=db,
+                audit_context=InvocationContext(
+                    investigation_id=investigation_id,
+                    investigation_run_id=investigation_id,
+                    organization_id=payload.organization_id,
+                    workspace_id=payload.workspace_id,
+                    user_id=payload.user_id,
+                    correlation_id=investigation_id,
+                ),
+            )
+            llm_used = enhanced_reasoning is not reasoning
+            reasoning = enhanced_reasoning
+            if llm_used:
+                ai_debug_trace["ai_outcome"] = "evidence_summary_not_reproduced"
+                ai_debug_trace.pop("ai_skip_reason", None)
+        else:
+            llm_used = False
     else:
         reasoning = reason_about_evidence(
             payload.question,
@@ -2029,6 +2102,25 @@ def _run_dynamic_investigation(
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
+    logger.info(
+        "evidence_gate_decision investigation_id=%s run_id=%s entity_key=%s database=%s "
+        "evidence_item_count=%s sql_count=%s successful_sql_count=%s row_count=%s "
+        "reproduction_rule=%s reproduction_result=%s failed_gate_rule=%s "
+        "ai_reasoning_invoked=%s ai_skip_reason=%s",
+        investigation_id,
+        investigation_id,
+        evidence_focus.selected_business_key_value,
+        connection.name,
+        evidence_gate.evidence_item_count,
+        len(plan),
+        evidence_gate.successful_sql_count,
+        evidence_gate.returned_row_count,
+        evidence_gate.reproduction_rule,
+        evidence_gate.reproduced,
+        evidence_gate.failed_rule,
+        bool(ai_debug_trace and ai_debug_trace.get("ai_reasoning_invoked")),
+        None if llm_used else (ai_debug_trace or {}).get("ai_skip_reason"),
+    )
     if ai_debug_trace is not None:
         ai_debug_trace.update({
             "metadata_cache": getattr(active_schema_metadata, "cache_diagnostics", {}),
@@ -2084,7 +2176,11 @@ def _run_dynamic_investigation(
             confidence_notes.append(
                 f"- Verification check suggestions were skipped because generated check SQL did not pass safety validation: {exc}"
             )
-    ai_status = _ai_reasoning_status(llm_configured=llm_configured, llm_used=llm_used)
+    ai_status = _ai_reasoning_status(
+        llm_configured=llm_configured,
+        llm_used=llm_used,
+        evidence_gate=evidence_gate if not summary_mode else None,
+    )
     bundle = DynamicInvestigationBundle(
         question=payload.question,
         intent=intent,
@@ -2301,7 +2397,9 @@ def _run_dynamic_investigation(
         + "\n".join(f"- {item}" for item in reasoning.missing_evidence)
     )
     answer_provenance = (
-        "AI_SKIPPED_BY_EVIDENCE_GATE"
+        "AI_SUMMARIZED_NOT_REPRODUCED"
+        if evidence_gate.required and not evidence_gate.reproduced and llm_used
+        else "AI_SKIPPED_BY_EVIDENCE_GATE"
         if evidence_gate.required and not evidence_gate.reproduced
         else "AI_ANSWERED"
         if llm_used
@@ -2446,7 +2544,7 @@ def _entity_resolution_blocked_answer(connection_name: str, entities, result: En
     return message, [connection_name], 0.0, None, metadata
 
 
-def _expand_related_id_evidence(connector, metadata, evidence):
+def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadata=None):
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -2475,16 +2573,29 @@ def _expand_related_id_evidence(connector, metadata, evidence):
             for key, value in row.items():
                 normalized_key = re.sub(r"[^a-z0-9]", "", key.lower())
                 if normalized_key.endswith("id") and value not in (None, ""):
-                    id_values.setdefault(key, set()).add(value)
+                    id_values.setdefault(normalized_key, set()).add(value)
+    ranked_names = {table.name.casefold() for table in metadata.tables}
+    table_candidates = list(metadata.tables)
+    for table in getattr(active_metadata, "tables", []) if active_metadata else []:
+        if table.name.casefold() in {item.name.casefold() for item in table_candidates}:
+            continue
+        if any(re.sub(r"[^a-z0-9]", "", column.casefold()) in id_values for column in table.columns):
+            table_candidates.append(table)
     related_tables = sorted(
-        metadata.tables[:12],
-        key=lambda table: (not is_diagnostic_object(table.name), -table.score, table.name),
-    )
+        table_candidates,
+        key=lambda table: (
+            table.name.casefold() not in ranked_names,
+            not is_diagnostic_object(table.name),
+            -table.score,
+            table.name,
+        ),
+    )[:24]
     for table in related_tables:
         for column in table.columns:
-            if column not in id_values:
+            normalized_column = re.sub(r"[^a-z0-9]", "", column.casefold())
+            if normalized_column not in id_values:
                 continue
-            values = list(id_values[column])[:5]
+            values = list(id_values[normalized_column])[:5]
             literals = ", ".join(
                 str(value) if isinstance(value, int)
                 else "'" + str(value).replace("'", "''") + "'"
@@ -2504,11 +2615,7 @@ def _expand_related_id_evidence(connector, metadata, evidence):
 
                     related.append(
                         EvidenceResult(
-                            (
-                                f"Inspect duplicate correlated rows by {column} in {table.name}"
-                                if len(rows) > 1
-                                else f"Inspect correlated rows by {column} in {table.name}"
-                            ),
+                            f"Inspect correlated rows by {column} in {table.name}",
                             sql,
                             rows,
                             evidence_id=f"SQL-{len(evidence) + len(related) + 1}",

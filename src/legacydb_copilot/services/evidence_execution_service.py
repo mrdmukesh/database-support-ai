@@ -4,7 +4,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Any
+from typing import Any, Literal
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, validate_read_only_sql
@@ -28,6 +28,25 @@ class EvidenceResult:
     original_sql: str | None = None
     safety_note: str | None = None
     evidence_id: str = field(default_factory=_next_evidence_id)
+    execution_status: Literal["succeeded", "failed", "blocked", "timed_out"] = "succeeded"
+    evidence_semantics: Literal[
+        "positive_rows",
+        "verified_absence",
+        "aggregate",
+        "metadata",
+        "procedure_definition",
+        "not_applicable",
+        "execution_failure",
+    ] = "not_applicable"
+    supports_claim: str = ""
+
+    @property
+    def row_count(self) -> int:
+        return len(self.rows)
+
+    @property
+    def zero_row_result(self) -> bool:
+        return self.execution_status == "succeeded" and self.row_count == 0
 
 
 def execute_evidence_plan(
@@ -92,6 +111,7 @@ def execute_evidence_plan(
                 query_id=query.query_id or f"Q-{index}",
             )
             rows = connector.execute_read_only_query(safe_read.sql, limit=settings.max_investigation_rows)
+            semantics, supports_claim = _successful_evidence_semantics(query, safe_read.sql, rows)
             if plan_statuses is not None:
                 plan_statuses.append(
                     {
@@ -112,9 +132,13 @@ def execute_evidence_plan(
                     original_sql=query.sql if safe_read.changed else None,
                     safety_note=safe_read.reason or None,
                     evidence_id=f"SQL-{index}",
+                    execution_status="succeeded",
+                    evidence_semantics=semantics,
+                    supports_claim=supports_claim,
                 )
             )
         except Exception as exc:
+            execution_status = _failed_execution_status(exc)
             if plan_statuses is not None:
                 plan_statuses.append(
                     {
@@ -127,8 +151,59 @@ def execute_evidence_plan(
                     }
                 )
             logger.warning("evidence_plan failed %s %s", query.query_id or f"Q-{index}", exc)
-            evidence.append(EvidenceResult(query.purpose, query.sql, [], str(exc), evidence_id=f"SQL-{index}"))
+            evidence.append(
+                EvidenceResult(
+                    query.purpose,
+                    query.sql,
+                    [],
+                    str(exc),
+                    evidence_id=f"SQL-{index}",
+                    execution_status=execution_status,
+                    evidence_semantics="execution_failure",
+                )
+            )
     return evidence
+
+
+def _successful_evidence_semantics(
+    query: PlannedQuery,
+    sql: str,
+    rows: list[dict[str, Any]],
+) -> tuple[str, str]:
+    normalized = f"{query.purpose} {sql}".casefold()
+    if re.search(r"\b(count\s*\(|exists\s*\(|not\s+exists\b)", sql, re.I):
+        values = [value for row in rows for value in row.values()]
+        zero = bool(values) and all(
+            isinstance(value, (int, float, bool)) and int(value) == 0 for value in values
+        )
+        return "aggregate", (
+            f"The aggregate/existence query completed and verified a zero outcome for: {query.purpose}."
+            if zero
+            else f"The aggregate/existence query completed for: {query.purpose}."
+        )
+    if rows:
+        return "positive_rows", f"{len(rows)} verified row(s) support: {query.purpose}."
+    absence_markers = (
+        "missing", "without", "orphan", "not exist", "no matching", "downstream",
+        "related record", "duplicate", "absence",
+    )
+    declared = getattr(query, "evidence_semantics", "not_applicable")
+    if declared == "verified_absence" or any(marker in normalized for marker in absence_markers):
+        return "verified_absence", (
+            f"The query executed successfully and found no matching rows for: {query.purpose}."
+        )
+    return "not_applicable", ""
+
+
+def _failed_execution_status(exc: Exception) -> Literal["failed", "blocked", "timed_out"]:
+    text = f"{type(exc).__name__} {exc}".casefold()
+    if "timeout" in text or "timed out" in text:
+        return "timed_out"
+    if isinstance(exc, PermissionError) or any(
+        marker in text for marker in ("blocked", "rejected", "safety", "policy")
+    ):
+        return "blocked"
+    return "failed"
 
 
 def _row_estimates_for_plan(connector, plan: list[PlannedQuery]) -> dict[str, int]:

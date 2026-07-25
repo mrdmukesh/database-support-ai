@@ -579,6 +579,10 @@ def _evidence_to_json(evidence) -> str:
                 "purpose": getattr(item, "purpose", getattr(item, "title", "Evidence query")),
                 "sql": item.sql,
                 "row_count": len(item.rows),
+                "execution_status": item.execution_status,
+                "zero_row_result": item.zero_row_result,
+                "evidence_semantics": item.evidence_semantics,
+                "supports_claim": item.supports_claim,
                 "sample_rows": item.rows[:10],
                 "error": getattr(item, "error", None),
             }
@@ -2208,7 +2212,17 @@ def _run_dynamic_investigation(
             "ranked_objects": [asdict(item) for item in ranking.objects],
             "sql_plan": [asdict(item) for item in plan],
             "sql_evidence": [
-                {"evidence_id": item.evidence_id, "purpose": item.purpose, "sql": item.sql, "row_count": len(item.rows), "error": item.error}
+                {
+                    "evidence_id": item.evidence_id,
+                    "purpose": item.purpose,
+                    "sql": item.sql,
+                    "execution_status": item.execution_status,
+                    "row_count": item.row_count,
+                    "zero_row_result": item.zero_row_result,
+                    "evidence_semantics": item.evidence_semantics,
+                    "supports_claim": item.supports_claim,
+                    "error": item.error,
+                }
                 for item in evidence
             ],
             "evidence_gate": asdict(evidence_gate),

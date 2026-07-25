@@ -337,6 +337,10 @@ def _build_llm_payload_unmasked(
             "purpose": item.purpose,
             "sql_generated_by_safe_engine": item.sql,
             "row_count": len(item.rows),
+            "execution_status": item.execution_status,
+            "zero_row_result": item.zero_row_result,
+            "evidence_semantics": item.evidence_semantics,
+            "supports_claim": item.supports_claim,
             "sample_rows": item.rows[:5],
             "error": item.error,
         }

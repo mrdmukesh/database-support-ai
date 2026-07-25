@@ -212,7 +212,7 @@ def run_evidence_gate(
     verified_sql_row_count = sum(
         len(item.rows)
         for item in evidence
-        if item.sql.strip() and not item.error and item.rows
+        if item.sql.strip() and item.execution_status == "succeeded" and item.rows
     )
     key_values = [
         entity.value
@@ -226,9 +226,38 @@ def run_evidence_gate(
             facts.append(f"Supplied business key found in returned evidence: {', '.join(key_values[:3])}.")
         else:
             blockers.append(f"Supplied business key not found in returned rows: {', '.join(key_values[:3])}.")
-    affected_rows_exist = _affected_rows_exist(evidence, evidence_focus)
+    verified_absence_items = [
+        item
+        for item in evidence
+        if _is_relevant_negative_evidence(
+            item,
+            question=question,
+            intent=intent,
+            evidence_focus=evidence_focus,
+        )
+    ]
+    verified_sql_evidence_count = sum(
+        1
+        for item in evidence
+        if item.sql.strip()
+        and item.execution_status == "succeeded"
+        and (item.rows or item in verified_absence_items or item.evidence_semantics == "aggregate")
+    )
+    affected_rows_exist = _affected_rows_exist(
+        evidence,
+        evidence_focus,
+        question=question,
+        intent=intent,
+    )
     if affected_rows_exist:
-        facts.append("Affected rows were returned by safe SQL evidence.")
+        if verified_absence_items:
+            facts.extend(
+                item.supports_claim
+                or f"The query executed successfully and verified no matching rows for: {item.purpose}."
+                for item in verified_absence_items[:3]
+            )
+        else:
+            facts.append("Affected rows were returned by safe SQL evidence.")
     else:
         blockers.append("No affected rows were returned by the evidence plan.")
     relationship_exists = _relationship_exists(metadata, evidence, evidence_focus)
@@ -237,6 +266,9 @@ def run_evidence_gate(
     elif intent in {InvestigationIntent.PRODUCTION_INVESTIGATION, InvestigationIntent.DUPLICATE_DATA, InvestigationIntent.MISSING_DATA, InvestigationIntent.PROCESS_FLOW_BREAK}:
         blockers.append("Parent-child relationship was not confirmed by metadata or SQL join evidence.")
     condition_exists = _reported_condition_exists(question, intent, evidence, documents, status_notes)
+    if intent == InvestigationIntent.MISSING_DATA and verified_absence_items:
+        condition_exists = True
+        status_notes.append("Relevant successful zero-row SQL was classified as verified absence.")
     if condition_exists:
         facts.append("Reported condition was reproduced by returned evidence.")
     else:
@@ -246,7 +278,9 @@ def run_evidence_gate(
         blockers.append("Performance investigation lacks EXPLAIN or row-estimate evidence.")
     reproduction_rule = _reproduction_rule(intent)
     if not required:
-        verified_evidence = business_key_exists and affected_rows_exist and verified_sql_row_count > 0
+        verified_evidence = (
+            business_key_exists and affected_rows_exist and verified_sql_evidence_count > 0
+        )
         return EvidenceGateResult(
             False, True, business_key_exists, True, affected_rows_exist, relationship_exists,
             facts, [], [], status_notes, reproduction_rule=reproduction_rule,
@@ -256,7 +290,7 @@ def run_evidence_gate(
             permission_reason=(
                 "Verified deterministic SQL evidence is available."
                 if verified_evidence
-                else "No verified deterministic SQL rows are available."
+                else "No relevant verified deterministic SQL evidence is available."
             ),
         )
     relationship_ok = relationship_exists or intent in {
@@ -271,12 +305,14 @@ def run_evidence_gate(
         condition_exists=condition_exists,
         relationship_ok=relationship_ok,
     )
-    verified_evidence = business_key_exists and affected_rows_exist and verified_sql_row_count > 0
+    verified_evidence = (
+        business_key_exists and affected_rows_exist and verified_sql_evidence_count > 0
+    )
     reasoning_permission = "ALLOW_REASONING" if verified_evidence else "DENY_REASONING"
     permission_reason = (
         "Verified deterministic SQL evidence is available for evidence-grounded reasoning."
         if verified_evidence
-        else "Reasoning denied because no verified deterministic SQL rows support this investigation."
+        else "Reasoning denied because no relevant verified deterministic SQL evidence supports this investigation."
     )
     return EvidenceGateResult(
         required=required,
@@ -382,7 +418,13 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
     )
 
 
-def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus | None) -> bool:
+def _affected_rows_exist(
+    evidence: list[EvidenceResult],
+    evidence_focus: EvidenceFocus | None,
+    *,
+    question: str = "",
+    intent: InvestigationIntent = InvestigationIntent.GENERAL_DATABASE_QUESTION,
+) -> bool:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -404,7 +446,15 @@ def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: Evidenc
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
     if not evidence_focus or evidence_focus.affected_object == "Not determined":
-        return any(item.rows for item in evidence)
+        return any(item.rows for item in evidence) or any(
+            _is_relevant_negative_evidence(
+                item,
+                question=question,
+                intent=intent,
+                evidence_focus=evidence_focus,
+            )
+            for item in evidence
+        )
     affected = evidence_focus.affected_object.lower()
     return any(
         item.rows
@@ -413,7 +463,70 @@ def _affected_rows_exist(evidence: list[EvidenceResult], evidence_focus: Evidenc
             or "prove requested entity exists" in item.purpose.lower()
         )
         for item in evidence
+    ) or any(
+        _is_relevant_negative_evidence(
+            item,
+            question=question,
+            intent=intent,
+            evidence_focus=evidence_focus,
+        )
+        for item in evidence
     )
+
+
+def _is_relevant_negative_evidence(
+    item: EvidenceResult,
+    *,
+    question: str,
+    intent: InvestigationIntent,
+    evidence_focus: EvidenceFocus | None,
+) -> bool:
+    if item.execution_status != "succeeded" or item.error or not item.sql.strip():
+        return False
+    aggregate_values = [
+        value
+        for row in item.rows
+        for value in row.values()
+        if isinstance(value, (int, float, bool))
+    ]
+    aggregate_zero = (
+        item.evidence_semantics == "aggregate"
+        and bool(aggregate_values)
+        and all(int(value) == 0 for value in aggregate_values)
+    )
+    if not (item.zero_row_result and item.evidence_semantics == "verified_absence") and not aggregate_zero:
+        return False
+    if intent not in {InvestigationIntent.MISSING_DATA, InvestigationIntent.DUPLICATE_DATA}:
+        return False
+    text = f"{item.purpose} {item.sql}".casefold()
+    affected = (
+        evidence_focus.affected_object.casefold()
+        if evidence_focus and evidence_focus.affected_object != "Not determined"
+        else ""
+    )
+    if affected:
+        leaf = affected.split(".")[-1]
+        return affected in text or leaf in text
+    question_terms = {
+        term
+        for term in _semantic_tokens(question)
+        if term not in {"find", "check", "verify", "investigate", "records", "record"}
+    }
+    object_tokens = set(_semantic_tokens(text))
+    return bool(question_terms & object_tokens) and any(
+        marker in text
+        for marker in (
+            "missing", "without", "orphan", "not exists", "no matching",
+            "duplicate", "related", "inspect relevant rows",
+        )
+    )
+
+
+def _semantic_tokens(text: str) -> set[str]:
+    expanded = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    tokens = set(re.findall(r"[a-z][a-z0-9]{2,}", expanded.casefold()))
+    tokens.update(token[:-1] for token in tuple(tokens) if token.endswith("s") and len(token) > 4)
+    return tokens
 
 
 def _relationship_exists(metadata: MetadataSearchResult, evidence: list[EvidenceResult], evidence_focus: EvidenceFocus | None) -> bool:

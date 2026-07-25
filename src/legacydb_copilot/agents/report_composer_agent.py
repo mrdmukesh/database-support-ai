@@ -487,13 +487,20 @@ def _strongest_evidence_rows(bundle: DynamicInvestigationBundle) -> list[dict[st
     for item in bundle.evidence:
         if len(rows) >= 4:
             break
-        if item.rows or item.safety_note or item.error:
+        if item.rows or item.zero_row_result or item.safety_note or item.error:
+            if item.execution_status == "succeeded" and item.zero_row_result:
+                summary = (
+                    item.supports_claim
+                    or "The query executed successfully and found no matching rows for the tested scope."
+                )
+            else:
+                summary = item.error or f"{len(item.rows)} row(s) returned"
             rows.append(
                 {
                     "Evidence": item.purpose,
                     "Type": "SQL",
                     "Source": "Read-only evidence query",
-                    "Summary": item.error or f"{len(item.rows)} row(s) returned",
+                    "Summary": summary,
                 }
             )
     for proc in bundle.procedure_analysis:

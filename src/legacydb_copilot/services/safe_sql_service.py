@@ -28,6 +28,7 @@ class PlannedQuery:
     sql: str
     risk: str = "Read-only"
     query_id: str = ""
+    evidence_semantics: str = "not_applicable"
 
 
 def _record_plan_event(events: list[dict[str, Any]] | None, *, query: PlannedQuery, status: str, reason: str = "") -> None:
@@ -2046,6 +2047,7 @@ def plan_safe_queries(
             sql=query.sql,
             risk=query.risk,
             query_id=f"Q-{index}",
+            evidence_semantics=_planned_evidence_semantics(intent, query),
         )
         _record_plan_event(debug_events, query=staged_query, status="planned", reason="candidate_created")
         logger.info("evidence_plan planned %s %s", staged_query.query_id, staged_query.purpose)
@@ -2057,6 +2059,7 @@ def plan_safe_queries(
                 sql=sql,
                 risk=staged_query.risk,
                 query_id=staged_query.query_id,
+                evidence_semantics=staged_query.evidence_semantics,
             )
         staged.append(staged_query)
 
@@ -2105,6 +2108,24 @@ def plan_safe_queries(
         )
         logger.info("evidence_plan rejected %s max_query_limit", dropped.query_id)
     return safe
+
+
+def _planned_evidence_semantics(
+    intent: InvestigationIntent,
+    query: PlannedQuery,
+) -> str:
+    text = f"{query.purpose} {query.sql}".casefold()
+    if re.search(r"\b(count\s*\(|exists\s*\(|not\s+exists\b)", query.sql, re.I):
+        return "aggregate"
+    absence_markers = (
+        "missing", "without", "orphan", "not exist", "downstream",
+        "related record", "duplicate", "inspect relevant rows",
+    )
+    if intent in {InvestigationIntent.MISSING_DATA, InvestigationIntent.DUPLICATE_DATA} and any(
+        marker in text for marker in absence_markers
+    ):
+        return "verified_absence"
+    return query.evidence_semantics
 
 
 def _cast_to_text(expression: str, engine_type: str | None) -> str:

@@ -44,6 +44,28 @@ def test_ordered_sql_server_offset_fetch_is_preserved() -> None:
     assert apply_row_limit(sql, 100, SqlDialect.SQL_SERVER) == sql
 
 
+def test_existing_parenthesized_sql_server_top_is_unchanged() -> None:
+    sql = "SELECT TOP (100) EmployeeHistoryId FROM dbo.EmployeeHistory"
+    assert apply_row_limit(sql, 100, SqlDialect.SQL_SERVER) == sql
+
+
+def test_sql_server_select_without_top_receives_parenthesized_top() -> None:
+    assert apply_row_limit(
+        "SELECT EmployeeHistoryId FROM dbo.EmployeeHistory",
+        100,
+        SqlDialect.SQL_SERVER,
+    ) == "SELECT TOP (100) EmployeeHistoryId FROM dbo.EmployeeHistory"
+
+
+def test_sql_server_row_limit_transformation_is_idempotent() -> None:
+    original = "SELECT EmployeeHistoryId FROM dbo.EmployeeHistory"
+    once = apply_row_limit(original, 100, SqlDialect.SQL_SERVER)
+    twice = apply_row_limit(once, 100, SqlDialect.SQL_SERVER)
+    three_times = apply_row_limit(twice, 100, SqlDialect.SQL_SERVER)
+    assert once == twice == three_times
+    assert once.upper().count("TOP") == 1
+
+
 def test_unknown_provider_fails_closed() -> None:
     with pytest.raises(ValueError, match="missing or unsupported"):
         resolve_sql_dialect(None)

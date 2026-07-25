@@ -52,7 +52,11 @@ def apply_row_limit(select_sql: str, limit: int, dialect: SqlDialect) -> str:
 def _has_row_limit(sql: str) -> bool:
     return bool(
         re.search(r"\blimit\s+\d+\b", sql, re.I)
-        or re.match(r"^\s*select\s+top\s*(?:\(\s*\d+\s*\)|\d+)\b", sql, re.I)
+        or re.match(
+            r"^\s*select\s+top\s*(?:\(\s*\d+\s*\)|\d+)(?=\s|$)",
+            sql,
+            re.I,
+        )
         or re.search(r"\bfetch\s+(?:first|next)\s+\d+\s+rows\s+only\b", sql, re.I)
     )
 
@@ -94,4 +98,3 @@ def validate_sql_dialect(
         raise SqlDialectValidationError(
             SqlDialectDiagnostic(dialect.value, invalid_token, planner_step, query_id)
         )
-

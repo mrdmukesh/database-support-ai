@@ -338,6 +338,8 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     report_storage_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     report_snapshot_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     ai_debug_trace_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    llm_audit_outcome: Mapped[str] = mapped_column(String(80), default="", nullable=False, index=True)
+    llm_audit_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="AI_ANSWERED", nullable=False, index=True)
 
     workspace: Mapped["WorkspaceModel"] = relationship(back_populates="investigations")
@@ -598,6 +600,7 @@ class LLMInvocationAuditModel(UUIDPrimaryKeyMixin, Base):
     duration_ms: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     finish_reason: Mapped[str | None] = mapped_column(String(120))
+    provider_request_id: Mapped[str | None] = mapped_column(String(160), index=True)
     error_code: Mapped[str | None] = mapped_column(String(120))
     error_message_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
     retry_attempt: Mapped[int] = mapped_column(Integer, default=1, nullable=False)

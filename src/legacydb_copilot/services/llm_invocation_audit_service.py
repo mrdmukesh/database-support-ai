@@ -58,7 +58,49 @@ def payload_hash(value: Any) -> str:
 
 
 def _sanitized_json(value: Any) -> str:
-    return json.dumps(sanitize_ai_trace(value), ensure_ascii=False, default=str)
+    return json.dumps(sanitize_llm_audit_payload(value), ensure_ascii=False, default=str)
+
+
+def sanitize_llm_audit_payload(value: Any) -> Any:
+    """Apply the approved sanitizer and normalize placeholders for audit consumers."""
+    sanitized = sanitize_ai_trace(value)
+    if isinstance(sanitized, dict):
+        protected: dict[str, Any] = {}
+        for key, item in sanitized.items():
+            if key.lower() in {"rows", "sample_rows", "sql_results", "result_payload"}:
+                count = len(item) if isinstance(item, (list, tuple)) else None
+                protected[key] = {
+                    "redacted": "[REDACTED_PII]",
+                    "row_count": count,
+                }
+            else:
+                protected[key] = sanitize_llm_audit_payload(item)
+        return protected
+    if isinstance(sanitized, list):
+        return [sanitize_llm_audit_payload(item) for item in sanitized]
+    if not isinstance(sanitized, str):
+        return sanitized
+    replacements = {
+        "[MASKED_SECRET]": "[REDACTED_SECRET]",
+        "[MASKED_TOKEN]": "[REDACTED_TOKEN]",
+        "[MASKED_CONNECTION_STRING]": "[REDACTED_CONNECTION_STRING]",
+        "[MASKED_EMAIL]": "[REDACTED_PII]",
+        "[MASKED_PHONE]": "[REDACTED_PII]",
+        "[MASKED_IDENTIFIER]": "[REDACTED_PII]",
+        "[MASKED_NAME]": "[REDACTED_PII]",
+        "[MASKED_PII]": "[REDACTED_PII]",
+    }
+    for source, target in replacements.items():
+        sanitized = sanitized.replace(source, target)
+    return sanitized
+
+
+def _sanitized_prompt(value: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return str(sanitize_llm_audit_payload(value))
+    return json.dumps(sanitize_llm_audit_payload(parsed), ensure_ascii=False, default=str)
 
 
 class LLMInvocationAuditService:
@@ -82,7 +124,7 @@ class LLMInvocationAuditService:
         prompt_template_version: str | None = None,
     ) -> LLMInvocationAuditModel | None:
         try:
-            sanitized_request = sanitize_ai_trace(request_payload)
+            sanitized_request = sanitize_llm_audit_payload(request_payload)
             row = LLMInvocationAuditModel(
                 investigation_id=context.investigation_id,
                 investigation_run_id=context.investigation_run_id,
@@ -103,8 +145,8 @@ class LLMInvocationAuditService:
                 max_tokens=request_parameters.get("max_output_tokens") or request_parameters.get("max_tokens"),
                 response_format=request_parameters.get("response_format"),
                 tool_choice=request_parameters.get("tool_choice"),
-                system_prompt_sanitized=str(sanitize_ai_trace(system_prompt)),
-                user_prompt_sanitized=str(sanitize_ai_trace(user_prompt)),
+                system_prompt_sanitized=_sanitized_prompt(system_prompt),
+                user_prompt_sanitized=_sanitized_prompt(user_prompt),
                 context_payload_sanitized=_sanitized_json(sanitized_request),
                 tool_definitions_sanitized=_sanitized_json(request_parameters.get("tools", [])),
                 request_payload_hash=payload_hash(request_payload),
@@ -125,7 +167,14 @@ class LLMInvocationAuditService:
             logger.warning("LLM audit start failed (%s)", type(exc).__name__)
             return None
 
-    def complete_invocation(self, row: LLMInvocationAuditModel | None, response: Any) -> None:
+    def complete_invocation(
+        self,
+        row: LLMInvocationAuditModel | None,
+        response: Any,
+        *,
+        input_cost_per_million: float = 0.0,
+        output_cost_per_million: float = 0.0,
+    ) -> None:
         if row is None:
             return
         try:
@@ -142,6 +191,11 @@ class LLMInvocationAuditService:
                 row.total_tokens = int(usage.get("total_tokens") or input_tokens + output_tokens)
                 row.cached_tokens = int((usage.get("input_tokens_details") or {}).get("cached_tokens") or 0)
                 row.reasoning_tokens = int((usage.get("output_tokens_details") or {}).get("reasoning_tokens") or 0)
+                row.estimated_cost = (
+                    input_tokens * input_cost_per_million
+                    + output_tokens * output_cost_per_million
+                ) / 1_000_000
+                row.provider_request_id = str(response.get("id") or "") or None
                 row.completed_at = completed
                 row.duration_ms = int((completed - row.started_at).total_seconds() * 1000)
                 row.status = "completed"
@@ -161,7 +215,7 @@ class LLMInvocationAuditService:
                 row.duration_ms = int((completed - row.started_at).total_seconds() * 1000)
                 row.status = status
                 row.error_code = code
-                row.error_message_sanitized = str(sanitize_ai_trace(str(exc)))
+                row.error_message_sanitized = str(sanitize_llm_audit_payload(str(exc)))
                 row.was_retried = was_retried
                 self.db.add(row)
         except Exception as audit_exc:

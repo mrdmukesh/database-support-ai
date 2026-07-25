@@ -7,7 +7,7 @@ import threading
 import time
 from dataclasses import replace
 from typing import Any
-from urllib import error, request
+from urllib import error
 from uuid import uuid4
 from sqlalchemy.orm import Session
 
@@ -20,8 +20,9 @@ from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
 from legacydb_copilot.services.llm_invocation_audit_service import (
     InvocationContext,
-    LLMInvocationAuditService,
 )
+from legacydb_copilot.services.llm_provider_client import AuditedLLMProviderClient, ProviderRequest
+from legacydb_copilot.services.llm_provider_client import request  # compatibility for provider retry tests
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
@@ -406,19 +407,9 @@ def _call_openai_responses(
         "temperature": 0.1,
         "max_output_tokens": 2500,
     }
-    audit_service = LLMInvocationAuditService(audit_db) if audit_db is not None and audit_context is not None else None
     if audit_context is not None and audit_context.logical_request_id is None:
         audit_context = replace(audit_context, logical_request_id=str(uuid4()))
-    data = json.dumps(body).encode("utf-8")
-    http_request = request.Request(
-        f"{settings.openai_base_url}/responses",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {settings.openai_api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+    provider_client = AuditedLLMProviderClient(db=audit_db, context=audit_context)
     attempts = max(1, settings.llm_retry_attempts)
     deadline = time.monotonic() + settings.llm_total_timeout_seconds
     response_json: dict[str, Any] | None = None
@@ -441,23 +432,23 @@ def _call_openai_responses(
         if debug_trace is not None:
             debug_trace["provider_attempt_count"] = attempt
         attempt_started = time.monotonic()
-        audit_row = audit_service.start_invocation(
-            context=audit_context,
-            provider=settings.llm_provider,
-            model_name=settings.llm_model,
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=json.dumps(evidence_payload, default=str),
-            request_payload=body,
-            request_parameters=body,
-            retry_attempt=attempt,
-            prompt_template_name="root_cause_reasoning",
-            prompt_template_version=AI_REASONING_PROMPT_VERSION,
-        ) if audit_service else None
         try:
-            with request.urlopen(http_request, timeout=request_timeout) as response:
-                response_json = json.loads(response.read().decode("utf-8"))
-            if audit_service:
-                audit_service.complete_invocation(audit_row, response_json)
+            response_json = provider_client.invoke_json(ProviderRequest(
+                provider=settings.llm_provider,
+                model=settings.llm_model,
+                endpoint=f"{settings.openai_base_url}/responses",
+                api_key=settings.openai_api_key or "",
+                body=body,
+                system_prompt=SYSTEM_PROMPT,
+                user_prompt=json.dumps(evidence_payload, default=str),
+                timeout_seconds=request_timeout,
+                retry_attempt=attempt,
+                will_retry_on_failure=attempt < attempts,
+                prompt_template_name="root_cause_reasoning",
+                prompt_template_version=AI_REASONING_PROMPT_VERSION,
+                input_cost_per_million=settings.llm_input_cost_per_million,
+                output_cost_per_million=settings.llm_output_cost_per_million,
+            ))
             _PROVIDER_CIRCUIT.success()
             if debug_trace is not None:
                 debug_trace["provider_attempts"].append({
@@ -468,10 +459,6 @@ def _call_openai_responses(
         except Exception as exc:
             retryable = _is_transient_provider_error(exc)
             status_code = exc.code if isinstance(exc, error.HTTPError) else None
-            if audit_service:
-                audit_service.fail_invocation(
-                    audit_row, exc, was_retried=bool(retryable and attempt < attempts)
-                )
             if retryable:
                 _PROVIDER_CIRCUIT.transient_failure(
                     threshold=settings.llm_circuit_breaker_threshold,

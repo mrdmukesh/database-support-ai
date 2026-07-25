@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -43,6 +44,7 @@ def _summary(row: LLMInvocationAuditModel) -> dict:
         "logical_request_id": row.logical_request_id,
         "started_at": row.started_at,
         "completed_at": row.completed_at,
+        "provider_request_id": row.provider_request_id,
     }
 
 
@@ -77,6 +79,26 @@ def _detail(row: LLMInvocationAuditModel) -> dict:
     return data
 
 
+def _zero_invocation_explanation(investigation: InvestigationModel | None) -> dict | None:
+    if investigation is None:
+        return None
+    outcome = investigation.llm_audit_outcome
+    reason = investigation.llm_audit_reason
+    if not outcome:
+        try:
+            trace = json.loads(investigation.ai_debug_trace_json or "{}")
+        except (TypeError, ValueError):
+            trace = {}
+        if trace.get("ai_reasoning_invoked"):
+            outcome, reason = "AUDIT_NOT_CAPTURED", "A provider call predates invocation audit capture."
+        elif investigation.status == "AI_SKIPPED_BY_EVIDENCE_GATE":
+            outcome = "AI_SKIPPED_BY_EVIDENCE_GATE"
+            reason = str(trace.get("ai_skip_reason") or "The evidence gate did not permit LLM reasoning.")
+        else:
+            outcome, reason = "DETERMINISTIC_ONLY", "The investigation completed without a provider request."
+    return {"code": outcome, "reason": reason}
+
+
 @router.get("/llm-invocations")
 def search_llm_invocations(
     user: AuditAdmin,
@@ -104,7 +126,15 @@ def search_llm_invocations(
         min_duration_ms=min_duration_ms, failed_only=failed_only, search=search,
         page=page, page_size=page_size,
     )
-    return {"items": [_summary(row) for row in rows], "page": page, "page_size": page_size, "total": total}
+    explanation = None
+    if investigation_id and not rows:
+        investigation = db.get(InvestigationModel, investigation_id)
+        if investigation and (_scope(user) is None or investigation.organization_id == user.organization_id):
+            explanation = _zero_invocation_explanation(investigation)
+    return {
+        "items": [_summary(row) for row in rows], "page": page, "page_size": page_size,
+        "total": total, "zero_invocation_explanation": explanation,
+    }
 
 
 @router.get("/investigations/{investigation_id}/llm-invocations")
@@ -122,7 +152,8 @@ def investigation_llm_invocations(
     return {
         "items": [_summary(row) for row in rows],
         "captured": bool(rows),
-        "message": None if rows else "LLM invocation audit data was not captured for this investigation.",
+        "message": None if rows else "No LLM provider request occurred for this investigation.",
+        "zero_invocation_explanation": None if rows else _zero_invocation_explanation(investigation),
     }
 
 

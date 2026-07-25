@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { getLLMInvocation, listLLMInvocations, type AuditFilters } from "../../api/llm-audit-api";
 import type { LLMInvocationDetail, LLMInvocationSummary } from "../../models/llm-audit";
+import type { ZeroInvocationExplanation } from "../../models/llm-audit";
 
 const codeSections: Array<[keyof LLMInvocationDetail, string]> = [
   ["system_prompt_sanitized", "System Prompt"],
@@ -16,12 +17,14 @@ export function LLMInvocationAuditPage() {
   const [filters, setFilters] = useState<AuditFilters>({ page: 1, page_size: 25 });
   const [detail, setDetail] = useState<LLMInvocationDetail | null>(null);
   const [error, setError] = useState("");
+  const [zeroExplanation, setZeroExplanation] = useState<ZeroInvocationExplanation | null>(null);
 
   const load = async (next = filters) => {
     try {
       const result = await listLLMInvocations(next);
       if (!result) throw new Error("The audit service returned no data.");
       setItems(result.items); setTotal(result.total); setError("");
+      setZeroExplanation(result.zero_invocation_explanation);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load audit records.");
     }
@@ -47,11 +50,16 @@ export function LLMInvocationAuditPage() {
           <option>timeout</option><option>rate_limited</option><option>cancelled</option>
         </select>
         <input aria-label="Search sanitized prompts" placeholder="Search sanitized prompts" onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
+        <label>From <input aria-label="From date and time" type="datetime-local" onChange={(e) => setFilters({ ...filters, started_after: e.target.value ? new Date(e.target.value).toISOString() : undefined })} /></label>
+        <label>To <input aria-label="To date and time" type="datetime-local" onChange={(e) => setFilters({ ...filters, started_before: e.target.value ? new Date(e.target.value).toISOString() : undefined })} /></label>
         <label><input type="checkbox" onChange={(e) => setFilters({ ...filters, failed_only: e.target.checked })} /> Failed calls only</label>
         <button type="submit">Apply filters</button>
       </form>
       {error && <p role="alert">{error}</p>}
       <p>{total} invocation{total === 1 ? "" : "s"}</p>
+      {zeroExplanation && <section className="redaction-notice" aria-label="Why the LLM was not invoked">
+        <strong>{zeroExplanation.code}</strong><p>{zeroExplanation.reason}</p>
+      </section>}
       <div className="table-scroll"><table><thead><tr>
         <th>Time</th><th>Investigation</th><th>Stage</th><th>Agent</th><th>Provider / Model</th>
         <th>Status</th><th>Tokens</th><th>Duration</th><th>Cost</th>

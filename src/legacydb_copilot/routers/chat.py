@@ -663,6 +663,43 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         trace.setdefault("ai_skip_reason", "application_terminal_path_before_ai")
         trace.setdefault("ai_outcome", "other")
 
+    generated_from_legacy = len(trace.get("validated_citations") or []) + len(trace.get("rejected_or_unsupported_claims") or [])
+    verified_from_legacy = len(trace.get("validated_citations") or [])
+    rejected_from_legacy = len(trace.get("rejected_or_unsupported_claims") or [])
+    llm_invoked = bool(trace.get("llm_invoked", trace.get("ai_reasoning_invoked", False)))
+
+    trace.setdefault("ai_enabled", bool(trace.get("ai_enabled", True)))
+    trace.setdefault("evidence_package_valid", not detected_intent.startswith("INSUFFICIENT_DATABASE_EVIDENCE:"))
+    trace["llm_invoked"] = llm_invoked
+    trace.setdefault("provider", trace.get("provider") or trace.get("llm_provider") or "openai")
+    trace.setdefault("model", trace.get("model") or trace.get("llm_model_name") or "")
+    trace.setdefault("generated_claim_count", generated_from_legacy)
+    trace.setdefault("verified_claim_count", verified_from_legacy)
+    trace.setdefault("rejected_claim_count", rejected_from_legacy)
+    trace.setdefault("skip_reason", trace.get("ai_skip_reason") or "none")
+    trace.setdefault("error_category", trace.get("ai_reasoning_error") or trace.get("provider_error_type"))
+
+    if not llm_invoked:
+        trace.setdefault("invocation_status", "skipped")
+    elif trace.get("error_category"):
+        trace.setdefault("invocation_status", "provider_failure")
+    elif int(trace.get("generated_claim_count") or 0) == 0:
+        trace.setdefault("invocation_status", "completed_zero_claims")
+    else:
+        trace.setdefault("invocation_status", "completed")
+
+    verified = int(trace.get("verified_claim_count") or 0)
+    generated = int(trace.get("generated_claim_count") or 0)
+    rejected = int(trace.get("rejected_claim_count") or 0)
+    if generated == 0:
+        trace.setdefault("verification_status", "no_claims")
+    elif verified == 0:
+        trace.setdefault("verification_status", "none_verified")
+    elif rejected > 0:
+        trace.setdefault("verification_status", "partial")
+    else:
+        trace.setdefault("verification_status", "verified")
+
     # Persist transfer normalization and target-selection trace in an existing DB JSON column.
     # Keep output compact by omitting absent values, which also preserves historical exact-trace tests.
     trace_fields = (
@@ -679,6 +716,12 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         if value is not None:
             trace.setdefault(key, value)
     return trace
+
+
+def _detected_intent_with_planning_status(base_intent: str, plan_statuses: list[dict[str, Any]]) -> str:
+    """Classify empty validated evidence plans as a planning failure for truthful reporting."""
+    has_validated = any(item.get("status") == "validated" for item in plan_statuses)
+    return base_intent if has_validated else "EVIDENCE_PLANNING_FAILED"
 
 
 def _approved_knowledge_context(db: Session, payload: ChatAskRequest) -> str:
@@ -1945,12 +1988,37 @@ def _run_dynamic_investigation(
         )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
     planning_warning = ""
+    evidence_plan_statuses: list[dict[str, Any]] = []
     try:
-        plan = build_investigation_plan(intent.intent, ranking.metadata, entities)
+        plan = build_investigation_plan(
+            intent.intent,
+            ranking.metadata,
+            entities,
+            debug_events=evidence_plan_statuses,
+        )
     except Exception as exc:
         plan = []
         planning_warning = f"Evidence SQL planning was skipped because generated SQL did not pass safety validation: {exc}"
-    evidence = execute_evidence_plan(connector, plan)
+        evidence_plan_statuses.append(
+            {
+                "query_id": "PLAN",
+                "purpose": "build_investigation_plan",
+                "status": "failed",
+                "reason": str(exc),
+                "sql": "",
+            }
+        )
+    if not plan:
+        evidence_plan_statuses.append(
+            {
+                "query_id": "PLAN",
+                "purpose": "build_investigation_plan",
+                "status": "failed",
+                "reason": "EVIDENCE_PLANNING_FAILED:empty_validated_plan",
+                "sql": "",
+            }
+        )
+    evidence = execute_evidence_plan(connector, plan, plan_statuses=evidence_plan_statuses)
     for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:
             continue
@@ -2021,6 +2089,18 @@ def _run_dynamic_investigation(
         llm_configured = llm_reasoning_enabled()
         settings = Settings.from_env()
         ai_debug_trace = {
+            "ai_enabled": bool(settings.ai_reasoning_enabled),
+            "evidence_package_valid": False,
+            "llm_invoked": False,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model,
+            "invocation_status": "skipped_by_evidence_gate",
+            "skip_reason": "evidence_gate_not_reproduced",
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "rejected_claim_count": 0,
+            "verification_status": "not_applicable",
+            "error_category": None,
             "ai_reasoning_invoked": False,
             "ai_skip_reason": "evidence_gate_not_reproduced",
             "ai_outcome": "evidence_gate",
@@ -2078,7 +2158,20 @@ def _run_dynamic_investigation(
         )
         settings = Settings.from_env()
         llm_configured = llm_reasoning_enabled(settings)
-        ai_debug_trace = {} if settings.ai_debug_trace_enabled else None
+        ai_debug_trace = {
+            "ai_enabled": bool(settings.ai_reasoning_enabled),
+            "evidence_package_valid": True,
+            "llm_invoked": False,
+            "provider": settings.llm_provider,
+            "model": settings.llm_model,
+            "invocation_status": "pending",
+            "skip_reason": "awaiting_provider_response" if llm_configured else "llm_not_configured",
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "rejected_claim_count": 0,
+            "verification_status": "not_applicable",
+            "error_category": None,
+        }
         enhanced_reasoning = enhance_reasoning_with_llm(
             question=payload.question,
             intent=intent,
@@ -2413,14 +2506,25 @@ def _run_dynamic_investigation(
         item for item in evidence_gate.confirmed_facts
         if "relationship" in item.lower() or "parent-child" in item.lower()
     ]
+    executed_any_query = any(item.get("status") == "executed" for item in evidence_plan_statuses)
     evidence_gate_reason = (
         "Issue reproduced from connected database evidence."
         if evidence_gate.reproduced
         else "; ".join(evidence_gate.blocking_reasons)
     )
+    ai_debug_trace_payload = sanitize_ai_trace(ai_debug_trace or {})
+    ai_debug_trace_payload["evidence_plan_statuses"] = evidence_plan_statuses
+    ai_debug_trace_payload["evidence_plan_summary"] = {
+        "planned": sum(1 for item in evidence_plan_statuses if item.get("status") == "planned"),
+        "validated": sum(1 for item in evidence_plan_statuses if item.get("status") == "validated"),
+        "executed": sum(1 for item in evidence_plan_statuses if item.get("status") == "executed"),
+        "rejected": sum(1 for item in evidence_plan_statuses if item.get("status") == "rejected"),
+        "failed": sum(1 for item in evidence_plan_statuses if item.get("status") == "failed"),
+        "executed_any_query": executed_any_query,
+    }
     investigation_metadata = {
         "investigation_id": report.cover.investigation_id,
-        "detected_intent": intent.intent.value,
+        "detected_intent": _detected_intent_with_planning_status(intent.intent.value, evidence_plan_statuses),
         "raw_extracted_entity": transfer_normalization_trace.raw_extracted_entity,
         "normalized_entity": transfer_normalization_trace.normalized_entity,
         "entity_type": transfer_normalization_trace.entity_type,
@@ -2467,7 +2571,7 @@ def _run_dynamic_investigation(
         "report_storage": json.dumps(report_storage_references(generated_report), default=str),
         "report_snapshot": json.dumps(report_to_dict(report), default=str),
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
-        "ai_debug_trace": json.dumps(sanitize_ai_trace(ai_debug_trace or {}), default=str),
+        "ai_debug_trace": json.dumps(ai_debug_trace_payload, default=str),
         "answer_provenance": answer_provenance,
         "primary_entity": json.dumps({
             "table": evidence_focus.affected_object,

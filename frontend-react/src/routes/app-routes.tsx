@@ -12,6 +12,7 @@ import { ReportViewerPage } from "../pages/reports/ReportViewerPage";
 import { InvestigationHistoryPage } from "../pages/investigations/InvestigationHistoryPage";
 import { LearningPage } from "../pages/learning/LearningPage";
 import { UsersAccessPage } from "../pages/admin/UsersAccessPage";
+import { LLMInvocationAuditPage } from "../pages/admin/LLMInvocationAuditPage";
 import { EvaluationDashboardPage } from "../pages/evaluation/EvaluationDashboardPage";
 import { EvaluationScenarioPage } from "../pages/evaluation/EvaluationScenarioPage";
 import {
@@ -38,6 +39,7 @@ export function AppRoutes() {
           <Route path="reports/view" element={<ReportViewerPage />} />
           <Route path="learning" element={<LearningPage />} />
           <Route path="admin/users" element={<UsersAccessPage />} />
+          <Route path="admin/llm-audit" element={<LLMInvocationAuditPage />} />
           <Route path="evaluation" element={<EvaluationDashboardPage />} />
           <Route path="evaluation/scenarios/:resultId" element={<EvaluationScenarioPage />} />
         </Route>

@@ -26,6 +26,7 @@ EXPECTED_PERMISSIONS: dict[Role, set[str]] = {
         "billing:manage",
         "chat:use",
         "admin:read",
+        "admin.llm_audit.read",
     },
     Role.DEVELOPER: {
         "documents:read",
@@ -52,7 +53,7 @@ EXPECTED_PERMISSIONS: dict[Role, set[str]] = {
         "learning:read",
     },
     Role.READ_ONLY: {"documents:read", "incidents:read", "learning:read"},
-    Role.AUDITOR: {"audit:read", "incidents:read", "documents:read"},
+    Role.AUDITOR: {"audit:read", "admin.llm_audit.read", "incidents:read", "documents:read"},
 }
 
 SENSITIVE_PERMISSIONS = (
@@ -66,6 +67,7 @@ SENSITIVE_PERMISSIONS = (
     "billing:manage",
     "sql:approve",
     "audit:read",
+    "admin.llm_audit.read",
 )
 
 

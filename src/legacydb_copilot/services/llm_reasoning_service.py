@@ -8,6 +8,8 @@ import time
 from dataclasses import replace
 from typing import Any
 from urllib import error, request
+from uuid import uuid4
+from sqlalchemy.orm import Session
 
 from legacydb_copilot.agents.intent_agent import IntentResult
 from legacydb_copilot.agents.reasoning_agent import RootCauseClaim, ReasoningResult, evaluate_claim_support_status
@@ -16,6 +18,10 @@ from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvi
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
+from legacydb_copilot.services.llm_invocation_audit_service import (
+    InvocationContext,
+    LLMInvocationAuditService,
+)
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
@@ -128,6 +134,8 @@ def enhance_reasoning_with_llm(
     evidence_focus: EvidenceFocus | None = None,
     settings: Settings | None = None,
     debug_trace: dict[str, Any] | None = None,
+    audit_db: Session | None = None,
+    audit_context: InvocationContext | None = None,
 ) -> ReasoningResult:
     """
     Owner: Mukesh Dabi
@@ -186,7 +194,14 @@ def enhance_reasoning_with_llm(
             }
         )
     try:
-        llm_json = _call_openai_responses(settings, payload, debug_trace=debug_trace)
+        audit_kwargs = (
+            {"audit_db": audit_db, "audit_context": audit_context}
+            if audit_db is not None and audit_context is not None
+            else {}
+        )
+        llm_json = _call_openai_responses(
+            settings, payload, debug_trace=debug_trace, **audit_kwargs,
+        )
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
         if debug_trace is not None:
             debug_trace["llm_response_raw"] = sanitize_ai_trace(mask_llm_payload(llm_json))
@@ -359,6 +374,8 @@ def _call_openai_responses(
     evidence_payload: dict[str, Any],
     *,
     debug_trace: dict[str, Any] | None = None,
+    audit_db: Session | None = None,
+    audit_context: InvocationContext | None = None,
 ) -> dict[str, Any]:
     """
     Owner: Mukesh Dabi
@@ -389,6 +406,9 @@ def _call_openai_responses(
         "temperature": 0.1,
         "max_output_tokens": 2500,
     }
+    audit_service = LLMInvocationAuditService(audit_db) if audit_db is not None and audit_context is not None else None
+    if audit_context is not None and audit_context.logical_request_id is None:
+        audit_context = replace(audit_context, logical_request_id=str(uuid4()))
     data = json.dumps(body).encode("utf-8")
     http_request = request.Request(
         f"{settings.openai_base_url}/responses",
@@ -421,9 +441,23 @@ def _call_openai_responses(
         if debug_trace is not None:
             debug_trace["provider_attempt_count"] = attempt
         attempt_started = time.monotonic()
+        audit_row = audit_service.start_invocation(
+            context=audit_context,
+            provider=settings.llm_provider,
+            model_name=settings.llm_model,
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=json.dumps(evidence_payload, default=str),
+            request_payload=body,
+            request_parameters=body,
+            retry_attempt=attempt,
+            prompt_template_name="root_cause_reasoning",
+            prompt_template_version=AI_REASONING_PROMPT_VERSION,
+        ) if audit_service else None
         try:
             with request.urlopen(http_request, timeout=request_timeout) as response:
                 response_json = json.loads(response.read().decode("utf-8"))
+            if audit_service:
+                audit_service.complete_invocation(audit_row, response_json)
             _PROVIDER_CIRCUIT.success()
             if debug_trace is not None:
                 debug_trace["provider_attempts"].append({
@@ -434,6 +468,10 @@ def _call_openai_responses(
         except Exception as exc:
             retryable = _is_transient_provider_error(exc)
             status_code = exc.code if isinstance(exc, error.HTTPError) else None
+            if audit_service:
+                audit_service.fail_invocation(
+                    audit_row, exc, was_retried=bool(retryable and attempt < attempts)
+                )
             if retryable:
                 _PROVIDER_CIRCUIT.transient_failure(
                     threshold=settings.llm_circuit_breaker_threshold,

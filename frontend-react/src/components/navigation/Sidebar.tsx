@@ -13,6 +13,7 @@ const navigation = [
 export function Sidebar() {
   const { user } = useAuth();
   const canManageUsers = user?.role === "super_admin" || user?.role === "organization_admin";
+  const canReadLLMAudit = canManageUsers || user?.role === "auditor";
   return (
     <aside className="application-sidebar">
       <div className="application-brand" aria-label="LegacyDB Support Copilot">
@@ -26,7 +27,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      {canManageUsers && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span><NavLink to="/app/admin/users">Users &amp; Access</NavLink><NavLink to="/app/evaluation">Evaluation</NavLink></nav>}
+      {canReadLLMAudit && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span>{canManageUsers && <><NavLink to="/app/admin/users">Users &amp; Access</NavLink><NavLink to="/app/evaluation">Evaluation</NavLink></>}<NavLink to="/app/admin/llm-audit">LLM Invocation Audit</NavLink></nav>}
     </aside>
   );
 }

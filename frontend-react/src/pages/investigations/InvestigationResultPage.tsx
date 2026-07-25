@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 
 import { loadSavedInvestigation } from "../../api/investigation-api";
 import { ExecutiveSummarySection } from "../../components/investigation/ExecutiveSummarySection";
+import { LLMActivity } from "../../components/investigation/LLMActivity";
 import { RecommendationSection } from "../../components/investigation/RecommendationSection";
 import { RootCauseSection } from "../../components/investigation/RootCauseSection";
 import { ReportDownloads } from "../../components/reports/ReportDownloads";
@@ -120,6 +121,7 @@ export function InvestigationResultPage() {
         <Card title="Reports"><ReportDownloads reports={result.report} showAiTrace={user?.role === "super_admin" || user?.role === "organization_admin"} /></Card>
       </div>
       <Card className="result-card-wide" title="Verification checks" description="Run read-only checks to validate key claims and update confidence."><VerificationPanel investigationId={result.id} /></Card>
+      {(user?.role === "super_admin" || user?.role === "organization_admin" || user?.role === "auditor") && <LLMActivity investigationId={result.id} />}
       <details className="technical-details"><summary>Technical details</summary><dl><dt>Investigation ID</dt><dd>{result.id}</dd><dt>Raw status</dt><dd>{result.status}</dd><dt>Raw intent</dt><dd>{result.detected_intent}</dd><dt>Connection ID</dt><dd>{result.connection_id}</dd></dl><pre>{parsed.raw}</pre></details>
     </article>
   );

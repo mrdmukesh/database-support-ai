@@ -547,6 +547,71 @@ class AuditLogModel(UUIDPrimaryKeyMixin, Base):
     occurred_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class LLMInvocationAuditModel(UUIDPrimaryKeyMixin, Base):
+    """Immutable, sanitized record of one actual LLM provider request."""
+
+    __tablename__ = "llm_invocation_audit"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('started','completed','failed','timeout','rate_limited','cancelled','skipped')",
+            name="ck_llm_invocation_audit_status",
+        ),
+        Index("ix_llm_audit_investigation_started", "investigation_id", "started_at"),
+    )
+
+    investigation_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    investigation_run_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    organization_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    user_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    session_id: Mapped[str | None] = mapped_column(String(120))
+    logical_request_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    correlation_id: Mapped[str | None] = mapped_column(String(120), index=True)
+    trace_id: Mapped[str | None] = mapped_column(String(120))
+    parent_span_id: Mapped[str | None] = mapped_column(String(120))
+    agent_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    stage_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    step_number: Mapped[int | None] = mapped_column(Integer)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    model_name: Mapped[str] = mapped_column(String(160), nullable=False, index=True)
+    model_version: Mapped[str | None] = mapped_column(String(120))
+    temperature: Mapped[float | None] = mapped_column(Numeric(6, 4))
+    max_tokens: Mapped[int | None] = mapped_column(Integer)
+    response_format: Mapped[str | None] = mapped_column(String(120))
+    tool_choice: Mapped[str | None] = mapped_column(String(120))
+    system_prompt_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    user_prompt_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    context_payload_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    tool_definitions_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    request_payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response_text_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    response_payload_hash: Mapped[str | None] = mapped_column(String(64))
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reasoning_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    estimated_cost: Mapped[object | None] = mapped_column(Numeric(14, 8))
+    currency: Mapped[str] = mapped_column(String(12), default="USD", nullable=False)
+    started_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    finish_reason: Mapped[str | None] = mapped_column(String(120))
+    error_code: Mapped[str | None] = mapped_column(String(120))
+    error_message_sanitized: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    retry_attempt: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    was_retried: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fallback_from_model: Mapped[str | None] = mapped_column(String(160))
+    fallback_reason: Mapped[str | None] = mapped_column(String(255))
+    prompt_template_name: Mapped[str | None] = mapped_column(String(160))
+    prompt_template_version: Mapped[str | None] = mapped_column(String(80))
+    prompt_template_hash: Mapped[str | None] = mapped_column(String(64))
+    application_commit: Mapped[str | None] = mapped_column(String(80))
+    application_version: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class SubscriptionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "subscriptions"
 

@@ -125,7 +125,12 @@ def create_database_connection(
             action="database_connection.create",
             resource_type="database_connection",
             resource_id=connection.id,
-            metadata={"engine": connection.engine, "name": connection.name},
+            metadata={
+                "engine": connection.engine,
+                "name": connection.name,
+                "environment_type": connection.environment_type,
+                "max_scan_rows": connection.max_scan_rows,
+            },
         )
         db.commit()
     except IntegrityError as exc:

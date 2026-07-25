@@ -88,6 +88,7 @@ from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
+from legacydb_copilot.services.scan_policy_service import resolve_connection_scan_policy
 from legacydb_copilot.services.report_generator import (
     ExecutiveSummary,
     InvestigationReport,
@@ -583,6 +584,7 @@ def _evidence_to_json(evidence) -> str:
                 "zero_row_result": item.zero_row_result,
                 "evidence_semantics": item.evidence_semantics,
                 "supports_claim": item.supports_claim,
+                "scan_policy_decision": item.scan_policy_decision,
                 "sample_rows": item.rows[:10],
                 "error": getattr(item, "error", None),
             }
@@ -1875,6 +1877,10 @@ def _run_dynamic_investigation(
             None,
             _empty_investigation_metadata(),
         )
+    scan_policy = resolve_connection_scan_policy(
+        connection,
+        default_max_rows=Settings.from_env().max_investigation_rows,
+    )
     try:
         connection_string = _build_connection_string(connection)
         engine = DatabaseEngine(connection.engine)
@@ -2032,6 +2038,7 @@ def _run_dynamic_investigation(
         plan,
         plan_statuses=evidence_plan_statuses,
         provider=connection.engine,
+        scan_policy=scan_policy,
     )
     for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:
@@ -2221,11 +2228,13 @@ def _run_dynamic_investigation(
                     "zero_row_result": item.zero_row_result,
                     "evidence_semantics": item.evidence_semantics,
                     "supports_claim": item.supports_claim,
+                    "scan_policy_decision": item.scan_policy_decision,
                     "error": item.error,
                 }
                 for item in evidence
             ],
             "evidence_gate": asdict(evidence_gate),
+            "scan_policy": asdict(scan_policy),
         })
     recommendation = recommend_actions(
         intent=intent.intent,

@@ -2,7 +2,10 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectionList } from "./ConnectionList";
 
-const connection = { id: "CONN-1", organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", is_active: true };
+const connection = {
+  id: "CONN-1", organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql",
+  name: "ERP", environment_type: "production" as const, max_scan_rows: 500, is_active: true,
+};
 afterEach(() => vi.restoreAllMocks());
 
 describe("ConnectionList", () => {

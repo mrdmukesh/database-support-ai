@@ -17,6 +17,7 @@ from legacydb_copilot.services.sql_dialect_service import (
     resolve_sql_dialect,
     validate_sql_dialect,
 )
+from legacydb_copilot.services.scan_policy_service import ScanPolicy, ScanPolicyDecision
 
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class ProductionReadSafetyResult:
     sql: str
     changed: bool = False
     reason: str = ""
+    policy_decision: ScanPolicyDecision | None = None
 
 
 class ProductionReadSafetyValidator:
@@ -81,6 +83,7 @@ class ProductionReadSafetyValidator:
         allow_full_table_scan: bool = False,
         row_estimates: dict[str, int] | None = None,
         engine_type: str | None = None,
+        scan_policy: ScanPolicy | None = None,
     ) -> None:
         """
         Owner: Mukesh Dabi
@@ -102,7 +105,8 @@ class ProductionReadSafetyValidator:
         Safety considerations:
             Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
         """
-        self.max_rows = max_rows
+        self.scan_policy = scan_policy
+        self.max_rows = scan_policy.max_rows if scan_policy is not None else max_rows
         self.allow_full_table_scan = allow_full_table_scan
         self.row_estimates = {key.lower(): value for key, value in (row_estimates or {}).items()}
         self.dialect = resolve_sql_dialect(engine_type) if engine_type else None
@@ -132,22 +136,52 @@ class ProductionReadSafetyValidator:
         normalized = _sql_without_literals_and_comments(stripped)
         command = _first_sql_word(normalized)
         if command in {"show", "describe", "desc"}:
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "metadata_scan")
         if command == "explain":
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "query_plan_inspection")
         if command != "select":
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "non_select_deferred_to_readonly_validator")
         table_name = _first_from_table(normalized)
         if table_name and _is_allowed_metadata_table(table_name):
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "metadata_scan", table=table_name)
         if _is_count_discovery(normalized):
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "aggregate_query", table=table_name or "")
+        if self.scan_policy is not None and not self.scan_policy.configuration_valid:
+            raise ScanPolicyViolation(
+                self._decision(
+                    "blocked",
+                    "invalid_environment_configuration",
+                    table=table_name or "",
+                    suggested_rewrite="correct_connection_environment_metadata",
+                ),
+                self.scan_policy.configuration_error,
+            )
+        if (
+            self.scan_policy is not None
+            and not self.scan_policy.require_filter_for_large_table
+            and not _has_limit_clause(normalized)
+        ):
+            bounded_sql = apply_row_limit(
+                stripped,
+                self.max_rows,
+                self.dialect if self.dialect is not None else resolve_sql_dialect(None),
+            )
+            return ProductionReadSafetyResult(
+                bounded_sql,
+                changed=bounded_sql != stripped,
+                reason=f"{self.scan_policy.name}: added bounded read-only scan limit.",
+                policy_decision=self._decision(
+                    "allowed",
+                    "bounded_readonly_scan",
+                    table=table_name or "",
+                ),
+            )
         if _has_where_clause(normalized) or _has_limit_clause(normalized):
-            return ProductionReadSafetyResult(stripped)
-        if self.allow_full_table_scan:
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "bounded_or_filtered_query", table=table_name or "")
+        if self.scan_policy is None and self.allow_full_table_scan:
+            return self._allowed(stripped, "legacy_unrestricted_scan_setting", table=table_name or "")
         if not table_name:
-            return ProductionReadSafetyResult(stripped)
+            return self._allowed(stripped, "select_without_table")
         if self._can_auto_limit(table_name):
             return ProductionReadSafetyResult(
                 apply_row_limit(
@@ -159,8 +193,45 @@ class ProductionReadSafetyValidator:
                 ),
                 changed=True,
                 reason="Production scan protection: added investigation row limit.",
+                policy_decision=self._decision(
+                    "allowed",
+                    "small_table_bounded_scan",
+                    table=table_name,
+                ),
             )
-        raise ValueError("Production scan protection rejected unrestricted table scan")
+        raise ScanPolicyViolation(
+            self._decision(
+                "blocked",
+                "unrestricted_table_scan",
+                table=table_name,
+                suggested_rewrite="bounded_or_filtered_query",
+            ),
+            "Production scan protection rejected unrestricted table scan",
+        )
+
+    def _decision(
+        self,
+        decision: str,
+        reason: str,
+        *,
+        table: str = "",
+        suggested_rewrite: str = "",
+    ) -> ScanPolicyDecision:
+        return ScanPolicyDecision(
+            policy=self.scan_policy.name if self.scan_policy else "production_strict",
+            environment_type=self.scan_policy.environment_type if self.scan_policy else "production",
+            decision=decision,  # type: ignore[arg-type]
+            reason=reason,
+            max_rows=self.max_rows,
+            table=_unquote_identifier(table),
+            suggested_rewrite=suggested_rewrite,
+        )
+
+    def _allowed(self, sql: str, reason: str, *, table: str = "") -> ProductionReadSafetyResult:
+        return ProductionReadSafetyResult(
+            sql,
+            policy_decision=self._decision("allowed", reason, table=table),
+        )
 
     def _can_auto_limit(self, table_name: str) -> bool:
         """
@@ -191,6 +262,12 @@ class ProductionReadSafetyValidator:
         if estimate is not None:
             return estimate <= self.max_rows
         return bool(re.search(r"(^|_)(lookup|reference|ref|status|type|category|code)(_|s?$)", normalized_table))
+
+
+class ScanPolicyViolation(ValueError):
+    def __init__(self, decision: ScanPolicyDecision, message: str) -> None:
+        super().__init__(message)
+        self.decision = decision
 
 
 @dataclass(frozen=True)
@@ -441,7 +518,11 @@ def _has_limit_clause(sql: str) -> bool:
     Safety considerations:
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
-    return bool(re.search(r"\blimit\s+\d+\b", sql, re.I) or re.match(r"\s*select\s+top\s+\d+\b", sql, re.I))
+    return bool(
+        re.search(r"\blimit\s+\d+\b", sql, re.I)
+        or re.match(r"\s*select\s+top\s*(?:\(\s*\d+\s*\)|\d+)(?=\s|$)", sql, re.I)
+        or re.search(r"\bfetch\s+(?:first|next)\s+\d+\s+rows\s+only\b", sql, re.I)
+    )
 
 
 def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None) -> str:

@@ -341,6 +341,7 @@ def _build_llm_payload_unmasked(
             "zero_row_result": item.zero_row_result,
             "evidence_semantics": item.evidence_semantics,
             "supports_claim": item.supports_claim,
+            "scan_policy_decision": item.scan_policy_decision,
             "sample_rows": item.rows[:5],
             "error": item.error,
         }

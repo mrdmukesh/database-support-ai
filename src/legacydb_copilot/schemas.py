@@ -131,12 +131,22 @@ class DatabaseConnectionCreate(BaseModel):
     database_name: str = ""
     secret_ref: str = ""
     connection_string: str | None = None
+    environment_type: str = Field(
+        default="production",
+        pattern=r"^(production|non_production|evaluation|demo|test)$",
+    )
+    max_scan_rows: int = Field(default=500, ge=1, le=5000)
 
 
 class DatabaseConnectionUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     connection_string: str | None = None
     is_active: bool | None = None
+    environment_type: str | None = Field(
+        default=None,
+        pattern=r"^(production|non_production|evaluation|demo|test)$",
+    )
+    max_scan_rows: int | None = Field(default=None, ge=1, le=5000)
 
 
 class DatabaseConnectionRead(BaseModel):
@@ -148,6 +158,8 @@ class DatabaseConnectionRead(BaseModel):
     engine: str
     name: str
     database_name: str
+    environment_type: str
+    max_scan_rows: int
     is_active: bool
 
 

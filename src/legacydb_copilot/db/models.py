@@ -145,6 +145,8 @@ class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     port: Mapped[int | None] = mapped_column(Integer)
     database_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     secret_ref: Mapped[str] = mapped_column(String(500), nullable=False)
+    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False)
+    max_scan_rows: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_checked_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
 

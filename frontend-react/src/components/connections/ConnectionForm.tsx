@@ -26,6 +26,8 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       database_name: String(form.get("databaseName") ?? "").trim(),
       secret_ref: String(form.get("secretRef") ?? "").trim(),
       connection_string: connectionString || null,
+      environment_type: String(form.get("environmentType") ?? "production") as DatabaseConnectionCreate["environment_type"],
+      max_scan_rows: Number(form.get("maxScanRows") ?? 500),
     });
     setFormKey((value) => value + 1);
   }
@@ -55,6 +57,17 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       <input id="connection-port" name="port" type="number" disabled={isSubmitting} />
       <label htmlFor="connection-database">Database name</label>
       <input id="connection-database" name="databaseName" disabled={isSubmitting} />
+      <label htmlFor="connection-environment">Trusted environment</label>
+      <select id="connection-environment" name="environmentType" defaultValue="production" disabled={isSubmitting}>
+        <option value="production">Production</option>
+        <option value="non_production">Non-production</option>
+        <option value="evaluation">Evaluation</option>
+        <option value="demo">Demo</option>
+        <option value="test">Test</option>
+      </select>
+      <label htmlFor="connection-max-scan-rows">Maximum bounded scan rows</label>
+      <input id="connection-max-scan-rows" name="maxScanRows" type="number" min="1" max="5000" defaultValue="500" disabled={isSubmitting} />
+      <p className="field-note">Production remains strict. Other trusted environments permit bounded read-only scans only.</p>
       <label htmlFor="connection-string">Connection string</label>
       <input id="connection-string" name="connectionString" type="password" autoComplete="off" disabled={isSubmitting} />
       <label htmlFor="connection-secret-ref">Secret reference</label>

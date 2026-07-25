@@ -20,8 +20,8 @@ const workspaces = [
   { id: "workspace-2", organization_id: "org-1", name: "Operations", slug: "ops", is_active: true },
 ];
 const connections = [
-  { id: "connection-1", organization_id: "org-1", workspace_id: "workspace-1", engine: "sqlserver", name: "Finance DB", is_active: true },
-  { id: "connection-2", organization_id: "org-1", workspace_id: "workspace-2", engine: "postgresql", name: "Operations DB", is_active: true },
+  { id: "connection-1", organization_id: "org-1", workspace_id: "workspace-1", engine: "sqlserver", name: "Finance DB", environment_type: "production" as const, max_scan_rows: 500, is_active: true },
+  { id: "connection-2", organization_id: "org-1", workspace_id: "workspace-2", engine: "postgresql", name: "Operations DB", environment_type: "production" as const, max_scan_rows: 500, is_active: true },
 ];
 const response = {
   conversation: { id: "conversation-1", organization_id: "org-1", workspace_id: "workspace-1", user_id: "user-1", title: "Question" },

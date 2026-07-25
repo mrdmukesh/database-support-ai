@@ -19,6 +19,8 @@ describe("ConnectionForm", () => {
       engine: "mysql",
       name: "ERP",
       connection_string: "mysql://user:password@db/erp",
+      environment_type: "production",
+      max_scan_rows: 500,
     })));
     expect(screen.getByLabelText("Connection string")).toHaveValue("");
   });
@@ -27,6 +29,7 @@ describe("ConnectionForm", () => {
     render(<ConnectionForm organizationId="ORG-1" workspaces={[workspace]} isSubmitting={false} onSubmit={vi.fn()} />);
     expect(screen.getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual([
       "WS-1", "sql_server", "postgresql", "mysql", "sqlite", "oracle",
+      "production", "non_production", "evaluation", "demo", "test",
     ]);
   });
 });

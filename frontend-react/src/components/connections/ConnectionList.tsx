@@ -30,12 +30,13 @@ export function ConnectionList({ connections, testingIds, testResults, testError
     <div className="connection-list">
       <h2>Connection list</h2>
       <table>
-        <thead><tr><th>Name</th><th>Engine</th><th>Status</th><th>Test</th><th>Actions</th><th>Result</th></tr></thead>
+        <thead><tr><th>Name</th><th>Engine</th><th>Environment</th><th>Status</th><th>Test</th><th>Actions</th><th>Result</th></tr></thead>
         <tbody>
           {connections.map((connection) => (
             <tr key={connection.id}>
               <td>{connection.name}</td>
               <td>{connection.engine}</td>
+              <td>{connection.environment_type} ({connection.max_scan_rows} rows)</td>
               <td><StatusBadge status={connection.is_active ? "Active" : "Inactive"} /></td>
               <td><button type="button" onClick={() => void onTest(connection)} disabled={!connection.is_active || testingIds.has(connection.id)}>{testingIds.has(connection.id) ? "Testing..." : "Test"}</button></td>
               <td>

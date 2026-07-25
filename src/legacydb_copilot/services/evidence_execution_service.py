@@ -7,7 +7,13 @@ from itertools import count
 from typing import Any, Literal
 
 from legacydb_copilot.config import Settings
-from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, validate_read_only_sql
+from legacydb_copilot.services.safe_sql_service import (
+    PlannedQuery,
+    ProductionReadSafetyValidator,
+    ScanPolicyViolation,
+    validate_read_only_sql,
+)
+from legacydb_copilot.services.scan_policy_service import ScanPolicy
 from legacydb_copilot.services.sql_dialect_service import resolve_sql_dialect, validate_sql_dialect
 
 
@@ -39,6 +45,7 @@ class EvidenceResult:
         "execution_failure",
     ] = "not_applicable"
     supports_claim: str = ""
+    scan_policy_decision: dict[str, Any] = field(default_factory=dict)
 
     @property
     def row_count(self) -> int:
@@ -55,6 +62,7 @@ def execute_evidence_plan(
     plan_statuses: list[dict[str, Any]] | None = None,
     *,
     provider: Any | None = None,
+    scan_policy: ScanPolicy | None = None,
 ) -> list[EvidenceResult]:
     """
     Owner: Mukesh Dabi
@@ -93,8 +101,10 @@ def execute_evidence_plan(
         allow_full_table_scan=settings.allow_full_table_scan,
         row_estimates=_row_estimates_for_plan(connector, plan),
         engine_type=dialect.value,
+        scan_policy=scan_policy,
     )
     for index, query in enumerate(plan, start=1):
+        policy_decision: dict[str, Any] = {}
         try:
             validate_sql_dialect(
                 query.sql,
@@ -104,6 +114,11 @@ def execute_evidence_plan(
             )
             validate_read_only_sql(query.sql)
             safe_read = validator.validate(query.sql)
+            policy_decision = (
+                safe_read.policy_decision.to_dict()
+                if safe_read.policy_decision is not None
+                else {}
+            )
             validate_sql_dialect(
                 safe_read.sql,
                 dialect,
@@ -121,6 +136,7 @@ def execute_evidence_plan(
                         "reason": safe_read.reason or "executed_successfully",
                         "row_count": len(rows),
                         "sql": safe_read.sql,
+                        "scan_policy_decision": policy_decision,
                     }
                 )
             logger.info("evidence_plan executed %s rows=%s", query.query_id or f"Q-{index}", len(rows))
@@ -135,10 +151,13 @@ def execute_evidence_plan(
                     execution_status="succeeded",
                     evidence_semantics=semantics,
                     supports_claim=supports_claim,
+                    scan_policy_decision=policy_decision,
                 )
             )
         except Exception as exc:
             execution_status = _failed_execution_status(exc)
+            if isinstance(exc, ScanPolicyViolation):
+                policy_decision = exc.decision.to_dict()
             if plan_statuses is not None:
                 plan_statuses.append(
                     {
@@ -148,6 +167,7 @@ def execute_evidence_plan(
                         "reason": str(exc),
                         "row_count": 0,
                         "sql": query.sql,
+                        "scan_policy_decision": policy_decision,
                     }
                 )
             logger.warning("evidence_plan failed %s %s", query.query_id or f"Q-{index}", exc)
@@ -160,6 +180,7 @@ def execute_evidence_plan(
                     evidence_id=f"SQL-{index}",
                     execution_status=execution_status,
                     evidence_semantics="execution_failure",
+                    scan_policy_decision=policy_decision,
                 )
             )
     return evidence
@@ -200,7 +221,10 @@ def _failed_execution_status(exc: Exception) -> Literal["failed", "blocked", "ti
     if "timeout" in text or "timed out" in text:
         return "timed_out"
     if isinstance(exc, PermissionError) or any(
-        marker in text for marker in ("blocked", "rejected", "safety", "policy")
+        marker in text for marker in (
+            "blocked", "rejected", "safety", "policy",
+            "only select", "read-only", "read only",
+        )
     ):
         return "blocked"
     return "failed"

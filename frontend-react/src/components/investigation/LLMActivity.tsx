@@ -9,7 +9,10 @@ export function LLMActivity({ investigationId }: { investigationId: string }) {
     getInvestigationLLMActivity(investigationId)
       .then((result) => {
         if (!result) { setMessage("LLM activity could not be loaded."); return; }
-        setItems(result.items); setMessage(result.message ?? "");
+        setItems(result.items);
+        setMessage(result.zero_invocation_explanation
+          ? `${result.zero_invocation_explanation.code}: ${result.zero_invocation_explanation.reason}`
+          : result.message ?? "");
       })
       .catch(() => setMessage("LLM activity could not be loaded."));
   }, [investigationId]);

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from urllib import error, request
+from urllib import error
 
 from evaluation.judges.ai_judge import JudgeProviderResponse, JudgeTransientError
+from legacydb_copilot.services.llm_provider_client import AuditedLLMProviderClient, ProviderRequest
+from legacydb_copilot.services.llm_provider_client import request  # compatibility for provider tests
 
 
 class OpenAIJudgeClient:
@@ -39,18 +41,20 @@ class OpenAIJudgeClient:
             "temperature": temperature,
             "max_output_tokens": 1800,
         }
-        call = request.Request(
-            f"{self.base_url}/responses",
-            data=json.dumps(body).encode("utf-8"),
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-            },
-            method="POST",
-        )
         try:
-            with request.urlopen(call, timeout=timeout_seconds) as response:
-                response_json = json.loads(response.read().decode("utf-8"))
+            response_json = AuditedLLMProviderClient().invoke_json(ProviderRequest(
+                provider="openai",
+                model=model,
+                endpoint=f"{self.base_url}/responses",
+                api_key=self.api_key,
+                body=body,
+                system_prompt=system_prompt,
+                user_prompt=json.dumps(payload, default=str),
+                timeout_seconds=timeout_seconds,
+                prompt_template_name="ai_judge",
+                input_cost_per_million=self.input_cost_per_million,
+                output_cost_per_million=self.output_cost_per_million,
+            ))
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 429 or 500 <= exc.code < 600:

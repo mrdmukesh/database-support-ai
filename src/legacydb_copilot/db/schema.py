@@ -34,12 +34,18 @@ _INVESTIGATION_COLUMNS: dict[str, str] = {
     "report_storage_json": "TEXT NOT NULL DEFAULT '{}'",
     "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
     "ai_debug_trace_json": "TEXT NOT NULL DEFAULT ''",
+    "llm_audit_outcome": "VARCHAR(80) NOT NULL DEFAULT ''",
+    "llm_audit_reason": "TEXT NOT NULL DEFAULT ''",
 }
 
 _AUDIT_COLUMNS: dict[str, str] = {
     "workspace_id": "VARCHAR",
     "status": "VARCHAR(40) NOT NULL DEFAULT 'success'",
     "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+}
+
+_LLM_AUDIT_COLUMNS: dict[str, str] = {
+    "provider_request_id": "VARCHAR(160)",
 }
 
 _VERIFICATION_COLUMNS: dict[str, str] = {
@@ -109,6 +115,16 @@ def initialize_application_schema(database_url: str) -> None:
             for column_name, ddl in _AUDIT_COLUMNS.items():
                 if column_name not in existing_audit_columns:
                     connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
+    if "llm_invocation_audit" in inspector.get_table_names():
+        existing_llm_audit_columns = {
+            column["name"] for column in inspector.get_columns("llm_invocation_audit")
+        }
+        with engine.begin() as connection:
+            for column_name, ddl in _LLM_AUDIT_COLUMNS.items():
+                if column_name not in existing_llm_audit_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE llm_invocation_audit ADD COLUMN {column_name} {ddl}")
+                    )
     if "verification_checks" in inspector.get_table_names():
         existing_verification_columns = {column["name"] for column in inspector.get_columns("verification_checks")}
         with engine.begin() as connection:

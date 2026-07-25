@@ -9,7 +9,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib import request
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,6 +17,8 @@ from sqlalchemy.orm import Session
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.models import DocumentModel, DocumentVersionModel, KnowledgeArticleModel, KnowledgeChunkModel
 from legacydb_copilot.services.storage_service import get_app_storage
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, LLMStage
+from legacydb_copilot.services.llm_provider_client import AuditedLLMProviderClient, ProviderRequest
 
 
 LOCAL_EMBEDDING_DIMENSIONS = 128
@@ -48,6 +49,7 @@ class KnowledgeQuery:
     question: str
     top_k: int = 8
     metadata_filters: dict[str, str] | None = None
+    audit_context: InvocationContext | None = None
 
 
 @dataclass(frozen=True)
@@ -492,7 +494,13 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
         settings = Settings.from_env()
         if not _pgvector_ready(db) or _missing_required_embedding_key(settings):
             return self.fallback.retrieve(db, query)
-        embedding = create_embedding(query.question, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
+        embedding = create_embedding(
+            query.question,
+            settings=settings,
+            dimensions=OPENAI_EMBEDDING_DIMENSIONS,
+            audit_db=db,
+            audit_context=query.audit_context,
+        )
         if embedding is None:
             return self.fallback.retrieve(db, query)
         _ensure_pgvector_schema(db)
@@ -585,7 +593,14 @@ def get_knowledge_retriever(settings: Settings | None = None) -> KnowledgeRetrie
     return SQLiteKnowledgeRetriever()
 
 
-def retrieve_documents(db: Session, organization_id: str, workspace_id: str, question: str) -> list[RetrievedDocument]:
+def retrieve_documents(
+    db: Session,
+    organization_id: str,
+    workspace_id: str,
+    question: str,
+    *,
+    audit_context: InvocationContext | None = None,
+) -> list[RetrievedDocument]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -614,6 +629,7 @@ def retrieve_documents(db: Session, organization_id: str, workspace_id: str, que
             workspace_id=workspace_id,
             question=question,
             top_k=8,
+            audit_context=audit_context,
         ),
     )
 
@@ -955,6 +971,8 @@ def create_embedding(
     *,
     settings: Settings | None = None,
     dimensions: int = OPENAI_EMBEDDING_DIMENSIONS,
+    audit_db: Session | None = None,
+    audit_context: InvocationContext | None = None,
 ) -> EmbeddingResult | None:
     """
     Owner: Mukesh Dabi
@@ -980,7 +998,12 @@ def create_embedding(
     if resolved.embedding_provider == "openai":
         if not resolved.openai_api_key:
             return None
-        vector = _call_openai_embedding(resolved, text)
+        vector = _call_openai_embedding(
+            resolved,
+            text,
+            audit_db=audit_db,
+            audit_context=audit_context,
+        )
         return EmbeddingResult(
             vector=vector,
             provider="openai",
@@ -1053,7 +1076,13 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     return sum(left[index] * right[index] for index in range(size))
 
 
-def _call_openai_embedding(settings: Settings, text_value: str) -> list[float]:
+def _call_openai_embedding(
+    settings: Settings,
+    text_value: str,
+    *,
+    audit_db: Session | None = None,
+    audit_context: InvocationContext | None = None,
+) -> list[float]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -1074,18 +1103,31 @@ def _call_openai_embedding(settings: Settings, text_value: str) -> list[float]:
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    payload = json.dumps({"model": settings.embedding_model, "input": text_value[:12000]}).encode("utf-8")
-    req = request.Request(
-        f"{settings.openai_base_url}/embeddings",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {settings.openai_api_key}",
-        },
-        method="POST",
+    payload = {"model": settings.embedding_model, "input": text_value[:12000]}
+    context = (
+        InvocationContext(
+            **{
+                **audit_context.__dict__,
+                "agent_name": "context_discovery_agent",
+                "stage_name": LLMStage.METADATA_DISCOVERY,
+                "step_number": 2,
+            }
+        )
+        if audit_context is not None
+        else None
     )
-    with request.urlopen(req, timeout=30) as response:
-        body = json.loads(response.read().decode("utf-8"))
+    body = AuditedLLMProviderClient(db=audit_db, context=context).invoke_json(ProviderRequest(
+        provider="openai",
+        model=settings.embedding_model,
+        endpoint=f"{settings.openai_base_url}/embeddings",
+        api_key=settings.openai_api_key or "",
+        body=payload,
+        audit_payload={"model": settings.embedding_model, "input": "[REDACTED_PII]"},
+        user_prompt="[REDACTED_PII]",
+        timeout_seconds=30,
+        prompt_template_name="knowledge_query_embedding",
+        prompt_template_version="v1",
+    ))
     vector = body.get("data", [{}])[0].get("embedding", [])
     if len(vector) != OPENAI_EMBEDDING_DIMENSIONS:
         raise RuntimeError("OpenAI embedding response had unexpected dimensions")

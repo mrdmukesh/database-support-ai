@@ -1538,6 +1538,28 @@ def _ai_reasoning_status(*, llm_configured: bool, llm_used: bool) -> dict[str, s
     }
 
 
+def _llm_audit_outcome(status: str, trace: dict[str, Any]) -> tuple[str, str]:
+    """Explain an investigation's provider outcome without fabricating an invocation."""
+    if trace.get("ai_reasoning_invoked"):
+        if trace.get("ai_outcome") == "provider_failure":
+            return "PROVIDER_FAILED", str(trace.get("sanitized_error_reason") or "Provider request failed.")
+        return "PROVIDER_INVOKED", "At least one provider request was submitted."
+    if status == "AI_SKIPPED_BY_EVIDENCE_GATE":
+        return "AI_SKIPPED_BY_EVIDENCE_GATE", str(
+            trace.get("ai_skip_reason") or "The evidence gate did not permit LLM reasoning."
+        )
+    if trace.get("ai_skip_reason") == "entity_resolution_failed":
+        return "ENTITY_RESOLUTION_FAILED", "Required entities could not be resolved."
+    settings = Settings.from_env()
+    if not settings.ai_reasoning_enabled or not settings.llm_enabled:
+        return "PROVIDER_DISABLED", "LLM reasoning is disabled by configuration."
+    if not settings.openai_api_key or settings.llm_provider != "openai":
+        return "INVALID_CONFIGURATION", "The configured LLM provider is unavailable."
+    return "DETERMINISTIC_ONLY", str(
+        trace.get("ai_skip_reason") or "The investigation completed without a provider request."
+    )
+
+
 def _verification_sections_from_models(checks: list[VerificationCheckModel]) -> list[ReportSection]:
     """
     Owner: Mukesh Dabi
@@ -1811,6 +1833,14 @@ def _run_dynamic_investigation(
         entities,
         metadata_context=metadata_context,
         schema_metadata=active_schema_metadata,
+        audit_context=InvocationContext(
+            investigation_id=investigation_id,
+            investigation_run_id=investigation_id,
+            organization_id=payload.organization_id,
+            workspace_id=payload.workspace_id,
+            user_id=payload.user_id,
+            correlation_id=investigation_id,
+        ),
     )
     if context.metadata.target_object_not_found:
         return _target_object_not_found_metadata_answer(
@@ -2575,6 +2605,9 @@ def ask_chat_question(
         investigation_metadata.get("answer_provenance"),
     )
     terminal_ai_trace = _terminal_ai_trace(investigation_metadata)
+    llm_audit_outcome, llm_audit_reason = _llm_audit_outcome(
+        investigation_status, terminal_ai_trace
+    )
     investigation = InvestigationModel(
         id=investigation_id,
         organization_id=payload.organization_id,
@@ -2594,6 +2627,8 @@ def ask_chat_question(
         report_storage_json=investigation_metadata.get("report_storage", "{}"),
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
         ai_debug_trace_json=json.dumps(sanitize_ai_trace(terminal_ai_trace), default=str),
+        llm_audit_outcome=llm_audit_outcome,
+        llm_audit_reason=llm_audit_reason,
         status=investigation_status,
     )
     db.add(investigation)

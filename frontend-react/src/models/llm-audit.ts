@@ -34,3 +34,8 @@ export type LLMInvocationDetail = LLMInvocationSummary & {
   application_commit: string | null;
   redaction_notice: string;
 };
+
+export type ZeroInvocationExplanation = {
+  code: string;
+  reason: string;
+};

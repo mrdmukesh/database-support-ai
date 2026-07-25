@@ -151,6 +151,14 @@ class EvidenceGateResult:
     blocking_reasons: list[str]
     missing_evidence: list[str]
     status_interpretation: list[str]
+    reproduction_rule: str = ""
+    failed_rule: str = ""
+    expected_value: str = ""
+    actual_value: str = ""
+    evidence_item_count: int = 0
+    successful_sql_count: int = 0
+    returned_row_count: int = 0
+    summary_mode_eligible: bool = False
 
 
 def run_evidence_gate(
@@ -196,6 +204,9 @@ def run_evidence_gate(
     facts: list[str] = []
     blockers: list[str] = []
     status_notes: list[str] = []
+    evidence_item_count = len(evidence)
+    successful_sql_count = sum(1 for item in evidence if not item.error)
+    returned_row_count = sum(len(item.rows) for item in evidence)
     key_values = [
         entity.value
         for entity in entities.entities
@@ -226,14 +237,33 @@ def run_evidence_gate(
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION and not _has_explain_or_row_estimate(evidence):
         condition_exists = False
         blockers.append("Performance investigation lacks EXPLAIN or row-estimate evidence.")
+    reproduction_rule = _reproduction_rule(intent)
     if not required:
-        return EvidenceGateResult(False, True, business_key_exists, True, affected_rows_exist, relationship_exists, facts, [], [], status_notes)
+        return EvidenceGateResult(
+            False, True, business_key_exists, True, affected_rows_exist, relationship_exists,
+            facts, [], [], status_notes, reproduction_rule=reproduction_rule,
+            evidence_item_count=evidence_item_count, successful_sql_count=successful_sql_count,
+            returned_row_count=returned_row_count,
+        )
     relationship_ok = relationship_exists or intent in {
         InvestigationIntent.PERFORMANCE_INVESTIGATION,
         InvestigationIntent.DUPLICATE_DATA,
         InvestigationIntent.PROCESS_FLOW_BREAK,
     }
     reproduced = business_key_exists and affected_rows_exist and condition_exists and relationship_ok
+    failed_rule, expected_value, actual_value = _failed_rule(
+        business_key_exists=business_key_exists,
+        affected_rows_exist=affected_rows_exist,
+        condition_exists=condition_exists,
+        relationship_ok=relationship_ok,
+    )
+    summary_mode_eligible = (
+        not reproduced
+        and business_key_exists
+        and affected_rows_exist
+        and returned_row_count > 0
+        and _is_exploratory_request(question, intent)
+    )
     return EvidenceGateResult(
         required=required,
         reproduced=reproduced,
@@ -245,7 +275,75 @@ def run_evidence_gate(
         blocking_reasons=[] if reproduced else blockers,
         missing_evidence=[] if reproduced else blockers,
         status_interpretation=status_notes,
+        reproduction_rule=reproduction_rule,
+        failed_rule=failed_rule,
+        expected_value=expected_value,
+        actual_value=actual_value,
+        evidence_item_count=evidence_item_count,
+        successful_sql_count=successful_sql_count,
+        returned_row_count=returned_row_count,
+        summary_mode_eligible=summary_mode_eligible,
     )
+
+
+def _failed_rule(
+    *,
+    business_key_exists: bool,
+    affected_rows_exist: bool,
+    condition_exists: bool,
+    relationship_ok: bool,
+) -> tuple[str, str, str]:
+    """Return the first stable evidence-gate rule failure for persisted diagnostics."""
+    checks = (
+        ("EG-BUSINESS-KEY", business_key_exists, "business key present in verified rows"),
+        ("EG-AFFECTED-ROWS", affected_rows_exist, "at least one relevant verified row"),
+        ("EG-REPORTED-CONDITION", condition_exists, "reported condition reproduced"),
+        ("EG-RELATIONSHIP", relationship_ok, "relationship confirmed by metadata or evidence"),
+    )
+    for rule, actual, expected in checks:
+        if not actual:
+            return rule, expected, "not confirmed"
+    return "", "all required rules pass", "all required rules pass"
+
+
+def _reproduction_rule(intent: InvestigationIntent) -> str:
+    if intent == InvestigationIntent.PROCESS_FLOW_BREAK:
+        return "PROCESS_FLOW_STATUS_OR_TRANSITION_CONFIRMED"
+    if intent == InvestigationIntent.DUPLICATE_DATA:
+        return "DUPLICATE_COUNT_OR_REPEATED_CORRELATION_CONFIRMED"
+    if intent == InvestigationIntent.MISSING_DATA:
+        return "MISSING_RELATED_RECORD_CONFIRMED"
+    if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
+        return "EXPLAIN_OR_ROW_ESTIMATE_CONFIRMED"
+    return "REPORTED_CONDITION_CONFIRMED"
+
+
+def _is_exploratory_request(question: str, intent: InvestigationIntent) -> bool:
+    """Allow factual summary mode only when the user did not assert a concrete defect."""
+    if intent not in {
+        InvestigationIntent.PRODUCTION_INVESTIGATION,
+        InvestigationIntent.PROCESS_FLOW_BREAK,
+    }:
+        return False
+    text = " ".join(question.casefold().split())
+    explicit_assertions = (
+        r"\b(?:is|was|has been|remains)\s+(?:delayed|stuck|failed|missing|duplicated|incomplete)\b",
+        r"\b(?:did not|does not|has not|was not|is not)\s+(?:complete|completed|transition|process|deliver|arrive)\b",
+        r"\b(?:has|have|had)\s+no\s+(?:downstream|related|delivery|shipment|milestone|event|record)\b",
+        r"\b(?:downstream|related|delivery|shipment|milestone|event|record)\s+(?:is|was|are|were)\s+missing\b",
+        r"\bexperienced\s+(?:a\s+)?(?:delay|failure|error|timeout)\b",
+    )
+    if any(re.search(pattern, text) for pattern in explicit_assertions):
+        return False
+    exploratory_markers = (
+        "identify any",
+        "determine whether",
+        "trace and correlate",
+        "reconstruct the complete timeline",
+        "investigate shipment",
+        "evidence-backed investigation",
+    )
+    return any(marker in text for marker in exploratory_markers)
 
 
 def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:

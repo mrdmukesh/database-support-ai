@@ -34,12 +34,18 @@ _INVESTIGATION_COLUMNS: dict[str, str] = {
     "report_storage_json": "TEXT NOT NULL DEFAULT '{}'",
     "report_snapshot_json": "TEXT NOT NULL DEFAULT ''",
     "ai_debug_trace_json": "TEXT NOT NULL DEFAULT ''",
+    "llm_audit_outcome": "VARCHAR(80) NOT NULL DEFAULT ''",
+    "llm_audit_reason": "TEXT NOT NULL DEFAULT ''",
 }
 
 _AUDIT_COLUMNS: dict[str, str] = {
     "workspace_id": "VARCHAR",
     "status": "VARCHAR(40) NOT NULL DEFAULT 'success'",
     "created_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+}
+
+_LLM_AUDIT_COLUMNS: dict[str, str] = {
+    "provider_request_id": "VARCHAR(160)",
 }
 
 _VERIFICATION_COLUMNS: dict[str, str] = {
@@ -52,16 +58,26 @@ _VERIFICATION_COLUMNS: dict[str, str] = {
 }
 
 
-def _try_enable_pgvector(connection) -> bool:
+def _try_enable_pgvector(
+    connection,
+    *,
+    add_embedding_column: bool = True,
+    add_embedding_index: bool = True,
+) -> bool:
     try:
+        # A compatibility DDL statement must never hold application startup
+        # behind an unrelated long-running transaction.
+        connection.execute(text("SET LOCAL lock_timeout = '5s'"))
         connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        connection.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
-        connection.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
-                "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+        if add_embedding_column:
+            connection.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+        if add_embedding_index:
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+                    "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+                )
             )
-        )
         return True
     except SQLAlchemyError:
         return False
@@ -99,6 +115,16 @@ def initialize_application_schema(database_url: str) -> None:
             for column_name, ddl in _AUDIT_COLUMNS.items():
                 if column_name not in existing_audit_columns:
                     connection.execute(text(f"ALTER TABLE audit_logs ADD COLUMN {column_name} {ddl}"))
+    if "llm_invocation_audit" in inspector.get_table_names():
+        existing_llm_audit_columns = {
+            column["name"] for column in inspector.get_columns("llm_invocation_audit")
+        }
+        with engine.begin() as connection:
+            for column_name, ddl in _LLM_AUDIT_COLUMNS.items():
+                if column_name not in existing_llm_audit_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE llm_invocation_audit ADD COLUMN {column_name} {ddl}")
+                    )
     if "verification_checks" in inspector.get_table_names():
         existing_verification_columns = {column["name"] for column in inspector.get_columns("verification_checks")}
         with engine.begin() as connection:
@@ -106,8 +132,17 @@ def initialize_application_schema(database_url: str) -> None:
                 if column_name not in existing_verification_columns:
                     connection.execute(text(f"ALTER TABLE verification_checks ADD COLUMN {column_name} {ddl}"))
     if engine.dialect.name == "postgresql" and "knowledge_chunks" in inspector.get_table_names():
-        with engine.begin() as connection:
-            _try_enable_pgvector(connection)
+        knowledge_columns = {column["name"] for column in inspector.get_columns("knowledge_chunks")}
+        knowledge_indexes = {index["name"] for index in inspector.get_indexes("knowledge_chunks")}
+        add_embedding_column = "embedding" not in knowledge_columns
+        add_embedding_index = "ix_knowledge_chunks_embedding_cosine" not in knowledge_indexes
+        if add_embedding_column or add_embedding_index:
+            with engine.begin() as connection:
+                _try_enable_pgvector(
+                    connection,
+                    add_embedding_column=add_embedding_column,
+                    add_embedding_index=add_embedding_index,
+                )
     if not database_url.startswith("sqlite"):
         return
     if "knowledge_articles" not in inspector.get_table_names():

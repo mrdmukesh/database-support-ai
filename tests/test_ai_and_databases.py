@@ -2518,6 +2518,40 @@ def test_llm_payload_masks_pii_before_openai_reasoning() -> None:
     assert "[MASKED_EMAIL]" in payload_text
 
 
+def test_unreproduced_reasoning_builds_constrained_evidence_summary_prompt() -> None:
+    reasoning = ReasoningResult(
+        summary="Reported issue could not be reproduced.",
+        likely_root_causes=[],
+        supporting_evidence=["Shipment exists.", "Milestone exists."],
+        missing_evidence=["No delay condition was confirmed."],
+        recommended_fix=[],
+        test_cases=[],
+        proof_of_fix=[],
+        rollback_plan=[],
+        risks=[],
+        response_type="insufficient_evidence",
+    )
+
+    payload = _build_llm_payload(
+        question="Investigate shipment SHP-5001 and identify any delays.",
+        intent=IntentResult(InvestigationIntent.PROCESS_FLOW_BREAK, 0.9, "test"),
+        deterministic_reasoning=reasoning,
+        evidence=[EvidenceResult(
+            "Prove requested entity exists",
+            "SELECT BusinessKey, Status FROM shipments WHERE BusinessKey = 'SHP-5001'",
+            [{"BusinessKey": "SHP-5001", "Status": "InTransit"}],
+        )],
+        correlated_evidence=[],
+        procedure_analysis=[],
+        documents=[],
+        evidence_focus=None,
+    )
+
+    assert payload["reasoning_mode"] == "evidence_summary_not_reproduced"
+    assert "State clearly that the reported defect was not reproduced" in payload["task"]
+    assert "Do not infer or recommend a root cause" in payload["task"]
+
+
 def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch) -> None:
     def fake_call(settings, payload, *, debug_trace=None):
         if debug_trace is not None:
@@ -2803,8 +2837,47 @@ def test_related_evidence_expands_string_correlation_ids() -> None:
     evidence = [EvidenceResult("Primary entity", "SELECT ...", [{"BusinessKey": "SHP-17-A", "CorrelationId": "CORR-17"}])]
     related = _expand_related_id_evidence(Connector(), metadata, evidence)
     assert len(related) == 1
-    assert "duplicate correlated" in related[0].purpose.lower()
+    assert related[0].purpose == "Inspect correlated rows by CorrelationId in eval.integration_messages"
     assert len(related[0].rows) == 2
+
+
+def test_related_evidence_uses_active_metadata_beyond_ranked_subset() -> None:
+    executed: list[str] = []
+
+    class Connector:
+        def execute_read_only_query(self, sql, limit=25):
+            executed.append(sql)
+            return [{"ShipmentsId": 5001, "Status": "Recorded"}]
+
+    ranked = MetadataSearchResult(
+        [TableMetadata("eval.shipments", ["ShipmentsId", "BusinessKey"], 10)],
+        [], [], "test",
+    )
+    active = MetadataSearchResult(
+        [
+            *ranked.tables,
+            TableMetadata("eval.shipment_milestones", ["ShipmentMilestonesId", "ShipmentsId", "Status"], 0),
+            TableMetadata("eval.bills_of_lading", ["BillsOfLadingId", "ShipmentsId", "Status"], 0),
+        ],
+        [], [], "test",
+    )
+    evidence = [EvidenceResult(
+        "Prove requested entity exists in eval.shipments",
+        "SELECT * FROM eval.shipments WHERE BusinessKey = 'SHP-5001'",
+        [{"ShipmentsId": 5001, "BusinessKey": "SHP-5001"}],
+    )]
+
+    related = _expand_related_id_evidence(
+        Connector(), ranked, evidence, active_metadata=active
+    )
+
+    assert any("eval.shipment_milestones" in sql for sql in executed)
+    assert any("eval.bills_of_lading" in sql for sql in executed)
+    assert {item.purpose for item in related} >= {
+        "Inspect correlated rows by ShipmentsId in eval.shipment_milestones",
+        "Inspect correlated rows by ShipmentsId in eval.bills_of_lading",
+    }
+    assert all("duplicate" not in item.purpose.casefold() for item in related)
 
 
 def test_evidence_scope_retains_unseen_active_schema_diagnostics() -> None:
@@ -2881,6 +2954,77 @@ def test_process_flow_gate_accepts_keyed_missing_downstream_evidence() -> None:
     assert gate.affected_rows_exist is True
     assert gate.reported_condition_exists is True
     assert gate.reproduced is True
+
+
+def test_broad_process_flow_investigation_is_eligible_for_safe_evidence_summary() -> None:
+    question = (
+        "Investigate shipment SHP-5001. Trace and correlate all related records, "
+        "reconstruct the complete timeline, and identify any delays or missing downstream actions."
+    )
+    entities = extract_entities(question)
+    metadata = MetadataSearchResult(
+        [
+            TableMetadata("eval.shipments", ["BusinessKey", "CorrelationId", "Status"], 10),
+            TableMetadata("eval.shipment_milestones", ["BusinessKey", "CorrelationId", "Status"], 9),
+        ],
+        [], [], "test",
+    )
+    evidence = [
+        EvidenceResult(
+            "Prove requested entity exists in eval.shipments",
+            "SELECT * FROM eval.shipments WHERE BusinessKey = 'SHP-5001'",
+            [{"BusinessKey": "SHP-5001", "CorrelationId": "CORR-5001", "Status": "InTransit"}],
+        ),
+        EvidenceResult(
+            "Inspect related shipment milestones",
+            "SELECT * FROM eval.shipment_milestones WHERE CorrelationId = 'CORR-5001'",
+            [{"BusinessKey": "MS-1", "CorrelationId": "CORR-5001", "Status": "Recorded"}],
+        ),
+    ]
+
+    gate = run_evidence_gate(
+        question=question,
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=metadata,
+        evidence=evidence,
+        evidence_focus=None,
+        documents=[],
+    )
+
+    assert gate.reproduced is False
+    assert gate.failed_rule == "EG-REPORTED-CONDITION"
+    assert gate.reproduction_rule == "PROCESS_FLOW_STATUS_OR_TRANSITION_CONFIRMED"
+    assert gate.expected_value == "reported condition reproduced"
+    assert gate.actual_value == "not confirmed"
+    assert gate.evidence_item_count == 2
+    assert gate.successful_sql_count == 2
+    assert gate.returned_row_count == 2
+    assert gate.summary_mode_eligible is True
+
+
+def test_explicit_unreproduced_delay_is_not_eligible_for_summary_mode() -> None:
+    question = "Investigate why shipment SHP-5001 experienced delivery delays."
+    entities = extract_entities(question)
+    evidence = [EvidenceResult(
+        "Prove requested entity exists in eval.shipments",
+        "SELECT * FROM eval.shipments WHERE BusinessKey = 'SHP-5001'",
+        [{"BusinessKey": "SHP-5001", "Status": "Delivered"}],
+    )]
+    gate = run_evidence_gate(
+        question=question,
+        intent=InvestigationIntent.PROCESS_FLOW_BREAK,
+        entities=entities,
+        metadata=MetadataSearchResult(
+            [TableMetadata("eval.shipments", ["BusinessKey", "Status"], 10)], [], [], "test"
+        ),
+        evidence=evidence,
+        evidence_focus=None,
+        documents=[],
+    )
+
+    assert gate.reproduced is False
+    assert gate.summary_mode_eligible is False
 
 
 def test_duplicate_gate_requires_repeated_correlated_evidence() -> None:

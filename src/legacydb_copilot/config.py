@@ -37,6 +37,8 @@ class Settings:
     llm_retry_backoff_seconds: float = 0.5
     llm_retry_jitter_seconds: float = 0.25
     llm_total_timeout_seconds: float = 65.0
+    llm_input_cost_per_million: float = 0.0
+    llm_output_cost_per_million: float = 0.0
     llm_circuit_breaker_threshold: int = 5
     llm_circuit_breaker_cooldown_seconds: float = 30.0
     ai_debug_trace_enabled: bool = False
@@ -49,6 +51,7 @@ class Settings:
     feature_enterprise_rbac_enabled: bool = False
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
+    llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
 
     @classmethod
@@ -93,6 +96,8 @@ class Settings:
             llm_retry_backoff_seconds=max(0.0, float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5"))),
             llm_retry_jitter_seconds=max(0.0, float(os.getenv("LLM_RETRY_JITTER_SECONDS", "0.25"))),
             llm_total_timeout_seconds=max(0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "65"))),
+            llm_input_cost_per_million=max(0.0, float(os.getenv("LLM_INPUT_COST_PER_MILLION", "0"))),
+            llm_output_cost_per_million=max(0.0, float(os.getenv("LLM_OUTPUT_COST_PER_MILLION", "0"))),
             llm_circuit_breaker_threshold=max(1, int(os.getenv("LLM_CIRCUIT_BREAKER_THRESHOLD", "5"))),
             llm_circuit_breaker_cooldown_seconds=max(
                 0.1, float(os.getenv("LLM_CIRCUIT_BREAKER_COOLDOWN_SECONDS", "30"))
@@ -122,5 +127,6 @@ class Settings:
                 "false",
             ).lower()
             in {"1", "true", "yes", "on"},
+            llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
         )

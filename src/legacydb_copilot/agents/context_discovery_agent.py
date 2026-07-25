@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, search_metadata
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument, retrieve_documents
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,7 @@ def discover_context(
     entities: EntityExtractionResult,
     metadata_context: MetadataSearchContext | None = None,
     schema_metadata=None,
+    audit_context: InvocationContext | None = None,
 ) -> DiscoveredContext:
     """
     Owner: Mukesh Dabi
@@ -48,5 +50,7 @@ def discover_context(
     """
 
     metadata = search_metadata(connector, question, entities, context=metadata_context, schema_metadata=schema_metadata)
-    documents = retrieve_documents(db, organization_id, workspace_id, question)
+    documents = retrieve_documents(
+        db, organization_id, workspace_id, question, audit_context=audit_context
+    )
     return DiscoveredContext(metadata=metadata, documents=documents)

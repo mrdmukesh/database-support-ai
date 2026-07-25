@@ -103,6 +103,7 @@ def create_fastapi_app() -> Any:
     from legacydb_copilot.services.evaluation_worker_runtime import EvaluationWorkerRuntime, evaluation_worker_enabled
     from legacydb_copilot.routers import (
         admin,
+        llm_audit,
         auth,
         billing,
         chat,
@@ -156,6 +157,7 @@ def create_fastapi_app() -> Any:
     app.include_router(reports.router)
     app.include_router(billing.router)
     app.include_router(admin.router)
+    app.include_router(llm_audit.router)
 
     if react_root:
         @app.get("/react/assets/{asset_path:path}", include_in_schema=False)

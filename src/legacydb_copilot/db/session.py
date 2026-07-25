@@ -25,6 +25,15 @@ def create_db_engine(database_url: str):
                 cursor.execute("PRAGMA busy_timeout=60000")
             finally:
                 cursor.close()
+    elif engine.dialect.name == "postgresql":
+        @event.listens_for(engine, "connect")
+        def configure_postgresql_connection(dbapi_connection, _connection_record) -> None:
+            """Prevent abandoned requests from holding deployment-blocking locks indefinitely."""
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("SET idle_in_transaction_session_timeout = '5min'")
+            finally:
+                cursor.close()
     return engine
 
 

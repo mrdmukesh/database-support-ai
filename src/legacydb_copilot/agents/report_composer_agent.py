@@ -730,6 +730,7 @@ def compose_report(
     workspace_name: str,
     database_name: str,
     generated_by: str,
+    investigation_id: str | None = None,
 ) -> InvestigationReport:
     """
     Owner: Mukesh Dabi
@@ -977,7 +978,7 @@ def compose_report(
             database=database_name,
             generated_by=generated_by,
             generated_on=now_label(),
-            investigation_id=new_investigation_id(),
+            investigation_id=investigation_id or new_investigation_id(),
             report_version=REPORT_VERSION,
         ),
         executive_summary=ExecutiveSummary(

@@ -761,6 +761,8 @@ def _supporting_transfer_relationship_queries(
             transfer_projection = _qualified_columns(transfer_table.columns, "t", "Transfer") if transfer_table.columns else ["t.*"]
             related_projection = _qualified_columns(table.columns, "s", "Related") if table.columns else ["s.*"]
             projection = ", ".join([*transfer_projection, *related_projection])
+            order_col = table.columns[0] if table.columns else None
+            order_by = f" ORDER BY s.{order_col}" if order_col else ""
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
@@ -768,6 +770,7 @@ def _supporting_transfer_relationship_queries(
                         f"SELECT {projection} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{child_col} = t.{parent_col} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                        f"{order_by}"
                     ),
                 )
             )
@@ -788,6 +791,8 @@ def _supporting_transfer_relationship_queries(
             transfer_projection = _qualified_columns(transfer_table.columns, "t", "Transfer") if transfer_table.columns else ["t.*"]
             related_projection = _qualified_columns(table.columns, "s", "Related") if table.columns else ["s.*"]
             projection = ", ".join([*transfer_projection, *related_projection])
+            order_col = table.columns[0] if table.columns else None
+            order_by = f" ORDER BY s.{order_col}" if order_col else ""
             supporting.append(
                 PlannedQuery(
                     purpose=f"Inspect {role} relationship evidence in {table.name}",
@@ -795,6 +800,7 @@ def _supporting_transfer_relationship_queries(
                         f"SELECT {projection} FROM {transfer_table.name} t "
                         f"JOIN {table.name} s ON s.{related_pk} = t.{transfer_fk} "
                         f"WHERE {_cast_to_text('t.' + transfer_key, metadata.engine_type)} = '{escaped}'"
+                        f"{order_by}"
                     ),
                 )
             )

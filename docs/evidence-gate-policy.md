@@ -1,42 +1,49 @@
-# Evidence Gate Policy
+# Evidence Gate and Reasoning Dispatch Policy
 
-The evidence gate continues to block unsupported root-cause conclusions. A successful SQL statement or an
-existing business entity is not, by itself, proof that a reported defect occurred.
+The Evidence Gate and Reasoning Dispatcher have separate responsibilities.
 
-## Decision modes
+## Evidence Gate
 
-- **Root-cause mode:** A concrete reported condition (for example, a delay, duplicate, missing child, failed
-  transition, or performance problem) must be reproduced by verified evidence before AI root-cause reasoning.
-- **Evidence-summary mode:** A broad exploratory request that does not assert a concrete defect may be sent to
-  the provider when the business key and relevant rows were verified. The prompt is constrained to a factual
-  evidence/timeline summary, must say that no defect was reproduced, and may not infer a root cause. The result
-  is classified `AI_SUMMARIZED_NOT_REPRODUCED`.
-- **Blocked mode:** A concrete condition that was not reproduced remains
-  `AI_SKIPPED_BY_EVIDENCE_GATE`. No provider request or fabricated invocation audit row is created.
+The gate evaluates deterministic state and emits only a permission:
 
-This is policy B for exploratory investigations only. It does not relax SQL validation, read-only enforcement,
-claim citation checks, tenant isolation, masking, or invocation auditing.
+- `ALLOW_REASONING`: at least one safe SQL statement returned relevant verified rows, the requested key (when
+  supplied) exists in those rows, and the rows belong to the affected evidence scope.
+- `DENY_REASONING`: verified deterministic SQL rows are unavailable, the requested key was not established, or
+  the evidence does not cover the affected scope.
 
-## Stable rule identifiers
+Metadata, retrieved documents, or procedure definitions alone do not permit provider reasoning. SQL errors do
+not become evidence. A successful query with no rows does not become evidence. Existing intent-specific
+reproduction checks remain intact and continue to determine whether the reported condition was reproduced.
 
-- `EG-BUSINESS-KEY`: requested business key was not present in returned evidence.
-- `EG-AFFECTED-ROWS`: no relevant verified row was returned.
-- `EG-REPORTED-CONDITION`: the intent-specific defect/reproduction condition was not confirmed.
-- `EG-RELATIONSHIP`: no relationship was confirmed through metadata, joins, or cross-table correlation.
+The gate does not select an LLM prompt or reasoning mode.
 
-Process-flow reproduction uses `PROCESS_FLOW_STATUS_OR_TRANSITION_CONFIRMED`. A broad request such as “identify
-any delays” does not define a status value that can satisfy this rule, so it is eligible for constrained summary
-mode when verified evidence exists. An assertion such as “shipment experienced delivery delays” still requires
-delay evidence and remains blocked if that evidence is absent.
+## Reasoning Dispatcher
 
-## Diagnostics
+After permission is known, the dispatcher selects exactly one mode:
 
-The persisted sanitized AI trace contains the complete `evidence_gate` decision, including the rule, expected and
-actual values, evidence item count, successful SQL count, returned row count, blockers, and summary-mode
-eligibility. Structured application logs include investigation/run ID, entity key, database name, SQL/evidence
-counts, reproduction rule/result, failed rule, invocation decision, and skip reason. Raw row payloads and
-credentials are not logged.
+| Verified evidence | Issue reproduced | Permission | Invoke provider | Mode |
+|---|---:|---|---:|---|
+| No | No | `DENY_REASONING` | No | `SKIP` |
+| No | Yes | `DENY_REASONING` | No | `SKIP` |
+| Yes | Yes | `ALLOW_REASONING` | Yes | `NORMAL_ROOT_CAUSE` |
+| Yes | No | `ALLOW_REASONING` | Yes | `EVIDENCE_SUMMARY_NOT_REPRODUCED` |
 
-Relationship expansion uses the active schema's ID-bearing tables in addition to the ranked subset. Multiple
-rows related by a booking or shipment ID are described as correlated rows; they are not labelled duplicates
-unless a dedicated duplicate rule proves a repeated key/count.
+This decision uses investigation state, never a domain, schema, table, business key, benchmark identifier, intent
+wording, or question phrase.
+
+## Constrained summary mode
+
+`EVIDENCE_SUMMARY_NOT_REPRODUCED` may summarize only verified evidence, factual chronology, confirmed facts, and
+missing evidence. It must say that the reported condition was not reproduced. The application forcibly retains
+the deterministic no-root-cause conclusion, investigation-only recommendations, and proof-of-fix restrictions,
+even if a provider response attempts to return a root cause or fix.
+
+## Preserved controls
+
+- SQL is still produced and executed only by the safe read-only planner and validator.
+- Entity/key and affected-row checks still precede permission.
+- Intent-specific reproduction checks are unchanged.
+- Provider prompts are masked and invocation-audited.
+- Provider claims still undergo citation validation.
+- A denied investigation never calls the provider and never creates an invocation row.
+- Provider configuration and failure fallbacks remain deterministic.

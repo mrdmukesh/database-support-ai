@@ -158,7 +158,9 @@ class EvidenceGateResult:
     evidence_item_count: int = 0
     successful_sql_count: int = 0
     returned_row_count: int = 0
-    summary_mode_eligible: bool = False
+    verified_evidence: bool = False
+    reasoning_permission: str = "DENY_REASONING"
+    permission_reason: str = ""
 
 
 def run_evidence_gate(
@@ -207,6 +209,11 @@ def run_evidence_gate(
     evidence_item_count = len(evidence)
     successful_sql_count = sum(1 for item in evidence if not item.error)
     returned_row_count = sum(len(item.rows) for item in evidence)
+    verified_sql_row_count = sum(
+        len(item.rows)
+        for item in evidence
+        if item.sql.strip() and not item.error and item.rows
+    )
     key_values = [
         entity.value
         for entity in entities.entities
@@ -239,11 +246,18 @@ def run_evidence_gate(
         blockers.append("Performance investigation lacks EXPLAIN or row-estimate evidence.")
     reproduction_rule = _reproduction_rule(intent)
     if not required:
+        verified_evidence = business_key_exists and affected_rows_exist and verified_sql_row_count > 0
         return EvidenceGateResult(
             False, True, business_key_exists, True, affected_rows_exist, relationship_exists,
             facts, [], [], status_notes, reproduction_rule=reproduction_rule,
             evidence_item_count=evidence_item_count, successful_sql_count=successful_sql_count,
-            returned_row_count=returned_row_count,
+            returned_row_count=returned_row_count, verified_evidence=verified_evidence,
+            reasoning_permission="ALLOW_REASONING" if verified_evidence else "DENY_REASONING",
+            permission_reason=(
+                "Verified deterministic SQL evidence is available."
+                if verified_evidence
+                else "No verified deterministic SQL rows are available."
+            ),
         )
     relationship_ok = relationship_exists or intent in {
         InvestigationIntent.PERFORMANCE_INVESTIGATION,
@@ -257,12 +271,12 @@ def run_evidence_gate(
         condition_exists=condition_exists,
         relationship_ok=relationship_ok,
     )
-    summary_mode_eligible = (
-        not reproduced
-        and business_key_exists
-        and affected_rows_exist
-        and returned_row_count > 0
-        and _is_exploratory_request(question, intent)
+    verified_evidence = business_key_exists and affected_rows_exist and verified_sql_row_count > 0
+    reasoning_permission = "ALLOW_REASONING" if verified_evidence else "DENY_REASONING"
+    permission_reason = (
+        "Verified deterministic SQL evidence is available for evidence-grounded reasoning."
+        if verified_evidence
+        else "Reasoning denied because no verified deterministic SQL rows support this investigation."
     )
     return EvidenceGateResult(
         required=required,
@@ -282,7 +296,9 @@ def run_evidence_gate(
         evidence_item_count=evidence_item_count,
         successful_sql_count=successful_sql_count,
         returned_row_count=returned_row_count,
-        summary_mode_eligible=summary_mode_eligible,
+        verified_evidence=verified_evidence,
+        reasoning_permission=reasoning_permission,
+        permission_reason=permission_reason,
     )
 
 
@@ -316,34 +332,6 @@ def _reproduction_rule(intent: InvestigationIntent) -> str:
     if intent == InvestigationIntent.PERFORMANCE_INVESTIGATION:
         return "EXPLAIN_OR_ROW_ESTIMATE_CONFIRMED"
     return "REPORTED_CONDITION_CONFIRMED"
-
-
-def _is_exploratory_request(question: str, intent: InvestigationIntent) -> bool:
-    """Allow factual summary mode only when the user did not assert a concrete defect."""
-    if intent not in {
-        InvestigationIntent.PRODUCTION_INVESTIGATION,
-        InvestigationIntent.PROCESS_FLOW_BREAK,
-    }:
-        return False
-    text = " ".join(question.casefold().split())
-    explicit_assertions = (
-        r"\b(?:is|was|has been|remains)\s+(?:delayed|stuck|failed|missing|duplicated|incomplete)\b",
-        r"\b(?:did not|does not|has not|was not|is not)\s+(?:complete|completed|transition|process|deliver|arrive)\b",
-        r"\b(?:has|have|had)\s+no\s+(?:downstream|related|delivery|shipment|milestone|event|record)\b",
-        r"\b(?:downstream|related|delivery|shipment|milestone|event|record)\s+(?:is|was|are|were)\s+missing\b",
-        r"\bexperienced\s+(?:a\s+)?(?:delay|failure|error|timeout)\b",
-    )
-    if any(re.search(pattern, text) for pattern in explicit_assertions):
-        return False
-    exploratory_markers = (
-        "identify any",
-        "determine whether",
-        "trace and correlate",
-        "reconstruct the complete timeline",
-        "investigate shipment",
-        "evidence-backed investigation",
-    )
-    return any(marker in text for marker in exploratory_markers)
 
 
 def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:

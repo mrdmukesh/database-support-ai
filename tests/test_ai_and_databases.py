@@ -44,6 +44,11 @@ from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
+from legacydb_copilot.services.reasoning_dispatch_service import (
+    ReasoningMode,
+    ReasoningPermission,
+    dispatch_reasoning,
+)
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.agents.report_composer_agent import (
     _executive_root_cause_items,
@@ -2545,9 +2550,10 @@ def test_unreproduced_reasoning_builds_constrained_evidence_summary_prompt() -> 
         procedure_analysis=[],
         documents=[],
         evidence_focus=None,
+        reasoning_mode=ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
     )
 
-    assert payload["reasoning_mode"] == "evidence_summary_not_reproduced"
+    assert payload["reasoning_mode"] == "EVIDENCE_SUMMARY_NOT_REPRODUCED"
     assert "State clearly that the reported defect was not reproduced" in payload["task"]
     assert "Do not infer or recommend a root cause" in payload["task"]
 
@@ -3000,10 +3006,13 @@ def test_broad_process_flow_investigation_is_eligible_for_safe_evidence_summary(
     assert gate.evidence_item_count == 2
     assert gate.successful_sql_count == 2
     assert gate.returned_row_count == 2
-    assert gate.summary_mode_eligible is True
+    decision = dispatch_reasoning(gate)
+    assert gate.verified_evidence is True
+    assert gate.reasoning_permission == ReasoningPermission.ALLOW_REASONING
+    assert decision.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
 
 
-def test_explicit_unreproduced_delay_is_not_eligible_for_summary_mode() -> None:
+def test_explicit_unreproduced_delay_with_verified_rows_uses_constrained_summary_mode() -> None:
     question = "Investigate why shipment SHP-5001 experienced delivery delays."
     entities = extract_entities(question)
     evidence = [EvidenceResult(
@@ -3024,7 +3033,8 @@ def test_explicit_unreproduced_delay_is_not_eligible_for_summary_mode() -> None:
     )
 
     assert gate.reproduced is False
-    assert gate.summary_mode_eligible is False
+    assert gate.verified_evidence is True
+    assert dispatch_reasoning(gate).mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
 
 
 def test_duplicate_gate_requires_repeated_correlated_evidence() -> None:

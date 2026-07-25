@@ -22,6 +22,7 @@ from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, u
 from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
 from legacydb_copilot.services.llm_reasoning_service import enhance_reasoning_with_llm
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
+from legacydb_copilot.services.reasoning_dispatch_service import ReasoningMode, dispatch_reasoning
 
 
 QUESTION = (
@@ -97,7 +98,8 @@ def test_shp_5001_cross_table_evidence_uses_constrained_ai_summary_and_real_audi
     )
     assert gate.reproduced is False
     assert gate.failed_rule == "EG-REPORTED-CONDITION"
-    assert gate.summary_mode_eligible is True
+    assert gate.verified_evidence is True
+    assert dispatch_reasoning(gate).mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
     assert gate.returned_row_count >= 3
 
     response_payload = {
@@ -168,6 +170,7 @@ def test_shp_5001_cross_table_evidence_uses_constrained_ai_summary_and_real_audi
             debug_trace=trace,
             audit_db=db,
             audit_context=context,
+            reasoning_mode=ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
         )
 
         audits = db.query(LLMInvocationAuditModel).all()

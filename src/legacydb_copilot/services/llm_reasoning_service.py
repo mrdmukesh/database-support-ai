@@ -23,6 +23,7 @@ from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvi
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
+from legacydb_copilot.services.reasoning_dispatch_service import ReasoningMode
 from legacydb_copilot.services.llm_invocation_audit_service import (
     InvocationContext,
 )
@@ -142,6 +143,7 @@ def enhance_reasoning_with_llm(
     debug_trace: dict[str, Any] | None = None,
     audit_db: Session | None = None,
     audit_context: InvocationContext | None = None,
+    reasoning_mode: ReasoningMode = ReasoningMode.NORMAL_ROOT_CAUSE,
 ) -> ReasoningResult:
     """
     Owner: Mukesh Dabi
@@ -201,6 +203,7 @@ def enhance_reasoning_with_llm(
         procedure_analysis=procedure_analysis,
         documents=documents,
         evidence_focus=evidence_focus,
+        reasoning_mode=reasoning_mode,
     )
     payload = mask_llm_payload(raw_payload)
     if debug_trace is not None:
@@ -239,7 +242,7 @@ def enhance_reasoning_with_llm(
             settings, payload, debug_trace=debug_trace, **audit_kwargs,
         )
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
-        if deterministic_reasoning.response_type == "insufficient_evidence":
+        if reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED:
             enhanced = replace(
                 enhanced,
                 likely_root_causes=deterministic_reasoning.likely_root_causes,
@@ -279,6 +282,7 @@ def _build_llm_payload(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None,
+    reasoning_mode: ReasoningMode = ReasoningMode.NORMAL_ROOT_CAUSE,
 ) -> dict[str, Any]:
     """
     Owner: Mukesh Dabi
@@ -310,6 +314,7 @@ def _build_llm_payload(
             procedure_analysis=procedure_analysis,
             documents=documents,
             evidence_focus=evidence_focus,
+            reasoning_mode=reasoning_mode,
         )
     )
 
@@ -324,6 +329,7 @@ def _build_llm_payload_unmasked(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
     evidence_focus: EvidenceFocus | None,
+    reasoning_mode: ReasoningMode = ReasoningMode.NORMAL_ROOT_CAUSE,
 ) -> dict[str, Any]:
     evidence_items = [
         {
@@ -369,9 +375,9 @@ def _build_llm_payload_unmasked(
         }
         for index, item in enumerate(correlated_evidence[:20], start=1)
     ]
-    summary_only = deterministic_reasoning.response_type == "insufficient_evidence"
+    summary_only = reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
     payload = {
-        "reasoning_mode": "evidence_summary_not_reproduced" if summary_only else "root_cause_analysis",
+        "reasoning_mode": reasoning_mode.value,
         "task": (
             "Summarize only the verified evidence and factual timeline. State clearly that the reported defect "
             "was not reproduced. Do not infer or recommend a root cause, and do not create new SQL or facts."

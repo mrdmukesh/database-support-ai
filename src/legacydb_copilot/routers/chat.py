@@ -99,6 +99,10 @@ from legacydb_copilot.services.report_generator import (
     now_label,
 )
 from legacydb_copilot.services.report_snapshot_service import report_from_dict, report_to_dict
+from legacydb_copilot.services.reasoning_dispatch_service import (
+    ReasoningMode,
+    dispatch_reasoning,
+)
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
 
@@ -2079,72 +2083,10 @@ def _run_dynamic_investigation(
         documents=context.documents,
         evidence_focus=evidence_focus,
     )
-    summary_mode = (
-        evidence_gate.required
-        and not evidence_gate.reproduced
-        and evidence_gate.summary_mode_eligible
-    )
-    if evidence_gate.required and not evidence_gate.reproduced:
-        reasoning = unreproduced_reasoning(evidence_gate)
-        llm_configured = llm_reasoning_enabled()
-        settings = Settings.from_env()
-        ai_debug_trace = {
-            "ai_enabled": bool(settings.ai_reasoning_enabled),
-            "evidence_package_valid": False,
-            "llm_invoked": False,
-            "provider": settings.llm_provider,
-            "model": settings.llm_model,
-            "invocation_status": "skipped_by_evidence_gate",
-            "skip_reason": "evidence_gate_not_reproduced",
-            "generated_claim_count": 0,
-            "verified_claim_count": 0,
-            "rejected_claim_count": 0,
-            "verification_status": "not_applicable",
-            "error_category": None,
-            "ai_reasoning_invoked": False,
-            "ai_skip_reason": "evidence_gate_not_reproduced",
-            "ai_outcome": "evidence_gate",
-            "ai_skip_branch": "evidence_gate.required_and_not_reproduced",
-            "reasoning_mode": (
-                "evidence_summary_not_reproduced"
-                if summary_mode
-                else "blocked_not_reproduced"
-            ),
-            "llm_model_name": settings.llm_model,
-            "prompt_version": AI_REASONING_PROMPT_VERSION,
-            "input_tokens": 0,
-            "output_tokens": 0,
-        }
-        if summary_mode:
-            enhanced_reasoning = enhance_reasoning_with_llm(
-                question=payload.question,
-                intent=intent,
-                deterministic_reasoning=reasoning,
-                evidence=evidence,
-                correlated_evidence=correlated_evidence,
-                procedure_analysis=procedure_analysis,
-                documents=context.documents,
-                evidence_focus=evidence_focus,
-                settings=settings,
-                debug_trace=ai_debug_trace,
-                audit_db=db,
-                audit_context=InvocationContext(
-                    investigation_id=investigation_id,
-                    investigation_run_id=investigation_id,
-                    organization_id=payload.organization_id,
-                    workspace_id=payload.workspace_id,
-                    user_id=payload.user_id,
-                    correlation_id=investigation_id,
-                ),
-            )
-            llm_used = enhanced_reasoning is not reasoning
-            reasoning = enhanced_reasoning
-            if llm_used:
-                ai_debug_trace["ai_outcome"] = "evidence_summary_not_reproduced"
-                ai_debug_trace.pop("ai_skip_reason", None)
-        else:
-            llm_used = False
-    else:
+    reasoning_dispatch = dispatch_reasoning(evidence_gate)
+    settings = Settings.from_env()
+    llm_configured = llm_reasoning_enabled(settings)
+    if reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
         reasoning = reason_about_evidence(
             payload.question,
             intent,
@@ -2156,22 +2098,39 @@ def _run_dynamic_investigation(
             procedure_analysis,
             evidence_focus,
         )
-        settings = Settings.from_env()
-        llm_configured = llm_reasoning_enabled(settings)
-        ai_debug_trace = {
-            "ai_enabled": bool(settings.ai_reasoning_enabled),
-            "evidence_package_valid": True,
-            "llm_invoked": False,
-            "provider": settings.llm_provider,
-            "model": settings.llm_model,
-            "invocation_status": "pending",
-            "skip_reason": "awaiting_provider_response" if llm_configured else "llm_not_configured",
-            "generated_claim_count": 0,
-            "verified_claim_count": 0,
-            "rejected_claim_count": 0,
-            "verification_status": "not_applicable",
-            "error_category": None,
-        }
+    else:
+        reasoning = unreproduced_reasoning(evidence_gate)
+
+    reasoning_allowed = reasoning_dispatch.mode != ReasoningMode.SKIP
+    ai_debug_trace = {
+        "ai_enabled": bool(settings.ai_reasoning_enabled),
+        "evidence_package_valid": evidence_gate.verified_evidence,
+        "reasoning_permission": reasoning_dispatch.permission.value,
+        "reasoning_mode": reasoning_dispatch.mode.value,
+        "reasoning_dispatch_reason": reasoning_dispatch.reason,
+        "llm_invoked": False,
+        "provider": settings.llm_provider,
+        "model": settings.llm_model,
+        "invocation_status": "pending" if reasoning_allowed else "skipped_by_evidence_gate",
+        "skip_reason": (
+            "awaiting_provider_response"
+            if reasoning_allowed and llm_configured
+            else "llm_not_configured"
+            if reasoning_allowed
+            else evidence_gate.permission_reason
+        ),
+        "generated_claim_count": 0,
+        "verified_claim_count": 0,
+        "rejected_claim_count": 0,
+        "verification_status": "not_applicable",
+        "error_category": None,
+        "ai_reasoning_invoked": False,
+        "llm_model_name": settings.llm_model,
+        "prompt_version": AI_REASONING_PROMPT_VERSION,
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }
+    if reasoning_allowed:
         enhanced_reasoning = enhance_reasoning_with_llm(
             question=payload.question,
             intent=intent,
@@ -2192,9 +2151,20 @@ def _run_dynamic_investigation(
                 user_id=payload.user_id,
                 correlation_id=investigation_id,
             ),
+            reasoning_mode=reasoning_dispatch.mode,
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
+        if llm_used and reasoning_dispatch.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED:
+            ai_debug_trace["ai_outcome"] = "evidence_summary_not_reproduced"
+            ai_debug_trace.pop("ai_skip_reason", None)
+    else:
+        llm_used = False
+        ai_debug_trace.update({
+            "ai_skip_reason": "evidence_gate_denied_reasoning",
+            "ai_outcome": "evidence_gate",
+            "ai_skip_branch": "reasoning_dispatch.permission_denied",
+        })
     logger.info(
         "evidence_gate_decision investigation_id=%s run_id=%s entity_key=%s database=%s "
         "evidence_item_count=%s sql_count=%s successful_sql_count=%s row_count=%s "
@@ -2272,7 +2242,7 @@ def _run_dynamic_investigation(
     ai_status = _ai_reasoning_status(
         llm_configured=llm_configured,
         llm_used=llm_used,
-        evidence_gate=evidence_gate if not summary_mode else None,
+        evidence_gate=evidence_gate if reasoning_dispatch.mode == ReasoningMode.SKIP else None,
     )
     bundle = DynamicInvestigationBundle(
         question=payload.question,
@@ -2351,6 +2321,9 @@ def _run_dynamic_investigation(
     gate_text = "\n".join(
         [
             f"- Gate Required: {'Yes' if evidence_gate.required else 'No'}",
+            f"- Reasoning Permission: {reasoning_dispatch.permission.value}",
+            f"- Reasoning Mode: {reasoning_dispatch.mode.value}",
+            f"- Verified Evidence: {'Yes' if evidence_gate.verified_evidence else 'No'}",
             f"- Issue Reproduced: {'Yes' if evidence_gate.reproduced else 'No'}",
             f"- Business Key Exists: {'Yes' if evidence_gate.business_key_exists else 'No'}",
             f"- Reported Condition Exists: {'Yes' if evidence_gate.reported_condition_exists else 'No'}",
@@ -2491,9 +2464,9 @@ def _run_dynamic_investigation(
     )
     answer_provenance = (
         "AI_SUMMARIZED_NOT_REPRODUCED"
-        if evidence_gate.required and not evidence_gate.reproduced and llm_used
+        if reasoning_dispatch.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED and llm_used
         else "AI_SKIPPED_BY_EVIDENCE_GATE"
-        if evidence_gate.required and not evidence_gate.reproduced
+        if reasoning_dispatch.mode == ReasoningMode.SKIP
         else "AI_ANSWERED"
         if llm_used
         else "AI_INVOCATION_FAILED"

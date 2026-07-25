@@ -45,12 +45,13 @@ DEFAULT_ROLE_PERMISSIONS: dict[Role, set[str]] = {
         "billing:manage",
         "chat:use",
         "admin:read",
+        "admin.llm_audit.read",
     },
     Role.DEVELOPER: {"documents:read", "chat:use", "incidents:write", "sql:analyze", "learning:feedback", "learning:read"},
     Role.DBA: {"database:manage", "database:read", "sql:approve", "incidents:manage", "documents:read", "learning:approve", "learning:read"},
     Role.SUPPORT_ENGINEER: {"chat:use", "incidents:write", "documents:read", "learning:feedback", "learning:read"},
     Role.READ_ONLY: {"documents:read", "incidents:read", "learning:read"},
-    Role.AUDITOR: {"audit:read", "incidents:read", "documents:read"},
+    Role.AUDITOR: {"audit:read", "admin.llm_audit.read", "incidents:read", "documents:read"},
 }
 
 

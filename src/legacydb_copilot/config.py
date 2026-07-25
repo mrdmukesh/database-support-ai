@@ -49,6 +49,7 @@ class Settings:
     feature_enterprise_rbac_enabled: bool = False
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
+    llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
 
     @classmethod
@@ -122,5 +123,6 @@ class Settings:
                 "false",
             ).lower()
             in {"1", "true", "yes", "on"},
+            llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
         )

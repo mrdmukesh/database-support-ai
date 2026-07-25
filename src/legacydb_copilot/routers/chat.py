@@ -85,6 +85,7 @@ from legacydb_copilot.services.metadata_search_service import (
     resolve_qualified_object_names,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
 from legacydb_copilot.services.report_generator import (
@@ -1750,6 +1751,7 @@ def _run_dynamic_investigation(
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
+    investigation_id = new_investigation_id()
     intent = detect_intent(payload.question)
     entities = extract_entities(payload.question)
     mode = classify_investigation_mode(payload.question, intent)
@@ -1985,6 +1987,15 @@ def _run_dynamic_investigation(
             evidence_focus=evidence_focus,
             settings=settings,
             debug_trace=ai_debug_trace,
+            audit_db=db,
+            audit_context=InvocationContext(
+                investigation_id=investigation_id,
+                investigation_run_id=investigation_id,
+                organization_id=payload.organization_id,
+                workspace_id=payload.workspace_id,
+                user_id=payload.user_id,
+                correlation_id=investigation_id,
+            ),
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
@@ -2074,6 +2085,7 @@ def _run_dynamic_investigation(
         workspace_name=workspace.name if workspace else payload.workspace_id,
         database_name=f"{connection.name} ({connection.engine}) [connection_id={connection.id}]",
         generated_by=generated_by,
+        investigation_id=investigation_id,
     )
     generated_report = generate_investigation_report_files(report)
     entity_text = ", ".join(f"{entity.entity_type}={entity.value}" for entity in entities.entities) or "none"

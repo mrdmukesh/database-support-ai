@@ -28,12 +28,19 @@ from legacydb_copilot.services.reasoning_dispatch_service import (
 )
 
 
-def _gate(*, verified: bool, reproduced: bool) -> EvidenceGateResult:
+def _gate(
+    *,
+    verified: bool,
+    reproduced: bool,
+    reported_condition_exists: bool | None = None,
+) -> EvidenceGateResult:
     return EvidenceGateResult(
         required=True,
         reproduced=reproduced,
         business_key_exists=verified,
-        reported_condition_exists=reproduced,
+        reported_condition_exists=(
+            reproduced if reported_condition_exists is None else reported_condition_exists
+        ),
         affected_rows_exist=verified,
         parent_child_relationship_exists=verified,
         confirmed_facts=["Verified deterministic evidence exists."] if verified else [],
@@ -70,6 +77,16 @@ def test_reasoning_decision_table_is_independent_of_domain_and_question_wording(
     decision = dispatch_reasoning(_gate(verified=verified, reproduced=reproduced))
     assert decision.permission == permission
     assert decision.mode == mode
+
+
+def test_verified_reported_condition_routes_to_root_cause_when_legacy_reproduced_flag_is_false() -> None:
+    decision = dispatch_reasoning(
+        _gate(verified=True, reproduced=False, reported_condition_exists=True)
+    )
+
+    assert decision.mode == ReasoningMode.NORMAL_ROOT_CAUSE
+    assert decision.reproduction_status.value == "reproduced"
+    assert decision.reason_code == "VERIFIED_EVIDENCE_REPRODUCED"
 
 
 DOMAIN_CASES = [

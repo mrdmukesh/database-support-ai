@@ -54,12 +54,11 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
         if verified_count > 0
         else ReasoningPermission.DENY_REASONING
     )
+    condition_verified = gate.reproduced or gate.reported_condition_exists
     reproduction_status = (
         ReproductionStatus.REPRODUCED
-        if gate.reproduced
+        if condition_verified
         else ReproductionStatus.NOT_REPRODUCED
-        if not gate.reported_condition_exists
-        else ReproductionStatus.INDETERMINATE
     )
     if permission == ReasoningPermission.DENY_REASONING:
         return ReasoningDispatchDecision(
@@ -74,7 +73,7 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
             evidence_categories=gate.evidence_categories,
             evidence_gaps=gate.evidence_gaps or gate.missing_evidence,
         )
-    if gate.reproduced:
+    if condition_verified:
         return ReasoningDispatchDecision(
             permission=permission,
             mode=ReasoningMode.NORMAL_ROOT_CAUSE,

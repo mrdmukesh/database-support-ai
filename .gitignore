@@ -68,3 +68,13 @@ yarn-error.log*
 .funcignore
 
 .r/
+
+# Local test sandboxes and linked worktrees
+/.tmp/pytest-*/
+/.tmp/fixture-framework-*/
+/.tmp/react-static-task*/
+/pytest*_tmp/
+/pytest_*/
+/tmp/pytest-*/
+/tmp_pytest/
+/.worktrees/

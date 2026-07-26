@@ -2039,6 +2039,8 @@ def _run_dynamic_investigation(
         plan_statuses=evidence_plan_statuses,
         provider=connection.engine,
         scan_policy=scan_policy,
+        workspace_id=payload.workspace_id,
+        connection_id=connection.id,
     )
     for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:

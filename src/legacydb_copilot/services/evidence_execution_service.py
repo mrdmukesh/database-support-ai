@@ -63,6 +63,8 @@ def execute_evidence_plan(
     *,
     provider: Any | None = None,
     scan_policy: ScanPolicy | None = None,
+    workspace_id: str = "",
+    connection_id: str = "",
 ) -> list[EvidenceResult]:
     """
     Owner: Mukesh Dabi
@@ -124,6 +126,17 @@ def execute_evidence_plan(
                 dialect,
                 planner_step="production_read_safety",
                 query_id=query.query_id or f"Q-{index}",
+            )
+            logger.info(
+                "scan_policy_decision workspace_id=%s connection_id=%s "
+                "environment=%s policy=%s decision=%s reason=%s component=%s",
+                workspace_id,
+                connection_id,
+                policy_decision.get("environment_type", "production"),
+                policy_decision.get("policy", "production_strict"),
+                policy_decision.get("decision", "allowed"),
+                policy_decision.get("reason", "read_only_validation_passed"),
+                "ProductionReadSafetyValidator",
             )
             rows = connector.execute_read_only_query(safe_read.sql, limit=settings.max_investigation_rows)
             semantics, supports_claim = _successful_evidence_semantics(query, safe_read.sql, rows)

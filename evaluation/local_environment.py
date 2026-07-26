@@ -227,10 +227,15 @@ def bootstrap_application(env_path: Path) -> None:
                     port=int(values["LOCAL_MYSQL_PORT"]),
                     database_name=DATABASES[domain],
                     secret_ref=f"env://EVAL_APP_MYSQL_SECRET_{domain.upper()}",
+                    environment_type="evaluation",
+                    max_scan_rows=500,
                     is_active=True,
                 )
                 db.add(record)
                 db.flush()
+            else:
+                record.environment_type = "evaluation"
+                record.max_scan_rows = 500
             connection_ids[domain] = record.id
         db.commit()
         updates = {

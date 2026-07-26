@@ -251,6 +251,8 @@ class LLMInvocationAuditService:
         search: str | None = None,
         page: int = 1,
         page_size: int = 25,
+        sort_by: str = "started_at",
+        sort_direction: str = "asc",
     ) -> tuple[list[LLMInvocationAuditModel], int]:
         query = self.db.query(LLMInvocationAuditModel)
         filters = {
@@ -278,7 +280,21 @@ class LLMInvocationAuditService:
                 LLMInvocationAuditModel.user_prompt_sanitized.ilike(term),
             ))
         total = query.count()
-        rows = query.order_by(LLMInvocationAuditModel.started_at.asc()).offset((page - 1) * page_size).limit(page_size).all()
+        sortable_columns = {
+            "started_at": LLMInvocationAuditModel.started_at,
+            "investigation_id": LLMInvocationAuditModel.investigation_id,
+            "provider": LLMInvocationAuditModel.provider,
+            "model": LLMInvocationAuditModel.model_name,
+            "stage_name": LLMInvocationAuditModel.stage_name,
+            "status": LLMInvocationAuditModel.status,
+            "prompt_tokens": LLMInvocationAuditModel.prompt_tokens,
+            "completion_tokens": LLMInvocationAuditModel.completion_tokens,
+            "duration_ms": LLMInvocationAuditModel.duration_ms,
+            "estimated_cost": LLMInvocationAuditModel.estimated_cost,
+        }
+        sort_column = sortable_columns.get(sort_by, LLMInvocationAuditModel.started_at)
+        order = sort_column.asc() if sort_direction == "asc" else sort_column.desc()
+        rows = query.order_by(order, LLMInvocationAuditModel.id.asc()).offset((page - 1) * page_size).limit(page_size).all()
         return rows, total
 
     def get_invocations_for_investigation(

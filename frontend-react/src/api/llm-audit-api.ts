@@ -13,15 +13,23 @@ export type AuditFilters = {
   started_before?: string;
   page?: number;
   page_size?: number;
+  sort_by?: string;
+  sort_direction?: "asc" | "desc";
 };
 
-export async function listLLMInvocations(filters: AuditFilters = {}) {
+export type AuditPage = {
+  items: LLMInvocationSummary[]; total: number; total_items: number; page: number; page_size: number;
+  total_pages: number; has_previous: boolean; has_next: boolean;
+  zero_invocation_explanation: ZeroInvocationExplanation | null;
+};
+
+export async function listLLMInvocations(filters: AuditFilters = {}, signal?: AbortSignal) {
   const query = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
     if (value !== undefined && value !== "") query.set(key, String(value));
   });
-  return apiRequest<{ items: LLMInvocationSummary[]; total: number; page: number; page_size: number; zero_invocation_explanation: ZeroInvocationExplanation | null }>(
-    `/admin/llm-invocations?${query}`,
+  return apiRequest<AuditPage>(
+    `/admin/llm-invocations?${query}`, { signal },
   );
 }
 

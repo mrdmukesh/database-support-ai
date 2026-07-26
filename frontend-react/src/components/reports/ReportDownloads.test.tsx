@@ -10,4 +10,10 @@ describe("ReportDownloads", () => {
   it("shows disabled formats and an unavailable state for empty reports", () => { render(<ReportDownloads reports={{}} />); expect(screen.getAllByRole("button")).toHaveLength(4); expect(screen.getByText("Reports unavailable")).toBeInTheDocument(); });
   it("handles unauthorized and failed downloads", async () => { fetchReportArtifact.mockRejectedValue(new Error("Authentication is required.")); render(<ReportDownloads reports={{ pdf: "/reports/x/a.pdf" }} />); fireEvent.click(screen.getByRole("button", { name: "Download PDF" })); expect(await screen.findByRole("alert")).toHaveTextContent("Authentication is required."); });
   it("handles popup blocking safely", async () => { fetchReportArtifact.mockResolvedValue({ blob: new Blob(["x"]), filename: "a.html", contentType: "text/html" }); vi.spyOn(window, "open").mockReturnValue(null); render(<ReportDownloads reports={{ html: "/reports/x/a.html" }} />); fireEvent.click(screen.getByRole("button", { name: "View HTML Report" })); await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Popup blocked")); });
+  it("renders only available report header actions in compact mode", () => {
+    render(<ReportDownloads compact reports={{ pdf: "/reports/x/a.pdf" }} />);
+    expect(screen.getByRole("button", { name: "Download PDF" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Full audit report" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Audit and diagnostic reports")).not.toBeInTheDocument();
+  });
 });

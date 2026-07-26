@@ -97,7 +97,7 @@ describe("LLMInvocationAuditPage", () => {
       started_before: expect.stringContaining("2026-07-25T"),
       page: 1,
       page_size: 25,
-    }));
+    }), expect.any(AbortSignal));
   });
 
   it("opens an obvious read-only prompt dialog and switches between prompt sections", async () => {
@@ -130,5 +130,63 @@ describe("LLMInvocationAuditPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "View prompt" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Prompt details unavailable");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("paginates, refreshes the current page, and resets page when page size changes", async () => {
+    listInvocations.mockImplementation(async (filters: { page?: number; page_size?: number }) => ({
+      items: [invocation], total: 60, total_items: 60, page: filters.page ?? 1,
+      page_size: filters.page_size ?? 25, total_pages: Math.ceil(60 / (filters.page_size ?? 25)),
+      has_previous: (filters.page ?? 1) > 1, has_next: (filters.page ?? 1) < 3,
+      zero_invocation_explanation: null,
+    }));
+    render(<LLMInvocationAuditPage />);
+    await screen.findByRole("button", { name: "View prompt" });
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    await waitFor(() => expect(listInvocations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, page_size: 25, sort_by: "started_at", sort_direction: "desc" }),
+      expect.any(AbortSignal),
+    ));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh audit records" }));
+    await waitFor(() => expect(listInvocations).toHaveBeenCalledTimes(3));
+    expect(listInvocations).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }), undefined);
+    fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "50" } });
+    await waitFor(() => expect(listInvocations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 1, page_size: 50 }), expect.any(AbortSignal),
+    ));
+  });
+
+  it("retains filters while sorting and renders prompt preview and text status", async () => {
+    listInvocations.mockResolvedValue({
+      items: [{ ...invocation, prompt_preview: "A sanitized prompt preview", status: "completed" }],
+      total: 1, total_items: 1, page: 1, page_size: 25, total_pages: 1,
+      has_previous: false, has_next: false, zero_invocation_explanation: null,
+    });
+    render(<LLMInvocationAuditPage />);
+    expect(await screen.findByText("A sanitized prompt preview")).toBeInTheDocument();
+    expect(document.querySelector(".audit-status")).toHaveTextContent("Completed");
+    fireEvent.change(screen.getByLabelText("Investigation ID"), { target: { value: "INV-KEEP" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
+    await waitFor(() => expect(listInvocations).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Sort by Provider" }));
+    await waitFor(() => expect(listInvocations).toHaveBeenLastCalledWith(
+      expect.objectContaining({ investigation_id: "INV-KEEP", sort_by: "provider", sort_direction: "asc" }),
+      expect.any(AbortSignal),
+    ));
+  });
+
+  it("shows a loading skeleton, empty state, and recoverable error state", async () => {
+    let reject!: (reason: Error) => void;
+    listInvocations.mockReturnValueOnce(new Promise((_resolve, rejectPromise) => { reject = rejectPromise; }));
+    const view = render(<LLMInvocationAuditPage />);
+    expect(screen.getByLabelText("Loading audit records")).toBeInTheDocument();
+    reject(new Error("Audit unavailable"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Audit unavailable");
+    listInvocations.mockResolvedValueOnce({
+      items: [], total: 0, total_items: 0, page: 1, page_size: 25, total_pages: 0,
+      has_previous: false, has_next: false, zero_invocation_explanation: null,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("No invocation records")).toBeInTheDocument();
+    view.unmount();
   });
 });

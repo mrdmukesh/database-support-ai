@@ -19,6 +19,12 @@ export type LLMInvocationSummary = {
   currency: string;
   retry_attempt: number;
   started_at: string;
+  completed_at?: string | null;
+  workspace_id?: string | null;
+  workspace_name?: string | null;
+  database_name?: string | null;
+  prompt_preview?: string;
+  reason?: string | null;
 };
 
 export type LLMInvocationDetail = LLMInvocationSummary & {

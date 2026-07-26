@@ -116,6 +116,38 @@ def test_tenant_isolation_and_combined_filters(audit_api) -> None:
     assert client.get(query, headers=outsider).json()["total"] == 0
 
 
+def test_server_pagination_sorting_and_page_size_validation(audit_api) -> None:
+    client, factory, ids = audit_api
+    with factory() as db:
+        for index in range(30):
+            db.add(LLMInvocationAuditModel(
+                organization_id=ids["org"], workspace_id=ids["workspace"],
+                investigation_id=f"INV-PAGE-{index:02d}", logical_request_id=f"logical-{index}",
+                agent_name="reasoning_agent", stage_name="Root Cause Reasoning",
+                provider="openai", model_name="gpt-test", request_payload_hash="b" * 64,
+                started_at=datetime(2026, 7, 26, 0, index, tzinfo=UTC), status="completed",
+                user_prompt_sanitized=f"sanitized prompt {index}",
+            ))
+        db.commit()
+    headers = login(client, "admin@audit.test")
+    response = client.get(
+        "/admin/llm-invocations?page=2&page_size=10&sort_by=started_at&sort_direction=asc",
+        headers=headers,
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["page"] == 2
+    assert payload["page_size"] == 10
+    assert payload["total_items"] == payload["total"] == 31
+    assert payload["total_pages"] == 4
+    assert payload["has_previous"] is True
+    assert payload["has_next"] is True
+    assert len(payload["items"]) == 10
+    assert payload["items"][0]["prompt_preview"].startswith("sanitized prompt")
+    assert client.get("/admin/llm-invocations?page_size=101", headers=headers).status_code == 422
+    assert client.get("/admin/llm-invocations?sort_by=drop_table", headers=headers).status_code == 422
+
+
 def test_apt_2101_submission_audits_every_actual_provider_call(
     audit_api, monkeypatch
 ) -> None:
@@ -214,6 +246,9 @@ def test_apt_2101_submission_audits_every_actual_provider_call(
         assert row["total_tokens"] == 18
         assert row["duration_ms"] is not None
         assert row["estimated_cost"] is not None
+        assert "never-persist-this-key" not in row["prompt_preview"]
+        assert "Jane Doe" not in row["prompt_preview"]
+        assert "private" not in row["prompt_preview"]
         detail = client.get(
             f"/admin/llm-invocations/{row['llm_invocation_id']}",
             headers=login(client, "admin@audit.test"),

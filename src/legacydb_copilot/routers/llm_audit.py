@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from legacydb_copilot.db.models import InvestigationModel, LLMInvocationAuditModel, UserModel
+from legacydb_copilot.db.models import (
+    DatabaseConnectionModel, InvestigationModel, LLMInvocationAuditModel, UserModel, WorkspaceModel,
+)
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import require_permission
 from legacydb_copilot.services.audit_service import record_audit_event
@@ -21,13 +23,23 @@ def _scope(user: UserModel) -> str | None:
     return None if user.role == "super_admin" else user.organization_id
 
 
-def _summary(row: LLMInvocationAuditModel) -> dict:
+def _summary(
+    row: LLMInvocationAuditModel,
+    workspace_names: dict[str, str] | None = None,
+    database_names: dict[str, str] | None = None,
+) -> dict:
+    prompt = " ".join(
+        str(row.user_prompt_sanitized or row.system_prompt_sanitized or "").split()
+    )
+    prompt_preview = prompt[:180] + ("…" if len(prompt) > 180 else "")
     return {
         "llm_invocation_id": row.id,
         "investigation_id": row.investigation_id,
         "investigation_run_id": row.investigation_run_id,
         "workspace_id": row.workspace_id,
+        "workspace_name": (workspace_names or {}).get(row.workspace_id or ""),
         "connection_id": row.connection_id,
+        "database_name": (database_names or {}).get(row.connection_id or ""),
         "environment_type": row.environment_type,
         "policy_name": row.policy_name,
         "policy_version": row.policy_version,
@@ -49,6 +61,8 @@ def _summary(row: LLMInvocationAuditModel) -> dict:
         "started_at": row.started_at,
         "completed_at": row.completed_at,
         "provider_request_id": row.provider_request_id,
+        "prompt_preview": prompt_preview,
+        "reason": row.error_message_sanitized or row.error_code,
     }
 
 
@@ -122,22 +136,41 @@ def search_llm_invocations(
     search: str | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
+    sort_by: Literal[
+        "started_at", "investigation_id", "provider", "model", "stage_name",
+        "status", "prompt_tokens", "completion_tokens", "duration_ms", "estimated_cost",
+    ] = "started_at",
+    sort_direction: Literal["asc", "desc"] = "desc",
 ) -> dict:
     rows, total = LLMInvocationAuditService(db).search_invocations(
         organization_id=_scope(user), workspace_id=workspace_id, investigation_id=investigation_id,
         status=status, stage_name=stage_name, agent_name=agent_name, provider=provider,
         model=model, user_id=user_id, started_after=started_after, started_before=started_before,
         min_duration_ms=min_duration_ms, failed_only=failed_only, search=search,
-        page=page, page_size=page_size,
+        page=page, page_size=page_size, sort_by=sort_by, sort_direction=sort_direction,
     )
     explanation = None
     if investigation_id and not rows:
         investigation = db.get(InvestigationModel, investigation_id)
         if investigation and (_scope(user) is None or investigation.organization_id == user.organization_id):
             explanation = _zero_invocation_explanation(investigation)
+    total_pages = (total + page_size - 1) // page_size if total else 0
+    workspace_ids = {row.workspace_id for row in rows if row.workspace_id}
+    connection_ids = {row.connection_id for row in rows if row.connection_id}
+    workspace_names = dict(
+        db.query(WorkspaceModel.id, WorkspaceModel.name).filter(WorkspaceModel.id.in_(workspace_ids)).all()
+    ) if workspace_ids else {}
+    database_names = dict(
+        db.query(DatabaseConnectionModel.id, DatabaseConnectionModel.name).filter(
+            DatabaseConnectionModel.id.in_(connection_ids)
+        ).all()
+    ) if connection_ids else {}
     return {
-        "items": [_summary(row) for row in rows], "page": page, "page_size": page_size,
-        "total": total, "zero_invocation_explanation": explanation,
+        "items": [_summary(row, workspace_names, database_names) for row in rows], "page": page, "page_size": page_size,
+        "total": total, "total_items": total, "total_pages": total_pages,
+        "has_previous": page > 1, "has_next": page < total_pages,
+        "sort_by": sort_by, "sort_direction": sort_direction,
+        "zero_invocation_explanation": explanation,
     }
 
 

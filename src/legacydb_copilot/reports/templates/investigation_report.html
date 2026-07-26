@@ -4,19 +4,28 @@
   <meta charset="utf-8" />
   <title>{{ report.cover.title }} - {{ report.cover.investigation_id }}</title>
   <style>
-    @page { margin: 24mm 18mm; }
+    @page {
+      margin: 24mm 18mm;
+      @bottom-center { content: "Page " counter(page) " of " counter(pages); color: #60707c; font-size: 10px; }
+    }
     body { font-family: "Segoe UI", Arial, sans-serif; color: #17212b; margin: 0; line-height: 1.5; }
     .cover { min-height: 92vh; display: grid; align-content: center; border-left: 12px solid #0f8f86; padding-left: 34px; }
     .logo { width: 96px; height: 96px; display: grid; place-items: center; background: #e8f4f3; color: #0f8f86; border: 2px dashed #9acac4; font-weight: 800; margin-bottom: 28px; }
     h1 { font-size: 34px; margin: 0 0 8px; color: #102033; }
-    h2 { margin-top: 34px; padding: 10px 14px; background: #10324a; color: white; border-radius: 6px; font-size: 18px; }
+    h2 { margin-top: 34px; padding: 0 0 8px; border-bottom: 2px solid #8fc6c3; color: #173744; font-size: 18px; break-after: avoid; }
     h3 { color: #0f5f8f; margin-top: 20px; }
     .meta { display: grid; grid-template-columns: 180px 1fr; gap: 8px 16px; margin-top: 26px; max-width: 760px; }
     .meta strong { color: #60707c; }
-    .summary-grid { display: grid; grid-template-columns: 220px 1fr; gap: 8px 14px; border: 1px solid #d9e3e8; border-radius: 8px; padding: 16px; }
+    .summary-grid { display: grid; grid-template-columns: 190px 1fr; gap: 0; border: 1px solid #d9e3e8; border-radius: 8px; overflow: hidden; }
+    .summary-grid strong, .summary-grid span { padding: 10px 12px; border-bottom: 1px solid #e1e9ec; overflow-wrap: anywhere; }
+    .summary-grid strong { color: #385863; background: #f2f7f7; }
     table { width: 100%; border-collapse: collapse; margin: 12px 0 22px; font-size: 13px; }
     th { background: #e8f4f3; color: #15313f; text-align: left; }
-    th, td { border: 1px solid #cfdbe2; padding: 8px 10px; vertical-align: top; }
+    th, td { border: 1px solid #cfdbe2; padding: 8px 10px; vertical-align: top; overflow-wrap: anywhere; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; }
+    h2, h3 { break-after: avoid; }
+    .summary-grid, .sql { break-inside: avoid; }
     tr:nth-child(even) td { background: #f8fbfc; }
     .toc li { margin: 5px 0; }
     .sql { background: #102033; color: #e8f4f3; border-radius: 8px; padding: 12px; overflow-wrap: anywhere; white-space: pre-wrap; font-family: Consolas, monospace; font-size: 12px; border-left: 5px solid #0f8f86; }

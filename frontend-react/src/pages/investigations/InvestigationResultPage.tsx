@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { loadSavedInvestigation } from "../../api/investigation-api";
 import { ExecutiveSummarySection } from "../../components/investigation/ExecutiveSummarySection";
@@ -28,6 +28,7 @@ export function InvestigationResultPage() {
     normalizedInvestigationId ? { status: "loading" } : { status: "not-found" }
   ));
   const requestIdRef = useRef(0);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const id = normalizedInvestigationId;
@@ -106,10 +107,19 @@ export function InvestigationResultPage() {
   });
   return (
     <article className="management-page" aria-labelledby="investigation-result-title">
-      <PageHeader eyebrow="Investigation result" title={`Investigation ${result.id || normalizedInvestigationId}`} description={result.user_question} />
-      <Card className="investigation-overview">
+      <PageHeader eyebrow="Executive RCA report" title={`Investigation ${result.id || normalizedInvestigationId}`} description={result.user_question}
+        actions={<div className="report-header-actions no-print">
+          <ReportDownloads reports={result.report} showAiTrace={user?.role === "super_admin" || user?.role === "organization_admin"} compact />
+          <button className="ui-button ui-button-secondary" type="button" aria-label="Copy investigation ID"
+            onClick={() => { void navigator.clipboard.writeText(result.id); setCopied(true); window.setTimeout(() => setCopied(false), 1500); }}>
+            {copied ? "Copied" : "Copy ID"}
+          </button>
+          <button className="ui-button ui-button-secondary" type="button" onClick={() => window.print()}>Print</button>
+          <Link className="ui-button ui-button-secondary" to="/app/investigations">Back to investigations</Link>
+        </div>} />
+      <Card className="investigation-overview report-header-metadata">
         <div className="investigation-overview-badges"><StatusBadge status={result.status} /><strong className="environment-badge">{environmentLabel(result.environment_type ?? "production")}</strong><ConfidenceBadge confidence={result.confidence_score} /><RiskBadge risk={risk} /><StatusBadge status="Verification available" /></div>
-        <dl><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Selected database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Environment</dt><dd>{environmentLabel(result.environment_type ?? "production")}</dd><dt>Policy</dt><dd>{result.policy_name ?? "production_strict"} ({result.policy_version ?? "v1"})</dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd><dt>Created</dt><dd>{new Date(result.created_at).toLocaleString()}</dd></dl>
+        <dl><dt>Investigation ID</dt><dd>{result.id}</dd><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Environment</dt><dd>{environmentLabel(result.environment_type ?? "production")}</dd><dt>Generated</dt><dd>{new Date(result.created_at).toLocaleString()}</dd><dt>Report version</dt><dd>1.0</dd><dt>Policy</dt><dd>{result.policy_name ?? "production_strict"} ({result.policy_version ?? "v1"})</dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd></dl>
       </Card>
       <EnvironmentNotice environment={result.environment_type} />
       <div className="investigation-result-grid">
@@ -120,7 +130,6 @@ export function InvestigationResultPage() {
         <RecommendationSection recommendations={parsed.recommendations} />
         <Card className="result-card-wide" title="Evidence SQL" description="Read-only statements used or recommended during evidence collection."><SqlCodeBlock sql={sql} /></Card>
         <Card title="Limitations">{limitations.length ? <ul>{limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <Alert tone="success">No limitations were recorded.</Alert>}</Card>
-        <Card title="Reports"><ReportDownloads reports={result.report} showAiTrace={user?.role === "super_admin" || user?.role === "organization_admin"} /></Card>
       </div>
       <Card className="result-card-wide" title="Verification checks" description="Run read-only checks to validate key claims and update confidence."><VerificationPanel investigationId={result.id} /></Card>
       {(user?.role === "super_admin" || user?.role === "organization_admin" || user?.role === "auditor") && <LLMActivity investigationId={result.id} />}

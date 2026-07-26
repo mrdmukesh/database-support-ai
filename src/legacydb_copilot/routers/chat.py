@@ -2419,6 +2419,28 @@ def _run_dynamic_investigation(
         for index, item in enumerate(hypothesis_reasoning.ranked_root_causes, start=1)
     )
     event_chain_text = "\n".join(f"- {item}" for item in hypothesis_reasoning.event_chain)
+    summary_only_report = reasoning_dispatch.mode in {
+        ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+        ReasoningMode.EVIDENCE_GAP_SUMMARY,
+        ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+    }
+    if summary_only_report:
+        final_root_cause_text = "- Root cause not established from the available evidence."
+        hypothesis_rank_text = "- Root-cause hypotheses were not ranked because the available evidence does not support a cause."
+        event_chain_text = "- No causal event chain was established from the available evidence."
+        recommendation_text = (
+            "- No corrective action is recommended because root cause is not established.\n"
+            "- Collect the missing evidence identified above before proposing a fix."
+        )
+    else:
+        recommendation_text = "\n".join(
+            [
+                "- Immediate Fix: " + " ".join(recommendation.immediate_fix),
+                "- Permanent Fix: " + " ".join(recommendation.permanent_fix),
+                "- Monitoring: " + " ".join(recommendation.monitoring),
+                f"- Risk: {recommendation.risk}",
+            ]
+        )
     answer = (
         "Investigation Complete.\n\n"
         f"Investigation ID: {report.cover.investigation_id}\n"
@@ -2505,14 +2527,7 @@ def _run_dynamic_investigation(
         + "\n\n## Recommended Next SQL\n"
         + "\n\n".join(_evidence_sql_block(item) for item in evidence[:5])
         + "\n\n## Recommendation\n"
-        + "\n".join(
-            [
-                "- Immediate Fix: " + " ".join(recommendation.immediate_fix),
-                "- Permanent Fix: " + " ".join(recommendation.permanent_fix),
-                "- Monitoring: " + " ".join(recommendation.monitoring),
-                f"- Risk: {recommendation.risk}",
-            ]
-        )
+        + recommendation_text
         + "\n\n## Self Validation\n"
         + "\n".join(f"- {item}" for item in self_validation)
         + "\n\n## Confidence Explanation\n"

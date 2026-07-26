@@ -221,6 +221,7 @@ def test_non_gate_intent_does_not_force_reproduction_or_root_cause_mode() -> Non
 
     assert gate.required is False
     assert gate.reproduced is False
+    assert "Reported condition was reproduced by returned evidence." not in gate.confirmed_facts
     assert decision.invoke_llm is True
     assert decision.mode in {
         ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,

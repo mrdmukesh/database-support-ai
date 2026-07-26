@@ -280,6 +280,11 @@ def run_evidence_gate(
         # Intents outside the reproduction rule set can have verified evidence,
         # but their generic "any rows" condition is not proof of reproduction.
         reproduced = False
+        facts = [
+            fact
+            for fact in facts
+            if fact != "Reported condition was reproduced by returned evidence."
+        ]
         return EvidenceGateResult(
             False, reproduced, business_key_exists, condition_exists, affected_rows_exist, relationship_exists,
             facts, [] if reproduced else blockers, [] if reproduced else blockers, status_notes,

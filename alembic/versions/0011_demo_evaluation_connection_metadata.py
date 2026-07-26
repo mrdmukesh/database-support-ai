@@ -1,8 +1,4 @@
-"""Backfill trusted scan metadata for the canonical evaluation workspace."""
-
-from alembic import op
-import sqlalchemy as sa
-
+"""Reserve the post-policy migration marker without inferring environment."""
 
 revision = "0011_demo_evaluation_connection_metadata"
 down_revision = "0010_connection_scan_policy"
@@ -11,25 +7,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    connection = sa.table(
-        "database_connections",
-        sa.column("workspace_id", sa.String()),
-        sa.column("environment_type", sa.String()),
-    )
-    workspace = sa.table(
-        "workspaces",
-        sa.column("id", sa.String()),
-        sa.column("name", sa.String()),
-    )
-    evaluation_workspace_ids = sa.select(workspace.c.id).where(
-        sa.func.lower(workspace.c.name) == "demo_databases"
-    )
-    op.execute(
-        connection.update()
-        .where(connection.c.workspace_id.in_(evaluation_workspace_ids))
-        .where(connection.c.environment_type == "production")
-        .values(environment_type="evaluation")
-    )
+    # Environment is trusted connection metadata and must be configured
+    # explicitly by an administrator or evaluation bootstrap. Never infer it
+    # from workspace or connection display names.
+    pass
 
 
 def downgrade() -> None:

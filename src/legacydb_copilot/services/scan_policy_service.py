@@ -4,7 +4,8 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 
-EnvironmentType = Literal["production", "non_production", "evaluation", "demo", "test"]
+EnvironmentType = Literal["production", "uat", "test", "evaluation", "demo"]
+POLICY_VERSION = "v1"
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,10 @@ class ScanPolicy:
     require_filter_for_large_table: bool
     allow_metadata_scan: bool = True
     allow_relationship_discovery: bool = True
+    max_relationship_depth: int = 1
+    mask_sensitive_data: bool = True
+    query_timeout_seconds: int = 15
+    policy_version: str = POLICY_VERSION
     configuration_valid: bool = True
     configuration_error: str = ""
 
@@ -30,6 +35,9 @@ class ScanPolicyDecision:
     max_rows: int
     table: str = ""
     suggested_rewrite: str = ""
+    query_rewritten: bool = False
+    original_query_hash: str = ""
+    executed_query_hash: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -38,12 +46,12 @@ class ScanPolicyDecision:
 class ScanPolicyService:
     SUPPORTED_ENVIRONMENTS = {
         "production",
-        "non_production",
+        "uat",
         "evaluation",
         "demo",
         "test",
     }
-    RELAXED_ENVIRONMENTS = {"non_production", "evaluation", "demo", "test"}
+    RELAXED_ENVIRONMENTS = {"uat", "evaluation", "demo", "test"}
 
     def resolve_policy(
         self,
@@ -53,6 +61,8 @@ class ScanPolicyService:
         default_max_rows: int,
     ) -> ScanPolicy:
         normalized = (environment_type or "production").strip().casefold()
+        if normalized == "non_production":
+            normalized = "uat"
         if normalized not in self.SUPPORTED_ENVIRONMENTS:
             return ScanPolicy(
                 name="production_strict",
@@ -68,7 +78,8 @@ class ScanPolicyService:
                 ),
             )
         if normalized in self.RELAXED_ENVIRONMENTS:
-            configured_limit = max_scan_rows if max_scan_rows is not None else 500
+            default_limit = 500 if normalized == "uat" else 1000
+            configured_limit = max_scan_rows if max_scan_rows is not None else default_limit
             if configured_limit < 1 or configured_limit > 5000:
                 return ScanPolicy(
                     name="production_strict",
@@ -83,12 +94,15 @@ class ScanPolicyService:
                     ),
                 )
             return ScanPolicy(
-                name=f"{normalized}_readonly",
-                environment_type=normalized,
+                name="evaluation_readonly" if normalized == "demo" else f"{normalized}_readonly",
+                environment_type="evaluation" if normalized == "demo" else normalized,
                 allow_unrestricted_read_scan=False,
                 require_row_limit=True,
                 max_rows=configured_limit,
                 require_filter_for_large_table=False,
+                max_relationship_depth=3 if normalized in {"evaluation", "demo", "test"} else 2,
+                mask_sensitive_data=normalized == "uat",
+                query_timeout_seconds=30,
             )
         return ScanPolicy(
             name="production_strict",

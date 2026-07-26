@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { DatabaseConnectionCreate } from "../../models/connection";
+import type { EnvironmentType } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
 
 interface ConnectionFormProps {
@@ -11,6 +12,8 @@ interface ConnectionFormProps {
 
 export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSubmit }: ConnectionFormProps) {
   const [formKey, setFormKey] = useState(0);
+  const [environment, setEnvironment] = useState<EnvironmentType>("production");
+  const [maxScanRows, setMaxScanRows] = useState(100);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +33,8 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       max_scan_rows: Number(form.get("maxScanRows") ?? 500),
     });
     setFormKey((value) => value + 1);
+    setEnvironment("production");
+    setMaxScanRows(100);
   }
 
   return (
@@ -58,16 +63,26 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       <label htmlFor="connection-database">Database name</label>
       <input id="connection-database" name="databaseName" disabled={isSubmitting} />
       <label htmlFor="connection-environment">Trusted environment</label>
-      <select id="connection-environment" name="environmentType" defaultValue="production" disabled={isSubmitting}>
+      <select id="connection-environment" name="environmentType" value={environment} disabled={isSubmitting}
+        onChange={(event) => {
+          const value = event.target.value as EnvironmentType;
+          setEnvironment(value);
+          setMaxScanRows(value === "production" ? 100 : value === "uat" ? 500 : 1000);
+        }}>
         <option value="production">Production</option>
-        <option value="non_production">Non-production</option>
+        <option value="uat">UAT</option>
+        <option value="test">Test</option>
         <option value="evaluation">Evaluation</option>
         <option value="demo">Demo</option>
-        <option value="test">Test</option>
       </select>
       <label htmlFor="connection-max-scan-rows">Maximum bounded scan rows</label>
-      <input id="connection-max-scan-rows" name="maxScanRows" type="number" min="1" max="5000" defaultValue="500" disabled={isSubmitting} />
-      <p className="field-note">Production remains strict. Other trusted environments permit bounded read-only scans only.</p>
+      <input id="connection-max-scan-rows" name="maxScanRows" type="number" min="1" max="5000" value={maxScanRows} onChange={(event) => setMaxScanRows(Number(event.target.value))} disabled={isSubmitting} />
+      <div className="field-note environment-help">
+        <p><strong>Production:</strong> Strict read-only investigation policy. Some sensitive, unrestricted, or expensive evidence queries may be blocked.</p>
+        <p><strong>UAT:</strong> Read-only investigation with broader bounded evidence collection. Data and schema changes remain prohibited.</p>
+        <p><strong>Test:</strong> Read-only investigation with broader metadata, relationship, and bounded table analysis. Data and schema changes remain prohibited.</p>
+        <p><strong>Demo / Evaluation:</strong> Benchmark and evaluation mode. Broader read-only evidence collection is allowed using bounded scans. DML and DDL remain prohibited.</p>
+      </div>
       <label htmlFor="connection-string">Connection string</label>
       <input id="connection-string" name="connectionString" type="password" autoComplete="off" disabled={isSubmitting} />
       <label htmlFor="connection-secret-ref">Secret reference</label>

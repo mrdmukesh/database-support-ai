@@ -12,6 +12,7 @@ import { useAuth } from "../../hooks/use-auth";
 import type { SavedInvestigation } from "../../models/investigation";
 import { extractSection, extractSectionBullets, parseLegacyAssistantMessage } from "../../utils/investigation-parser";
 import { Alert, Card, ConfidenceBadge, EvidenceTable, PageHeader, RiskBadge, SkeletonLoader, SqlCodeBlock, StatusBadge, humanize } from "../../components/ui";
+import { EnvironmentNotice, environmentLabel } from "../../components/investigation/EnvironmentNotice";
 
 type LoadState =
   | { status: "loading" }
@@ -107,9 +108,10 @@ export function InvestigationResultPage() {
     <article className="management-page" aria-labelledby="investigation-result-title">
       <PageHeader eyebrow="Investigation result" title={`Investigation ${result.id || normalizedInvestigationId}`} description={result.user_question} />
       <Card className="investigation-overview">
-        <div className="investigation-overview-badges"><StatusBadge status={result.status} /><ConfidenceBadge confidence={result.confidence_score} /><RiskBadge risk={risk} /><StatusBadge status="Verification available" /></div>
-        <dl><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Selected database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd><dt>Created</dt><dd>{new Date(result.created_at).toLocaleString()}</dd></dl>
+        <div className="investigation-overview-badges"><StatusBadge status={result.status} /><strong className="environment-badge">{environmentLabel(result.environment_type ?? "production")}</strong><ConfidenceBadge confidence={result.confidence_score} /><RiskBadge risk={risk} /><StatusBadge status="Verification available" /></div>
+        <dl><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Selected database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Environment</dt><dd>{environmentLabel(result.environment_type ?? "production")}</dd><dt>Policy</dt><dd>{result.policy_name ?? "production_strict"} ({result.policy_version ?? "v1"})</dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd><dt>Created</dt><dd>{new Date(result.created_at).toLocaleString()}</dd></dl>
       </Card>
+      <EnvironmentNotice environment={result.environment_type} />
       <div className="investigation-result-grid">
         <RootCauseSection rootCauses={parsed.rootCauses} />
         <ExecutiveSummarySection summary={extractSection(parsed.raw, "Stage 6 - Reason") || "No executive summary was returned."} />

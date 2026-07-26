@@ -323,6 +323,10 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     connection_id: Mapped[str] = mapped_column(String, default="", nullable=False, index=True)
     connection_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False, index=True)
+    policy_name: Mapped[str] = mapped_column(String(80), default="production_strict", nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(40), default="v1", nullable=False)
+    policy_audit_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     conversation_id: Mapped[str | None] = mapped_column(
         ForeignKey("chat_conversations.id", ondelete="SET NULL"),
         nullable=True,
@@ -567,6 +571,10 @@ class LLMInvocationAuditModel(UUIDPrimaryKeyMixin, Base):
     investigation_run_id: Mapped[str | None] = mapped_column(String(36), index=True)
     organization_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    connection_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False, index=True)
+    policy_name: Mapped[str] = mapped_column(String(80), default="production_strict", nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(40), default="v1", nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(36), index=True)
     session_id: Mapped[str | None] = mapped_column(String(120))
     logical_request_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)

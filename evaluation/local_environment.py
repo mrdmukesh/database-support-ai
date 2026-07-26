@@ -228,14 +228,14 @@ def bootstrap_application(env_path: Path) -> None:
                     database_name=DATABASES[domain],
                     secret_ref=f"env://EVAL_APP_MYSQL_SECRET_{domain.upper()}",
                     environment_type="evaluation",
-                    max_scan_rows=500,
+                    max_scan_rows=1000,
                     is_active=True,
                 )
                 db.add(record)
                 db.flush()
             else:
                 record.environment_type = "evaluation"
-                record.max_scan_rows = 500
+                record.max_scan_rows = 1000
             connection_ids[domain] = record.id
         db.commit()
         updates = {

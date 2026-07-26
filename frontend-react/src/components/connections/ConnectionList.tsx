@@ -4,13 +4,15 @@ import { useState } from "react";
 import { ConfirmationDialog } from "../common/ConfirmationDialog";
 import { EmptyState } from "../common/EmptyState";
 import { StatusBadge } from "../common/StatusBadge";
+import { environmentLabel } from "../investigation/EnvironmentNotice";
+import type { EnvironmentType } from "../../models/connection";
 
 interface ConnectionListProps {
   connections: DatabaseConnection[];
   testingIds: Set<string>;
   testResults: Record<string, ConnectionValidationResult | undefined>;
   testErrors: Record<string, string | undefined>;
-  onEdit: (connection: DatabaseConnection, name: string, connectionString?: string) => Promise<void> | void;
+  onEdit: (connection: DatabaseConnection, name: string, environment: EnvironmentType, connectionString?: string) => Promise<void> | void;
   onDelete: (connection: DatabaseConnection) => Promise<void> | void;
   onTest: (connection: DatabaseConnection) => Promise<void> | void;
 }
@@ -22,7 +24,15 @@ export function ConnectionList({ connections, testingIds, testResults, testError
     if (name === null) return;
     const connectionString = window.prompt("New connection string. Leave blank to keep existing secret.");
     if (connectionString === null) return;
-    void onEdit(connection, name.trim(), connectionString.trim() || undefined);
+    const environment = window.prompt(
+      "Environment: production, uat, test, evaluation, or demo",
+      connection.environment_type,
+    ) ?? connection.environment_type;
+    if (!["production", "uat", "test", "evaluation", "demo"].includes(environment)) {
+      window.alert("Invalid environment.");
+      return;
+    }
+    void onEdit(connection, name.trim(), environment as EnvironmentType, connectionString.trim() || undefined);
   }
 
   if (!connections.length) return <EmptyState message="No database connections yet." />;
@@ -36,7 +46,7 @@ export function ConnectionList({ connections, testingIds, testResults, testError
             <tr key={connection.id}>
               <td>{connection.name}</td>
               <td>{connection.engine}</td>
-              <td>{connection.environment_type} ({connection.max_scan_rows} rows)</td>
+              <td><strong className="environment-badge">{environmentLabel(connection.environment_type)}</strong> ({connection.max_scan_rows} rows)</td>
               <td><StatusBadge status={connection.is_active ? "Active" : "Inactive"} /></td>
               <td><button type="button" onClick={() => void onTest(connection)} disabled={!connection.is_active || testingIds.has(connection.id)}>{testingIds.has(connection.id) ? "Testing..." : "Test"}</button></td>
               <td>

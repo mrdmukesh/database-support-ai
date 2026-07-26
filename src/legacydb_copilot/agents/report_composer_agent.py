@@ -908,8 +908,24 @@ def compose_report(
         "Monitoring: " + " ".join(bundle.recommendation.monitoring),
         "Modernization: " + " ".join(bundle.recommendation.modernization),
     ])
+    policy = bundle.investigation_policy or {}
+    environment = str(policy.get("environment_type") or "production")
+    environment_label = "Demo / Evaluation" if environment in {"demo", "evaluation"} else environment.upper()
+    policy_items = [
+        f"Environment: {environment_label}",
+        f"Investigation Policy: {policy.get('name') or 'production_strict'}",
+        f"Policy Version: {policy.get('policy_version') or 'v1'}",
+        f"Evidence Limit: {policy.get('max_rows') or 100} rows per bounded scan",
+        f"Sensitive Data Masking: {'Enabled' if policy.get('mask_sensitive_data', True) else 'Moderate'}",
+        f"Query Timeout: {policy.get('query_timeout_seconds') or 15} seconds",
+    ]
+    if environment == "production":
+        policy_items.append(
+            "Production safeguards may have limited evidence collection. Review the Evidence Gaps section before relying on the conclusion."
+        )
     sections = [
         ReportSection(title="Executive Summary", paragraphs=[bundle.reasoning.summary]),
+        ReportSection(title="Investigation Environment and Policy", items=policy_items),
         ReportSection(title="Question", paragraphs=[bundle.question]),
         _executive_ai_reasoning_section(bundle),
         _executive_key_findings_section(bundle),

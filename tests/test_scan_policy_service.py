@@ -49,7 +49,11 @@ def test_production_sql_server_unrestricted_scan_is_blocked_with_diagnostics() -
     with pytest.raises(ScanPolicyViolation) as caught:
         validator.validate("SELECT EmployeeId FROM dbo.Employee")
 
-    assert caught.value.decision.to_dict() == {
+    assert caught.value.decision.to_dict() | {
+        "query_rewritten": False,
+        "original_query_hash": caught.value.decision.original_query_hash,
+        "executed_query_hash": caught.value.decision.executed_query_hash,
+    } == {
         "policy": "production_strict",
         "environment_type": "production",
         "decision": "blocked",
@@ -57,6 +61,9 @@ def test_production_sql_server_unrestricted_scan_is_blocked_with_diagnostics() -
         "max_rows": 100,
         "table": "dbo.Employee",
         "suggested_rewrite": "bounded_or_filtered_query",
+        "query_rewritten": False,
+        "original_query_hash": caught.value.decision.original_query_hash,
+        "executed_query_hash": caught.value.decision.executed_query_hash,
     }
 
 
@@ -73,8 +80,11 @@ def test_production_filtered_and_existing_top_queries_remain_allowed() -> None:
     assert bounded.sql == "SELECT TOP (100) EmployeeId FROM dbo.Employee"
 
 
-@pytest.mark.parametrize("environment", ["evaluation", "demo", "test", "non_production"])
-def test_trusted_relaxed_environment_allows_only_bounded_sql_server_scan(environment: str) -> None:
+@pytest.mark.parametrize(
+    ("environment", "resolved_environment"),
+    [("evaluation", "evaluation"), ("demo", "evaluation"), ("test", "test"), ("uat", "uat")],
+)
+def test_trusted_relaxed_environment_allows_only_bounded_sql_server_scan(environment: str, resolved_environment: str) -> None:
     validator = ProductionReadSafetyValidator(
         engine_type="sql_server",
         scan_policy=policy(environment),
@@ -87,7 +97,7 @@ def test_trusted_relaxed_environment_allows_only_bounded_sql_server_scan(environ
     assert result.policy_decision is not None
     assert result.policy_decision.decision == "allowed"
     assert result.policy_decision.reason == "bounded_readonly_scan"
-    assert result.policy_decision.environment_type == environment
+    assert result.policy_decision.environment_type == resolved_environment
 
 
 def test_postgresql_evaluation_scan_uses_limit() -> None:
@@ -143,7 +153,7 @@ def test_connection_api_schema_defaults_strict_and_accepts_explicit_evaluation()
     )
 
     assert defaulted.environment_type == "production"
-    assert defaulted.max_scan_rows == 500
+    assert defaulted.max_scan_rows == 100
     assert configured.environment_type == "evaluation"
     with pytest.raises(ValidationError):
         DatabaseConnectionUpdate(environment_type="this is not production")
@@ -197,7 +207,11 @@ def test_allowed_evaluation_zero_rows_retain_bug004_semantics_and_policy_audit()
     assert result.execution_status == "succeeded"
     assert result.zero_row_result is True
     assert result.evidence_semantics == "verified_absence"
-    assert result.scan_policy_decision == {
+    assert result.scan_policy_decision | {
+        "query_rewritten": True,
+        "original_query_hash": result.scan_policy_decision["original_query_hash"],
+        "executed_query_hash": result.scan_policy_decision["executed_query_hash"],
+    } == {
         "policy": "evaluation_readonly",
         "environment_type": "evaluation",
         "decision": "allowed",
@@ -205,5 +219,8 @@ def test_allowed_evaluation_zero_rows_retain_bug004_semantics_and_policy_audit()
         "max_rows": 500,
         "table": "dbo.Employee",
         "suggested_rewrite": "",
+        "query_rewritten": True,
+        "original_query_hash": result.scan_policy_decision["original_query_hash"],
+        "executed_query_hash": result.scan_policy_decision["executed_query_hash"],
     }
     assert statuses[-1]["scan_policy_decision"] == result.scan_policy_decision

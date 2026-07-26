@@ -1724,7 +1724,7 @@ def test_evidence_gate_blocks_unreproduced_issue_and_fix_recommendation() -> Non
     reasoning = unreproduced_reasoning(gate)
 
     assert gate.reproduced is False
-    assert reasoning.likely_root_causes == ["Reported issue could not be reproduced from connected database evidence."]
+    assert reasoning.likely_root_causes[0].conclusion == "Root cause not established from the available evidence."
     assert reasoning.recommended_fix == ["No fix recommended until the reported condition is reproduced from connected database evidence."]
 
 
@@ -2556,7 +2556,8 @@ def test_unreproduced_reasoning_builds_constrained_evidence_summary_prompt() -> 
     )
 
     assert payload["reasoning_mode"] == "EVIDENCE_SUMMARY_NOT_REPRODUCED"
-    assert "State clearly that the reported defect was not reproduced" in payload["task"]
+    assert "reported condition could not be reproduced" in payload["task"]
+    assert "root cause was not established" in payload["task"]
     assert "Do not infer or recommend a root cause" in payload["task"]
 
 

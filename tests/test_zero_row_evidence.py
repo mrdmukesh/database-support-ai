@@ -167,7 +167,7 @@ def test_production_scan_rejection_remains_blocked(monkeypatch) -> None:
     assert _gate([result]).reasoning_permission == "DENY_REASONING"
 
 
-def test_unresolved_business_key_cannot_bypass_gate() -> None:
+def test_unresolved_business_key_does_not_erase_relevant_verified_absence() -> None:
     result = EvidenceResult(
         "Find missing payroll rows",
         "SELECT EmployeeId FROM PayrollItem WHERE EmployeeId = 'EMP-1042'",
@@ -180,7 +180,8 @@ def test_unresolved_business_key_cannot_bypass_gate() -> None:
     gate = _gate([result], entities=entities)
 
     assert gate.business_key_exists is False
-    assert gate.reasoning_permission == "DENY_REASONING"
+    assert gate.reasoning_permission == "ALLOW_REASONING"
+    assert gate.verified_evidence is True
 
 
 @pytest.mark.parametrize(

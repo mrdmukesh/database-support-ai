@@ -242,13 +242,17 @@ def enhance_reasoning_with_llm(
             settings, payload, debug_trace=debug_trace, **audit_kwargs,
         )
         enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
-        if reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED:
+        if reasoning_mode in {
+            ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+            ReasoningMode.EVIDENCE_GAP_SUMMARY,
+            ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+        }:
             enhanced = replace(
                 enhanced,
                 likely_root_causes=deterministic_reasoning.likely_root_causes,
                 recommended_fix=deterministic_reasoning.recommended_fix,
                 proof_of_fix=deterministic_reasoning.proof_of_fix,
-                response_type="evidence_summary_not_reproduced",
+                response_type=reasoning_mode.value.casefold(),
             )
         if debug_trace is not None:
             if settings.ai_debug_trace_enabled:
@@ -380,12 +384,26 @@ def _build_llm_payload_unmasked(
         }
         for index, item in enumerate(correlated_evidence[:20], start=1)
     ]
-    summary_only = reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
+    summary_only = reasoning_mode in {
+        ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+        ReasoningMode.EVIDENCE_GAP_SUMMARY,
+        ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+    }
+    summary_task = (
+        "Summarize only verified findings, reproduction status, observed system or workflow state, evidence gaps, "
+        "and confidence. State that root cause was not established from the available evidence. Do not infer a "
+        "root cause, recommend corrective action, or create new SQL or facts."
+        if reasoning_mode != ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
+        else
+        "Summarize only verified findings, reproduction result, observed system state, evidence gaps, and "
+        "confidence. State clearly that verified evidence was collected but the reported condition could not be "
+        "reproduced, and that root cause was not established. Do not infer or recommend a root cause or corrective "
+        "action, and do not create new SQL or facts."
+    )
     payload = {
         "reasoning_mode": reasoning_mode.value,
         "task": (
-            "Summarize only the verified evidence and factual timeline. State clearly that the reported defect "
-            "was not reproduced. Do not infer or recommend a root cause, and do not create new SQL or facts."
+            summary_task
             if summary_only
             else "Improve the database investigation reasoning using only this evidence. Do not create new SQL or facts."
         ),

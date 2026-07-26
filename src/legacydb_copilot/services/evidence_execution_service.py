@@ -45,6 +45,7 @@ class EvidenceResult:
         "execution_failure",
     ] = "not_applicable"
     supports_claim: str = ""
+    evidence_relevance: Literal["relevant", "irrelevant", "unverified"] = "unverified"
     scan_policy_decision: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -164,6 +165,7 @@ def execute_evidence_plan(
                     execution_status="succeeded",
                     evidence_semantics=semantics,
                     supports_claim=supports_claim,
+                    evidence_relevance="relevant",
                     scan_policy_decision=policy_decision,
                 )
             )

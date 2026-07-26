@@ -8,6 +8,7 @@ from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResu
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult, build_deterministic_root_cause_claim
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
+from legacydb_copilot.services.verified_evidence_service import normalize_verified_evidence
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
@@ -161,6 +162,9 @@ class EvidenceGateResult:
     verified_evidence: bool = False
     reasoning_permission: str = "DENY_REASONING"
     permission_reason: str = ""
+    verified_evidence_count: int = 0
+    evidence_categories: list[str] = field(default_factory=list)
+    evidence_gaps: list[str] = field(default_factory=list)
 
 
 def run_evidence_gate(
@@ -172,6 +176,7 @@ def run_evidence_gate(
     evidence: list[EvidenceResult],
     evidence_focus: EvidenceFocus | None,
     documents: list[RetrievedDocument],
+    procedure_analysis: list[Any] | None = None,
 ) -> EvidenceGateResult:
     """
     Owner: Mukesh Dabi
@@ -209,11 +214,6 @@ def run_evidence_gate(
     evidence_item_count = len(evidence)
     successful_sql_count = sum(1 for item in evidence if not item.error)
     returned_row_count = sum(len(item.rows) for item in evidence)
-    verified_sql_row_count = sum(
-        len(item.rows)
-        for item in evidence
-        if item.sql.strip() and item.execution_status == "succeeded" and item.rows
-    )
     key_values = [
         entity.value
         for entity in entities.entities
@@ -236,12 +236,10 @@ def run_evidence_gate(
             evidence_focus=evidence_focus,
         )
     ]
-    verified_sql_evidence_count = sum(
-        1
-        for item in evidence
-        if item.sql.strip()
-        and item.execution_status == "succeeded"
-        and (item.rows or item in verified_absence_items or item.evidence_semantics == "aggregate")
+    normalized_evidence = normalize_verified_evidence(
+        evidence,
+        procedure_analysis=procedure_analysis or [],
+        relevant_absence_ids={item.evidence_id for item in verified_absence_items},
     )
     affected_rows_exist = _affected_rows_exist(
         evidence,
@@ -278,9 +276,7 @@ def run_evidence_gate(
         blockers.append("Performance investigation lacks EXPLAIN or row-estimate evidence.")
     reproduction_rule = _reproduction_rule(intent)
     if not required:
-        verified_evidence = (
-            business_key_exists and affected_rows_exist and verified_sql_evidence_count > 0
-        )
+        verified_evidence = normalized_evidence.available
         return EvidenceGateResult(
             False, True, business_key_exists, True, affected_rows_exist, relationship_exists,
             facts, [], [], status_notes, reproduction_rule=reproduction_rule,
@@ -292,6 +288,9 @@ def run_evidence_gate(
                 if verified_evidence
                 else "No relevant verified deterministic SQL evidence is available."
             ),
+            verified_evidence_count=normalized_evidence.verified_evidence_count,
+            evidence_categories=normalized_evidence.evidence_categories,
+            evidence_gaps=normalized_evidence.evidence_gaps,
         )
     relationship_ok = relationship_exists or intent in {
         InvestigationIntent.PERFORMANCE_INVESTIGATION,
@@ -305,9 +304,7 @@ def run_evidence_gate(
         condition_exists=condition_exists,
         relationship_ok=relationship_ok,
     )
-    verified_evidence = (
-        business_key_exists and affected_rows_exist and verified_sql_evidence_count > 0
-    )
+    verified_evidence = normalized_evidence.available
     reasoning_permission = "ALLOW_REASONING" if verified_evidence else "DENY_REASONING"
     permission_reason = (
         "Verified deterministic SQL evidence is available for evidence-grounded reasoning."
@@ -335,6 +332,9 @@ def run_evidence_gate(
         verified_evidence=verified_evidence,
         reasoning_permission=reasoning_permission,
         permission_reason=permission_reason,
+        verified_evidence_count=normalized_evidence.verified_evidence_count,
+        evidence_categories=normalized_evidence.evidence_categories,
+        evidence_gaps=normalized_evidence.evidence_gaps,
     )
 
 
@@ -391,9 +391,15 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
-    claim = build_deterministic_root_cause_claim(UNREPRODUCED_MESSAGE)
+    summary = (
+        "Verified evidence was collected, but the reported condition could not be reproduced. "
+        "Root cause not established from the available evidence."
+    )
+    claim = build_deterministic_root_cause_claim(
+        "Root cause not established from the available evidence."
+    )
     return ReasoningResult(
-        summary=UNREPRODUCED_MESSAGE,
+        summary=summary,
         likely_root_causes=[claim] if claim else [],
         supporting_evidence=gate.confirmed_facts or ["No confirming rows were returned for the reported issue."],
         missing_evidence=gate.missing_evidence or gate.blocking_reasons,
@@ -413,8 +419,8 @@ def unreproduced_reasoning(gate: EvidenceGateResult) -> ReasoningResult:
         risks=["Fixes recommended without evidence can create new production defects."],
         confirmed_facts=gate.confirmed_facts,
         inferred_findings=[],
-        hypotheses=["Investigation stopped at the evidence gate because the reported condition was not confirmed."],
-        response_type="insufficient_evidence",
+        hypotheses=["Additional evidence is required to establish a root cause."],
+        response_type="evidence_summary_not_reproduced",
     )
 
 

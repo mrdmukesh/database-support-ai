@@ -2093,6 +2093,7 @@ def _run_dynamic_investigation(
         evidence=evidence,
         evidence_focus=evidence_focus,
         documents=context.documents,
+        procedure_analysis=procedure_analysis,
     )
     hypothesis_reasoning = run_hypothesis_investigation(
         question=payload.question,
@@ -2123,14 +2124,30 @@ def _run_dynamic_investigation(
         )
     else:
         reasoning = unreproduced_reasoning(evidence_gate)
+        if reasoning_dispatch.mode == ReasoningMode.EVIDENCE_GAP_SUMMARY:
+            reasoning = replace(
+                reasoning,
+                summary=(
+                    "Verified workflow and procedure evidence was collected. The available evidence does not "
+                    "establish whether the workflow completed successfully or where it stopped. "
+                    "Root cause not established from the available evidence."
+                ),
+                response_type="evidence_gap_summary",
+            )
 
-    reasoning_allowed = reasoning_dispatch.mode != ReasoningMode.SKIP
+    reasoning_allowed = reasoning_dispatch.invoke_llm
     ai_debug_trace = {
         "ai_enabled": bool(settings.ai_reasoning_enabled),
         "evidence_package_valid": evidence_gate.verified_evidence,
         "reasoning_permission": reasoning_dispatch.permission.value,
         "reasoning_mode": reasoning_dispatch.mode.value,
         "reasoning_dispatch_reason": reasoning_dispatch.reason,
+        "verified_evidence_count": reasoning_dispatch.verified_evidence_count,
+        "reproduction_status": reasoning_dispatch.reproduction_status.value,
+        "root_cause_support": reasoning_dispatch.root_cause_support.value,
+        "reason_code": reasoning_dispatch.reason_code,
+        "evidence_categories": reasoning_dispatch.evidence_categories,
+        "evidence_gaps": reasoning_dispatch.evidence_gaps,
         "llm_invoked": False,
         "provider": settings.llm_provider,
         "model": settings.llm_model,
@@ -2182,8 +2199,12 @@ def _run_dynamic_investigation(
         )
         llm_used = enhanced_reasoning is not reasoning
         reasoning = enhanced_reasoning
-        if llm_used and reasoning_dispatch.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED:
-            ai_debug_trace["ai_outcome"] = "evidence_summary_not_reproduced"
+        if llm_used and reasoning_dispatch.mode in {
+            ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+            ReasoningMode.EVIDENCE_GAP_SUMMARY,
+            ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+        }:
+            ai_debug_trace["ai_outcome"] = reasoning_dispatch.mode.value.casefold()
             ai_debug_trace.pop("ai_skip_reason", None)
     else:
         llm_used = False
@@ -2281,7 +2302,7 @@ def _run_dynamic_investigation(
     ai_status = _ai_reasoning_status(
         llm_configured=llm_configured,
         llm_used=llm_used,
-        evidence_gate=evidence_gate if reasoning_dispatch.mode == ReasoningMode.SKIP else None,
+        evidence_gate=evidence_gate if not reasoning_dispatch.invoke_llm else None,
     )
     bundle = DynamicInvestigationBundle(
         question=payload.question,

@@ -1,6 +1,6 @@
 """Reserve the post-policy migration marker without inferring environment."""
 
-revision = "0011_demo_evaluation_connection_metadata"
+revision = "0011_demo_eval_metadata"
 down_revision = "0010_connection_scan_policy"
 branch_labels = None
 depends_on = None

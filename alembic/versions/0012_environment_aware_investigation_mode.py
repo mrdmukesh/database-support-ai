@@ -4,8 +4,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0012_environment_aware_investigation_mode"
-down_revision = "0011_demo_evaluation_connection_metadata"
+revision = "0012_env_investigation"
+down_revision = "0011_demo_eval_metadata"
 branch_labels = None
 depends_on = None
 

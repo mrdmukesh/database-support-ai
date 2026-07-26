@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from legacydb_copilot.auth import Role
 from legacydb_copilot.billing import Plan
@@ -133,9 +133,15 @@ class DatabaseConnectionCreate(BaseModel):
     connection_string: str | None = None
     environment_type: str = Field(
         default="production",
-        pattern=r"^(production|non_production|evaluation|demo|test)$",
+        pattern=r"^(production|uat|test|evaluation|demo)$",
     )
-    max_scan_rows: int = Field(default=500, ge=1, le=5000)
+    max_scan_rows: int | None = Field(default=None, ge=1, le=5000)
+
+    @model_validator(mode="after")
+    def default_scan_rows_for_environment(self):
+        if self.max_scan_rows is None:
+            self.max_scan_rows = 500 if self.environment_type == "uat" else 1000 if self.environment_type in {"test", "evaluation", "demo"} else 100
+        return self
 
 
 class DatabaseConnectionUpdate(BaseModel):
@@ -144,7 +150,7 @@ class DatabaseConnectionUpdate(BaseModel):
     is_active: bool | None = None
     environment_type: str | None = Field(
         default=None,
-        pattern=r"^(production|non_production|evaluation|demo|test)$",
+        pattern=r"^(production|uat|test|evaluation|demo)$",
     )
     max_scan_rows: int | None = Field(default=None, ge=1, le=5000)
 
@@ -273,6 +279,9 @@ class ChatAskResponse(BaseModel):
     investigation_id: str | None = None
     connection_id: str
     connection_name: str
+    environment_type: str
+    policy_name: str
+    policy_version: str
 
 
 class VerificationCheckRead(BaseModel):
@@ -336,6 +345,10 @@ class InvestigationRead(BaseModel):
     workspace_id: str
     connection_id: str
     connection_name: str
+    environment_type: str
+    policy_name: str
+    policy_version: str
+    policy_audit_json: str
     user_question: str
     detected_intent: str
     ai_answer: str

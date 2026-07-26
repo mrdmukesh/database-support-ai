@@ -15,7 +15,7 @@ describe("ConnectionList", () => {
     render(<ConnectionList connections={[connection]} testingIds={new Set()} testResults={{}} testErrors={{}} onEdit={onEdit} onDelete={vi.fn()} onTest={vi.fn()} />);
     expect(screen.queryByText(/secret_ref|connection_string|password/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    expect(onEdit).toHaveBeenCalledWith(connection, "ERP 2", undefined);
+    expect(onEdit).toHaveBeenCalledWith(connection, "ERP 2", "production", undefined);
   });
 
   it("preserves delete confirmation and exposes connection testing", () => {

@@ -68,14 +68,14 @@ def test_demo_evaluation_policy_is_logged_as_allowed_before_execution(caplog) ->
     assert decision_log_index < execution_log_index
 
 
-def test_demo_workspace_backfill_and_evaluation_bootstrap_are_explicit() -> None:
+def test_evaluation_bootstrap_is_explicit_and_migration_does_not_infer_names() -> None:
     migration = Path(
         "alembic/versions/0011_demo_evaluation_connection_metadata.py"
     ).read_text(encoding="utf-8")
     bootstrap = Path("evaluation/local_environment.py").read_text(encoding="utf-8")
 
-    assert '"demo_databases"' in migration
-    assert '.values(environment_type="evaluation")' in migration
+    assert '"demo_databases"' not in migration
+    assert "Never infer it" in migration
     assert 'environment_type="evaluation"' in bootstrap
 
 

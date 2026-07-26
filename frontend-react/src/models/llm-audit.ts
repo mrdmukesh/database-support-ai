@@ -1,6 +1,10 @@
 export type LLMInvocationSummary = {
   llm_invocation_id: string;
   investigation_id: string | null;
+  connection_id?: string | null;
+  environment_type?: string;
+  policy_name?: string;
+  policy_version?: string;
   logical_request_id: string;
   stage_name: string;
   agent_name: string;

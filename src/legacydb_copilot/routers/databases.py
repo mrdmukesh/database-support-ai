@@ -29,6 +29,29 @@ from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.secrets_service import get_secret_store
 
 router = APIRouter(prefix="/databases", tags=["databases"])
+_ENVIRONMENT_ADMIN_ROLES = {
+    Role.SUPER_ADMIN.value,
+    Role.ORG_ADMIN.value,
+    Role.DBA.value,
+}
+
+
+def _require_environment_admin(db: Session, current_user, workspace_id: str) -> None:
+    membership = (
+        db.query(WorkspaceMembershipModel)
+        .filter(
+            WorkspaceMembershipModel.workspace_id == workspace_id,
+            WorkspaceMembershipModel.user_id == current_user.id,
+            WorkspaceMembershipModel.is_active.is_(True),
+        )
+        .first()
+    )
+    workspace_admin = membership is not None and membership.role in {"OWNER", "ADMIN", "DBA"}
+    if current_user.role not in _ENVIRONMENT_ADMIN_ROLES and not workspace_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator permission is required to configure a connection environment",
+        )
 
 
 def _looks_like_connection_string(value: str) -> bool:
@@ -106,6 +129,7 @@ def create_database_connection(
     current_user=Depends(get_current_user),
 ) -> DatabaseConnectionModel:
     assert_same_organization(current_user, payload.organization_id)
+    _require_environment_admin(db, current_user, payload.workspace_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="database")
     data = payload.model_dump(exclude={"connection_string"})
     data["secret_ref"] = _store_or_keep_secret_reference(
@@ -183,6 +207,9 @@ def update_database_connection(
         raise HTTPException(status_code=404, detail="Connection not found")
     require_resource_owner_workspace(db, current_user, connection, action="database")
     data = payload.model_dump(exclude_unset=True)
+    if "environment_type" in data or "max_scan_rows" in data:
+        _require_environment_admin(db, current_user, connection.workspace_id)
+    previous_environment = connection.environment_type
     connection_string = data.pop("connection_string", None)
     if connection_string:
         connection.secret_ref = _store_or_keep_secret_reference(
@@ -201,7 +228,12 @@ def update_database_connection(
             action="database_connection.update",
             resource_type="database_connection",
             resource_id=connection.id,
-            metadata={"fields": sorted([*data.keys(), *(["connection_string"] if connection_string else [])])},
+            metadata={
+                "fields": sorted([*data.keys(), *(["connection_string"] if connection_string else [])]),
+                "previous_environment_type": previous_environment,
+                "environment_type": connection.environment_type,
+                "max_scan_rows": connection.max_scan_rows,
+            },
         )
         db.commit()
     except IntegrityError as exc:

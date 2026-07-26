@@ -766,6 +766,11 @@ h1 {
 .password-control { position:relative; }
 .password-control input { padding-right:4.2rem; }
 .password-control button { position:absolute; top:50%; right:.55rem; border:0; color:#176f68; background:transparent; font-weight:700; transform:translateY(-50%); cursor:pointer; }
+.environment-notice { display:flex; gap:1rem; align-items:flex-start; margin:1rem 0; padding:1rem; border:1px solid #9fb8b5; border-left-width:.4rem; border-radius:.5rem; background:#f5faf9; }
+.environment-notice h3,.environment-notice p { margin:.1rem 0 .4rem; }
+.environment-production { border-left-color:#b42318; background:#fff4f2; }
+.environment-badge { display:inline-block; padding:.2rem .55rem; border:1px solid currentColor; border-radius:999px; white-space:nowrap; }
+.environment-help p { margin:.35rem 0; }
 .field-error { color:#9c2f2f !important; }
 .access-form-note { padding:.7rem; border:1px solid #b7ddce; border-radius:.5rem; color:#176143; background:#effaf4; font-size:.8rem; line-height:1.4; }
 .access-content { display:grid; min-width:0; gap:1.2rem; }

@@ -6,6 +6,7 @@ import { useAuth } from "../../hooks/use-auth";
 import type { DatabaseConnection } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
 import { Alert, Card, FormField, InvestigationProgress, PrimaryButton, Select, Textarea } from "../ui";
+import { EnvironmentNotice, environmentLabel } from "./EnvironmentNotice";
 
 interface InvestigationFormProps {
   workspaces: Workspace[];
@@ -87,11 +88,11 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
       </FormField>
 
       {selectedConnection ? (
-        <aside className="connection-summary" aria-label="Selected connection summary">
+        <><aside className="connection-summary" aria-label="Selected connection summary">
           <div><span>Selected connection</span><strong>{selectedConnection.name}</strong></div>
-          <dl><dt>Engine</dt><dd>{selectedConnection.engine}</dd><dt>Environment</dt><dd>Workspace configured</dd><dt>Status</dt><dd><span className="connection-live-dot" /> Active</dd><dt>Access</dt><dd>Read-only investigation</dd></dl>
+          <dl><dt>Engine</dt><dd>{selectedConnection.engine}</dd><dt>Environment</dt><dd>{environmentLabel(selectedConnection.environment_type)}</dd><dt>Status</dt><dd><span className="connection-live-dot" /> Active</dd><dt>Access</dt><dd>Read-only investigation</dd></dl>
           <small>Connection ID: {selectedConnection.id}</small>
-        </aside>
+        </aside><EnvironmentNotice environment={selectedConnection.environment_type} /></>
       ) : null}
 
       <FormField label="Database connection" htmlFor="investigation-connection" hint="Only active connections in the selected workspace are available." required>

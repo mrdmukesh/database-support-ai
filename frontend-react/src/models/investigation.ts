@@ -39,6 +39,9 @@ export interface InvestigationSubmitResponse {
   investigation_id: string | null;
   connection_id: string;
   connection_name: string;
+  environment_type?: string;
+  policy_name?: string;
+  policy_version?: string;
 }
 
 export interface InvestigationSummary {
@@ -47,6 +50,10 @@ export interface InvestigationSummary {
   workspace_id: string;
   connection_id: string;
   connection_name: string;
+  environment_type?: string;
+  policy_name?: string;
+  policy_version?: string;
+  policy_audit_json?: string;
   user_question: string;
   detected_intent: string;
   ai_answer: string;

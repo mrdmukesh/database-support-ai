@@ -42,3 +42,4 @@ class DynamicInvestigationBundle:
     ai_debug_trace: dict | None = None
     verification_checks: list[SuggestedVerificationCheck] | None = None
     verification_results: list[VerificationResult] | None = None
+    investigation_policy: dict | None = None

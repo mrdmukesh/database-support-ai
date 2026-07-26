@@ -1923,6 +1923,10 @@ def _run_dynamic_investigation(
             investigation_run_id=investigation_id,
             organization_id=payload.organization_id,
             workspace_id=payload.workspace_id,
+            connection_id=connection.id,
+            environment_type=scan_policy.environment_type,
+            policy_name=scan_policy.name,
+            policy_version=scan_policy.policy_version,
             user_id=payload.user_id,
             correlation_id=investigation_id,
         ),
@@ -2167,6 +2171,10 @@ def _run_dynamic_investigation(
                 investigation_run_id=investigation_id,
                 organization_id=payload.organization_id,
                 workspace_id=payload.workspace_id,
+                connection_id=connection.id,
+                environment_type=scan_policy.environment_type,
+                policy_name=scan_policy.name,
+                policy_version=scan_policy.policy_version,
                 user_id=payload.user_id,
                 correlation_id=investigation_id,
             ),
@@ -2298,6 +2306,7 @@ def _run_dynamic_investigation(
         ai_debug_trace=ai_debug_trace,
         verification_checks=verification_checks,
         verification_results=[],
+        investigation_policy=asdict(scan_policy),
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(
@@ -2518,6 +2527,7 @@ def _run_dynamic_investigation(
     )
     ai_debug_trace_payload = sanitize_ai_trace(ai_debug_trace or {})
     ai_debug_trace_payload["evidence_plan_statuses"] = evidence_plan_statuses
+    ai_debug_trace_payload["investigation_policy"] = asdict(scan_policy)
     ai_debug_trace_payload["evidence_plan_summary"] = {
         "planned": sum(1 for item in evidence_plan_statuses if item.get("status") == "planned"),
         "validated": sum(1 for item in evidence_plan_statuses if item.get("status") == "validated"),
@@ -2577,6 +2587,23 @@ def _run_dynamic_investigation(
         "verification_checks": json.dumps([asdict(item) for item in verification_checks], default=str),
         "ai_debug_trace": json.dumps(ai_debug_trace_payload, default=str),
         "answer_provenance": answer_provenance,
+        "environment_type": scan_policy.environment_type,
+        "policy_name": scan_policy.name,
+        "policy_version": scan_policy.policy_version,
+        "policy_audit": json.dumps(
+            {
+                **asdict(scan_policy),
+                "connection_id": connection.id,
+                "workspace_id": payload.workspace_id,
+                "provider": connection.engine,
+                "scan_decisions": [
+                    item.get("scan_policy_decision", {})
+                    for item in evidence_plan_statuses
+                    if item.get("scan_policy_decision")
+                ],
+            },
+            default=str,
+        ),
         "primary_entity": json.dumps({
             "table": evidence_focus.affected_object,
             "reason": evidence_focus.affected_object_reason,
@@ -2767,6 +2794,10 @@ def ask_chat_question(
     assert_same_user(current_user, payload.user_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="investigate")
     selected_connection = _find_workspace_connection(db, payload)
+    selected_policy = resolve_connection_scan_policy(
+        selected_connection,
+        default_max_rows=Settings.from_env().max_investigation_rows,
+    )
     conversation = _get_or_create_conversation(db, payload)
     report = analyze_prompt(payload.question, has_sources=True)
     if report.findings:
@@ -2819,6 +2850,22 @@ def ask_chat_question(
         investigation_metadata.get("detected_intent"),
         investigation_metadata.get("answer_provenance"),
     )
+    investigation_metadata.setdefault("environment_type", selected_policy.environment_type)
+    investigation_metadata.setdefault("policy_name", selected_policy.name)
+    investigation_metadata.setdefault("policy_version", selected_policy.policy_version)
+    investigation_metadata.setdefault(
+        "policy_audit",
+        json.dumps(
+            {
+                **asdict(selected_policy),
+                "connection_id": selected_connection.id,
+                "workspace_id": payload.workspace_id,
+                "provider": selected_connection.engine,
+                "scan_decisions": [],
+            },
+            default=str,
+        ),
+    )
     terminal_ai_trace = _terminal_ai_trace(investigation_metadata)
     llm_audit_outcome, llm_audit_reason = _llm_audit_outcome(
         investigation_status, terminal_ai_trace
@@ -2829,6 +2876,10 @@ def ask_chat_question(
         workspace_id=payload.workspace_id,
         connection_id=selected_connection.id,
         connection_name=selected_connection.name,
+        environment_type=investigation_metadata.get("environment_type", "production"),
+        policy_name=investigation_metadata.get("policy_name", "production_strict"),
+        policy_version=investigation_metadata.get("policy_version", "v1"),
+        policy_audit_json=investigation_metadata.get("policy_audit", "{}"),
         conversation_id=conversation.id,
         created_by_id=current_user.id,
         user_question=payload.question,
@@ -2857,7 +2908,13 @@ def ask_chat_question(
         resource_type="investigation",
         resource_id=investigation.id,
         status="success",
-        metadata={"detected_intent": investigation.detected_intent},
+        metadata={
+            "detected_intent": investigation.detected_intent,
+            "connection_id": investigation.connection_id,
+            "environment_type": investigation.environment_type,
+            "policy_name": investigation.policy_name,
+            "policy_version": investigation.policy_version,
+        },
     )
     for check in json.loads(investigation_metadata.get("verification_checks", "[]") or "[]"):
         db.add(
@@ -2898,6 +2955,9 @@ def ask_chat_question(
         "investigation_id": investigation.id,
         "connection_id": selected_connection.id,
         "connection_name": selected_connection.name,
+        "environment_type": investigation.environment_type,
+        "policy_name": investigation.policy_name,
+        "policy_version": investigation.policy_version,
     }
 
 

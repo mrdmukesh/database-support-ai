@@ -4,7 +4,7 @@ import { listWorkspaces } from "../../api/workspace-api";
 import { ConnectionForm } from "../../components/connections/ConnectionForm";
 import { ConnectionList } from "../../components/connections/ConnectionList";
 import { useAuth } from "../../hooks/use-auth";
-import type { ConnectionValidationResult, DatabaseConnection, DatabaseConnectionCreate } from "../../models/connection";
+import type { ConnectionValidationResult, DatabaseConnection, DatabaseConnectionCreate, EnvironmentType } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
 
 function messageOf(cause: unknown): string {
@@ -64,8 +64,8 @@ export function ConnectionsPage() {
     }
   }
 
-  async function edit(connection: DatabaseConnection, name: string, connectionString?: string) {
-    const payload = { name, ...(connectionString ? { connection_string: connectionString } : {}) };
+  async function edit(connection: DatabaseConnection, name: string, environment: EnvironmentType, connectionString?: string) {
+    const payload = { name, environment_type: environment, ...(connectionString ? { connection_string: connectionString } : {}) };
     try {
       await updateConnection(connection.id, payload);
       setMessage("Database connection updated.");

@@ -39,6 +39,10 @@ class LLMStage(StrEnum):
 class InvocationContext:
     organization_id: str
     workspace_id: str
+    connection_id: str | None = None
+    environment_type: str = "production"
+    policy_name: str = "production_strict"
+    policy_version: str = "v1"
     investigation_id: str | None = None
     investigation_run_id: str | None = None
     user_id: str | None = None
@@ -130,6 +134,10 @@ class LLMInvocationAuditService:
                 investigation_run_id=context.investigation_run_id,
                 organization_id=context.organization_id,
                 workspace_id=context.workspace_id,
+                connection_id=context.connection_id,
+                environment_type=context.environment_type,
+                policy_name=context.policy_name,
+                policy_version=context.policy_version,
                 user_id=context.user_id,
                 session_id=context.session_id,
                 logical_request_id=context.logical_request_id or str(uuid4()),

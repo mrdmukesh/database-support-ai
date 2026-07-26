@@ -50,6 +50,7 @@ function PromptDetailDialog({ detail, onClose }: { detail: LLMInvocationDetail; 
           <p className="eyebrow">Read-only prompt details</p>
           <h2 id="audit-prompt-title">{detail.stage_name}</h2>
           <p>{detail.agent_name} · {detail.provider} / {detail.model_name}</p>
+          <p>Environment: {detail.environment_type ?? "production"} · Policy: {detail.policy_name ?? "production_strict"} ({detail.policy_version ?? "v1"})</p>
         </div>
         <button ref={closeRef} className="icon-button" aria-label="Close prompt details" onClick={onClose}>×</button>
       </header>
@@ -142,11 +143,11 @@ export function LLMInvocationAuditPage() {
         <strong>{zeroExplanation.code}</strong><p>{zeroExplanation.reason}</p>
       </section>}
       <div className="table-scroll"><table><thead><tr>
-        <th>Time</th><th>Investigation</th><th>Stage</th><th>Agent</th><th>Provider / Model</th>
+        <th>Time</th><th>Investigation</th><th>Environment / Policy</th><th>Stage</th><th>Agent</th><th>Provider / Model</th>
         <th>Status</th><th>Tokens</th><th>Duration</th><th>Cost</th><th>Prompt details</th>
       </tr></thead><tbody>{items.map((item) => <tr key={item.llm_invocation_id}>
         <td>{new Date(item.started_at).toLocaleString()}</td>
-        <td>{item.investigation_id ?? "—"}</td><td>{item.stage_name}</td><td>{item.agent_name}</td>
+        <td>{item.investigation_id ?? "—"}</td><td>{item.environment_type ?? "production"} / {item.policy_name ?? "production_strict"}</td><td>{item.stage_name}</td><td>{item.agent_name}</td>
         <td>{item.provider} / {item.model_name}</td><td>{item.status}</td>
         <td>{item.prompt_tokens} / {item.completion_tokens} / {item.total_tokens}</td>
         <td>{item.duration_ms == null ? "—" : `${item.duration_ms} ms`}</td>

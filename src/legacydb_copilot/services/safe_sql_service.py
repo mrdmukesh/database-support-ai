@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 from dataclasses import dataclass
@@ -153,6 +154,7 @@ class ProductionReadSafetyValidator:
                     "invalid_environment_configuration",
                     table=table_name or "",
                     suggested_rewrite="correct_connection_environment_metadata",
+                    original_sql=stripped,
                 ),
                 self.scan_policy.configuration_error,
             )
@@ -174,6 +176,8 @@ class ProductionReadSafetyValidator:
                     "allowed",
                     "bounded_readonly_scan",
                     table=table_name or "",
+                    original_sql=stripped,
+                    executed_sql=bounded_sql,
                 ),
             )
         if _has_where_clause(normalized) or _has_limit_clause(normalized):
@@ -205,6 +209,7 @@ class ProductionReadSafetyValidator:
                 "unrestricted_table_scan",
                 table=table_name,
                 suggested_rewrite="bounded_or_filtered_query",
+                original_sql=stripped,
             ),
             "Production scan protection rejected unrestricted table scan",
         )
@@ -216,6 +221,8 @@ class ProductionReadSafetyValidator:
         *,
         table: str = "",
         suggested_rewrite: str = "",
+        original_sql: str = "",
+        executed_sql: str = "",
     ) -> ScanPolicyDecision:
         return ScanPolicyDecision(
             policy=self.scan_policy.name if self.scan_policy else "production_strict",
@@ -225,14 +232,22 @@ class ProductionReadSafetyValidator:
             max_rows=self.max_rows,
             table=_unquote_identifier(table),
             suggested_rewrite=suggested_rewrite,
+            query_rewritten=bool(original_sql and executed_sql and original_sql != executed_sql),
+            original_query_hash=_query_hash(original_sql),
+            executed_query_hash=_query_hash(executed_sql or original_sql),
         )
 
     def _allowed(self, sql: str, reason: str, *, table: str = "") -> ProductionReadSafetyResult:
         return ProductionReadSafetyResult(
             sql,
-            policy_decision=self._decision("allowed", reason, table=table),
+            policy_decision=self._decision(
+                "allowed",
+                reason,
+                table=table,
+                original_sql=sql,
+                executed_sql=sql,
+            ),
         )
-
     def _can_auto_limit(self, table_name: str) -> bool:
         """
         Owner: Mukesh Dabi
@@ -262,6 +277,10 @@ class ProductionReadSafetyValidator:
         if estimate is not None:
             return estimate <= self.max_rows
         return bool(re.search(r"(^|_)(lookup|reference|ref|status|type|category|code)(_|s?$)", normalized_table))
+
+
+def _query_hash(sql: str) -> str:
+    return hashlib.sha256(sql.encode("utf-8")).hexdigest() if sql else ""
 
 
 class ScanPolicyViolation(ValueError):

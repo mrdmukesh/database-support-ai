@@ -54,7 +54,10 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
         if verified_count > 0
         else ReasoningPermission.DENY_REASONING
     )
-    condition_verified = gate.reproduced or gate.reported_condition_exists
+    condition_verified = gate.reproduced or (
+        gate.reported_condition_exists
+        and "verified_absence" not in gate.evidence_categories
+    )
     reproduction_status = (
         ReproductionStatus.REPRODUCED
         if condition_verified

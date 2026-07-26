@@ -43,3 +43,7 @@ class DynamicInvestigationBundle:
     verification_checks: list[SuggestedVerificationCheck] | None = None
     verification_results: list[VerificationResult] | None = None
     investigation_policy: dict | None = None
+    investigation_id: str = ""
+    connection_id: str = ""
+    evidence_package_hash: str = ""
+    report_version: str = ""

@@ -271,8 +271,10 @@ def test_verified_unreproduced_evidence_invokes_audited_summary_and_composes_rep
     assert reasoning.response_type == "evidence_summary_not_reproduced"
     assert "Invented cause" not in str(reasoning)
     assert "Invented fix" not in str(reasoning)
+    assert "Invented cause" not in str(report)
+    assert "Invented fix" not in str(report)
     assert report.cover.investigation_id == investigation_id
-    assert "no reported issue was reproduced" in str(report).casefold()
+    assert "reported condition was not reproduced from verified evidence" in str(report).casefold()
 
 
 def test_unsupported_investigation_does_not_invoke_provider_or_create_audit(

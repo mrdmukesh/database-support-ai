@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.agents.recommendation_agent import Recommendation, RecommendationStatus
@@ -17,6 +18,88 @@ from legacydb_copilot.services.report_generator import (
     new_investigation_id,
     now_label,
 )
+
+
+@dataclass(frozen=True)
+class VerifiedReportInput:
+    """Investigation-scoped trust boundary for user-visible report composition."""
+
+    investigation_id: str
+    connection_id: str
+    evidence_package_hash: str
+    deterministic_findings: tuple[str, ...]
+    verified_claims: tuple[str, ...]
+    rejected_claims_count: int
+    reproduction_status: str
+    root_cause_support: str
+    evidence_gaps: tuple[str, ...]
+    reasoning_mode: str
+    identity_valid: bool
+
+
+def _verified_report_input(
+    bundle: DynamicInvestigationBundle,
+    investigation_id: str,
+) -> VerifiedReportInput:
+    trace = bundle.ai_debug_trace or {}
+    expected = (
+        bundle.investigation_id,
+        bundle.connection_id,
+        bundle.evidence_package_hash,
+        bundle.report_version,
+    )
+    observed = (
+        str(trace.get("investigation_id") or ""),
+        str(trace.get("connection_id") or ""),
+        str(trace.get("evidence_package_hash") or ""),
+        str(trace.get("report_version") or ""),
+    )
+    identity_required = any(expected)
+    identity_valid = (
+        not identity_required
+        or (
+            expected == observed
+            and bundle.investigation_id == investigation_id
+            and bundle.report_version == REPORT_VERSION
+        )
+    )
+    verified_claims = tuple(
+        claim.conclusion
+        for claim in bundle.reasoning.likely_root_causes
+        if claim.status is RootCauseSupportStatus.VERIFIED
+    ) if identity_valid else ()
+    gate = bundle.evidence_gate
+    return VerifiedReportInput(
+        investigation_id=investigation_id,
+        connection_id=bundle.connection_id,
+        evidence_package_hash=bundle.evidence_package_hash,
+        deterministic_findings=tuple(bundle.reasoning.confirmed_facts),
+        verified_claims=verified_claims,
+        rejected_claims_count=int(trace.get("rejected_claim_count") or 0),
+        reproduction_status="reproduced" if gate and gate.reproduced else "not_reproduced",
+        root_cause_support="supported" if verified_claims else "not_supported",
+        evidence_gaps=tuple(bundle.reasoning.missing_evidence),
+        reasoning_mode=str(trace.get("reasoning_mode") or ""),
+        identity_valid=identity_valid,
+    )
+
+
+def _evidence_only_summary(bundle: DynamicInvestigationBundle) -> str:
+    observations: list[str] = []
+    for item in bundle.evidence[:6]:
+        if item.execution_status != "succeeded":
+            continue
+        if item.zero_row_result:
+            observations.append(f"{item.purpose} returned no matching rows")
+        else:
+            observations.append(f"{item.purpose} returned {len(item.rows)} row(s)")
+    related = [item.name for item in bundle.procedure_analysis[:3]]
+    text = "Verified evidence confirms " + (
+        "; ".join(observations) if observations else "the collected deterministic observations"
+    ) + "."
+    if related:
+        text += f" Related procedure metadata identified {', '.join(related)}."
+    return text + " The available verified evidence does not establish the root cause."
 
 
 def _evidence_tables(bundle: DynamicInvestigationBundle) -> list[ReportTable]:
@@ -615,23 +698,34 @@ def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]
     verified = int(trace.get("verified_claim_count") or 0)
     skip_reason = str(trace.get("skip_reason") or "none")
 
-    claims = bundle.reasoning.likely_root_causes
+    claims = [
+        claim
+        for claim in bundle.reasoning.likely_root_causes
+        if claim.status is RootCauseSupportStatus.VERIFIED
+    ]
+    bundle_investigation_id = getattr(bundle, "investigation_id", "")
+    if bundle_investigation_id and (
+        str(trace.get("investigation_id") or "") != bundle_investigation_id
+        or str(trace.get("connection_id") or "") != getattr(bundle, "connection_id", "")
+        or str(trace.get("evidence_package_hash") or "") != getattr(bundle, "evidence_package_hash", "")
+        or str(trace.get("report_version") or "") != getattr(bundle, "report_version", "")
+    ):
+        return ["Root cause not established from verified evidence."]
     if ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0):
-        business_key = bundle.evidence_focus.inferred_business_key if bundle.evidence_focus and bundle.evidence_focus.inferred_business_key else "the investigated transfer"
-        return [
-            (
-                "Insufficient evidence to confirm the root cause. "
-                f"Transfer {business_key} is confirmed to have status 'Exception' and is associated with an open correlated exception record. "
-                "However, the collected evidence does not identify the exact processing step, validation rule, procedure, or system component that caused the failure."
-            )
-        ]
+        return ["Root cause not established from verified evidence."]
 
     if claims:
         return claims[:3]
-    return [
+    hypotheses = [
         f"{item.hypothesis_id} ({int(item.confidence * 100)}%): {item.description} - {item.reason}"
         for item in bundle.hypothesis_reasoning.ranked_root_causes
     ][:3]
+    if hypotheses:
+        return hypotheses
+    gate = getattr(bundle, "evidence_gate", None)
+    if gate and not gate.reported_condition_exists:
+        return ["The reported condition was not reproduced from verified evidence."]
+    return ["Root cause not established from verified evidence."]
 
 
 def _possible_investigation_hypothesis_section(bundle: DynamicInvestigationBundle) -> ReportSection | None:
@@ -643,12 +737,7 @@ def _possible_investigation_hypothesis_section(bundle: DynamicInvestigationBundl
     verified = int(trace.get("verified_claim_count") or 0)
     if not (ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0)):
         return None
-    return ReportSection(
-        title="Possible Investigation Hypothesis",
-        items=[
-            "A processing or validation failure may have occurred, but this is not confirmed by the available evidence."
-        ],
-    )
+    return None
 
 
 def _executive_recommendation_items(recommendations: list[str | Recommendation]) -> list[str]:
@@ -665,6 +754,13 @@ def _executive_recommendation_items(recommendations: list[str | Recommendation])
 
 
 def _executive_fix_items(bundle: DynamicInvestigationBundle) -> list[str]:
+    trace = bundle.ai_debug_trace or {}
+    if (
+        trace.get("evidence_package_valid")
+        and int(trace.get("generated_claim_count") or 0) > 0
+        and int(trace.get("verified_claim_count") or 0) == 0
+    ):
+        return ["No corrective change is recommended until the cause is established from verified evidence."]
     items = _executive_recommendation_items(bundle.reasoning.recommended_fix[:3])
     if not items:
         items = _executive_recommendation_items(
@@ -895,7 +991,23 @@ def compose_report(
     fact_rows = [{"Type": "Confirmed Fact", "Finding": item} for item in (bundle.reasoning.confirmed_facts or [])]
     fact_rows.extend({"Type": "Inferred Finding", "Finding": item} for item in (bundle.reasoning.inferred_findings or []))
     fact_rows.extend({"Type": "Hypothesis", "Finding": item} for item in (bundle.reasoning.hypotheses or []))
+    safe_input = _verified_report_input(
+        bundle,
+        investigation_id or bundle.investigation_id,
+    )
     final_root_cause_items = _executive_root_cause_items(bundle)
+    evidence_only = (
+        not safe_input.identity_valid
+        or (
+            safe_input.rejected_claims_count > 0
+            and not safe_input.verified_claims
+        )
+    )
+    executive_summary_text = (
+        _evidence_only_summary(bundle)
+        if evidence_only
+        else bundle.reasoning.summary
+    )
     confidence_items = [f"Overall confidence: {int(bundle.confidence * 100)}%"]
     confidence_items.extend(bundle.confidence_factors or ["Based on available evidence; no unsupported objects were fabricated."])
     recommended_fix_section = ReportSection(title="Recommended Fix", items=[
@@ -924,7 +1036,7 @@ def compose_report(
             "Production safeguards may have limited evidence collection. Review the Evidence Gaps section before relying on the conclusion."
         )
     sections = [
-        ReportSection(title="Executive Summary", paragraphs=[bundle.reasoning.summary]),
+        ReportSection(title="Executive Summary", paragraphs=[executive_summary_text]),
         ReportSection(title="Investigation Environment and Policy", items=policy_items),
         ReportSection(title="Question", paragraphs=[bundle.question]),
         _executive_ai_reasoning_section(bundle),
@@ -936,7 +1048,14 @@ def compose_report(
         ReportSection(title="Confidence Score", items=confidence_items),
         _executive_fix_section(bundle),
         _executive_tests_section(bundle),
-        ReportSection(title="Proof of Fix", items=bundle.reasoning.proof_of_fix),
+        ReportSection(
+            title="Proof of Fix",
+            items=(
+                ["No proof-of-fix claim is available until a verified cause and controlled change proposal exist."]
+                if evidence_only
+                else bundle.reasoning.proof_of_fix
+            ),
+        ),
         ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4]),
         ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
         ReportSection(title="Stage 1 - Understand the Question", items=[

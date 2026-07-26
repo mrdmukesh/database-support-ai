@@ -89,6 +89,29 @@ _CONTROLLED_CHANGE = re.compile(
     re.I,
 )
 
+_DOMAIN_TERMS = {
+    "transfer": {"transfer", "source account", "destination account"},
+    "payroll": {"payroll", "employee", "salary"},
+    "shipping": {"shipment", "shipping", "carrier"},
+    "order": {"order", "purchase"},
+    "clinic": {"clinic", "encounter", "patient"},
+}
+
+
+def _domain_compatible(text: str, evidence_records: list[EvidenceResult]) -> bool:
+    """Reject foreign-domain prose unless current evidence objects support that domain."""
+    normalized = text.casefold()
+    evidence_scope = " ".join(
+        f"{item.purpose} {item.sql}"
+        for item in evidence_records
+    ).casefold()
+    for terms in _DOMAIN_TERMS.values():
+        if any(term in normalized for term in terms) and not any(
+            term in evidence_scope for term in terms
+        ):
+            return False
+    return True
+
 
 def _safeguard_remediation_steps(steps: list[str]) -> list[str]:
     """Render model recommendations as read-only investigation or governed change proposals."""
@@ -279,7 +302,7 @@ def enhance_reasoning_with_llm(
             ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
         }:
             enhanced = replace(
-                enhanced,
+                deterministic_reasoning,
                 likely_root_causes=deterministic_reasoning.likely_root_causes,
                 recommended_fix=deterministic_reasoning.recommended_fix,
                 proof_of_fix=deterministic_reasoning.proof_of_fix,
@@ -700,19 +723,81 @@ def _merge_llm_reasoning(
         for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else [])
         if isinstance(raw_claim, dict) and raw_claim.get("evidence_refs")
         for claim in [convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])]
-        if claim is not None
+        if (
+            claim is not None
+            and claim.status == RootCauseSupportStatus.VERIFIED
+            and _domain_compatible(claim.conclusion, evidence_records or [])
+        )
     ]
+    verified_root_text = {claim.conclusion for claim in root_causes}
+    validation["accepted"] = [
+        item
+        for item in validation["accepted"]
+        if item.get("claim") in verified_root_text
+    ]
+    for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else []):
+        if not isinstance(raw_claim, dict):
+            continue
+        conclusion = str(raw_claim.get("conclusion") or "").strip()
+        if not conclusion or conclusion in verified_root_text:
+            continue
+        converted = convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])
+        validation["rejected"].append({
+            "claim": conclusion,
+            "claim_id": str(raw_claim.get("claim_id") or ""),
+            "decision": "excluded_from_report",
+            "reason": (
+                "domain_mismatch"
+                if converted is not None
+                and converted.status == RootCauseSupportStatus.VERIFIED
+                and not _domain_compatible(conclusion, evidence_records or [])
+                else
+                "missing_evidence_refs"
+                if converted is None or not converted.evidence_refs
+                else "invalid_evidence_refs"
+            ),
+            "missing_evidence_refs": (
+                converted.evidence_refs
+                if converted is not None
+                else []
+            ),
+        })
     verified_claim_count = len([claim for claim in root_causes if claim.status == RootCauseSupportStatus.VERIFIED])
     rejected_claim_count = max(generated_claim_count - verified_claim_count, 0)
+    available_evidence_ids = {item.evidence_id for item in (evidence_records or [])}
     fixes = _safeguard_remediation_steps(
-        _cited_items(llm_json.get("recommended_fix"), "step", validation=validation)
+        _cited_items(
+            llm_json.get("recommended_fix"),
+            "step",
+            validation=validation,
+            available_evidence_ids=available_evidence_ids,
+        )
     )
     proof = _safeguard_remediation_steps(
-        _cited_items(llm_json.get("proof_of_fix"), "step", validation=validation)
+        _cited_items(
+            llm_json.get("proof_of_fix"),
+            "step",
+            validation=validation,
+            available_evidence_ids=available_evidence_ids,
+        )
     )
-    risks = _cited_items(llm_json.get("risks"), "risk", validation=validation)
-    next_questions = _cited_items(llm_json.get("recommended_next_questions"), "question", validation=validation)
-    test_cases = _cited_test_cases(llm_json.get("test_cases"), validation=validation)
+    risks = _cited_items(
+        llm_json.get("risks"),
+        "risk",
+        validation=validation,
+        available_evidence_ids=available_evidence_ids,
+    )
+    next_questions = _cited_items(
+        llm_json.get("recommended_next_questions"),
+        "question",
+        validation=validation,
+        available_evidence_ids=available_evidence_ids,
+    )
+    test_cases = _cited_test_cases(
+        llm_json.get("test_cases"),
+        validation=validation,
+        available_evidence_ids=available_evidence_ids,
+    )
     if debug_trace is not None:
         debug_trace["validated_citations"] = validation["accepted"]
         debug_trace["rejected_or_unsupported_claims"] = validation["rejected"]
@@ -739,16 +824,10 @@ def _merge_llm_reasoning(
             debug_trace["verification_status"] = "verified"
     if not cited_root_causes or not root_causes:
         return base
-    summary_parts = [str(llm_json.get("summary") or base.summary)]
-    senior_explanation = str(llm_json.get("senior_engineer_explanation") or "").strip()
-    clearer_wording = str(llm_json.get("clearer_report_wording") or "").strip()
-    if senior_explanation:
-        summary_parts.append(f"Senior engineer explanation: {senior_explanation}")
-    if clearer_wording:
-        summary_parts.append(f"Clearer report wording: {clearer_wording}")
-    confidence_note = str(llm_json.get("confidence_note") or "").strip()
-    if confidence_note:
-        summary_parts.append(f"Confidence note: {confidence_note}")
+    # Raw provider narrative is audit-only. Visible prose is composed from the
+    # deterministic summary and claims that passed evidence-reference validation.
+    summary_parts = [base.summary]
+    summary_parts.extend(claim.conclusion for claim in root_causes)
     if next_questions:
         summary_parts.append("Recommended next questions: " + " ".join(next_questions))
     return replace(
@@ -768,6 +847,7 @@ def _cited_items(
     text_key: str,
     *,
     validation: dict[str, list[Any]] | None = None,
+    available_evidence_ids: set[str] | None = None,
 ) -> list[str]:
     """
     Owner: Mukesh Dabi
@@ -797,12 +877,18 @@ def _cited_items(
             continue
         text = str(item.get(text_key) or "").strip()
         refs = [str(ref) for ref in item.get("evidence_refs") or [] if ref]
-        if text and refs:
+        invalid_refs = [ref for ref in refs if available_evidence_ids is not None and ref not in available_evidence_ids]
+        if text and refs and not invalid_refs:
             items.append(f"{text} Evidence: {', '.join(refs)}.")
             if validation is not None:
                 validation["accepted"].append({"claim": text, "evidence_refs": refs})
         elif text and validation is not None:
-            validation["rejected"].append({"claim": text, "reason": "Missing evidence_refs"})
+            validation["rejected"].append({
+                "claim": text,
+                "reason": "missing_evidence_refs" if not refs else "invalid_evidence_refs",
+                "missing_evidence_refs": invalid_refs,
+                "decision": "excluded_from_report",
+            })
     return items
 
 
@@ -810,6 +896,7 @@ def _cited_test_cases(
     value: Any,
     *,
     validation: dict[str, list[Any]] | None = None,
+    available_evidence_ids: set[str] | None = None,
 ) -> list[dict[str, str]]:
     """
     Owner: Mukesh Dabi
@@ -838,10 +925,16 @@ def _cited_test_cases(
         if not isinstance(item, dict):
             continue
         refs = [str(ref) for ref in item.get("evidence_refs") or [] if ref]
-        if not refs:
+        invalid_refs = [ref for ref in refs if available_evidence_ids is not None and ref not in available_evidence_ids]
+        if not refs or invalid_refs:
             if validation is not None:
                 validation["rejected"].append(
-                    {"claim": str(item.get("scenario") or item.get("test_id") or "test case"), "reason": "Missing evidence_refs"}
+                    {
+                        "claim": str(item.get("scenario") or item.get("test_id") or "test case"),
+                        "reason": "missing_evidence_refs" if not refs else "invalid_evidence_refs",
+                        "missing_evidence_refs": invalid_refs,
+                        "decision": "excluded_from_report",
+                    }
                 )
             continue
         if validation is not None:

@@ -85,7 +85,7 @@ from legacydb_copilot.services.metadata_search_service import (
     resolve_qualified_object_names,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, payload_hash
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
 from legacydb_copilot.services.scan_policy_service import resolve_connection_scan_policy
@@ -2170,6 +2170,13 @@ def _run_dynamic_investigation(
         "input_tokens": 0,
         "output_tokens": 0,
     }
+    evidence_package_hash = payload_hash([asdict(item) for item in evidence])
+    ai_debug_trace.update({
+        "investigation_id": investigation_id,
+        "connection_id": connection.id,
+        "evidence_package_hash": evidence_package_hash,
+        "report_version": REPORT_VERSION,
+    })
     if reasoning_allowed:
         enhanced_reasoning = enhance_reasoning_with_llm(
             question=payload.question,
@@ -2328,6 +2335,10 @@ def _run_dynamic_investigation(
         verification_checks=verification_checks,
         verification_results=[],
         investigation_policy=asdict(scan_policy),
+        investigation_id=investigation_id,
+        connection_id=connection.id,
+        evidence_package_hash=evidence_package_hash,
+        report_version=REPORT_VERSION,
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(

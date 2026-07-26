@@ -2595,7 +2595,7 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
             rollback_plan=[],
             risks=[],
         ),
-        evidence=[EvidenceResult("Find duplicate rows", "SELECT email FROM users", [{"email": "jane@example.com"}])],
+        evidence=[EvidenceResult("Find duplicate rows", "SELECT email FROM users", [{"email": "jane@example.com"}], evidence_id="SQL-1")],
         correlated_evidence=[],
         procedure_analysis=[],
         documents=[],
@@ -2713,15 +2713,9 @@ def test_executive_report_avoids_confirmed_root_cause_when_llm_not_invoked() -> 
         },
     )
     root_cause_items = _executive_root_cause_items(bundle)
-    assert root_cause_items == [
-        "Insufficient evidence to confirm the root cause. Transfer TRF-3101 is confirmed to have status 'Exception' and is associated with an open correlated exception record. However, the collected evidence does not identify the exact processing step, validation rule, procedure, or system component that caused the failure."
-    ]
+    assert root_cause_items == ["Root cause not established from verified evidence."]
     hypothesis = _possible_investigation_hypothesis_section(bundle)
-    assert hypothesis is not None
-    assert hypothesis.title == "Possible Investigation Hypothesis"
-    assert hypothesis.items == [
-        "A processing or validation failure may have occurred, but this is not confirmed by the available evidence."
-    ]
+    assert hypothesis is None
 
 
 @pytest.mark.parametrize(

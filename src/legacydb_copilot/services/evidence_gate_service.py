@@ -277,9 +277,13 @@ def run_evidence_gate(
     reproduction_rule = _reproduction_rule(intent)
     if not required:
         verified_evidence = normalized_evidence.available
+        # Intents outside the reproduction rule set can have verified evidence,
+        # but their generic "any rows" condition is not proof of reproduction.
+        reproduced = False
         return EvidenceGateResult(
-            False, True, business_key_exists, True, affected_rows_exist, relationship_exists,
-            facts, [], [], status_notes, reproduction_rule=reproduction_rule,
+            False, reproduced, business_key_exists, condition_exists, affected_rows_exist, relationship_exists,
+            facts, [] if reproduced else blockers, [] if reproduced else blockers, status_notes,
+            reproduction_rule=reproduction_rule,
             evidence_item_count=evidence_item_count, successful_sql_count=successful_sql_count,
             returned_row_count=returned_row_count, verified_evidence=verified_evidence,
             reasoning_permission="ALLOW_REASONING" if verified_evidence else "DENY_REASONING",

@@ -202,3 +202,27 @@ def test_partial_verified_evidence_invokes_and_records_failed_query_gap() -> Non
     assert decision.invoke_llm is True
     assert decision.verified_evidence_count > 0
     assert "failed_query" in decision.evidence_gaps
+
+
+def test_non_gate_intent_does_not_force_reproduction_or_root_cause_mode() -> None:
+    gate = run_evidence_gate(
+        question=LONG_QUESTION,
+        intent=InvestigationIntent.STORED_PROCEDURE_ANALYSIS,
+        entities=EntityExtractionResult([], "investigation", "payroll"),
+        metadata=_metadata(),
+        evidence=_employees_and_absences(),
+        evidence_focus=SimpleNamespace(affected_object="Not determined"),
+        documents=[],
+        procedure_analysis=[
+            SimpleNamespace(definition_available=True, name="dbo.sp_RunPayroll")
+        ],
+    )
+    decision = dispatch_reasoning(gate)
+
+    assert gate.required is False
+    assert gate.reproduced is False
+    assert decision.invoke_llm is True
+    assert decision.mode in {
+        ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+        ReasoningMode.EVIDENCE_GAP_SUMMARY,
+    }

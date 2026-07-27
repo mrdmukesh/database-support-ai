@@ -426,6 +426,26 @@ class FixReadinessAssessmentRead(BaseModel):
     created_at: datetime
 
 
+class InvestigationProgressRead(BaseModel):
+    investigation_id: str
+    agentic: bool
+    current_state: str
+    iteration_number: int
+    terminal: bool
+    stop_reason: str
+    budget: dict
+    resolved_entities: list[dict]
+    question_counts: dict[str, int]
+    questions: list[dict]
+    completed_steps: list[dict]
+    failed_actions: list[dict]
+    verified_absence: list[dict]
+    root_cause_status: str
+    fix_readiness_state: str
+    source_badges: list[str]
+    can_cancel: bool
+
+
 class InvestigationFeedbackCreate(BaseModel):
     rating: FeedbackRating
     actual_root_cause: str = ""

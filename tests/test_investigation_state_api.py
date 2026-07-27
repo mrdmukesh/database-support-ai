@@ -7,3 +7,4 @@ def test_state_read_endpoints_are_registered() -> None:
     assert "/investigations/{investigation_id}/state" in paths
     assert "/investigations/{investigation_id}/state/history" in paths
     assert "/investigations/{investigation_id}/agentic-steps" in paths
+    assert "/investigations/{investigation_id}/execution-path" in paths

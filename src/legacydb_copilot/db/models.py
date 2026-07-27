@@ -372,6 +372,16 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="investigation",
         cascade="all, delete-orphan",
     )
+    root_cause_hypothesis_verifications: Mapped[
+        list["RootCauseHypothesisVerificationModel"]
+    ] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
+    execution_path_traces: Mapped[list["ExecutionPathTraceModel"]] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
 
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
@@ -478,6 +488,83 @@ class InvestigationAgenticStepModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     investigation: Mapped["InvestigationModel"] = relationship(
         back_populates="agentic_steps"
+    )
+
+
+class ExecutionPathTraceModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "execution_path_traces"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    affected_entity: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    expected_path_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    nodes_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    edges_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    verified_completed_steps_json: Mapped[str] = mapped_column(
+        Text, default="[]", nullable=False
+    )
+    last_successful_step: Mapped[str] = mapped_column(
+        String(120), default="", nullable=False
+    )
+    first_failed_or_missing_step: Mapped[str] = mapped_column(
+        String(120), default="", nullable=False
+    )
+    responsible_component: Mapped[str] = mapped_column(
+        String(255), default="", nullable=False
+    )
+    remaining_gap: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="execution_path_traces"
+    )
+
+
+class RootCauseHypothesisVerificationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "root_cause_hypothesis_verifications"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    hypothesis_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    origin: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    hypothesis_json: Mapped[str] = mapped_column(Text, nullable=False)
+    verification_matrix_json: Mapped[str] = mapped_column(Text, nullable=False)
+    valid_evidence_refs_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    missing_proof_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    contradictions_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    evidence_package_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    decision_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    visible_in_report: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="root_cause_hypothesis_verifications"
     )
 
 

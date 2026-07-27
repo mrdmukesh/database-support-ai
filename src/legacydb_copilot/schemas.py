@@ -393,6 +393,24 @@ class InvestigationAgenticStepRead(BaseModel):
     created_at: datetime
 
 
+class ExecutionPathTraceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    affected_entity: str
+    status: str
+    expected_path_json: str
+    nodes_json: str
+    edges_json: str
+    verified_completed_steps_json: str
+    last_successful_step: str
+    first_failed_or_missing_step: str
+    responsible_component: str
+    remaining_gap: str
+    created_at: datetime
+
+
 class InvestigationFeedbackCreate(BaseModel):
     rating: FeedbackRating
     actual_root_cause: str = ""

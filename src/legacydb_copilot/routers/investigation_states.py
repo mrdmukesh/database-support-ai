@@ -5,10 +5,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from legacydb_copilot.db.models import InvestigationAgenticStepModel, InvestigationModel
+from legacydb_copilot.db.models import (
+    ExecutionPathTraceModel,
+    InvestigationAgenticStepModel,
+    InvestigationModel,
+)
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import require_permission
 from legacydb_copilot.schemas import (
+    ExecutionPathTraceRead,
     InvestigationAgenticStepRead,
     InvestigationStateHistoryRead,
     InvestigationStateTransitionRead,
@@ -95,3 +100,24 @@ def investigation_agentic_steps(
         )
         .all()
     )
+
+
+@router.get(
+    "/{investigation_id}/execution-path",
+    response_model=ExecutionPathTraceRead,
+)
+def investigation_execution_path(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> ExecutionPathTraceModel:
+    _investigation(db, investigation_id, current_user)
+    trace = (
+        db.query(ExecutionPathTraceModel)
+        .filter(ExecutionPathTraceModel.investigation_id == investigation_id)
+        .order_by(ExecutionPathTraceModel.created_at.desc())
+        .first()
+    )
+    if trace is None:
+        raise HTTPException(status_code=404, detail="Execution path trace is not available")
+    return trace

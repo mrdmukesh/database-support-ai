@@ -14,8 +14,12 @@ from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.evidence_gap_detection_service import EvidenceGapAnalysis
 from legacydb_copilot.services.evidence_gate_service import EvidenceGateResult
 from legacydb_copilot.services.evidence_verification_agent import SuggestedVerificationCheck, VerificationResult
+from legacydb_copilot.services.execution_path_tracing_service import ExecutionPathTrace
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
+from legacydb_copilot.services.root_cause_hypothesis_service import (
+    RootCauseVerificationResult,
+)
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
 
@@ -49,3 +53,5 @@ class DynamicInvestigationBundle:
     evidence_package_hash: str = ""
     report_version: str = ""
     evidence_gap_analysis: EvidenceGapAnalysis | None = None
+    root_cause_verification: RootCauseVerificationResult | None = None
+    execution_path_trace: ExecutionPathTrace | None = None

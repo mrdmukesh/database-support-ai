@@ -19,18 +19,18 @@ def upgrade() -> None:
         sa.Column("investigation_id", sa.String(36), nullable=False),
         sa.Column("affected_entity", sa.String(255), nullable=False, server_default=""),
         sa.Column("status", sa.String(40), nullable=False),
-        sa.Column("expected_path_json", sa.Text(), nullable=False, server_default="[]"),
-        sa.Column("nodes_json", sa.Text(), nullable=False, server_default="[]"),
-        sa.Column("edges_json", sa.Text(), nullable=False, server_default="[]"),
+        sa.Column(
+            "expected_path_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")
+        ),
+        sa.Column("nodes_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")),
+        sa.Column("edges_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")),
         sa.Column(
             "verified_completed_steps_json",
             sa.Text(),
             nullable=False,
-            server_default="[]",
+            server_default=sa.text("('[]')"),
         ),
-        sa.Column(
-            "last_successful_step", sa.String(120), nullable=False, server_default=""
-        ),
+        sa.Column("last_successful_step", sa.String(120), nullable=False, server_default=""),
         sa.Column(
             "first_failed_or_missing_step",
             sa.String(120),
@@ -43,18 +43,12 @@ def upgrade() -> None:
             nullable=False,
             server_default="",
         ),
-        sa.Column("remaining_gap", sa.Text(), nullable=False, server_default=""),
+        sa.Column("remaining_gap", sa.Text(), nullable=False, server_default=sa.text("('')")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["investigation_id"], ["investigations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["workspace_id"], ["workspaces.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     for column in (

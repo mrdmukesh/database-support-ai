@@ -326,13 +326,23 @@ def _metadata_context_for_connection(
 
 
 def _active_database_name(connector, expected_engine: DatabaseEngine) -> str:
-    if expected_engine != DatabaseEngine.MYSQL:
+    query = {
+        DatabaseEngine.MYSQL: "SELECT DATABASE() AS active_database",
+        DatabaseEngine.SQL_SERVER: "SELECT DB_NAME() AS active_database",
+    }.get(expected_engine)
+    if not query:
         return ""
-    rows = connector.execute_read_only_query("SELECT DATABASE() AS active_database", limit=1)
+    rows = connector.execute_read_only_query(query, limit=1)
     if not rows:
         return ""
     row = rows[0]
-    return str(row.get("active_database") or row.get("DATABASE()") or next(iter(row.values()), "") or "")
+    return str(
+        row.get("active_database")
+        or row.get("DATABASE()")
+        or row.get("DB_NAME()")
+        or next(iter(row.values()), "")
+        or ""
+    )
 
 
 def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine):
@@ -657,6 +667,9 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
     elif provenance == "AI_INVOCATION_FAILED":
         trace.setdefault("ai_reasoning_invoked", True)
         trace.setdefault("ai_outcome", "provider_failure")
+    elif provenance == "AI_REASONING_UNVERIFIED":
+        trace.setdefault("ai_reasoning_invoked", True)
+        trace.setdefault("ai_outcome", "completed_no_verified_claims")
     elif provenance in {"AI_ANSWERED", "AI_SUMMARIZED_NOT_REPRODUCED"}:
         trace.setdefault("ai_reasoning_invoked", True)
         trace.setdefault(
@@ -728,6 +741,30 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         if value is not None:
             trace.setdefault(key, value)
     return trace
+
+
+def _answer_provenance(
+    reasoning_mode: ReasoningMode,
+    *,
+    llm_used: bool,
+    trace: dict[str, Any],
+    ai_reasoning_enabled: bool,
+) -> str:
+    """Separate provider completion from evidence-verification acceptance."""
+    if reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED and llm_used:
+        return "AI_SUMMARIZED_NOT_REPRODUCED"
+    if reasoning_mode == ReasoningMode.SKIP:
+        return "AI_SKIPPED_BY_EVIDENCE_GATE"
+    if llm_used:
+        return "AI_ANSWERED"
+    if str(trace.get("invocation_status") or "") in {
+        "completed_zero_claims",
+        "completed_no_verified_claims",
+    }:
+        return "AI_REASONING_UNVERIFIED"
+    if trace.get("ai_reasoning_invoked"):
+        return "AI_INVOCATION_FAILED"
+    return "AI_SKIPPED_BY_POLICY" if ai_reasoning_enabled else "DETERMINISTIC_ANSWERED"
 
 
 def _detected_intent_with_planning_status(base_intent: str, plan_statuses: list[dict[str, Any]]) -> str:
@@ -2586,18 +2623,11 @@ def _run_dynamic_investigation(
         + "\n\n## Missing Information / Clarifying Questions\n"
         + "\n".join(f"- {item}" for item in reasoning.missing_evidence)
     )
-    answer_provenance = (
-        "AI_SUMMARIZED_NOT_REPRODUCED"
-        if reasoning_dispatch.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED and llm_used
-        else "AI_SKIPPED_BY_EVIDENCE_GATE"
-        if reasoning_dispatch.mode == ReasoningMode.SKIP
-        else "AI_ANSWERED"
-        if llm_used
-        else "AI_INVOCATION_FAILED"
-        if ai_debug_trace and ai_debug_trace.get("ai_reasoning_invoked")
-        else "AI_SKIPPED_BY_POLICY"
-        if Settings.from_env().ai_reasoning_enabled
-        else "DETERMINISTIC_ANSWERED"
+    answer_provenance = _answer_provenance(
+        reasoning_dispatch.mode,
+        llm_used=llm_used,
+        trace=ai_debug_trace or {},
+        ai_reasoning_enabled=Settings.from_env().ai_reasoning_enabled,
     )
     relationship_proof = [
         item for item in evidence_gate.confirmed_facts

@@ -30,6 +30,8 @@ TERMINAL_STATUSES = {
     "AI_SKIPPED_BY_EVIDENCE_GATE",
     "AI_SKIPPED_BY_POLICY",
     "AI_INVOCATION_FAILED",
+    "AI_REASONING_UNVERIFIED",
+    "AI_SUMMARIZED_NOT_REPRODUCED",
     "DETERMINISTIC_ANSWERED",
     "DEVELOPER_REVIEW",
     "FIX_APPLIED",
@@ -287,13 +289,25 @@ class EvaluationRunner:
     def _poll(self, investigation_id: str, result: ExecutionResult) -> dict[str, Any]:
         started = self.clock()
         deadline = started + self.config.timeout_seconds
+        attempts = 0
+        last_status = ""
+        result.timings["polling_timeout_seconds"] = self.config.timeout_seconds
         while self.clock() <= deadline:
             detail = self._retry(lambda: self.api.retrieve(investigation_id), result)
-            if str(detail.get("status") or "") in TERMINAL_STATUSES:
+            attempts += 1
+            last_status = str(detail.get("status") or "")
+            result.timings["polling_attempts"] = attempts
+            result.timings["polling_last_status"] = last_status
+            if last_status in TERMINAL_STATUSES:
                 result.timings["polling_seconds"] = self.clock() - started
                 return detail
             self.sleeper(self.config.poll_interval_seconds)
-        raise TimeoutError(f"Investigation {investigation_id} exceeded polling timeout")
+        result.timings["polling_seconds"] = self.clock() - started
+        raise TimeoutError(
+            f"Investigation {investigation_id} exceeded polling timeout "
+            f"after {attempts} attempts; last_status={last_status or 'unknown'}; "
+            f"timeout_seconds={self.config.timeout_seconds}"
+        )
 
     @staticmethod
     def _extract(submission: dict[str, Any], detail: dict[str, Any]) -> dict[str, Any]:

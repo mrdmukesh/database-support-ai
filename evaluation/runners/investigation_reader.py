@@ -72,6 +72,26 @@ class InvestigationPersistenceReader:
                 .first()
             )
             return {
+                "lifecycle_diagnostics": {
+                    "created_at": str(record.created_at),
+                    "updated_at": str(record.updated_at),
+                    "execution_mode": "synchronous_public_api",
+                    "queue_time": None,
+                    "worker_claim_time": None,
+                    "state_transitions": [
+                        {
+                            "previous_state": item.previous_state,
+                            "current_state": item.current_state,
+                            "transitioned_at": str(item.transitioned_at),
+                            "reason": item.reason,
+                            "iteration_number": item.iteration_number,
+                        }
+                        for item in sorted(
+                            record.state_transitions,
+                            key=lambda transition: transition.transitioned_at,
+                        )
+                    ],
+                },
                 "identified_entities": _json(record.extracted_entities_json, []),
                 "evidence": _json(record.evidence_json, []),
                 "generated_sql": _json(record.sql_queries_json, []),

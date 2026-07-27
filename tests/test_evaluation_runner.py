@@ -277,7 +277,29 @@ def test_timeout(tmp_path):
 
     app = runner(tmp_path, api=FakeAPI(detail={"status": "OPEN"}), clock=clock)
     app.config = replace(app.config, timeout_seconds=1)
-    assert app.run_scenario("RUN", scenario()).status == "timeout"
+    result = app.run_scenario("RUN", scenario())
+    assert result.status == "timeout"
+    assert result.timings["polling_attempts"] > 0
+    assert result.timings["polling_last_status"] == "OPEN"
+    assert result.timings["polling_timeout_seconds"] == 1
+    assert "last_status=OPEN" in result.errors[0]
+
+
+def test_ai_summarized_not_reproduced_is_terminal_without_timeout(tmp_path):
+    result = runner(
+        tmp_path,
+        api=FakeAPI(
+            detail={
+                "id": "INV-1",
+                "status": "AI_SUMMARIZED_NOT_REPRODUCED",
+                "ai_answer": "Evidence summary",
+            }
+        ),
+    ).run_scenario("RUN", scenario())
+
+    assert result.status == "completed"
+    assert result.investigation_status == "AI_SUMMARIZED_NOT_REPRODUCED"
+    assert result.timings["polling_attempts"] == 1
 
 
 def test_polling_failure(tmp_path):

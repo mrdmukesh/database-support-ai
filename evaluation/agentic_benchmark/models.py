@@ -64,11 +64,15 @@ class AgenticScenarioCapture:
     findings: list[str] = field(default_factory=list)
     recommendations: list[str] = field(default_factory=list)
     validation_tests: list[str] = field(default_factory=list)
+    evidence_records: list[dict[str, Any]] = field(default_factory=list)
+    evidence_facts: list[str] = field(default_factory=list)
     evidence_refs: list[str] = field(default_factory=list)
     report_json: dict[str, Any] = field(default_factory=dict)
     report_pdf: str = ""
     duration_seconds: float = 0
     stop_reason: str = ""
+    polling_diagnostics: dict[str, Any] = field(default_factory=dict)
+    lifecycle_diagnostics: dict[str, Any] = field(default_factory=dict)
     execution_error: str = ""
     wrong_investigation_data: bool = False
 

@@ -861,6 +861,16 @@ def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> Repor
     )
 
 
+def _report_completion_status(bundle: DynamicInvestigationBundle) -> str:
+    trace = bundle.ai_debug_trace or {}
+    invocation_status = str(trace.get("invocation_status") or "")
+    if invocation_status == "provider_failure":
+        return "AI Invocation Failed — Deterministic Fallback Report Generated"
+    if invocation_status in {"completed_zero_claims", "completed_no_verified_claims"}:
+        return "Reasoning Incomplete — Deterministic Fallback Report Generated"
+    return "Investigation Complete"
+
+
 def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]:
     trace = bundle.ai_debug_trace or {}
     ai_enabled = bool(trace.get("ai_enabled"))
@@ -1387,7 +1397,7 @@ def compose_report(
             recommendation_summary=(
                 _executive_fix_items(bundle) or ["No recommendation is supported for executive display."]
             )[0],
-            status="Investigation Complete",
+            status=_report_completion_status(bundle),
         ),
         sections=sections,
     )

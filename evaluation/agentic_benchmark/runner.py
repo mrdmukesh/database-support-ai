@@ -43,13 +43,18 @@ class AgenticBenchmarkRunner:
         execute: Callable[[BenchmarkManifestEntry], AgenticScenarioCapture],
         output_root: str | Path,
         database_engine: str = "sqlserver",
+        require_full_manifest: bool = True,
     ):
         self.manifest = tuple(manifest)
         self.ground_truth = ground_truth
         self.execute = execute
         self.output_root = Path(output_root)
         self.database_engine = database_engine
-        _validate_manifest(self.manifest, ground_truth)
+        _validate_manifest(
+            self.manifest,
+            ground_truth,
+            require_full_manifest=require_full_manifest,
+        )
 
     def run(self) -> dict[str, Any]:
         self.output_root.mkdir(parents=True, exist_ok=True)
@@ -150,11 +155,15 @@ def capture_from_execution(
     detail = execution.raw_response.get("investigation", {})
     extracted = execution.extracted_result
     steps = list(detail.get("agentic_steps") or [])
-    evidence = [
+    step_evidence = [
         item
         for step in steps
         for item in step.get("evidence", [])
         if isinstance(item, dict)
+    ]
+    persisted_evidence = detail.get("evidence") or extracted.get("evidence") or []
+    evidence = step_evidence or [
+        item for item in persisted_evidence if isinstance(item, dict)
     ]
     failed = [
         item
@@ -178,11 +187,6 @@ def capture_from_execution(
     verified_claims = [
         item for item in hypotheses if item.get("status") == "CONFIRMED"
     ]
-    verified_claims.extend(
-        item
-        for item in debug_trace.get("validated_citations", [])
-        if isinstance(item, dict)
-    )
     rejected_claims = [
         {"hypothesis_id": item.get("hypothesis_id"), "status": "REJECTED"}
         for item in hypotheses
@@ -238,11 +242,19 @@ def capture_from_execution(
         findings=_flatten_text(extracted.get("verified_facts", [])),
         recommendations=_flatten_text(extracted.get("recommendations", [])),
         validation_tests=_sections(report, "test", "proof of fix"),
+        evidence_records=evidence,
+        evidence_facts=_flatten_text(evidence),
         evidence_refs=evidence_refs,
         report_json=report,
         report_pdf=_report_pdf(detail.get("report_artifacts") or {}),
         duration_seconds=float(execution.timings.get("total_seconds") or 0),
         stop_reason=str(detail.get("stop_reason") or ""),
+        polling_diagnostics={
+            key: value
+            for key, value in execution.timings.items()
+            if key.startswith("polling_")
+        },
+        lifecycle_diagnostics=dict(detail.get("lifecycle_diagnostics") or {}),
         execution_error="; ".join(execution.errors)
         if execution.status != "completed"
         else "",
@@ -295,12 +307,19 @@ def truth_from_scenario(
 def _validate_manifest(
     manifest: tuple[BenchmarkManifestEntry, ...],
     truth: dict[str, ProtectedGroundTruth],
+    *,
+    require_full_manifest: bool = True,
 ) -> None:
     counts = Counter(item.domain for item in manifest)
-    if len(manifest) != 25 or any(counts[domain] != 5 for domain in counts):
-        raise ValueError("AG-10 manifest must contain exactly five scenarios per database")
-    if len(counts) != 5:
-        raise ValueError("AG-10 manifest must cover exactly five databases")
+    if require_full_manifest:
+        if len(manifest) != 25 or any(counts[domain] != 5 for domain in counts):
+            raise ValueError(
+                "AG-10 manifest must contain exactly five scenarios per database"
+            )
+        if len(counts) != 5:
+            raise ValueError("AG-10 manifest must cover exactly five databases")
+    elif not manifest:
+        raise ValueError("Controlled AG-10 validation must select at least one scenario")
     ids = [item.scenario_id for item in manifest]
     if len(set(ids)) != len(ids):
         raise ValueError("AG-10 scenario IDs must be unique")

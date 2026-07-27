@@ -25,12 +25,28 @@ def execute() -> None:
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument("--api-retries", type=int, default=3)
     parser.add_argument(
+        "--scenario-id",
+        action="append",
+        default=[],
+        help="Run only the selected protected scenario; repeat for controlled validation.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Validate and display the protected manifest without investigations.",
     )
     args = parser.parse_args()
     manifest, ground_truth, scenarios = load_agentic_25()
+    if args.scenario_id:
+        requested = tuple(dict.fromkeys(args.scenario_id))
+        unknown = sorted(set(requested) - set(scenarios))
+        if unknown:
+            parser.error("unknown protected scenario ID(s): " + ", ".join(unknown))
+        selected = set(requested)
+        manifest = tuple(item for item in manifest if item.scenario_id in selected)
+        ground_truth = {
+            scenario_id: ground_truth[scenario_id] for scenario_id in requested
+        }
     if args.dry_run:
         print(
             json.dumps(
@@ -81,6 +97,7 @@ def execute() -> None:
         execute=investigate,
         output_root=Path(args.output) / run_id,
         database_engine=existing.config.database_engine or "sqlserver",
+        require_full_manifest=not bool(args.scenario_id),
     ).run()
     print(json.dumps({"run_id": run_id, **summary}, indent=2, default=str))
 

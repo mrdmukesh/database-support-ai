@@ -23,28 +23,22 @@ def upgrade() -> None:
         sa.Column("hypothesis_json", sa.Text(), nullable=False),
         sa.Column("verification_matrix_json", sa.Text(), nullable=False),
         sa.Column(
-            "valid_evidence_refs_json", sa.Text(), nullable=False, server_default="[]"
+            "valid_evidence_refs_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")
         ),
-        sa.Column("missing_proof_json", sa.Text(), nullable=False, server_default="[]"),
         sa.Column(
-            "contradictions_json", sa.Text(), nullable=False, server_default="[]"
+            "missing_proof_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")
+        ),
+        sa.Column(
+            "contradictions_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")
         ),
         sa.Column("evidence_package_hash", sa.String(64), nullable=False),
-        sa.Column("decision_reason", sa.Text(), nullable=False, server_default=""),
-        sa.Column(
-            "visible_in_report", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("decision_reason", sa.Text(), nullable=False, server_default=sa.text("('')")),
+        sa.Column("visible_in_report", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["investigation_id"], ["investigations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["workspace_id"], ["workspaces.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     for column in (

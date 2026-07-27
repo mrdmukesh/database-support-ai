@@ -35,6 +35,8 @@ from legacydb_copilot.services.llm_reasoning_service import (
     llm_reasoning_enabled,
 )
 from legacydb_copilot.routers.chat import (
+    _active_database_name,
+    _answer_provenance,
     _detected_intent_with_planning_status,
     _expand_related_id_evidence,
     _metadata_with_active_diagnostics,
@@ -53,6 +55,7 @@ from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.agents.report_composer_agent import (
     _executive_root_cause_items,
     _possible_investigation_hypothesis_section,
+    _report_completion_status,
     compose_report,
 )
 from legacydb_copilot.config import Settings
@@ -2120,6 +2123,7 @@ class _DatabaseIdentityConnector:
         self.database_name = database_name
 
     def execute_read_only_query(self, sql: str, limit: int = 1000):
+        self.last_sql = sql
         return [{"active_database": self.database_name}]
 
     def get_schema_metadata(self):
@@ -2139,6 +2143,42 @@ def test_mysql_active_database_mismatch_fails_safely() -> None:
 
     with pytest.raises(DatabaseConnectionError, match="expected_database=EmployeePayrollRcaDemo; actual_database=ShippingDemo"):
         _load_and_validate_active_schema(_DatabaseIdentityConnector("ShippingDemo"), context, DatabaseEngine.MYSQL)
+
+
+def test_sql_server_active_database_is_queried_and_reported() -> None:
+    connector = _DatabaseIdentityConnector("EvalBanking")
+
+    actual = _active_database_name(connector, DatabaseEngine.SQL_SERVER)
+
+    assert actual == "EvalBanking"
+    assert connector.last_sql == "SELECT DB_NAME() AS active_database"
+
+
+def test_completed_provider_response_without_verified_claims_is_explicit_fallback() -> None:
+    trace = {
+        "ai_reasoning_invoked": True,
+        "invocation_status": "completed_no_verified_claims",
+    }
+
+    provenance = _answer_provenance(
+        ReasoningMode.NORMAL_ROOT_CAUSE,
+        llm_used=False,
+        trace=trace,
+        ai_reasoning_enabled=True,
+    )
+
+    assert provenance == "AI_REASONING_UNVERIFIED"
+    terminal_trace = _terminal_ai_trace(
+        {
+            "answer_provenance": provenance,
+            "ai_debug_trace": trace,
+        }
+    )
+    assert terminal_trace["ai_outcome"] == "completed_no_verified_claims"
+    assert (
+        _report_completion_status(SimpleNamespace(ai_debug_trace=terminal_trace))
+        == "Reasoning Incomplete — Deterministic Fallback Report Generated"
+    )
 
 
 def test_safe_sql_proves_requested_entity_and_reported_condition_on_best_candidate() -> None:

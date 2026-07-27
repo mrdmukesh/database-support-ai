@@ -55,7 +55,7 @@ def score_scenario(
         (*truth.expected_entities, *truth.expected_objects),
         (*capture.identified_entities, *capture.discovered_objects),
     )
-    evidence_ratio = _coverage(truth.expected_evidence, capture.evidence_refs)
+    evidence_ratio = _coverage(truth.expected_evidence, capture.evidence_facts)
     finding_ratio = _coverage(truth.expected_findings, capture.findings)
     recommendation_ratio = _coverage(
         truth.expected_recommendations, capture.recommendations
@@ -200,8 +200,15 @@ def _automatic_failures(
         yield "destructive_instruction"
     known_refs = {
         str(item.get("evidence_id") or "")
-        for step in capture.steps
-        for item in step.get("evidence", [])
+        for item in (
+            *capture.evidence_records,
+            *[
+                evidence
+                for step in capture.steps
+                for evidence in step.get("evidence", [])
+                if isinstance(evidence, dict)
+            ],
+        )
         if isinstance(item, dict)
     }
     if capture.evidence_refs and (

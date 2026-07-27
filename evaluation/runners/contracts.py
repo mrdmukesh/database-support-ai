@@ -58,7 +58,7 @@ class ExecutionResult:
     raw_request: dict[str, Any] = field(default_factory=dict)
     raw_response: dict[str, Any] = field(default_factory=dict)
     extracted_result: dict[str, Any] = field(default_factory=dict)
-    timings: dict[str, float | None] = field(default_factory=dict)
+    timings: dict[str, Any] = field(default_factory=dict)
     usage_cost: dict[str, Any] = field(default_factory=dict)
     errors: list[str] = field(default_factory=list)
     retries: int = 0

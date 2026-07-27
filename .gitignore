@@ -49,6 +49,8 @@ ui*.err.log
 /reports/
 /storage/
 /uploads/
+/evaluation/results/
+/.tmp/migration-backups/
 
 # OS and editor files
 .DS_Store

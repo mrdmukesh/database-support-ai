@@ -19,32 +19,26 @@ def upgrade() -> None:
         sa.Column("investigation_id", sa.String(36), nullable=False),
         sa.Column("state", sa.String(60), nullable=False),
         sa.Column("score", sa.Integer(), nullable=False),
-        sa.Column("criteria_json", sa.Text(), nullable=False, server_default="[]"),
-        sa.Column("blockers_json", sa.Text(), nullable=False, server_default="[]"),
+        sa.Column("criteria_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")),
+        sa.Column("blockers_json", sa.Text(), nullable=False, server_default=sa.text("('[]')")),
         sa.Column(
             "recommended_next_evidence_json",
             sa.Text(),
             nullable=False,
-            server_default="[]",
+            server_default=sa.text("('[]')"),
         ),
         sa.Column(
             "confirmed_hypothesis_ids_json",
             sa.Text(),
             nullable=False,
-            server_default="[]",
+            server_default=sa.text("('[]')"),
         ),
-        sa.Column("decision_reason", sa.Text(), nullable=False, server_default=""),
+        sa.Column("decision_reason", sa.Text(), nullable=False, server_default=sa.text("('')")),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["investigation_id"], ["investigations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["organization_id"], ["organizations.id"], ondelete="CASCADE"
-        ),
-        sa.ForeignKeyConstraint(
-            ["workspace_id"], ["workspaces.id"], ondelete="CASCADE"
-        ),
+        sa.ForeignKeyConstraint(["investigation_id"], ["investigations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["workspace_id"], ["workspaces.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
     for column in ("organization_id", "workspace_id", "investigation_id", "state"):

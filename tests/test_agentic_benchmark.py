@@ -15,10 +15,12 @@ from evaluation.agentic_benchmark.models import (
 )
 from evaluation.agentic_benchmark.runner import (
     AgenticBenchmarkRunner,
+    capture_from_execution,
     truth_from_scenario,
 )
 from evaluation.agentic_benchmark.scoring import score_scenario
 from evaluation.framework.contracts import ExpectedResponseType
+from evaluation.runners.contracts import ExecutionResult
 
 
 def truth(
@@ -66,6 +68,8 @@ def capture(scenario_id: str = "banking-pilot-001") -> AgenticScenarioCapture:
         findings=["Required downstream movement missing."],
         recommendations=["Use a transactional workflow."],
         validation_tests=["Verify expected state after controlled change."],
+        evidence_records=[evidence],
+        evidence_facts=["E-1"],
         evidence_refs=["E-1"],
         report_json={
             "cover": {"investigation_id": f"INV-{scenario_id}"},
@@ -121,6 +125,54 @@ def test_unexpected_terminal_state_is_reported() -> None:
     result = score_scenario(item, expected)
 
     assert "unexpected_terminal_state" in result.defects
+
+
+def test_capture_uses_persisted_evidence_when_agentic_steps_are_absent() -> None:
+    entry = BenchmarkManifestEntry(
+        scenario_id="banking-pilot-001",
+        database="DemoBankingV2",
+        domain="banking",
+        question="Why?",
+    )
+    execution = ExecutionResult(
+        scenario_id=entry.scenario_id,
+        domain=entry.domain,
+        status="completed",
+        investigation_id="INV-1",
+        investigation_status="AI_REASONING_UNVERIFIED",
+        raw_response={
+            "investigation": {
+                "terminal_state": "AI_REASONING_UNVERIFIED",
+                "agentic_steps": [],
+                "evidence": [
+                    {
+                        "evidence_id": "SQL-1",
+                        "execution_status": "succeeded",
+                        "evidence_semantics": "verified_rows",
+                    }
+                ],
+                "lifecycle_diagnostics": {
+                    "execution_mode": "synchronous_public_api"
+                },
+            }
+        },
+        extracted_result={"generated_sql": ["SELECT 1"]},
+        timings={
+            "polling_attempts": 1,
+            "polling_last_status": "AI_REASONING_UNVERIFIED",
+        },
+    )
+
+    captured = capture_from_execution(entry, execution)
+
+    assert captured.evidence_status == "verified"
+    assert captured.evidence_facts
+    assert captured.evidence_refs == ["SQL-1"]
+    assert captured.polling_diagnostics["polling_attempts"] == 1
+    assert (
+        captured.lifecycle_diagnostics["execution_mode"]
+        == "synchronous_public_api"
+    )
 
 
 @pytest.mark.parametrize(
@@ -243,6 +295,23 @@ def test_runner_continues_after_scenario_failure_and_exports_every_artifact(
     rows = json.loads((tmp_path / "scenario-results.json").read_text(encoding="utf-8"))
     assert len(rows) == 25
     assert (tmp_path / "artifacts" / manifest[0].scenario_id / "capture.json").is_file()
+
+
+def test_controlled_runner_accepts_explicit_manifest_subset(tmp_path: Path) -> None:
+    manifest, truths = benchmark_inputs()
+    selected = manifest[:3]
+    selected_truth = {item.scenario_id: truths[item.scenario_id] for item in selected}
+
+    summary = AgenticBenchmarkRunner(
+        manifest=selected,
+        ground_truth=selected_truth,
+        execute=lambda entry: capture(entry.scenario_id),
+        output_root=tmp_path,
+        require_full_manifest=False,
+    ).run()
+
+    assert summary["metrics"]["scenario_count"] == 3
+    assert (tmp_path / "scenario-results.json").is_file()
 
 
 def benchmark_inputs():

@@ -56,11 +56,15 @@ def _env_values(path: Path) -> dict[str, str]:
 def _update_env(path: Path, updates: dict[str, str]) -> None:
     lines = path.read_text(encoding="utf-8").splitlines()
     remaining = dict(updates)
+    emitted: set[str] = set()
     output: list[str] = []
     for line in lines:
         name = line.split("=", 1)[0].strip() if "=" in line else ""
-        if name in remaining:
-            output.append(f"{name}={remaining.pop(name)}")
+        if name in updates:
+            if name not in emitted:
+                output.append(f"{name}={updates[name]}")
+                emitted.add(name)
+            remaining.pop(name, None)
         else:
             output.append(line)
     if remaining:
@@ -200,6 +204,9 @@ def bootstrap_application(env_path: Path) -> None:
             )
             db.add(user)
             db.flush()
+        else:
+            user.role = Role.ORG_ADMIN.value
+            user.is_active = True
         membership = db.query(WorkspaceMembershipModel).filter_by(
             workspace_id=workspace.id, user_id=user.id
         ).one_or_none()
@@ -211,6 +218,9 @@ def bootstrap_application(env_path: Path) -> None:
                 role="OWNER",
                 is_active=True,
             ))
+        else:
+            membership.role = "OWNER"
+            membership.is_active = True
         connection_ids: dict[str, str] = {}
         for domain in DOMAINS:
             name = f"Local {domain.title()} Read Only"

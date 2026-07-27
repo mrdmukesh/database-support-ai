@@ -17,6 +17,7 @@ from legacydb_copilot.agents.reasoning_agent import (
     RootCauseSupportStatus,
     ReasoningResult,
     evaluate_claim_support_status,
+    validate_claim_evidence_references,
 )
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
@@ -58,7 +59,8 @@ Restrictions:
 - Do not infer facts that are not supported by verified evidence.
 - Never override deterministic SQL evidence, metadata evidence, stored procedure analysis,
   workflow analysis, or Evidence Gate decisions.
-- Treat successful zero-row results as verified absence evidence when supplied by the evidence package.
+- Treat a successful zero-row result as verified absence only when its evidence_semantics is
+  explicitly verified_absence. Otherwise describe it as an evidence gap, not proof of absence.
 - Distinguish clearly between verified findings, verified absence, evidence gaps, inference, and hypothesis.
 - If deterministic evidence contradicts a possible explanation, reject that explanation.
 - Never fabricate a root cause.
@@ -77,6 +79,8 @@ Recommendations:
 Evidence traceability:
 - Every finding, root cause, recommendation, validation test, and proof-of-fix step must reference
   one or more evidence_refs.
+- Use only exact citation IDs listed in citation_contract.valid_evidence_ids. Correlated context has
+  no independent citation ID and must never be cited with an invented alias.
 
 Output:
 - Return only valid JSON matching the requested schema.
@@ -152,6 +156,25 @@ def convert_llm_claim_to_root_cause_claim(
     evidence_refs = [ref.strip() for ref in candidates if isinstance(ref, str) and ref.strip()]
     claim = RootCauseClaim(conclusion=conclusion, evidence_refs=evidence_refs)
     return evaluate_claim_support_status(claim, evidence_records)
+
+
+def _root_cause_evidence_issue(
+    claim: RootCauseClaim | None,
+    evidence_records: list[EvidenceResult],
+) -> str:
+    """Reject causal claims that rely on failed or semantically unverified evidence."""
+    if claim is None or claim.status is not RootCauseSupportStatus.VERIFIED:
+        return ""
+    evidence_by_id = {item.evidence_id: item for item in evidence_records}
+    cited = [evidence_by_id[ref] for ref in claim.evidence_refs if ref in evidence_by_id]
+    if any(item.execution_status != "succeeded" for item in cited):
+        return "unsuccessful_evidence"
+    if any(
+        item.zero_row_result and item.evidence_semantics != "verified_absence"
+        for item in cited
+    ):
+        return "unverified_negative_evidence"
+    return ""
 
 
 def llm_reasoning_enabled(settings: Settings | None = None) -> bool:
@@ -391,7 +414,7 @@ def _build_llm_payload_unmasked(
 ) -> dict[str, Any]:
     evidence_items = [
         {
-            "ref": f"SQL-{index}",
+            "ref": item.evidence_id,
             "purpose": item.purpose,
             "sql_generated_by_safe_engine": item.sql,
             "row_count": len(item.rows),
@@ -403,7 +426,7 @@ def _build_llm_payload_unmasked(
             "sample_rows": item.rows[:5],
             "error": item.error,
         }
-        for index, item in enumerate(evidence, start=1)
+        for item in evidence
     ]
     procedure_items = [
         {
@@ -429,7 +452,6 @@ def _build_llm_payload_unmasked(
     ]
     correlated_items = [
         {
-            "ref": f"EV-{index}",
             "type": item.evidence_type,
             "subject": item.subject,
             "finding": item.finding,
@@ -481,6 +503,21 @@ def _build_llm_payload_unmasked(
             "documents": document_items,
             "correlated": correlated_items,
         },
+        "citation_contract": {
+            "valid_evidence_ids": list(
+                dict.fromkeys(
+                    [
+                        *[str(item["ref"]) for item in evidence_items],
+                        *[str(item["ref"]) for item in procedure_items],
+                    ]
+                )
+            ),
+            "instruction": (
+                "Use only the exact IDs in valid_evidence_ids for evidence_refs. "
+                "Correlated entries are explanatory context derived from persisted evidence "
+                "and are not independently citable. Never invent, alias, or renumber an ID."
+            ),
+        },
         "evidence_focus": {
             "affected_object": evidence_focus.affected_object,
             "affected_object_reason": evidence_focus.affected_object_reason,
@@ -494,9 +531,9 @@ def _build_llm_payload_unmasked(
         else None,
         "required_json_schema": {
             "summary": "string",
-            "verified_findings": [{"finding": "string", "evidence_refs": ["SQL-1", "PROC-1", "EV-1"]}],
+            "verified_findings": [{"finding": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
             "verified_absences": [{"finding": "string", "evidence_refs": ["SQL-1"]}],
-            "evidence_gaps": [{"gap": "string", "evidence_refs": ["SQL-1", "PROC-1", "EV-1"]}],
+            "evidence_gaps": [{"gap": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
             "senior_engineer_explanation": "string",
             "confidence_note": "string",
             "likely_root_causes": [{"conclusion": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
@@ -726,10 +763,12 @@ def _merge_llm_reasoning(
         if (
             claim is not None
             and claim.status == RootCauseSupportStatus.VERIFIED
+            and not _root_cause_evidence_issue(claim, evidence_records or [])
             and _domain_compatible(claim.conclusion, evidence_records or [])
         )
     ]
     verified_root_text = {claim.conclusion for claim in root_causes}
+    supported_observations: list[str] = []
     validation["accepted"] = [
         item
         for item in validation["accepted"]
@@ -742,6 +781,35 @@ def _merge_llm_reasoning(
         if not conclusion or conclusion in verified_root_text:
             continue
         converted = convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])
+        reference_validation = (
+            validate_claim_evidence_references(converted, evidence_records or [])
+            if converted is not None
+            else None
+        )
+        valid_refs = (
+            reference_validation.valid_evidence_refs
+            if reference_validation is not None
+            else []
+        )
+        missing_refs = (
+            reference_validation.missing_evidence_refs
+            if reference_validation is not None
+            else []
+        )
+        evidence_issue = _root_cause_evidence_issue(
+            converted, evidence_records or []
+        )
+        evidence_by_id = {
+            item.evidence_id: item for item in (evidence_records or [])
+        }
+        supported_observations.extend(
+            observation
+            for ref in valid_refs
+            for observation in [
+                str(evidence_by_id[ref].supports_claim or "").strip()
+            ]
+            if observation
+        )
         validation["rejected"].append({
             "claim": conclusion,
             "claim_id": str(raw_claim.get("claim_id") or ""),
@@ -751,16 +819,17 @@ def _merge_llm_reasoning(
                 if converted is not None
                 and converted.status == RootCauseSupportStatus.VERIFIED
                 and not _domain_compatible(conclusion, evidence_records or [])
+                else evidence_issue
+                if evidence_issue
                 else
                 "missing_evidence_refs"
                 if converted is None or not converted.evidence_refs
                 else "invalid_evidence_refs"
             ),
             "missing_evidence_refs": (
-                converted.evidence_refs
-                if converted is not None
-                else []
+                missing_refs
             ),
+            "valid_evidence_refs": valid_refs,
         })
     verified_claim_count = len([claim for claim in root_causes if claim.status == RootCauseSupportStatus.VERIFIED])
     rejected_claim_count = max(generated_claim_count - verified_claim_count, 0)
@@ -822,8 +891,15 @@ def _merge_llm_reasoning(
             debug_trace["invocation_status"] = "completed"
             debug_trace["skip_reason"] = "none"
             debug_trace["verification_status"] = "verified"
+    narrowed_facts = list(
+        dict.fromkeys([*base.confirmed_facts, *supported_observations])
+    )
     if not cited_root_causes or not root_causes:
-        return base
+        return (
+            replace(base, confirmed_facts=narrowed_facts)
+            if narrowed_facts != base.confirmed_facts
+            else base
+        )
     # Raw provider narrative is audit-only. Visible prose is composed from the
     # deterministic summary and claims that passed evidence-reference validation.
     summary_parts = [base.summary]
@@ -834,6 +910,7 @@ def _merge_llm_reasoning(
         base,
         summary=" ".join(summary_parts),
         likely_root_causes=root_causes,
+        confirmed_facts=narrowed_facts,
         missing_evidence=_string_list(llm_json.get("missing_evidence")) or base.missing_evidence,
         recommended_fix=fixes or base.recommended_fix,
         test_cases=test_cases or base.test_cases,

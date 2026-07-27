@@ -84,6 +84,115 @@ def test_mixed_claims_render_only_verified_domain_compatible_claim() -> None:
     assert "Raw mixed narrative" not in result.summary
 
 
+def test_partially_supported_broad_claim_is_rejected_but_proven_fact_is_preserved() -> None:
+    trace: dict = {}
+    evidence = [
+        EvidenceResult(
+            purpose="Inspect payment instruction",
+            sql="SELECT Status FROM payment_instructions",
+            rows=[{"Status": "Exception"}],
+            evidence_id="SQL-1",
+            supports_claim="The payment instruction has status Exception.",
+        )
+    ]
+
+    result = _merge_llm_reasoning(
+        _base(),
+        {
+            "likely_root_causes": [
+                {
+                    "conclusion": (
+                        "A retry without an idempotency guard created the duplicate."
+                    ),
+                    "evidence_refs": ["SQL-1", "EV-1"],
+                }
+            ]
+        },
+        evidence_records=evidence,
+        debug_trace=trace,
+    )
+
+    assert result.likely_root_causes == []
+    assert "The payment instruction has status Exception." in result.confirmed_facts
+    rejected = trace["rejected_or_unsupported_claims"][0]
+    assert rejected["valid_evidence_refs"] == ["SQL-1"]
+    assert rejected["missing_evidence_refs"] == ["EV-1"]
+
+
+def test_unverified_ai_reasoning_does_not_discard_existing_deterministic_facts() -> None:
+    base = _base()
+
+    result = _merge_llm_reasoning(
+        base,
+        {
+            "likely_root_causes": [
+                {"conclusion": "Unsupported cause.", "evidence_refs": ["UNKNOWN-1"]}
+            ]
+        },
+        evidence_records=_evidence("payroll"),
+    )
+
+    assert result.likely_root_causes == []
+    assert result.confirmed_facts == base.confirmed_facts
+
+
+def test_zero_rows_without_verified_absence_cannot_verify_root_cause() -> None:
+    trace: dict = {}
+    result = _merge_llm_reasoning(
+        _base(),
+        {
+            "likely_root_causes": [
+                {
+                    "conclusion": "The missing child row caused the workflow failure.",
+                    "evidence_refs": ["SQL-1"],
+                }
+            ]
+        },
+        evidence_records=[
+            EvidenceResult(
+                purpose="Inspect child rows",
+                sql="SELECT id FROM child",
+                rows=[],
+                evidence_id="SQL-1",
+                evidence_semantics="not_applicable",
+            )
+        ],
+        debug_trace=trace,
+    )
+
+    assert result.likely_root_causes == []
+    assert trace["rejected_or_unsupported_claims"][0]["reason"] == (
+        "unverified_negative_evidence"
+    )
+
+
+def test_explicit_verified_absence_can_support_a_cited_claim() -> None:
+    result = _merge_llm_reasoning(
+        _base(),
+        {
+            "likely_root_causes": [
+                {
+                    "conclusion": "The required child row is absent.",
+                    "evidence_refs": ["SQL-1"],
+                }
+            ]
+        },
+        evidence_records=[
+            EvidenceResult(
+                purpose="Verify required child absence",
+                sql="SELECT id FROM child WHERE parent_id = 1",
+                rows=[],
+                evidence_id="SQL-1",
+                evidence_semantics="verified_absence",
+            )
+        ],
+    )
+
+    assert [claim.conclusion for claim in result.likely_root_causes] == [
+        "The required child row is absent."
+    ]
+
+
 def test_report_input_fails_closed_on_investigation_or_evidence_hash_mismatch() -> None:
     bundle = SimpleNamespace(
         investigation_id="INV-PAYROLL",

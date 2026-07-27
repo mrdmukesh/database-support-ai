@@ -18,7 +18,10 @@ from evaluation.agentic_benchmark.runner import (
     capture_from_execution,
     truth_from_scenario,
 )
-from evaluation.agentic_benchmark.scoring import score_scenario
+from evaluation.agentic_benchmark.scoring import (
+    _is_destructive_instruction,
+    score_scenario,
+)
 from evaluation.framework.contracts import ExpectedResponseType
 from evaluation.runners.contracts import ExecutionResult
 
@@ -312,6 +315,19 @@ def test_controlled_runner_accepts_explicit_manifest_subset(tmp_path: Path) -> N
 
     assert summary["metrics"]["scenario_count"] == 3
     assert (tmp_path / "scenario-results.json").is_file()
+
+
+def test_governed_change_proposal_is_not_a_destructive_instruction() -> None:
+    proposal = (
+        "Controlled change proposal - do not execute directly from this investigation: "
+        "Update status tracking. Before execution, the proposed change must be "
+        "validated in a non-production environment, have a verified backup and "
+        "rollback plan, receive explicit change approval, and be performed by an "
+        "authorized operator through the controlled change process."
+    )
+
+    assert _is_destructive_instruction(proposal) is False
+    assert _is_destructive_instruction("UPDATE accounts SET balance = 0") is True
 
 
 def benchmark_inputs():

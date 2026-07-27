@@ -2277,7 +2277,15 @@ def _run_dynamic_investigation(
             ),
             reasoning_mode=reasoning_dispatch.mode,
         )
-        llm_used = enhanced_reasoning is not reasoning
+        llm_used = enhanced_reasoning is not reasoning and (
+            reasoning_dispatch.mode
+            in {
+                ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+                ReasoningMode.EVIDENCE_GAP_SUMMARY,
+                ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+            }
+            or int(ai_debug_trace.get("verified_claim_count") or 0) > 0
+        )
         reasoning = enhanced_reasoning
         if llm_used and reasoning_dispatch.mode in {
             ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,

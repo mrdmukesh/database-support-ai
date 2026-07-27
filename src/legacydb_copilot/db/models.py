@@ -364,6 +364,10 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="investigation",
         cascade="all, delete-orphan",
     )
+    planner_selections: Mapped[list["InvestigationPlannerSelectionModel"]] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
 
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
@@ -397,6 +401,37 @@ class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
 
     investigation: Mapped["InvestigationModel"] = relationship(
         back_populates="state_transitions"
+    )
+
+
+class InvestigationPlannerSelectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "investigation_planner_selections"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    action_fingerprint: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    evidence_request_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    selection_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    expected_information_gain: Mapped[float] = mapped_column(Numeric(5, 4), nullable=False)
+    retry_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    ranking_audit_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="planner_selections"
     )
 
 

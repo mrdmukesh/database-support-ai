@@ -56,6 +56,14 @@ def _persisted_trace_fields(investigation: InvestigationModel) -> dict[str, obje
     return {key: trace.get(key) for key in keys}
 
 
+def _evidence_gap_analysis(investigation: InvestigationModel) -> dict[str, object]:
+    try:
+        value = json.loads(investigation.evidence_gap_analysis_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        value = {}
+    return value if isinstance(value, dict) else {}
+
+
 def _get_investigation(db: Session, investigation_id: str) -> InvestigationModel:
     """
     Owner: Mukesh Dabi
@@ -309,6 +317,7 @@ def get_investigation(
         "created_at": investigation.created_at,
         "report": _report_links_for_investigation(investigation),
         "trace": _persisted_trace_fields(investigation),
+        "evidence_gap_analysis": _evidence_gap_analysis(investigation),
     }
 
 

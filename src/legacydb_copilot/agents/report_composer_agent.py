@@ -153,6 +153,69 @@ def _evidence_tables(bundle: DynamicInvestigationBundle) -> list[ReportTable]:
     return tables
 
 
+def _structured_evidence_gap_section(
+    bundle: DynamicInvestigationBundle,
+) -> ReportSection:
+    analysis = bundle.evidence_gap_analysis
+    rows = []
+    if analysis is not None:
+        rows = [
+            {
+                "Gap ID": item.gap_id,
+                "Question": item.question,
+                "Priority": item.priority.value,
+                "Required": "Yes" if item.required_for_goal else "No",
+                "Status": item.status.value,
+                "Source": item.source_type.value,
+                "Evidence Refs": ", ".join(item.supporting_evidence_refs) or "None",
+                "Recommended Next Evidence": (
+                    f"{item.recommended_next_evidence.evidence_type}: "
+                    f"{item.recommended_next_evidence.description}"
+                ),
+                "Reason": item.reason,
+            }
+            for item in analysis.gaps
+        ]
+    if not rows:
+        rows = [
+            {
+                "Gap ID": "None",
+                "Question": "All required deterministic evidence questions are answered.",
+                "Priority": "",
+                "Required": "",
+                "Status": "COMPLETE",
+                "Source": "",
+                "Evidence Refs": "",
+                "Recommended Next Evidence": "",
+                "Reason": "",
+            }
+        ]
+    return ReportSection(
+        title="Structured Evidence Gap Analysis",
+        paragraphs=[
+            "Failed or blocked SQL is not absence evidence. "
+            "Procedure metadata does not prove runtime execution."
+        ],
+        tables=[
+            ReportTable(
+                title="Unresolved Evidence Questions",
+                columns=[
+                    "Gap ID",
+                    "Question",
+                    "Priority",
+                    "Required",
+                    "Status",
+                    "Source",
+                    "Evidence Refs",
+                    "Recommended Next Evidence",
+                    "Reason",
+                ],
+                rows=rows,
+            )
+        ],
+    )
+
+
 def _sql_blocks(bundle: DynamicInvestigationBundle) -> list[ReportSqlBlock]:
     """
     Owner: Mukesh Dabi
@@ -1058,6 +1121,7 @@ def compose_report(
         ),
         ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4]),
         ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
+        _structured_evidence_gap_section(bundle),
         ReportSection(title="Stage 1 - Understand the Question", items=[
             f"Investigation Mode: {bundle.investigation_mode}",
             f"Mode Rationale: {bundle.mode_rationale or 'Default full investigation path selected.'}",

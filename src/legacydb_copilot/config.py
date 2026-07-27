@@ -51,6 +51,7 @@ class Settings:
     feature_enterprise_rbac_enabled: bool = False
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
+    feature_agentic_investigation_enabled: bool = False
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
 
@@ -124,6 +125,11 @@ class Settings:
             in {"1", "true", "yes", "on"},
             feature_keyvault_secrets_enabled=os.getenv(
                 "FEATURE_KEYVAULT_SECRETS_ENABLED",
+                "false",
+            ).lower()
+            in {"1", "true", "yes", "on"},
+            feature_agentic_investigation_enabled=os.getenv(
+                "FEATURE_AGENTIC_INVESTIGATION_ENABLED",
                 "false",
             ).lower()
             in {"1", "true", "yes", "on"},

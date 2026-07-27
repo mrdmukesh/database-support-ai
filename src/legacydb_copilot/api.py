@@ -113,6 +113,7 @@ def create_fastapi_app() -> Any:
         evaluation_jobs,
         help,
         incidents,
+        investigation_states,
         learning,
         organizations,
         reports,
@@ -151,6 +152,7 @@ def create_fastapi_app() -> Any:
     app.include_router(evaluation_dashboard.router)
     app.include_router(evaluation_jobs.router)
     app.include_router(incidents.router)
+    app.include_router(investigation_states.router)
     app.include_router(chat.router)
     app.include_router(help.router)
     app.include_router(learning.router)

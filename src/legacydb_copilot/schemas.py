@@ -351,11 +351,27 @@ class InvestigationRead(BaseModel):
     policy_audit_json: str
     user_question: str
     detected_intent: str
+    evidence_gap_analysis_json: str
     ai_answer: str
     confidence_score: float | None
     report_path: str
     status: str
     created_at: datetime
+
+
+class InvestigationStateTransitionRead(BaseModel):
+    investigation_id: str
+    previous_state: str | None
+    current_state: str
+    transitioned_at: datetime
+    reason: str
+    iteration_number: int
+
+
+class InvestigationStateHistoryRead(BaseModel):
+    investigation_id: str
+    current: InvestigationStateTransitionRead | None
+    transitions: list[InvestigationStateTransitionRead]
 
 
 class InvestigationFeedbackCreate(BaseModel):

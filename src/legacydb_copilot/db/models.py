@@ -337,6 +337,11 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     detected_intent: Mapped[str] = mapped_column(String(80), default="UNKNOWN", nullable=False, index=True)
     extracted_entities_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     evidence_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    evidence_gap_analysis_json: Mapped[str] = mapped_column(
+        Text,
+        default='{"status":"NOT_ANALYZED","gaps":[]}',
+        nullable=False,
+    )
     sql_queries_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     ai_answer: Mapped[str] = mapped_column(Text, default="", nullable=False)
     confidence_score: Mapped[float | None] = mapped_column(Numeric(5, 4))
@@ -354,6 +359,44 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     verification_checks: Mapped[list["VerificationCheckModel"]] = relationship(
         back_populates="investigation"
+    )
+    state_transitions: Mapped[list["InvestigationStateTransitionModel"]] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
+
+
+class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "investigation_state_transitions"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    previous_state: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    current_state: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    transitioned_at: Mapped[object] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+        index=True,
+    )
+    reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    iteration_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="state_transitions"
     )
 
 

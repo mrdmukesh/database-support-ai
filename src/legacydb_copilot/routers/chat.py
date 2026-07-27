@@ -56,6 +56,7 @@ from legacydb_copilot.services.confidence_scoring_service import confidence_fact
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
 from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
+from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
 from legacydb_copilot.services.entity_resolution_service import (
@@ -626,6 +627,7 @@ def _empty_investigation_metadata() -> dict[str, Any]:
         "selected_business_key": None,
         "extracted_entities": "[]",
         "evidence": "[]",
+        "evidence_gap_analysis": '{"status":"NOT_ANALYZED","gaps":[]}',
         "sql_queries": "[]",
         "report_path": "",
         "report_snapshot": "",
@@ -2095,6 +2097,40 @@ def _run_dynamic_investigation(
         documents=context.documents,
         procedure_analysis=procedure_analysis,
     )
+    question_text = payload.question.casefold()
+    external_evidence_required = any(
+        marker in question_text
+        for marker in (
+            "application log",
+            "message queue",
+            "queue message",
+            "service log",
+            "external trace",
+        )
+    )
+    evidence_gap_analysis = detect_evidence_gaps(
+        evidence=evidence,
+        evidence_gate=evidence_gate,
+        procedure_analysis=procedure_analysis,
+        expected_state_rule=evidence_gate.expected_value,
+        affected_entity_verified=bool(
+            evidence_focus.selected_business_key_value
+            and evidence_gate.business_key_exists
+        ),
+        external_evidence_required=external_evidence_required,
+        external_evidence_refs=tuple(
+            f"DOC-{index}"
+            for index, document in enumerate(context.documents, start=1)
+            if any(
+                marker
+                in (
+                    f"{document.title} {document.filename} "
+                    f"{document.source}"
+                ).casefold()
+                for marker in ("log", "queue", "trace", "telemetry")
+            )
+        ),
+    )
     hypothesis_reasoning = run_hypothesis_investigation(
         question=payload.question,
         intent=intent,
@@ -2339,6 +2375,7 @@ def _run_dynamic_investigation(
         connection_id=connection.id,
         evidence_package_hash=evidence_package_hash,
         report_version=REPORT_VERSION,
+        evidence_gap_analysis=evidence_gap_analysis,
     )
     workspace = db.get(WorkspaceModel, payload.workspace_id)
     report = compose_report(
@@ -2627,6 +2664,10 @@ def _run_dynamic_investigation(
             default=str,
         ),
         "evidence": _evidence_to_json(evidence),
+        "evidence_gap_analysis": json.dumps(
+            asdict(evidence_gap_analysis),
+            default=str,
+        ),
         "sql_queries": json.dumps([item.sql for item in evidence], default=str),
         "report_path": str(generated_report.directory),
         "report_storage": json.dumps(report_storage_references(generated_report), default=str),
@@ -2933,6 +2974,10 @@ def ask_chat_question(
         detected_intent=investigation_metadata["detected_intent"],
         extracted_entities_json=investigation_metadata["extracted_entities"],
         evidence_json=investigation_metadata["evidence"],
+        evidence_gap_analysis_json=investigation_metadata.get(
+            "evidence_gap_analysis",
+            '{"status":"NOT_ANALYZED","gaps":[]}',
+        ),
         sql_queries_json=investigation_metadata["sql_queries"],
         ai_answer=answer,
         confidence_score=confidence,
@@ -2946,6 +2991,15 @@ def ask_chat_question(
     )
     db.add(investigation)
     db.flush()
+    if Settings.from_env().feature_agentic_investigation_enabled:
+        from legacydb_copilot.services.investigation_state_machine import (
+            InvestigationStateService,
+        )
+
+        InvestigationStateService(db).initialize(
+            investigation,
+            reason="Agentic state tracking initialized after the existing investigation completed.",
+        )
     record_audit_event(
         db,
         organization_id=payload.organization_id,

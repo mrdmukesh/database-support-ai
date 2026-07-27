@@ -11,6 +11,7 @@ from legacydb_copilot.agents.reasoning_agent import ReasoningResult
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
+from legacydb_copilot.services.evidence_gap_detection_service import EvidenceGapAnalysis
 from legacydb_copilot.services.evidence_gate_service import EvidenceGateResult
 from legacydb_copilot.services.evidence_verification_agent import SuggestedVerificationCheck, VerificationResult
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
@@ -47,3 +48,4 @@ class DynamicInvestigationBundle:
     connection_id: str = ""
     evidence_package_hash: str = ""
     report_version: str = ""
+    evidence_gap_analysis: EvidenceGapAnalysis | None = None

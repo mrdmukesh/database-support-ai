@@ -374,6 +374,25 @@ class InvestigationStateHistoryRead(BaseModel):
     transitions: list[InvestigationStateTransitionRead]
 
 
+class InvestigationAgenticStepRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    iteration_number: int
+    state: str
+    action_fingerprint: str
+    evidence_request_json: str
+    planned_queries_json: str
+    evidence_json: str
+    gap_analysis_json: str
+    budget_json: str
+    outcome: str
+    reason: str
+    duration_ms: int
+    created_at: datetime
+
+
 class InvestigationFeedbackCreate(BaseModel):
     rating: FeedbackRating
     actual_root_cause: str = ""

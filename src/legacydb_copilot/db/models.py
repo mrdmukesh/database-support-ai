@@ -368,6 +368,10 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="investigation",
         cascade="all, delete-orphan",
     )
+    agentic_steps: Mapped[list["InvestigationAgenticStepModel"]] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
 
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
@@ -432,6 +436,48 @@ class InvestigationPlannerSelectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Ba
 
     investigation: Mapped["InvestigationModel"] = relationship(
         back_populates="planner_selections"
+    )
+
+
+class InvestigationAgenticStepModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "investigation_agentic_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "investigation_id",
+            "iteration_number",
+            name="uq_investigation_agentic_step_iteration",
+        ),
+    )
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    iteration_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    action_fingerprint: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    evidence_request_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    planned_queries_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    evidence_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    gap_analysis_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    budget_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    outcome: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="agentic_steps"
     )
 
 

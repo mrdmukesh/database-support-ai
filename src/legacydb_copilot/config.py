@@ -52,6 +52,13 @@ class Settings:
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
     feature_agentic_investigation_enabled: bool = False
+    agentic_max_iterations: int = 8
+    agentic_max_sql_queries: int = 16
+    agentic_max_total_rows: int = 1000
+    agentic_max_execution_seconds: float = 120.0
+    agentic_max_llm_calls: int = 8
+    agentic_max_tokens: int = 32000
+    agentic_max_retries: int = 1
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
 
@@ -133,6 +140,15 @@ class Settings:
                 "false",
             ).lower()
             in {"1", "true", "yes", "on"},
+            agentic_max_iterations=max(1, int(os.getenv("AGENTIC_MAX_ITERATIONS", "8"))),
+            agentic_max_sql_queries=max(1, int(os.getenv("AGENTIC_MAX_SQL_QUERIES", "16"))),
+            agentic_max_total_rows=max(1, int(os.getenv("AGENTIC_MAX_TOTAL_ROWS", "1000"))),
+            agentic_max_execution_seconds=max(
+                0.1, float(os.getenv("AGENTIC_MAX_EXECUTION_SECONDS", "120"))
+            ),
+            agentic_max_llm_calls=max(0, int(os.getenv("AGENTIC_MAX_LLM_CALLS", "8"))),
+            agentic_max_tokens=max(0, int(os.getenv("AGENTIC_MAX_TOKENS", "32000"))),
+            agentic_max_retries=max(0, int(os.getenv("AGENTIC_MAX_RETRIES", "1"))),
             llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
         )

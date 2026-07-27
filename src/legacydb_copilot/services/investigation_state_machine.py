@@ -70,6 +70,8 @@ ALLOWED_TRANSITIONS: dict[InvestigationState, frozenset[InvestigationState]] = {
     }),
     InvestigationState.ACTION_SELECTION: frozenset({
         InvestigationState.PLANNING,
+        InvestigationState.INSUFFICIENT_EVIDENCE,
+        InvestigationState.BLOCKED_BY_MISSING_SOURCE,
         InvestigationState.QUERY_BUDGET_EXHAUSTED,
         InvestigationState.ITERATION_BUDGET_EXHAUSTED,
         InvestigationState.POLICY_BLOCKED,
@@ -77,11 +79,13 @@ ALLOWED_TRANSITIONS: dict[InvestigationState, frozenset[InvestigationState]] = {
     }),
     InvestigationState.PLANNING: frozenset({
         InvestigationState.VALIDATION,
+        InvestigationState.STATE_UPDATE,
         InvestigationState.POLICY_BLOCKED,
         *_FAIL_OR_CANCEL,
     }),
     InvestigationState.VALIDATION: frozenset({
         InvestigationState.EXECUTION,
+        InvestigationState.STATE_UPDATE,
         InvestigationState.POLICY_BLOCKED,
         *_FAIL_OR_CANCEL,
     }),

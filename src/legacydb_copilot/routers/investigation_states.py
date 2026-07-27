@@ -5,10 +5,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from legacydb_copilot.db.models import InvestigationModel
+from legacydb_copilot.db.models import InvestigationAgenticStepModel, InvestigationModel
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import require_permission
 from legacydb_copilot.schemas import (
+    InvestigationAgenticStepRead,
     InvestigationStateHistoryRead,
     InvestigationStateTransitionRead,
 )
@@ -72,4 +73,25 @@ def investigation_state_history(
         investigation_id=investigation_id,
         current=_read(transitions[-1]) if transitions else None,
         transitions=[_read(item) for item in transitions],
+    )
+
+
+@router.get(
+    "/{investigation_id}/agentic-steps",
+    response_model=list[InvestigationAgenticStepRead],
+)
+def investigation_agentic_steps(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> list[InvestigationAgenticStepModel]:
+    _investigation(db, investigation_id, current_user)
+    return (
+        db.query(InvestigationAgenticStepModel)
+        .filter(InvestigationAgenticStepModel.investigation_id == investigation_id)
+        .order_by(
+            InvestigationAgenticStepModel.iteration_number.asc(),
+            InvestigationAgenticStepModel.created_at.asc(),
+        )
+        .all()
     )

@@ -522,6 +522,12 @@ def test_saved_investigation_can_be_reopened_for_feedback(client: TestClient) ->
     assert detail["id"] == investigation_id
     assert detail["user_question"].startswith("Appointment APT-2005")
     assert "report" in detail
+    assert detail["evidence_gap_analysis"]["status"] in {
+        "COMPLETE",
+        "GAPS_IDENTIFIED",
+        "NOT_ANALYZED",
+    }
+    assert isinstance(detail["evidence_gap_analysis"]["gaps"], list)
     if detail["report"]:
         assert detail["report"]["pdf"].startswith(f"/reports/{investigation_id}/")
         assert detail["report"]["html"].endswith(".html")

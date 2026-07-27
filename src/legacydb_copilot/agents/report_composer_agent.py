@@ -18,6 +18,7 @@ from legacydb_copilot.services.report_generator import (
     new_investigation_id,
     now_label,
 )
+from legacydb_copilot.services.fix_readiness_service import FixReadinessState
 from legacydb_copilot.services.root_cause_hypothesis_service import HypothesisStatus
 
 
@@ -267,6 +268,58 @@ def _execution_path_section(bundle: DynamicInvestigationBundle) -> ReportSection
                     "reason",
                 ],
                 rows=trace.report_timeline(),
+            )
+        ],
+    )
+
+
+def _fix_readiness_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    assessment = getattr(bundle, "fix_readiness_assessment", None)
+    if assessment is None:
+        verification = getattr(bundle, "root_cause_verification", None)
+        confirmed = bool(verification and verification.root_cause_confirmed)
+        state = (
+            FixReadinessState.ROOT_CAUSE_CONFIRMED.value
+            if confirmed
+            else FixReadinessState.INVESTIGATION_INCOMPLETE.value
+        )
+        return ReportSection(
+            title="Fix Readiness Assessment",
+            items=[
+                f"Readiness: {state} (backward-compatible fallback)",
+                "Run the deterministic AG-08 assessment to obtain criterion-level blockers.",
+            ],
+        )
+    rows = [
+        {
+            "Criterion": item.name,
+            "Status": item.status.value,
+            "Evidence Refs": "; ".join(item.evidence_refs),
+            "Reason": item.reason,
+        }
+        for item in assessment.criteria
+    ]
+    ready_for_change = assessment.state in {
+        FixReadinessState.FIX_PROPOSAL_READY,
+        FixReadinessState.PROOF_OF_FIX_READY,
+    }
+    return ReportSection(
+        title="Fix Readiness Assessment",
+        items=[
+            f"Readiness: {assessment.state.value}",
+            f"Informational score: {assessment.score}% (prerequisites remain authoritative)",
+            f"SQL developer may prepare a controlled change: {'Yes' if ready_for_change else 'No'}",
+            f"Decision: {assessment.decision_reason}",
+            *(
+                [f"Blocker: {item}" for item in assessment.blockers]
+                or ["No readiness blockers remain."]
+            ),
+        ],
+        tables=[
+            ReportTable(
+                title="Deterministic Readiness Criteria",
+                columns=["Criterion", "Status", "Evidence Refs", "Reason"],
+                rows=rows,
             )
         ],
     )
@@ -1251,6 +1304,7 @@ def compose_report(
         ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
         _structured_evidence_gap_section(bundle),
         _execution_path_section(bundle),
+        _fix_readiness_section(bundle),
         ReportSection(title="Stage 1 - Understand the Question", items=[
             f"Investigation Mode: {bundle.investigation_mode}",
             f"Mode Rationale: {bundle.mode_rationale or 'Default full investigation path selected.'}",

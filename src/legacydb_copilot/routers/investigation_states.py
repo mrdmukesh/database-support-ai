@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from legacydb_copilot.db.models import (
     ExecutionPathTraceModel,
+    FixReadinessAssessmentModel,
     InvestigationAgenticStepModel,
     InvestigationModel,
 )
@@ -14,6 +15,7 @@ from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import require_permission
 from legacydb_copilot.schemas import (
     ExecutionPathTraceRead,
+    FixReadinessAssessmentRead,
     InvestigationAgenticStepRead,
     InvestigationStateHistoryRead,
     InvestigationStateTransitionRead,
@@ -121,3 +123,24 @@ def investigation_execution_path(
     if trace is None:
         raise HTTPException(status_code=404, detail="Execution path trace is not available")
     return trace
+
+
+@router.get(
+    "/{investigation_id}/fix-readiness",
+    response_model=FixReadinessAssessmentRead,
+)
+def investigation_fix_readiness(
+    investigation_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("chat:use")),
+) -> FixReadinessAssessmentModel:
+    _investigation(db, investigation_id, current_user)
+    assessment = (
+        db.query(FixReadinessAssessmentModel)
+        .filter(FixReadinessAssessmentModel.investigation_id == investigation_id)
+        .order_by(FixReadinessAssessmentModel.created_at.desc())
+        .first()
+    )
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Fix readiness assessment is not available")
+    return assessment

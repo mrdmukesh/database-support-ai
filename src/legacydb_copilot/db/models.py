@@ -382,6 +382,10 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="investigation",
         cascade="all, delete-orphan",
     )
+    fix_readiness_assessments: Mapped[list["FixReadinessAssessmentModel"]] = relationship(
+        back_populates="investigation",
+        cascade="all, delete-orphan",
+    )
 
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
@@ -565,6 +569,41 @@ class RootCauseHypothesisVerificationModel(UUIDPrimaryKeyMixin, TimestampMixin, 
 
     investigation: Mapped["InvestigationModel"] = relationship(
         back_populates="root_cause_hypothesis_verifications"
+    )
+
+
+class FixReadinessAssessmentModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "fix_readiness_assessments"
+
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    investigation_id: Mapped[str] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    state: Mapped[str] = mapped_column(String(60), nullable=False, index=True)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    criteria_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    blockers_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
+    recommended_next_evidence_json: Mapped[str] = mapped_column(
+        Text, default="[]", nullable=False
+    )
+    confirmed_hypothesis_ids_json: Mapped[str] = mapped_column(
+        Text, default="[]", nullable=False
+    )
+    decision_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    investigation: Mapped["InvestigationModel"] = relationship(
+        back_populates="fix_readiness_assessments"
     )
 
 

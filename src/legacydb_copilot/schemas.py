@@ -411,6 +411,21 @@ class ExecutionPathTraceRead(BaseModel):
     created_at: datetime
 
 
+class FixReadinessAssessmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    state: str
+    score: int
+    criteria_json: str
+    blockers_json: str
+    recommended_next_evidence_json: str
+    confirmed_hypothesis_ids_json: str
+    decision_reason: str
+    created_at: datetime
+
+
 class InvestigationFeedbackCreate(BaseModel):
     rating: FeedbackRating
     actual_root_cause: str = ""

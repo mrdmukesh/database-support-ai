@@ -73,6 +73,7 @@ yarn-error.log*
 /.tmp/pytest-*/
 /.tmp/fixture-framework-*/
 /.tmp/react-static-task*/
+/.tmp/ag10-*/
 /pytest*_tmp/
 /pytest_*/
 /tmp/pytest-*/

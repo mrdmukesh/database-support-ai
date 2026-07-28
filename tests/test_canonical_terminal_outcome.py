@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -17,6 +18,7 @@ from evaluation.runners.investigation_reader import InvestigationPersistenceRead
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.models import (
     InvestigationModel,
+    InvestigationStateTransitionModel,
     OrganizationModel,
     UserModel,
     WorkspaceModel,
@@ -138,6 +140,120 @@ def test_persistence_reader_prefers_canonical_state_transition() -> None:
     )
 
     assert detail["terminal_state"] == "ROOT_CAUSE_CONFIRMED"
+
+
+@pytest.mark.parametrize(
+    "canonical_state",
+    [
+        InvestigationState.ROOT_CAUSE_CONFIRMED,
+        InvestigationState.ISSUE_NOT_REPRODUCED,
+        InvestigationState.INSUFFICIENT_EVIDENCE,
+        InvestigationState.POLICY_BLOCKED,
+    ],
+)
+def test_reader_prefers_same_timestamp_canonical_transition_over_uuid_order(
+    canonical_state: InvestigationState,
+) -> None:
+    factory, investigation = _persisted_investigation(status="AI_ANSWERED")
+    shared_timestamp = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
+    with factory() as db:
+        db.add_all(
+            [
+                InvestigationStateTransitionModel(
+                    id="ffffffff-ffff-ffff-ffff-ffffffffffff",
+                    organization_id=investigation.organization_id,
+                    workspace_id=investigation.workspace_id,
+                    investigation_id=investigation.id,
+                    previous_state="",
+                    current_state=InvestigationState.INITIALIZATION.value,
+                    transitioned_at=shared_timestamp,
+                    reason="Initialize.",
+                    sequence_number=1,
+                ),
+                InvestigationStateTransitionModel(
+                    id="eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+                    organization_id=investigation.organization_id,
+                    workspace_id=investigation.workspace_id,
+                    investigation_id=investigation.id,
+                    previous_state=InvestigationState.INITIALIZATION.value,
+                    current_state=InvestigationState.EVIDENCE_ASSESSMENT.value,
+                    transitioned_at=shared_timestamp,
+                    reason="Assess.",
+                    sequence_number=2,
+                ),
+                InvestigationStateTransitionModel(
+                    id="00000000-0000-0000-0000-000000000001",
+                    organization_id=investigation.organization_id,
+                    workspace_id=investigation.workspace_id,
+                    investigation_id=investigation.id,
+                    previous_state=InvestigationState.EVIDENCE_ASSESSMENT.value,
+                    current_state=canonical_state.value,
+                    transitioned_at=shared_timestamp,
+                    reason="Canonical outcome.",
+                    sequence_number=3,
+                ),
+            ]
+        )
+        db.commit()
+
+    detail = InvestigationPersistenceReader(factory).read(
+        investigation.id,
+        organization_id=investigation.organization_id,
+        workspace_id=investigation.workspace_id,
+    )
+
+    assert detail["terminal_state"] == canonical_state.value
+    assert [
+        item["current_state"]
+        for item in detail["lifecycle_diagnostics"]["state_transitions"]
+    ] == [
+        InvestigationState.INITIALIZATION.value,
+        InvestigationState.EVIDENCE_ASSESSMENT.value,
+        canonical_state.value,
+    ]
+    assert [
+        item["sequence_number"]
+        for item in detail["lifecycle_diagnostics"]["state_transitions"]
+    ] == [1, 2, 3]
+
+
+def test_reader_uses_legacy_fallback_only_without_canonical_transition() -> None:
+    factory, investigation = _persisted_investigation(
+        status="AI_SUMMARIZED_NOT_REPRODUCED"
+    )
+    with factory() as db:
+        db.add(
+            InvestigationStateTransitionModel(
+                organization_id=investigation.organization_id,
+                workspace_id=investigation.workspace_id,
+                investigation_id=investigation.id,
+                previous_state="",
+                current_state=InvestigationState.INITIALIZATION.value,
+                reason="No canonical outcome was persisted.",
+                sequence_number=1,
+            )
+        )
+        db.commit()
+
+    detail = InvestigationPersistenceReader(factory).read(
+        investigation.id,
+        organization_id=investigation.organization_id,
+        workspace_id=investigation.workspace_id,
+    )
+
+    assert detail["terminal_state"] == "ISSUE_NOT_REPRODUCED"
+
+
+def test_reader_leaves_unknown_legacy_state_unresolved_without_canonical_transition() -> None:
+    factory, investigation = _persisted_investigation(status="LEGACY_UNKNOWN_OUTCOME")
+
+    detail = InvestigationPersistenceReader(factory).read(
+        investigation.id,
+        organization_id=investigation.organization_id,
+        workspace_id=investigation.workspace_id,
+    )
+
+    assert detail["terminal_state"] == "LEGACY_UNKNOWN_OUTCOME"
 
 
 def test_legacy_investigation_uses_narrow_structured_compatibility() -> None:

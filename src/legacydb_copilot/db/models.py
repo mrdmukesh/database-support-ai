@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
@@ -425,6 +426,13 @@ def _prevent_environment_snapshot_changes(_mapper, _connection, target: Investig
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "investigation_state_transitions"
+    __table_args__ = (
+        UniqueConstraint(
+            "investigation_id",
+            "sequence_number",
+            name="uq_investigation_state_transition_sequence",
+        ),
+    )
 
     organization_id: Mapped[str] = mapped_column(
         ForeignKey("organizations.id", ondelete="CASCADE"),
@@ -451,6 +459,7 @@ class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
     )
     reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
     iteration_number: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sequence_number: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     investigation: Mapped["InvestigationModel"] = relationship(
         back_populates="state_transitions"

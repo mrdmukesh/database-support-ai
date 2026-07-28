@@ -57,8 +57,21 @@ class InvestigationPersistenceReader:
                 db.query(InvestigationStateTransitionModel)
                 .filter(InvestigationStateTransitionModel.investigation_id == record.id)
                 .order_by(
-                    InvestigationStateTransitionModel.transitioned_at.desc(),
-                    InvestigationStateTransitionModel.id.desc(),
+                    InvestigationStateTransitionModel.sequence_number.desc(),
+                )
+                .first()
+            )
+            terminal_state_values = {item.value for item in TERMINAL_STATES}
+            canonical_transition = (
+                db.query(InvestigationStateTransitionModel)
+                .filter(
+                    InvestigationStateTransitionModel.investigation_id == record.id,
+                    InvestigationStateTransitionModel.current_state.in_(
+                        terminal_state_values
+                    ),
+                )
+                .order_by(
+                    InvestigationStateTransitionModel.sequence_number.desc(),
                 )
                 .first()
             )
@@ -77,8 +90,8 @@ class InvestigationPersistenceReader:
             )
             debug_trace = _json(record.ai_debug_trace_json, {})
             canonical_state = (
-                state.current_state
-                if state and state.current_state in {item.value for item in TERMINAL_STATES}
+                canonical_transition.current_state
+                if canonical_transition
                 else ""
             )
             legacy_state = resolve_legacy_terminal_outcome(
@@ -99,10 +112,11 @@ class InvestigationPersistenceReader:
                             "transitioned_at": str(item.transitioned_at),
                             "reason": item.reason,
                             "iteration_number": item.iteration_number,
+                            "sequence_number": item.sequence_number,
                         }
                         for item in sorted(
                             record.state_transitions,
-                            key=lambda transition: transition.transitioned_at,
+                            key=lambda transition: transition.sequence_number,
                         )
                     ],
                 },
@@ -116,7 +130,11 @@ class InvestigationPersistenceReader:
                     canonical_state
                     or (legacy_state.value if legacy_state else record.status)
                 ),
-                "stop_reason": state.reason if state else "",
+                "stop_reason": (
+                    canonical_transition.reason
+                    if canonical_transition
+                    else state.reason if state else ""
+                ),
                 "agentic_steps": [
                     {
                         "iteration": item.iteration_number,

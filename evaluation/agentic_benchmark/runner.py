@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import shutil
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable
@@ -184,9 +185,20 @@ def capture_from_execution(
     ]
     hypotheses = detail.get("root_cause_verifications") or []
     debug_trace = detail.get("debug_trace") or {}
-    verified_claims = [
+    ag_verified_claims = [
         item for item in hypotheses if item.get("status") == "CONFIRMED"
     ]
+    synchronous_verified_claims = [
+        item
+        for item in debug_trace.get("validated_citations", [])
+        if isinstance(item, dict)
+        and str(item.get("status") or item.get("decision") or "").upper()
+        not in {"REJECTED", "EXCLUDED_FROM_REPORT"}
+    ]
+    verified_claims = _merge_verified_claims(
+        ag_verified_claims,
+        synchronous_verified_claims,
+    )
     rejected_claims = [
         {"hypothesis_id": item.get("hypothesis_id"), "status": "REJECTED"}
         for item in hypotheses
@@ -199,6 +211,9 @@ def capture_from_execution(
     )
     budget = steps[-1].get("budget", {}) if steps else {}
     report = detail.get("report_json") or extracted.get("report_snapshot") or {}
+    findings = _confirmed_fact_findings(report)
+    if not findings:
+        findings = _flatten_text(extracted.get("verified_facts", []))
     evidence_refs = [
         str(item.get("evidence_id") or "")
         for item in evidence
@@ -239,7 +254,7 @@ def capture_from_execution(
         discovered_objects=_flatten_text(
             extracted.get("discovered_database_objects", [])
         ),
-        findings=_flatten_text(extracted.get("verified_facts", [])),
+        findings=findings,
         recommendations=_flatten_text(extracted.get("recommendations", [])),
         validation_tests=_sections(report, "test", "proof of fix"),
         evidence_records=evidence,
@@ -569,6 +584,58 @@ def _flatten_text(value: Any) -> list[str]:
             for item in value
         ]
     return []
+
+
+def _merge_verified_claims(*claim_groups: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: list[dict[str, Any]] = []
+    positions: dict[tuple[str, str], int] = {}
+    for claim in (item for group in claim_groups for item in group):
+        key = _verified_claim_key(claim)
+        if key is None or key not in positions:
+            if key is not None:
+                positions[key] = len(merged)
+            merged.append(dict(claim))
+            continue
+        existing = merged[positions[key]]
+        for field, value in claim.items():
+            if field not in existing or existing[field] in (None, "", [], {}):
+                existing[field] = value
+    return merged
+
+
+def _verified_claim_key(claim: dict[str, Any]) -> tuple[str, str] | None:
+    claim_id = str(
+        claim.get("claim_id")
+        or claim.get("hypothesis_id")
+        or claim.get("id")
+        or ""
+    ).strip()
+    if claim_id:
+        return "id", claim_id.casefold()
+    text = str(
+        claim.get("claim")
+        or claim.get("statement")
+        or claim.get("conclusion")
+        or claim.get("description")
+        or ""
+    )
+    normalized = re.sub(r"[^\w]+", " ", text.casefold()).strip()
+    return ("text", normalized) if normalized else None
+
+
+def _confirmed_fact_findings(report: dict[str, Any]) -> list[str]:
+    findings: list[str] = []
+    for section in report.get("sections", []):
+        if section.get("title") != "Facts, Inferences, and Hypotheses":
+            continue
+        for table in section.get("tables", []):
+            for row in table.get("rows", []):
+                if row.get("Type") != "Confirmed Fact":
+                    continue
+                finding = str(row.get("Finding") or "").strip()
+                if finding and finding not in findings:
+                    findings.append(finding)
+    return findings
 
 
 def _sections(report: dict[str, Any], *terms: str) -> list[str]:

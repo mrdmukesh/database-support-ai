@@ -51,6 +51,8 @@ ui*.err.log
 /uploads/
 /evaluation/results/
 /.tmp/migration-backups/
+/.tmp/local-evaluation/worker.pid
+/.tmp/local-evaluation/worker-runtime.json
 
 # OS and editor files
 .DS_Store

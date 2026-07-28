@@ -5,7 +5,7 @@ import os
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from urllib import error, parse, request
+from urllib import parse, request
 
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
@@ -13,8 +13,8 @@ from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, text
 
 from evaluation.framework.scenario_loader import load_scenarios
-from evaluation.runners.public_api import EvaluationServiceTokenProvider
 from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
+from evaluation.runners.public_api import EvaluationServiceTokenProvider
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 
 DOMAINS = ("payroll", "clinic", "orders", "banking", "shipping")
@@ -56,6 +56,34 @@ def _http_json(method: str, url: str, token: str = "") -> object:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _process_is_running(process_id: int) -> bool:
+    if os.name == "nt":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, process_id)
+        running = bool(handle)
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
+        return running
+    os.kill(process_id, 0)
+    return True
+
+
+def _worker_health(pid_file: Path = Path(".tmp/local-evaluation/worker.pid")) -> tuple[bool, str]:
+    if not pid_file.is_file():
+        return False, "worker pid file missing"
+    try:
+        worker_pid = int(pid_file.read_text(encoding="utf-8").strip())
+        running = _process_is_running(worker_pid)
+    except (OSError, ValueError):
+        return False, "worker process is not running"
+    return running, (
+        f"process {worker_pid} is running"
+        if running
+        else f"process {worker_pid} is not running"
+    )
+
+
 def run_preflight(*, check_live: bool = True) -> PreflightReport:
     checks: list[Check] = []
 
@@ -90,29 +118,7 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     else:
         add("application metadata database", False, "DATABASE_URL is missing")
 
-    worker_pid_file = Path(".tmp/local-evaluation/worker.pid")
-    worker_ok = False
-    worker_detail = "worker pid file missing"
-    if worker_pid_file.is_file():
-        try:
-            worker_pid = int(worker_pid_file.read_text(encoding="utf-8").strip())
-            if os.name == "nt":
-                import ctypes
-
-                handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, worker_pid)
-                worker_ok = bool(handle)
-                if handle:
-                    ctypes.windll.kernel32.CloseHandle(handle)
-            else:
-                os.kill(worker_pid, 0)
-                worker_ok = True
-            worker_detail = (
-                f"process {worker_pid} is running"
-                if worker_ok
-                else f"process {worker_pid} is not running"
-            )
-        except (OSError, ValueError):
-            worker_detail = "worker process is not running"
+    worker_ok, worker_detail = _worker_health()
     add("investigation worker health", worker_ok, worker_detail)
 
     base_url = os.getenv("EVAL_API_BASE_URL", "").rstrip("/")

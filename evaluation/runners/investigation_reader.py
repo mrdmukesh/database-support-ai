@@ -12,6 +12,10 @@ from legacydb_copilot.db.models import (
     InvestigationStateTransitionModel,
     RootCauseHypothesisVerificationModel,
 )
+from legacydb_copilot.services.investigation_state_machine import TERMINAL_STATES
+from legacydb_copilot.services.terminal_outcome_service import (
+    resolve_legacy_terminal_outcome,
+)
 
 
 def _json(value: str, fallback):
@@ -71,6 +75,16 @@ class InvestigationPersistenceReader:
                 .order_by(FixReadinessAssessmentModel.created_at.desc())
                 .first()
             )
+            debug_trace = _json(record.ai_debug_trace_json, {})
+            canonical_state = (
+                state.current_state
+                if state and state.current_state in {item.value for item in TERMINAL_STATES}
+                else ""
+            )
+            legacy_state = resolve_legacy_terminal_outcome(
+                record.status,
+                debug_trace,
+            )
             return {
                 "lifecycle_diagnostics": {
                     "created_at": str(record.created_at),
@@ -97,8 +111,11 @@ class InvestigationPersistenceReader:
                 "generated_sql": _json(record.sql_queries_json, []),
                 "executed_sql": _json(record.sql_queries_json, []),
                 "report_snapshot": _json(record.report_snapshot_json, {}),
-                "debug_trace": _json(record.ai_debug_trace_json, {}),
-                "terminal_state": state.current_state if state else record.status,
+                "debug_trace": debug_trace,
+                "terminal_state": (
+                    canonical_state
+                    or (legacy_state.value if legacy_state else record.status)
+                ),
                 "stop_reason": state.reason if state else "",
                 "agentic_steps": [
                     {

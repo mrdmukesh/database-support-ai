@@ -20,7 +20,10 @@ from legacydb_copilot.agents.intent_agent import InvestigationIntent, detect_int
 from legacydb_copilot.agents.investigation_planner_agent import build_investigation_plan
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
 from legacydb_copilot.agents.recommendation_agent import recommend_actions
-from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
+from legacydb_copilot.agents.reasoning_agent import (
+    RootCauseSupportStatus,
+    reason_about_evidence,
+)
 from legacydb_copilot.agents.report_composer_agent import compose_report
 from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.config import Settings
@@ -2329,6 +2332,10 @@ def _run_dynamic_investigation(
     )
     if ai_debug_trace is not None:
         ai_debug_trace.update({
+            "root_cause_requirements_satisfied": any(
+                item.status is RootCauseSupportStatus.VERIFIED
+                for item in reasoning.likely_root_causes
+            ),
             "metadata_cache": getattr(active_schema_metadata, "cache_diagnostics", {}),
             "raw_metadata_objects": {
                 "tables": active_schema_metadata.tables,
@@ -3077,11 +3084,55 @@ def ask_chat_question(
         from legacydb_copilot.services.investigation_state_machine import (
             InvestigationStateService,
         )
-
-        InvestigationStateService(db).initialize(
-            investigation,
-            reason="Agentic state tracking initialized after the existing investigation completed.",
+        from legacydb_copilot.services.terminal_outcome_service import (
+            persist_canonical_terminal_outcome,
+            resolve_canonical_terminal_outcome,
         )
+
+        state_service = InvestigationStateService(db)
+        state_service.initialize(
+            investigation,
+            reason=(
+                "Agentic state tracking initialized after the existing "
+                "investigation completed."
+            ),
+        )
+        persisted_evidence = json.loads(investigation.evidence_json or "[]")
+        verified_evidence_count = terminal_ai_trace.get(
+            "verified_evidence_count"
+        )
+        if verified_evidence_count is None:
+            verified_evidence_count = sum(
+                str(item.get("execution_status") or "").casefold()
+                == "succeeded"
+                for item in persisted_evidence
+                if isinstance(item, dict)
+            )
+        canonical_outcome = resolve_canonical_terminal_outcome(
+            reproduction_status=terminal_ai_trace.get("reproduction_status"),
+            reasoning_mode=terminal_ai_trace.get("reasoning_mode"),
+            ai_outcome=terminal_ai_trace.get("ai_outcome"),
+            workflow_status=investigation_status,
+            policy_blocked=investigation_status == "AI_SKIPPED_BY_POLICY",
+            insufficient_evidence=(
+                str(investigation.detected_intent).startswith(
+                    "INSUFFICIENT_DATABASE_EVIDENCE:"
+                )
+                or investigation.detected_intent == "EVIDENCE_PLANNING_FAILED"
+            ),
+            reasoning_permission=terminal_ai_trace.get("reasoning_permission"),
+            verified_evidence_count=verified_evidence_count,
+            root_cause_requirements_satisfied=terminal_ai_trace.get(
+                "root_cause_requirements_satisfied"
+            ),
+        )
+        if canonical_outcome is not None:
+            persist_canonical_terminal_outcome(
+                state_service,
+                investigation,
+                canonical_outcome,
+                reason="Resolved from structured synchronous investigation signals.",
+            )
     record_audit_event(
         db,
         organization_id=payload.organization_id,

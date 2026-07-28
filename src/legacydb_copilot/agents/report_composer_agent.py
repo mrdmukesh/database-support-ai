@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
@@ -738,6 +739,314 @@ def _write_path_likely_procedure_section(bundle: DynamicInvestigationBundle) -> 
     )
 
 
+def _matches_requested_object(name: str, requested: str) -> bool:
+    actual = name.casefold()
+    target = requested.casefold()
+    return actual == target or actual.split(".")[-1] == target.split(".")[-1]
+
+
+def _sql_literal(value: str) -> str:
+    value = value.strip().strip(",.;")
+    if re.fullmatch(r"-?\d+(?:\.\d+)?", value):
+        return value
+    if value.upper() in {"NULL", "TRUE", "FALSE"}:
+        return value.upper()
+    return "N'" + value.strip("'\"").replace("'", "''") + "'"
+
+
+def _parameter_values(question: str, parameters: tuple[str, ...]) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for parameter in parameters:
+        label = parameter.lstrip("@")
+        match = re.search(
+            rf"@?{re.escape(label)}\s*(?:=|:|\bis\b)?\s*"
+            r"(N?'[^']*'|\"[^\"]*\"|-?\d+(?:\.\d+)?|[A-Za-z0-9_-]+)",
+            question,
+            re.I,
+        )
+        if match:
+            values[parameter.casefold()] = _sql_literal(match.group(1))
+    if len(parameters) == 1 and not values:
+        numeric = re.search(r"\b\d+\b", question)
+        if numeric:
+            values[parameters[0].casefold()] = numeric.group(0)
+    return values
+
+
+def _execution_sql(
+    name: str,
+    object_type: str,
+    parameters: tuple[str, ...],
+    values: dict[str, str],
+) -> str:
+    if object_type != "STORED_PROCEDURE":
+        return ""
+    assignments = [
+        f"{parameter} = {values.get(parameter.casefold(), '<required_value>')}"
+        for parameter in parameters
+    ]
+    return f"EXEC {name}" + (f" {', '.join(assignments)}" if assignments else "") + ";"
+
+
+def _source_verification_sql(definition: str, values: dict[str, str]) -> str:
+    match = re.search(
+        r"(\bSELECT\b.*?\bFROM\b.*?)(?=\n\s*(?:END|RETURN)\b|\Z)",
+        definition,
+        re.I | re.S,
+    )
+    if not match:
+        return ""
+    sql = match.group(1).strip().rstrip(";") + ";"
+    for parameter, value in values.items():
+        sql = re.sub(re.escape(parameter), value, sql, flags=re.I)
+    return sql
+
+
+def _developer_object_sections(
+    bundle: DynamicInvestigationBundle,
+) -> list[ReportSection]:
+    requested = list(bundle.metadata.exact_procedures_requested)
+    if not requested:
+        return []
+    target_name = requested[0]
+    target = next(
+        (
+            item
+            for item in bundle.procedure_analysis
+            if _matches_requested_object(item.name, target_name)
+        ),
+        None,
+    )
+    related = [
+        item
+        for item in bundle.procedure_analysis
+        if target is None or item.name != target.name
+    ]
+    requested_name = target.name if target else target_name
+    object_type = target.object_type if target else "DATABASE_ROUTINE"
+    requested_items = [
+        f"Name: {requested_name}",
+        f"Object type: {object_type.replace('_', ' ').title()}",
+        "Role: Primary object explicitly requested by the user.",
+    ]
+    if target is None:
+        definition_section = ReportSection(
+            title="Actual Stored Procedure Definition",
+            items=[
+                "Evidence gap: the requested object was not present in the analyzed "
+                "metadata, so no source SQL can be displayed."
+            ],
+        )
+        parameters: tuple[str, ...] = ()
+        values: dict[str, str] = {}
+        execution_sql = ""
+        verification_sql = ""
+    else:
+        parameters = target.input_parameters
+        values = _parameter_values(bundle.question, parameters)
+        execution_sql = _execution_sql(
+            target.name,
+            target.object_type,
+            parameters,
+            values,
+        )
+        verification_sql = _source_verification_sql(target.definition, values)
+        definition_section = (
+            ReportSection(
+                title="Actual Stored Procedure Definition",
+                paragraphs=[
+                    "Actual SQL definition retrieved from database metadata. "
+                    "Formatting is preserved; parser summaries are not source SQL."
+                ],
+                sql_blocks=[
+                    ReportSqlBlock(
+                        purpose="Actual database object source definition",
+                        expected_result="Source SQL exactly as returned by database metadata.",
+                        risk="Source display only. Review before executing any DDL.",
+                        sql=target.definition,
+                    )
+                ],
+            )
+            if target.definition_available
+            else ReportSection(
+                title="Actual Stored Procedure Definition",
+                items=[f"Evidence gap: {target.definition_error}"],
+            )
+        )
+    parameter_rows = [
+        {
+            "Parameter": parameter,
+            "Requested Value": values.get(parameter.casefold(), "Not supplied"),
+        }
+        for parameter in parameters
+    ]
+    dependency_rows = (
+        [
+            {
+                "Referenced Table": table,
+                "Referenced Columns": ", ".join(target.referenced_columns)
+                or "Not parsed",
+                "Dependency Type": (
+                    "Read/Write" if table in target.tables_written else "Read"
+                ),
+            }
+            for table in dict.fromkeys(
+                [*target.tables_read, *target.tables_written]
+            )
+        ]
+        if target
+        else []
+    )
+    result_evidence = [
+        item
+        for item in bundle.evidence
+        if requested_name.casefold() in (
+            f"{item.purpose} {item.sql} {item.rows}".casefold()
+        )
+        and item.sql
+    ]
+    result_tables = [
+        ReportTable(
+            title=item.purpose,
+            columns=list(item.rows[0]) if item.rows else ["Result"],
+            rows=item.rows or [{"Result": item.error or "No rows returned"}],
+        )
+        for item in result_evidence
+    ]
+    verified_causes = [
+        claim.conclusion
+        for claim in bundle.reasoning.likely_root_causes
+        if claim.status is RootCauseSupportStatus.VERIFIED
+    ]
+    related_rows = [
+        {
+            "Object": item.name,
+            "Object Type": item.object_type.replace("_", " ").title(),
+            "Relationship": (
+                "Reads " + ", ".join(item.tables_read)
+                if item.tables_read
+                else "Discovered during metadata analysis"
+            ),
+        }
+        for item in related
+    ]
+    return [
+        ReportSection(title="Requested Object", items=requested_items),
+        definition_section,
+        ReportSection(
+            title="Input Parameters",
+            tables=[
+                ReportTable(
+                    title="Declared Input Parameters",
+                    columns=["Parameter", "Requested Value"],
+                    rows=parameter_rows
+                    or [{"Parameter": "None declared", "Requested Value": ""}],
+                )
+            ],
+        ),
+        ReportSection(
+            title="Referenced Tables and Columns",
+            paragraphs=[
+                "Parsed dependency summary generated from the actual definition; "
+                "this table is not executable SQL."
+            ],
+            tables=[
+                ReportTable(
+                    title="Parsed Dependencies",
+                    columns=[
+                        "Referenced Table",
+                        "Referenced Columns",
+                        "Dependency Type",
+                    ],
+                    rows=dependency_rows
+                    or [{
+                        "Referenced Table": "Not established",
+                        "Referenced Columns": "",
+                        "Dependency Type": "",
+                    }],
+                )
+            ],
+        ),
+        ReportSection(
+            title="Execution SQL",
+            sql_blocks=(
+                [
+                    ReportSqlBlock(
+                        purpose="Executable invocation of the requested stored procedure",
+                        expected_result="A read-only result set from the requested object.",
+                        risk="Execute only under the resolved environment safety policy.",
+                        sql=execution_sql,
+                    )
+                ]
+                if execution_sql
+                else []
+            ),
+            items=(
+                []
+                if execution_sql
+                else ["Executable invocation could not be generated from available metadata."]
+            ),
+        ),
+        ReportSection(
+            title="Execution Results",
+            tables=result_tables,
+            items=(
+                []
+                if result_tables
+                else ["No execution result was collected for the requested object."]
+            ),
+        ),
+        ReportSection(
+            title="Source Data Verification",
+            sql_blocks=(
+                [
+                    ReportSqlBlock(
+                        purpose="Executable read-only source-data verification",
+                        expected_result="Rows used by the requested database object.",
+                        risk="Read-only verification query.",
+                        sql=verification_sql,
+                    )
+                ]
+                if verification_sql
+                else []
+            ),
+            items=(
+                []
+                if verification_sql
+                else ["Evidence gap: no read-only source query could be derived."]
+            ),
+        ),
+        ReportSection(
+            title="Verified Root Cause",
+            items=verified_causes
+            or ["No root cause has been verified for the requested object."],
+        ),
+        ReportSection(
+            title="Recommended Resolution",
+            items=bundle.reasoning.recommended_fix
+            or ["No corrective change is recommended without verified evidence."],
+        ),
+        ReportSection(
+            title="Related Objects",
+            paragraphs=[
+                "Objects below were discovered as context and are not the requested object."
+            ],
+            tables=[
+                ReportTable(
+                    title="Related Objects",
+                    columns=["Object", "Object Type", "Relationship"],
+                    rows=related_rows
+                    or [{
+                        "Object": "None",
+                        "Object Type": "",
+                        "Relationship": "No related objects were identified.",
+                    }],
+                )
+            ],
+        ),
+    ]
+
+
 def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     status = bundle.ai_reasoning_status or {}
     trace = bundle.ai_debug_trace or {}
@@ -1193,6 +1502,7 @@ def compose_report(
         ReportSection(title="Executive Summary", paragraphs=[executive_summary_text]),
         ReportSection(title="Investigation Environment and Policy", items=policy_items),
         ReportSection(title="Question", paragraphs=[bundle.question]),
+        *_developer_object_sections(bundle),
         _executive_ai_reasoning_section(bundle),
         _executive_key_findings_section(bundle),
         _executive_evidence_summary_section(bundle),

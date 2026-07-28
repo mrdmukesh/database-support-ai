@@ -132,8 +132,7 @@ class DatabaseConnectionCreate(BaseModel):
     secret_ref: str = ""
     connection_string: str | None = None
     environment_type: str = Field(
-        default="production",
-        pattern=r"^(production|uat|test|evaluation|demo)$",
+        pattern=r"^(production|uat|test|development|evaluation|demo)$",
     )
     max_scan_rows: int | None = Field(default=None, ge=1, le=5000)
 
@@ -240,6 +239,7 @@ class ChatAskRequest(BaseModel):
     organization_id: str
     workspace_id: str
     connection_id: str | None = None
+    environment_type: str | None = None
     user_id: str
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: str | None = None
@@ -282,6 +282,8 @@ class ChatAskResponse(BaseModel):
     environment_type: str
     policy_name: str
     policy_version: str
+    safety_profile: str
+    environment_source: str
 
 
 class VerificationCheckRead(BaseModel):
@@ -345,8 +347,13 @@ class InvestigationRead(BaseModel):
     workspace_id: str
     connection_id: str
     connection_name: str
+    selected_database_name: str
     environment_type: str
     policy_name: str
+    safety_profile: str
+    environment_source: str
+    environment_snapshot_json: str
+    environment_telemetry_json: str
     policy_version: str
     policy_audit_json: str
     user_question: str

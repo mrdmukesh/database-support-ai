@@ -243,6 +243,12 @@ def test_assessment_persistence_and_audit() -> None:
             workspace_id=workspace.id,
             created_by_id=user.id,
             user_question="Can a safe payroll correction be prepared?",
+            environment_type="DEMO",
+            policy_name="evaluation_readonly",
+            safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+            environment_source="Registered connection metadata",
+            environment_snapshot_json="{}",
+            environment_telemetry_json="{}",
         )
         db.add(investigation)
         db.flush()

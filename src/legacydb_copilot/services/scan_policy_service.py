@@ -24,6 +24,10 @@ class ScanPolicy:
     policy_version: str = POLICY_VERSION
     configuration_valid: bool = True
     configuration_error: str = ""
+    safety_profile: str = ""
+    environment_source: str = "Registered connection metadata"
+    allow_read_only_procedure_execution: bool = False
+    data_modification_permitted: bool = False
 
 
 @dataclass(frozen=True)
@@ -60,39 +64,27 @@ class ScanPolicyService:
         max_scan_rows: int | None,
         default_max_rows: int,
     ) -> ScanPolicy:
-        normalized = (environment_type or "production").strip().casefold()
+        if not environment_type or not environment_type.strip():
+            raise ValueError("Registered connection environment metadata is missing.")
+        normalized = environment_type.strip().casefold()
+        canonical_aliases = {
+            "production": "production",
+            "test": "test",
+            "development": "uat",
+            "uat": "uat",
+            "demo": "demo",
+            "evaluation": "evaluation",
+        }
         if normalized == "non_production":
             normalized = "uat"
+        normalized = canonical_aliases.get(normalized, normalized)
         if normalized not in self.SUPPORTED_ENVIRONMENTS:
-            return ScanPolicy(
-                name="production_strict",
-                environment_type="production",
-                allow_unrestricted_read_scan=False,
-                require_row_limit=True,
-                max_rows=default_max_rows,
-                require_filter_for_large_table=True,
-                configuration_valid=False,
-                configuration_error=(
-                    f"Unsupported environment_type {environment_type!r}; "
-                    "production_strict was applied."
-                ),
-            )
+            raise ValueError(f"Unsupported registered connection environment_type {environment_type!r}.")
         if normalized in self.RELAXED_ENVIRONMENTS:
             default_limit = 500 if normalized == "uat" else 1000
             configured_limit = max_scan_rows if max_scan_rows is not None else default_limit
             if configured_limit < 1 or configured_limit > 5000:
-                return ScanPolicy(
-                    name="production_strict",
-                    environment_type="production",
-                    allow_unrestricted_read_scan=False,
-                    require_row_limit=True,
-                    max_rows=default_max_rows,
-                    require_filter_for_large_table=True,
-                    configuration_valid=False,
-                    configuration_error=(
-                        f"Invalid max_scan_rows {configured_limit}; production_strict was applied."
-                    ),
-                )
+                raise ValueError(f"Invalid max_scan_rows {configured_limit}.")
             return ScanPolicy(
                 name="evaluation_readonly" if normalized == "demo" else f"{normalized}_readonly",
                 environment_type="evaluation" if normalized == "demo" else normalized,
@@ -103,6 +95,8 @@ class ScanPolicyService:
                 max_relationship_depth=3 if normalized in {"evaluation", "demo", "test"} else 2,
                 mask_sensitive_data=normalized == "uat",
                 query_timeout_seconds=30,
+                safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+                allow_read_only_procedure_execution=True,
             )
         return ScanPolicy(
             name="production_strict",
@@ -111,6 +105,7 @@ class ScanPolicyService:
             require_row_limit=True,
             max_rows=default_max_rows,
             require_filter_for_large_table=True,
+            safety_profile="PRODUCTION_STRICT_READ_ONLY",
         )
 
 

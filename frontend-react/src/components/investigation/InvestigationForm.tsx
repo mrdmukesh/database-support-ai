@@ -57,6 +57,7 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
         organization_id: organizationId,
         workspace_id: investigation.selectedWorkspaceId,
         connection_id: investigation.selectedConnectionId,
+        environment_type: selectedConnection.environment_type,
         user_id: user.id,
         question: trimmedQuestion,
       });

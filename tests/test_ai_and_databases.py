@@ -2608,7 +2608,7 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
         return {
             "summary": "Masked reasoning",
             "likely_root_causes": [
-                {"conclusion": "Supported claim", "evidence_refs": ["SQL-1"]},
+                {"conclusion": "The evidence contains jane@example.com.", "evidence_refs": ["SQL-1"]},
                 {"conclusion": "Unsupported claim", "evidence_refs": []},
             ],
             "recommended_fix": [],
@@ -2649,9 +2649,9 @@ def test_llm_debug_trace_records_masked_payload_and_rejected_claims(monkeypatch)
         debug_trace=trace,
     )
 
-    assert result.likely_root_causes == ["Supported claim Evidence: SQL-1."]
+    assert result.likely_root_causes == ["The evidence contains jane@example.com. Evidence: SQL-1."]
     assert "jane@example.com" not in trace["user_prompt"]
-    assert trace["validated_citations"][0]["claim"] == "Supported claim"
+    assert trace["validated_citations"][0]["claim"] == "The evidence contains jane@example.com."
     assert trace["rejected_or_unsupported_claims"][0]["claim"] == "Unsupported claim"
 
 

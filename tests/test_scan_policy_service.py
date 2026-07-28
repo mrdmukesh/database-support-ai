@@ -133,44 +133,32 @@ def test_prompt_wording_cannot_override_trusted_policy() -> None:
     assert not hasattr(ScanPolicyService.resolve_policy, "question")
 
 
-def test_missing_environment_metadata_fails_closed_to_production() -> None:
-    resolved = policy(None)
-
-    assert resolved.name == "production_strict"
-    assert resolved.environment_type == "production"
+def test_missing_environment_metadata_is_rejected_without_production_default() -> None:
+    with pytest.raises(ValueError, match="metadata is missing"):
+        policy(None)
 
 
-def test_connection_api_schema_defaults_strict_and_accepts_explicit_evaluation() -> None:
-    defaulted = DatabaseConnectionCreate(
-        organization_id="ORG",
-        workspace_id="WS",
-        engine="sql_server",
-        name="Production",
-    )
+def test_connection_api_schema_requires_environment_and_accepts_explicit_evaluation() -> None:
+    with pytest.raises(ValidationError):
+        DatabaseConnectionCreate(
+            organization_id="ORG",
+            workspace_id="WS",
+            engine="sql_server",
+            name="Missing environment",
+        )
     configured = DatabaseConnectionUpdate(
         environment_type="evaluation",
         max_scan_rows=500,
     )
 
-    assert defaulted.environment_type == "production"
-    assert defaulted.max_scan_rows == 100
     assert configured.environment_type == "evaluation"
     with pytest.raises(ValidationError):
         DatabaseConnectionUpdate(environment_type="this is not production")
 
 
-def test_unsupported_environment_fails_closed_with_configuration_error() -> None:
-    resolved = policy("customer_says_demo")
-
-    assert resolved.name == "production_strict"
-    assert resolved.configuration_valid is False
-    assert "Unsupported environment_type" in resolved.configuration_error
-    with pytest.raises(ScanPolicyViolation) as caught:
-        ProductionReadSafetyValidator(
-            engine_type="sql_server",
-            scan_policy=resolved,
-        ).validate("SELECT EmployeeId FROM dbo.Employee")
-    assert caught.value.decision.reason == "invalid_environment_configuration"
+def test_unsupported_environment_is_rejected_instead_of_coerced_to_production() -> None:
+    with pytest.raises(ValueError, match="Unsupported registered"):
+        policy("customer_says_demo")
 
 
 def test_execution_error_is_distinct_from_policy_block() -> None:

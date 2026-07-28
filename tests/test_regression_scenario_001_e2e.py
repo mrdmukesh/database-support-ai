@@ -91,6 +91,7 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
         connection = DatabaseConnectionModel(
             id="connection-e2e", organization_id="org-e2e", workspace_id=workspace.id,
             engine="sqlite", name="Seed payroll", database_name=str(customer_db), secret_ref="test", is_active=True,
+            environment_type="test",
         )
         db.add_all([workspace, connection])
         db.commit()

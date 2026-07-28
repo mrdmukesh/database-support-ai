@@ -149,8 +149,12 @@ def investigation_db():
             workspace_id=workspace.id,
             created_by_id=user.id,
             user_question="Why is PayrollItem PI-404 missing?",
-            environment_type="evaluation",
+            environment_type="DEMO",
             policy_name="evaluation_readonly",
+            safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+            environment_source="Registered connection metadata",
+            environment_snapshot_json="{}",
+            environment_telemetry_json="{}",
         )
         db.add(investigation)
         db.flush()

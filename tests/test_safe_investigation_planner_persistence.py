@@ -40,6 +40,12 @@ def test_selection_reason_and_information_gain_are_persisted() -> None:
             workspace_id=workspace.id,
             created_by_id=user.id,
             user_question="Why is order 42 stuck?",
+            environment_type="TEST",
+            policy_name="test_readonly",
+            safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+            environment_source="Registered connection metadata",
+            environment_snapshot_json="{}",
+            environment_telemetry_json="{}",
         )
         db.add(investigation)
         db.flush()

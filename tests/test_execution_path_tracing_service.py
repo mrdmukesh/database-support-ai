@@ -272,6 +272,12 @@ def test_trace_persists_nodes_edges_and_summary() -> None:
             workspace_id=workspace.id,
             created_by_id=user.id,
             user_question="Trace missing PayrollItem",
+            environment_type="DEMO",
+            policy_name="evaluation_readonly",
+            safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+            environment_source="Registered connection metadata",
+            environment_snapshot_json="{}",
+            environment_telemetry_json="{}",
         )
         db.add(investigation)
         db.flush()

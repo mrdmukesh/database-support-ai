@@ -59,6 +59,11 @@ from legacydb_copilot.services.evidence_focus_service import build_evidence_focu
 from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
 from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
+from legacydb_copilot.services.environment_resolution_service import (
+    EnvironmentResolutionError,
+    EnvironmentSnapshot,
+    resolve_environment,
+)
 from legacydb_copilot.services.entity_resolution_service import (
     EntityResolutionResult,
     metadata_with_resolved_tables,
@@ -1872,6 +1877,9 @@ def _run_dynamic_investigation(
     db: Session,
     payload: ChatAskRequest,
     generated_by: str,
+    *,
+    environment_snapshot: EnvironmentSnapshot | None = None,
+    resolved_scan_policy=None,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
     """
     Owner: Mukesh Dabi
@@ -1916,9 +1924,8 @@ def _run_dynamic_investigation(
             None,
             _empty_investigation_metadata(),
         )
-    scan_policy = resolve_connection_scan_policy(
-        connection,
-        default_max_rows=Settings.from_env().max_investigation_rows,
+    scan_policy = resolved_scan_policy or resolve_connection_scan_policy(
+        connection, default_max_rows=Settings.from_env().max_investigation_rows
     )
     try:
         connection_string = _build_connection_string(connection)
@@ -2415,7 +2422,10 @@ def _run_dynamic_investigation(
         ai_debug_trace=ai_debug_trace,
         verification_checks=verification_checks,
         verification_results=[],
-        investigation_policy=asdict(scan_policy),
+        investigation_policy={
+            **asdict(scan_policy),
+            **(environment_snapshot.to_dict() if environment_snapshot else {}),
+        },
         investigation_id=investigation_id,
         connection_id=connection.id,
         evidence_package_hash=evidence_package_hash,
@@ -2649,7 +2659,10 @@ def _run_dynamic_investigation(
     )
     ai_debug_trace_payload = sanitize_ai_trace(ai_debug_trace or {})
     ai_debug_trace_payload["evidence_plan_statuses"] = evidence_plan_statuses
-    ai_debug_trace_payload["investigation_policy"] = asdict(scan_policy)
+    ai_debug_trace_payload["investigation_policy"] = {
+        **asdict(scan_policy),
+        **(environment_snapshot.to_dict() if environment_snapshot else {}),
+    }
     ai_debug_trace_payload["evidence_plan_summary"] = {
         "planned": sum(1 for item in evidence_plan_statuses if item.get("status") == "planned"),
         "validated": sum(1 for item in evidence_plan_statuses if item.get("status") == "validated"),
@@ -2920,10 +2933,21 @@ def ask_chat_question(
     assert_same_user(current_user, payload.user_id)
     require_workspace_access(db, current_user, payload.workspace_id, action="investigate")
     selected_connection = _find_workspace_connection(db, payload)
-    selected_policy = resolve_connection_scan_policy(
-        selected_connection,
-        default_max_rows=Settings.from_env().max_investigation_rows,
-    )
+    try:
+        environment_resolution = resolve_environment(
+            selected_connection,
+            workspace_id=payload.workspace_id,
+            request_environment=payload.environment_type,
+        )
+        selected_policy = resolve_connection_scan_policy(
+            selected_connection,
+            default_max_rows=Settings.from_env().max_investigation_rows,
+        )
+    except EnvironmentResolutionError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    environment_snapshot = environment_resolution.snapshot
     conversation = _get_or_create_conversation(db, payload)
     report = analyze_prompt(payload.question, has_sources=True)
     if report.findings:
@@ -2938,6 +2962,8 @@ def ask_chat_question(
                 db,
                 payload,
                 current_user.email or current_user.full_name or current_user.id,
+                environment_snapshot=environment_snapshot,
+                resolved_scan_policy=selected_policy,
             )
         except Exception as exc:
             raise HTTPException(
@@ -2976,22 +3002,35 @@ def ask_chat_question(
         investigation_metadata.get("detected_intent"),
         investigation_metadata.get("answer_provenance"),
     )
-    investigation_metadata.setdefault("environment_type", selected_policy.environment_type)
-    investigation_metadata.setdefault("policy_name", selected_policy.name)
-    investigation_metadata.setdefault("policy_version", selected_policy.policy_version)
-    investigation_metadata.setdefault(
-        "policy_audit",
-        json.dumps(
-            {
-                **asdict(selected_policy),
-                "connection_id": selected_connection.id,
-                "workspace_id": payload.workspace_id,
-                "provider": selected_connection.engine,
-                "scan_decisions": [],
-            },
-            default=str,
-        ),
+    investigation_metadata["environment_type"] = environment_snapshot.environment_type.value
+    investigation_metadata["policy_name"] = selected_policy.name
+    investigation_metadata["policy_version"] = selected_policy.policy_version
+    investigation_metadata["safety_profile"] = environment_snapshot.safety_profile.value
+    investigation_metadata["environment_source"] = environment_snapshot.environment_source
+    investigation_metadata["environment_snapshot"] = json.dumps(
+        environment_snapshot.to_dict(), default=str
     )
+    investigation_metadata["environment_telemetry"] = json.dumps(
+        environment_resolution.telemetry, default=str
+    )
+    policy_audit = json.loads(investigation_metadata.get("policy_audit", "{}") or "{}")
+    investigation_metadata["policy_audit"] = json.dumps(
+        {
+            **policy_audit,
+            **asdict(selected_policy),
+            **environment_resolution.telemetry,
+            "connection_id": selected_connection.id,
+            "workspace_id": payload.workspace_id,
+            "provider": selected_connection.engine,
+            "scan_decisions": policy_audit.get("scan_decisions", []),
+        },
+        default=str,
+    )
+    raw_trace = investigation_metadata.get("ai_debug_trace", "{}") or "{}"
+    trace = raw_trace if isinstance(raw_trace, dict) else json.loads(raw_trace)
+    trace["environment_resolution"] = environment_resolution.telemetry
+    trace["environment_snapshot"] = environment_snapshot.to_dict()
+    investigation_metadata["ai_debug_trace"] = json.dumps(trace, default=str)
     terminal_ai_trace = _terminal_ai_trace(investigation_metadata)
     llm_audit_outcome, llm_audit_reason = _llm_audit_outcome(
         investigation_status, terminal_ai_trace
@@ -3002,10 +3041,15 @@ def ask_chat_question(
         workspace_id=payload.workspace_id,
         connection_id=selected_connection.id,
         connection_name=selected_connection.name,
-        environment_type=investigation_metadata.get("environment_type", "production"),
-        policy_name=investigation_metadata.get("policy_name", "production_strict"),
-        policy_version=investigation_metadata.get("policy_version", "v1"),
-        policy_audit_json=investigation_metadata.get("policy_audit", "{}"),
+        selected_database_name=environment_snapshot.selected_database_name,
+        environment_type=investigation_metadata["environment_type"],
+        policy_name=investigation_metadata["policy_name"],
+        safety_profile=investigation_metadata["safety_profile"],
+        environment_source=investigation_metadata["environment_source"],
+        environment_snapshot_json=investigation_metadata["environment_snapshot"],
+        environment_telemetry_json=investigation_metadata["environment_telemetry"],
+        policy_version=investigation_metadata["policy_version"],
+        policy_audit_json=investigation_metadata["policy_audit"],
         conversation_id=conversation.id,
         created_by_id=current_user.id,
         user_question=payload.question,
@@ -3097,6 +3141,8 @@ def ask_chat_question(
         "environment_type": investigation.environment_type,
         "policy_name": investigation.policy_name,
         "policy_version": investigation.policy_version,
+        "safety_profile": investigation.safety_profile,
+        "environment_source": investigation.environment_source,
     }
 
 

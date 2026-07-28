@@ -147,7 +147,18 @@ def extract_entities(question: str) -> EntityExtractionResult:
     for value in business_keys:
         entities.append(ExtractedEntity("exact_id_or_code", value))
         entities.append(ExtractedEntity("business_identifier", value))
-    for value in re.findall(r"\bsp_[a-zA-Z0-9_]+\b", question):
+    routine_identifier = (
+        r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
+    )
+    routine_pattern = (
+        rf"\b(?:stored\s+procedure|procedure|function|view|trigger)"
+        rf"\s+(?:named\s+|called\s+)?({routine_identifier})\b"
+    )
+    routines = re.findall(routine_pattern, question, re.I)
+    routines.extend(
+        re.findall(r"\b(?:sp|usp|fn|tr)_[a-zA-Z0-9_]+\b", question, re.I)
+    )
+    for value in dict.fromkeys(routines):
         entities.append(ExtractedEntity("stored_procedure", value))
     for value in re.findall(r"\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b", question):
         entities.append(ExtractedEntity("possible_table", value[0]))

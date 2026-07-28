@@ -225,8 +225,8 @@ class ProductionReadSafetyValidator:
         executed_sql: str = "",
     ) -> ScanPolicyDecision:
         return ScanPolicyDecision(
-            policy=self.scan_policy.name if self.scan_policy else "production_strict",
-            environment_type=self.scan_policy.environment_type if self.scan_policy else "production",
+            policy=self.scan_policy.name if self.scan_policy else "UNRESOLVED_STRICT_READ_ONLY",
+            environment_type=self.scan_policy.environment_type if self.scan_policy else "UNRESOLVED",
             decision=decision,  # type: ignore[arg-type]
             reason=reason,
             max_rows=self.max_rows,

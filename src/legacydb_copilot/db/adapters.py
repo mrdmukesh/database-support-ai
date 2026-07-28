@@ -716,7 +716,7 @@ class SQLServerAdapter(BaseDatabaseAdapter):
                 text(
                     "SELECT SCHEMA_NAME(schema_id) AS schema_name, name "
                     "FROM sys.objects "
-                    "WHERE type IN ('P', 'PC', 'FN', 'FS', 'FT', 'IF', 'TF', 'TR') "
+                    "WHERE type IN ('P', 'PC', 'FN', 'FS', 'FT', 'IF', 'TF', 'TR', 'V') "
                     "AND SCHEMA_NAME(schema_id) NOT IN ('sys', 'INFORMATION_SCHEMA') "
                     "ORDER BY schema_name, name"
                 )

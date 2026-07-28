@@ -197,8 +197,21 @@ def _requires_diagnostic_objects(tokens: set[str]) -> bool:
 def _explicit_names(question: str, label: str) -> set[str]:
     names: set[str] = set()
     identifier = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
-    pattern = rf"\b{label}\s*:\s*({identifier})\b"
-    names.update(match.group(1).lower() for match in re.finditer(pattern, question, re.I))
+    labels = (
+        ("stored procedure", "procedure", "function", "view", "trigger")
+        if label == "procedure"
+        else (label,)
+    )
+    alternatives = "|".join(re.escape(item) for item in labels)
+    patterns = (
+        rf"\b(?:{alternatives})\s*:\s*({identifier})\b",
+        rf"\b(?:{alternatives})\s+(?:named\s+|called\s+)?({identifier})\b",
+    )
+    for pattern in patterns:
+        names.update(
+            match.group(1).lower()
+            for match in re.finditer(pattern, question, re.I)
+        )
     return names
 
 

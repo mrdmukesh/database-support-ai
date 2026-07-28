@@ -52,8 +52,8 @@ def test_environment_validation_is_server_side_and_missing_fails_closed() -> Non
         "name": "Payroll",
         "secret_ref": "env://PAYROLL",
     }
-    defaulted = DatabaseConnectionCreate(**payload)
-    assert defaulted.environment_type == "production"
+    with pytest.raises(ValidationError):
+        DatabaseConnectionCreate(**payload)
 
     with pytest.raises(ValidationError):
         DatabaseConnectionCreate(**payload, environment_type="this is not production")
@@ -81,3 +81,20 @@ def test_policy_and_llm_audit_models_persist_required_context() -> None:
         "connection_id",
     ):
         assert field in models
+
+
+def test_authoritative_snapshot_migration_is_additive_and_follows_current_head() -> None:
+    migration = Path(
+        "alembic/versions/0016_authoritative_environment_snapshot.py"
+    ).read_text(encoding="utf-8")
+    assert 'down_revision = "0015_safe_planner"' in migration
+    for field in (
+        "selected_database_name",
+        "safety_profile",
+        "environment_source",
+        "environment_snapshot_json",
+        "environment_telemetry_json",
+    ):
+        assert field in migration
+    assert "drop_table" not in migration
+    assert "DELETE FROM" not in migration

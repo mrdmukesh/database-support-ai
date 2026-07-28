@@ -30,6 +30,11 @@ class ProcedureAnalysis:
     complexity: str
     business_rules: list[str]
     definition_excerpt: str
+    definition: str = ""
+    definition_error: str = ""
+    object_type: str = "DATABASE_ROUTINE"
+    input_parameters: tuple[str, ...] = ()
+    referenced_columns: tuple[str, ...] = ()
 
 
 def _read_definition(connector, procedure_name: str) -> str:
@@ -37,19 +42,20 @@ def _read_definition(connector, procedure_name: str) -> str:
     Owner: Mukesh Dabi
     Purpose:
         Internal helper for read definition within stored_procedure_intelligence.py.
-    
+
     Input:
         Function parameters declared in the signature.
-    
+
     Output:
         Return value declared by the type hints or route response model.
-    
+
     How it is called:
         Internal callers in stored_procedure_intelligence.py.
-    
+
     Where it fits in the flow:
-        Application orchestration -> service function -> structured result for the next workflow step.
-    
+        Application orchestration -> service function -> structured result for
+        the next workflow step.
+
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
@@ -61,23 +67,69 @@ def _identifiers(pattern: str, definition: str) -> list[str]:
     Owner: Mukesh Dabi
     Purpose:
         Internal helper for identifiers within stored_procedure_intelligence.py.
-    
+
     Input:
         Function parameters declared in the signature.
-    
+
     Output:
         Return value declared by the type hints or route response model.
-    
+
     How it is called:
         Internal callers in stored_procedure_intelligence.py.
-    
+
     Where it fits in the flow:
-        Application orchestration -> service function -> structured result for the next workflow step.
-    
+        Application orchestration -> service function -> structured result for
+        the next workflow step.
+
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    return list(dict.fromkeys(match.group(1).strip("`[]\"") for match in re.finditer(pattern, definition, re.I)))
+    return list(
+        dict.fromkeys(
+            match.group(1).strip('`[]"') for match in re.finditer(pattern, definition, re.I)
+        )
+    )
+
+
+def _object_type(definition: str) -> str:
+    match = re.search(
+        r"\b(?:create|alter)\s+(?:or\s+alter\s+)?"
+        r"(procedure|proc|function|view|trigger)\b",
+        definition,
+        re.I,
+    )
+    if not match:
+        return "DATABASE_ROUTINE"
+    value = match.group(1).upper()
+    return "STORED_PROCEDURE" if value in {"PROCEDURE", "PROC"} else value
+
+
+def _input_parameters(definition: str) -> tuple[str, ...]:
+    header = re.split(r"\bAS\b", definition, maxsplit=1, flags=re.I)[0]
+    return tuple(dict.fromkeys(re.findall(r"@[A-Za-z_][A-Za-z0-9_]*", header)))
+
+
+def _referenced_columns(definition: str) -> tuple[str, ...]:
+    columns: list[str] = []
+    for select_list in re.findall(
+        r"\bselect\s+(.*?)\s+\bfrom\b",
+        definition,
+        re.I | re.S,
+    ):
+        for expression in select_list.split(","):
+            candidate = expression.strip().split()[-1].strip('[]`"')
+            if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", candidate):
+                columns.append(candidate)
+    columns.extend(
+        match.group(1).strip('[]`"')
+        for match in re.finditer(
+            r"\bwhere\s+(?:[A-Za-z_][A-Za-z0-9_]*\.)?"
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*=",
+            definition,
+            re.I,
+        )
+    )
+    return tuple(dict.fromkeys(columns))
 
 
 def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[ProcedureAnalysis]:
@@ -85,28 +137,36 @@ def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[Pro
     Owner: Mukesh Dabi
     Purpose:
         Handles analyze stored procedures within the Database Support AI application flow.
-    
+
     Input:
         Function parameters declared in the signature.
-    
+
     Output:
         Return value declared by the type hints or route response model.
-    
+
     How it is called:
         Investigation, reporting, verification, or knowledge workflows as needed.
-    
+
     Where it fits in the flow:
-        Application orchestration -> service function -> structured result for the next workflow step.
-    
+        Application orchestration -> service function -> structured result for
+        the next workflow step.
+
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
     analyses: list[ProcedureAnalysis] = []
     for procedure_name in procedure_names[:20]:
+        definition_error = ""
         try:
             definition = _read_definition(connector, procedure_name)
-        except Exception:
+        except Exception as exc:
             definition = ""
+            definition_error = f"Definition retrieval failed: {type(exc).__name__}"
+        if not definition and not definition_error:
+            definition_error = (
+                "Definition is unavailable. The object may be encrypted or metadata "
+                "visibility may be restricted."
+            )
         lowered = definition.lower()
         tables_read = _identifiers(r"\bfrom\s+([`\"\[\]\w.]+)", definition)
         tables_read.extend(_identifiers(r"\bjoin\s+([`\"\[\]\w.]+)", definition))
@@ -126,15 +186,21 @@ def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[Pro
         tables_written = list(dict.fromkeys(tables_written))
         joins = len(re.findall(r"\bjoin\b", lowered))
         loops = len(re.findall(r"\b(loop|while|cursor\s+for)\b", lowered))
-        transactions = len(re.findall(r"\b(begin\s+transaction|start\s+transaction|commit|rollback)\b", lowered))
+        transactions = len(
+            re.findall(r"\b(begin\s+transaction|start\s+transaction|commit|rollback)\b", lowered)
+        )
         try_catch = bool(re.search(r"\btry\b|\bcatch\b|exception\s+when", lowered))
         rollback_statements = len(re.findall(r"\brollback\b", lowered))
         cursors = len(re.findall(r"\bcursor\b", lowered))
         temp_tables = len(re.findall(r"(#\w+|temporary\s+table|temp\s+table)", lowered))
-        dynamic_sql = bool(re.search(r"\b(exec|execute|sp_executesql|prepare|concat\s*\()", lowered))
+        dynamic_sql = bool(
+            re.search(r"\b(exec|execute|sp_executesql|prepare|concat\s*\()", lowered)
+        )
         has_write = bool(tables_written)
         missing_exists_checks = has_write and not bool(re.search(r"\bexists\b", lowered))
-        missing_uniqueness_checks = has_write and not bool(re.search(r"\b(unique|duplicate|count\s*\(|group\s+by|exists)\b", lowered))
+        missing_uniqueness_checks = has_write and not bool(
+            re.search(r"\b(unique|duplicate|count\s*\(|group\s+by|exists)\b", lowered)
+        )
         complexity_score = (
             joins
             + loops * 2
@@ -147,9 +213,19 @@ def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[Pro
             + merge_statements * 2
             + (2 if dynamic_sql else 0)
         )
-        complexity = "High" if complexity_score >= 8 else "Medium" if complexity_score >= 3 else "Low"
-        locking_risk = "High" if transactions and tables_written else "Medium" if tables_written else "Low"
-        deadlock_risk = "High" if transactions and len(tables_written) > 1 else "Medium" if transactions or cursors else "Low"
+        complexity = (
+            "High" if complexity_score >= 8 else "Medium" if complexity_score >= 3 else "Low"
+        )
+        locking_risk = (
+            "High" if transactions and tables_written else "Medium" if tables_written else "Low"
+        )
+        deadlock_risk = (
+            "High"
+            if transactions and len(tables_written) > 1
+            else "Medium"
+            if transactions or cursors
+            else "Low"
+        )
         rules = []
         for line in definition.splitlines():
             stripped = line.strip()
@@ -183,6 +259,11 @@ def analyze_stored_procedures(connector, procedure_names: list[str]) -> list[Pro
                 complexity=complexity,
                 business_rules=rules,
                 definition_excerpt=definition[:2000],
+                definition=definition,
+                definition_error=definition_error,
+                object_type=_object_type(definition),
+                input_parameters=_input_parameters(definition),
+                referenced_columns=_referenced_columns(definition),
             )
         )
     return analyses

@@ -258,6 +258,18 @@ def test_verified_unreproduced_evidence_invokes_audited_summary_and_composes_rep
                 "pii_masking_scope": "Sensitive values masked",
             },
             ai_debug_trace=trace,
+            investigation_policy={
+                "name": "test_readonly",
+                "environment_type": "TEST",
+                "safety_profile": "NON_PRODUCTION_DEEP_READ_ONLY",
+                "environment_source": "Registered connection metadata",
+                "allow_read_only_procedure_execution": True,
+                "data_modification_permitted": False,
+                "policy_version": "v1",
+                "max_rows": 1000,
+                "mask_sensitive_data": False,
+                "query_timeout_seconds": 30,
+            },
         )
         report = compose_report(
             bundle=bundle,
@@ -274,6 +286,26 @@ def test_verified_unreproduced_evidence_invokes_audited_summary_and_composes_rep
     assert "Invented cause" not in str(report)
     assert "Invented fix" not in str(report)
     assert report.cover.investigation_id == investigation_id
+    policy_section = next(
+        section
+        for section in report.sections
+        if section.title == "Investigation Environment and Policy"
+    )
+    assert "Environment: TEST" in policy_section.items
+    assert "Environment source: Registered connection metadata" in policy_section.items
+    assert "Safety profile: NON_PRODUCTION_DEEP_READ_ONLY" in policy_section.items
+    assert "Procedure execution permitted: Yes, read-only only" in policy_section.items
+    assert "Data modification permitted: No" in policy_section.items
+    assert all(section.title != "Rollback" for section in report.sections)
+    assert "Production safeguards may have limited evidence collection" not in str(report)
+    coverage = next(section for section in report.sections if section.title == "Evidence Coverage")
+    assert coverage.tables[0].columns == [
+        "Requested area",
+        "Evidence found",
+        "Claim produced",
+        "Verification status",
+        "Evidence IDs",
+    ]
     assert "reported condition was not reproduced from verified evidence" in str(report).casefold()
 
 

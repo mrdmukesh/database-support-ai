@@ -89,6 +89,7 @@ describe("InvestigationForm", () => {
       organization_id: "org-1",
       workspace_id: "workspace-1",
       connection_id: "connection-1",
+      environment_type: "production",
       user_id: "user-1",
       question: "Why is payment duplicated?",
     }));

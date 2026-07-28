@@ -17,9 +17,9 @@ describe("connection API", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify(connection), { status: 201 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ...connection, name: "ERP 2" })));
     vi.stubGlobal("fetch", fetchMock);
-    await createConnection({ organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", host: "db", port: 3306, database_name: "erp", secret_ref: "env://DB", connection_string: null });
+    await createConnection({ organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", host: "db", port: 3306, database_name: "erp", secret_ref: "env://DB", connection_string: null, environment_type: "production" });
     await updateConnection("CONN-1", { name: "ERP 2" });
-    expect(fetchMock.mock.calls[0][1]?.body).toBe(JSON.stringify({ organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", host: "db", port: 3306, database_name: "erp", secret_ref: "env://DB", connection_string: null }));
+    expect(fetchMock.mock.calls[0][1]?.body).toBe(JSON.stringify({ organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", host: "db", port: 3306, database_name: "erp", secret_ref: "env://DB", connection_string: null, environment_type: "production" }));
     expect(fetchMock.mock.calls[1][1]?.body).toBe(JSON.stringify({ name: "ERP 2" }));
   });
 

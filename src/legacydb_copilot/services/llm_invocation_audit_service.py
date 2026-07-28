@@ -40,8 +40,8 @@ class InvocationContext:
     organization_id: str
     workspace_id: str
     connection_id: str | None = None
-    environment_type: str = "production"
-    policy_name: str = "production_strict"
+    environment_type: str = "UNRESOLVED"
+    policy_name: str = "UNRESOLVED_STRICT_READ_ONLY"
     policy_version: str = "v1"
     investigation_id: str | None = None
     investigation_run_id: str | None = None

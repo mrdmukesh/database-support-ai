@@ -49,11 +49,17 @@ def audit_api():
         connection = DatabaseConnectionModel(
             organization_id=org.id, workspace_id=workspace.id, engine="sqlite",
             name="Clinical", database_name="clinical", secret_ref="env://TEST_DATABASE_URL",
+            environment_type="test",
         )
         db.add(connection); db.flush()
         investigation = InvestigationModel(
             id="INV-APT-2101", organization_id=org.id, workspace_id=workspace.id,
             created_by_id=admin.id, user_question="Investigate appointment APT-2101.",
+            connection_id=connection.id, connection_name=connection.name,
+            selected_database_name=connection.database_name, environment_type="TEST",
+            policy_name="test_readonly", safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+            environment_source="Registered connection metadata",
+            environment_snapshot_json="{}", environment_telemetry_json="{}",
             llm_audit_outcome="AI_SKIPPED_BY_EVIDENCE_GATE",
             llm_audit_reason="evidence_gate_not_reproduced",
         )
@@ -169,7 +175,7 @@ def test_apt_2101_submission_audits_every_actual_provider_call(
 
     from legacydb_copilot.routers import chat as chat_router
 
-    def run_dynamic(db, payload, _generated_by):
+    def run_dynamic(db, payload, _generated_by, **_environment_context):
         investigation_id = "INV-APT-2101-AUDITED"
         for agent, stage in [
             ("context_discovery_agent", "Metadata Discovery"),

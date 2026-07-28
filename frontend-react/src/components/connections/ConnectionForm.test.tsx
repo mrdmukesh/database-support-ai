@@ -11,6 +11,7 @@ describe("ConnectionForm", () => {
     expect(screen.getByLabelText("Connection string")).toHaveAttribute("type", "password");
     fireEvent.change(screen.getByLabelText("Engine"), { target: { value: "mysql" } });
     fireEvent.change(screen.getByLabelText("Connection name"), { target: { value: "ERP" } });
+    fireEvent.change(screen.getByLabelText("Trusted environment"), { target: { value: "production" } });
     fireEvent.change(screen.getByLabelText("Connection string"), { target: { value: "mysql://user:password@db/erp" } });
     fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
@@ -29,7 +30,7 @@ describe("ConnectionForm", () => {
     render(<ConnectionForm organizationId="ORG-1" workspaces={[workspace]} isSubmitting={false} onSubmit={vi.fn()} />);
     expect(screen.getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual([
       "WS-1", "sql_server", "postgresql", "mysql", "sqlite", "oracle",
-      "production", "uat", "test", "evaluation", "demo",
+      "", "production", "uat", "test", "evaluation", "demo",
     ]);
   });
 });

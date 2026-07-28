@@ -67,6 +67,7 @@ describe("investigation API", () => {
       organization_id: "ORG-1",
       workspace_id: "WS-1",
       connection_id: "DB-1",
+      environment_type: "test",
       user_id: "USER-1",
       question: "Why was payment duplicated?",
       conversation_id: null,

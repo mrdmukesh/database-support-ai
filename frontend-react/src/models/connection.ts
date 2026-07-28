@@ -21,7 +21,7 @@ export interface DatabaseConnectionCreate {
   database_name?: string;
   secret_ref?: string;
   connection_string?: string | null;
-  environment_type?: EnvironmentType;
+  environment_type: EnvironmentType;
   max_scan_rows?: number;
 }
 

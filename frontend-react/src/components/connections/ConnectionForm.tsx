@@ -12,7 +12,7 @@ interface ConnectionFormProps {
 
 export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSubmit }: ConnectionFormProps) {
   const [formKey, setFormKey] = useState(0);
-  const [environment, setEnvironment] = useState<EnvironmentType>("production");
+  const [environment, setEnvironment] = useState<EnvironmentType | "">("");
   const [maxScanRows, setMaxScanRows] = useState(100);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -29,11 +29,11 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       database_name: String(form.get("databaseName") ?? "").trim(),
       secret_ref: String(form.get("secretRef") ?? "").trim(),
       connection_string: connectionString || null,
-      environment_type: String(form.get("environmentType") ?? "production") as DatabaseConnectionCreate["environment_type"],
+      environment_type: String(form.get("environmentType")) as DatabaseConnectionCreate["environment_type"],
       max_scan_rows: Number(form.get("maxScanRows") ?? 500),
     });
     setFormKey((value) => value + 1);
-    setEnvironment("production");
+    setEnvironment("");
     setMaxScanRows(100);
   }
 
@@ -63,12 +63,13 @@ export function ConnectionForm({ organizationId, workspaces, isSubmitting, onSub
       <label htmlFor="connection-database">Database name</label>
       <input id="connection-database" name="databaseName" disabled={isSubmitting} />
       <label htmlFor="connection-environment">Trusted environment</label>
-      <select id="connection-environment" name="environmentType" value={environment} disabled={isSubmitting}
+      <select id="connection-environment" name="environmentType" value={environment} disabled={isSubmitting} required
         onChange={(event) => {
-          const value = event.target.value as EnvironmentType;
+          const value = event.target.value as EnvironmentType | "";
           setEnvironment(value);
           setMaxScanRows(value === "production" ? 100 : value === "uat" ? 500 : 1000);
         }}>
+        <option value="">Select an environment</option>
         <option value="production">Production</option>
         <option value="uat">UAT</option>
         <option value="test">Test</option>

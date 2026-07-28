@@ -22,6 +22,7 @@ export interface InvestigationSubmitRequest {
   organization_id: string;
   workspace_id: string;
   connection_id: string;
+  environment_type: string;
   user_id: string;
   question: string;
   conversation_id?: string | null;

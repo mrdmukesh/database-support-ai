@@ -42,6 +42,12 @@ def _session_and_investigation() -> tuple[Session, InvestigationModel]:
         workspace_id=workspace.id,
         created_by_id=user.id,
         user_question="Investigate",
+        environment_type="TEST",
+        policy_name="test_readonly",
+        safety_profile="NON_PRODUCTION_DEEP_READ_ONLY",
+        environment_source="Registered connection metadata",
+        environment_snapshot_json="{}",
+        environment_telemetry_json="{}",
     )
     db.add_all([organization, workspace, user, investigation])
     db.commit()

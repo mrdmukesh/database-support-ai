@@ -11,6 +11,8 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
+    inspect,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -145,7 +147,7 @@ class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     port: Mapped[int | None] = mapped_column(Integer)
     database_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     secret_ref: Mapped[str] = mapped_column(String(500), nullable=False)
-    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False)
+    environment_type: Mapped[str] = mapped_column(String(40), nullable=False)
     max_scan_rows: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_checked_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
@@ -323,8 +325,13 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     connection_id: Mapped[str] = mapped_column(String, default="", nullable=False, index=True)
     connection_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
-    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False, index=True)
-    policy_name: Mapped[str] = mapped_column(String(80), default="production_strict", nullable=False)
+    selected_database_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    environment_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    policy_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    safety_profile: Mapped[str] = mapped_column(String(80), nullable=False)
+    environment_source: Mapped[str] = mapped_column(String(120), nullable=False)
+    environment_snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    environment_telemetry_json: Mapped[str] = mapped_column(Text, nullable=False)
     policy_version: Mapped[str] = mapped_column(String(40), default="v1", nullable=False)
     policy_audit_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     conversation_id: Mapped[str | None] = mapped_column(
@@ -352,7 +359,6 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     llm_audit_outcome: Mapped[str] = mapped_column(String(80), default="", nullable=False, index=True)
     llm_audit_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="AI_ANSWERED", nullable=False, index=True)
-
     workspace: Mapped["WorkspaceModel"] = relationship(back_populates="investigations")
     feedback_items: Mapped[list["InvestigationFeedbackModel"]] = relationship(
         back_populates="investigation"
@@ -368,6 +374,35 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="investigation",
         cascade="all, delete-orphan",
     )
+
+
+_IMMUTABLE_INVESTIGATION_ENVIRONMENT_FIELDS = (
+    "connection_id",
+    "connection_name",
+    "selected_database_name",
+    "workspace_id",
+    "environment_type",
+    "policy_name",
+    "safety_profile",
+    "environment_source",
+    "environment_snapshot_json",
+    "environment_telemetry_json",
+)
+
+
+@event.listens_for(InvestigationModel, "before_update")
+def _prevent_environment_snapshot_changes(_mapper, _connection, target: InvestigationModel) -> None:
+    state = inspect(target)
+    changed = [
+        field
+        for field in _IMMUTABLE_INVESTIGATION_ENVIRONMENT_FIELDS
+        if state.attrs[field].history.has_changes()
+    ]
+    if changed:
+        raise ValueError(
+            "Investigation environment snapshot is immutable after execution begins: "
+            + ", ".join(changed)
+        )
 
 
 class InvestigationStateTransitionModel(UUIDPrimaryKeyMixin, Base):
@@ -650,8 +685,8 @@ class LLMInvocationAuditModel(UUIDPrimaryKeyMixin, Base):
     organization_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     workspace_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     connection_id: Mapped[str | None] = mapped_column(String(36), index=True)
-    environment_type: Mapped[str] = mapped_column(String(40), default="production", nullable=False, index=True)
-    policy_name: Mapped[str] = mapped_column(String(80), default="production_strict", nullable=False)
+    environment_type: Mapped[str] = mapped_column(String(40), default="UNRESOLVED", nullable=False, index=True)
+    policy_name: Mapped[str] = mapped_column(String(80), default="UNRESOLVED_STRICT_READ_ONLY", nullable=False)
     policy_version: Mapped[str] = mapped_column(String(40), default="v1", nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(36), index=True)
     session_id: Mapped[str | None] = mapped_column(String(120))

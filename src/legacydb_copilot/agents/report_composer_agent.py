@@ -346,15 +346,23 @@ def _intent_sections(bundle: DynamicInvestigationBundle) -> list[ReportSection]:
     if intent == InvestigationIntent.DUPLICATE_DATA:
         return [ReportSection(title="Duplicate Data Analysis", items=["Review duplicate business keys, insert source, retry/idempotency controls, and uniqueness protection."])]
     if intent == InvestigationIntent.PRODUCTION_INVESTIGATION:
+        environment = str((bundle.investigation_policy or {}).get("environment_type") or "").upper()
+        if environment != "PRODUCTION":
+            return [ReportSection(title="Non-Production Incident Analysis", items=["Use connected test/development/demo database evidence, evidence gate results, affected-object discovery, and write-path ranking to explain the reported condition."])]
         return [ReportSection(title="Production Incident Analysis", items=["Use live database evidence, evidence gate results, affected-object discovery, and write-path ranking to explain the reported production condition."])]
     if intent == InvestigationIntent.MISSING_DATA:
         return [ReportSection(title="Missing Data Analysis", items=["Identify the expected record, upstream dependency, guard condition, and validation SQL."])]
     if intent == InvestigationIntent.FAILED_BATCH_JOB:
         return [ReportSection(title="Failed Batch Job Analysis", items=["Review batch status, failed step, error logs, related procedure, and retry/fix plan."])]
     if intent == InvestigationIntent.IMPACT_ANALYSIS:
+        environment = str((bundle.investigation_policy or {}).get("environment_type") or "").upper()
         return [ReportSection(title="Impact Analysis", items=[
             "Analyze procedures, views, reports/queries, jobs, documents, and tests that reference the changed status/state/value/code.",
-            "Do not recommend deployment until regression SQL, rollback, and dependent workflow tests are listed.",
+            (
+                "Do not recommend deployment until regression SQL, rollback, and dependent workflow tests are listed."
+                if environment == "PRODUCTION"
+                else "Recommend corrective actions for the selected non-production environment and list dependent workflow tests."
+            ),
         ])]
     if intent == InvestigationIntent.HEALTH_ASSESSMENT:
         categories = [
@@ -1084,20 +1092,31 @@ def compose_report(
         "Modernization: " + " ".join(bundle.recommendation.modernization),
     ])
     policy = bundle.investigation_policy or {}
-    environment = str(policy.get("environment_type") or "production")
-    environment_label = "Demo / Evaluation" if environment in {"demo", "evaluation"} else environment.upper()
+    environment = str(policy.get("environment_type") or "").upper()
+    environment_label = environment or "UNRESOLVED"
+    safety_profile = str(policy.get("safety_profile") or "")
     policy_items = [
         f"Environment: {environment_label}",
-        f"Investigation Policy: {policy.get('name') or 'production_strict'}",
-        f"Policy Version: {policy.get('policy_version') or 'v1'}",
-        f"Evidence Limit: {policy.get('max_rows') or 100} rows per bounded scan",
-        f"Sensitive Data Masking: {'Enabled' if policy.get('mask_sensitive_data', True) else 'Moderate'}",
-        f"Query Timeout: {policy.get('query_timeout_seconds') or 15} seconds",
+        f"Environment source: {policy.get('environment_source') or 'Unresolved'}",
+        f"Safety profile: {safety_profile or 'UNRESOLVED'}",
+        "Procedure execution permitted: "
+        + ("Yes, read-only only" if policy.get("allow_read_only_procedure_execution") else "No"),
+        "Data modification permitted: No",
+        f"Investigation Policy: {policy.get('name') or 'UNRESOLVED'}",
+        f"Policy Version: {policy.get('policy_version') or 'UNRESOLVED'}",
+        f"Evidence Limit: {policy.get('max_rows')} rows per bounded scan",
+        f"Sensitive Data Masking: {'Enabled' if policy.get('mask_sensitive_data') else 'Disabled'}",
+        f"Query Timeout: {policy.get('query_timeout_seconds')} seconds",
     ]
-    if environment == "production":
+    if environment == "PRODUCTION":
         policy_items.append(
             "Production safeguards may have limited evidence collection. Review the Evidence Gaps section before relying on the conclusion."
         )
+    rollback_sections = (
+        [ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4])]
+        if environment == "PRODUCTION"
+        else []
+    )
     sections = [
         ReportSection(title="Executive Summary", paragraphs=[executive_summary_text]),
         ReportSection(title="Investigation Environment and Policy", items=policy_items),
@@ -1119,7 +1138,7 @@ def compose_report(
                 else bundle.reasoning.proof_of_fix
             ),
         ),
-        ReportSection(title="Rollback", items=bundle.reasoning.rollback_plan[:4]),
+        *rollback_sections,
         ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
         _structured_evidence_gap_section(bundle),
         ReportSection(title="Stage 1 - Understand the Question", items=[

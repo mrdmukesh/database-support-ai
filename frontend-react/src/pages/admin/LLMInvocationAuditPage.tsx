@@ -53,8 +53,8 @@ function PromptDetailDialog({ detail, onClose }: { detail: LLMInvocationDetail; 
         <div><dt>Tokens</dt><dd>{detail.prompt_tokens} input · {detail.completion_tokens} output</dd></div>
         <div><dt>Duration</dt><dd>{detail.duration_ms == null ? "—" : `${detail.duration_ms} ms`}</dd></div>
         <div><dt>Trace</dt><dd>{detail.trace_id ?? detail.correlation_id ?? "—"}</dd></div>
-        <div><dt>Environment</dt><dd>{detail.environment_type ?? "production"}</dd></div>
-        <div><dt>Policy</dt><dd>{detail.policy_name ?? "production_strict"}</dd></div>
+        <div><dt>Environment</dt><dd>{detail.environment_type ?? "UNRESOLVED"}</dd></div>
+        <div><dt>Policy</dt><dd>{detail.policy_name ?? "UNRESOLVED"}</dd></div>
         <div><dt>Started</dt><dd>{new Date(detail.started_at).toLocaleString()}</dd></div>
         <div><dt>Skip / error reason</dt><dd>{detail.error_message_sanitized || "—"}</dd></div>
       </dl>

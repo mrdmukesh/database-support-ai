@@ -298,6 +298,14 @@ def test_verified_unreproduced_evidence_invokes_audited_summary_and_composes_rep
     assert "Data modification permitted: No" in policy_section.items
     assert all(section.title != "Rollback" for section in report.sections)
     assert "Production safeguards may have limited evidence collection" not in str(report)
+    coverage = next(section for section in report.sections if section.title == "Evidence Coverage")
+    assert coverage.tables[0].columns == [
+        "Requested area",
+        "Evidence found",
+        "Claim produced",
+        "Verification status",
+        "Evidence IDs",
+    ]
     assert "reported condition was not reproduced from verified evidence" in str(report).casefold()
 
 

@@ -898,6 +898,78 @@ def _ai_reasoning_trace_section(bundle: DynamicInvestigationBundle) -> ReportSec
     )
 
 
+def _evidence_coverage_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    trace = bundle.ai_debug_trace or {}
+    registry = trace.get("evidence_reference_registry") or []
+    diagnostics = trace.get("claim_verification_diagnostics") or []
+    areas = (
+        ("Employee profile", ("employee", "profile", "entity exists")),
+        ("Payroll status", ("payroll status", "employee")),
+        ("Payroll records", ("payroll record", "payrollitem", "payroll run")),
+        ("Salary history", ("salary", "employeehistory", "pay history")),
+        ("Pay components", ("pay component", "payrollitem")),
+        ("Deductions", ("deduction",)),
+        ("Tax information", ("tax",)),
+        ("Payroll exceptions", ("exception",)),
+        ("Recent transactions", ("transaction", "payment")),
+        ("Recommended next action", ("recommend", "action")),
+    )
+    rows: list[dict[str, str]] = []
+    for area, terms in areas:
+        evidence = [
+            item
+            for item in registry
+            if any(term in str(item.get("title") or "").casefold() for term in terms)
+        ]
+        evidence_ids = {str(item.get("evidence_id") or "") for item in evidence}
+        claims = [
+            item
+            for item in diagnostics
+            if evidence_ids.intersection(item.get("evidence_ids_resolved") or [])
+            and (
+                area.casefold() in str(item.get("raw_claim_text") or "").casefold()
+                or any(
+                    term in str(item.get("raw_claim_text") or "").casefold()
+                    for term in terms
+                )
+            )
+        ]
+        rows.append(
+            {
+                "Requested area": area,
+                "Evidence found": "Yes" if evidence else "No",
+                "Claim produced": "; ".join(
+                    str(item.get("raw_claim_text") or "") for item in claims
+                ) or "No",
+                "Verification status": ", ".join(
+                    sorted(
+                        {
+                            str(item.get("verification_result") or "")
+                            for item in claims
+                        }
+                    )
+                ) or ("EVIDENCE_GAP" if not evidence else "NO_CLAIM"),
+                "Evidence IDs": ", ".join(sorted(evidence_ids)) or "None",
+            }
+        )
+    return ReportSection(
+        title="Evidence Coverage",
+        tables=[
+            ReportTable(
+                title="Requested Investigation Coverage",
+                columns=[
+                    "Requested area",
+                    "Evidence found",
+                    "Claim produced",
+                    "Verification status",
+                    "Evidence IDs",
+                ],
+                rows=rows,
+            )
+        ],
+    )
+
+
 def compose_report(
     *,
     bundle: DynamicInvestigationBundle,
@@ -1124,6 +1196,7 @@ def compose_report(
         _executive_ai_reasoning_section(bundle),
         _executive_key_findings_section(bundle),
         _executive_evidence_summary_section(bundle),
+        _evidence_coverage_section(bundle),
         _write_path_likely_procedure_section(bundle),
         ReportSection(title="Root Cause", items=final_root_cause_items),
         *([section] if (section := _possible_investigation_hypothesis_section(bundle)) else []),

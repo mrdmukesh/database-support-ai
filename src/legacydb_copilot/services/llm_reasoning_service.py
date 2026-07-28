@@ -20,6 +20,11 @@ from legacydb_copilot.agents.reasoning_agent import (
 )
 from legacydb_copilot.config import Settings
 from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
+from legacydb_copilot.services.claim_verification_service import (
+    build_evidence_registry,
+    parse_structured_claim,
+    verify_claim,
+)
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
@@ -295,7 +300,14 @@ def enhance_reasoning_with_llm(
         llm_json = _call_openai_responses(
             settings, payload, debug_trace=debug_trace, **audit_kwargs,
         )
-        enhanced = _merge_llm_reasoning(deterministic_reasoning, llm_json, evidence_records=evidence, debug_trace=debug_trace)
+        enhanced = _merge_llm_reasoning(
+            deterministic_reasoning,
+            llm_json,
+            evidence_records=evidence,
+            correlated_evidence=correlated_evidence,
+            procedure_analysis=procedure_analysis,
+            debug_trace=debug_trace,
+        )
         if reasoning_mode in {
             ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
             ReasoningMode.EVIDENCE_GAP_SUMMARY,
@@ -389,21 +401,30 @@ def _build_llm_payload_unmasked(
     evidence_focus: EvidenceFocus | None,
     reasoning_mode: ReasoningMode = ReasoningMode.NORMAL_ROOT_CAUSE,
 ) -> dict[str, Any]:
+    canonical_evidence = build_evidence_registry(
+        evidence, procedure_analysis, correlated_evidence
+    )
     evidence_items = [
         {
-            "ref": f"SQL-{index}",
-            "purpose": item.purpose,
+            "ref": item.evidence_id,
+            "evidence_id": item.evidence_id,
+            "type": item.type,
+            "title": item.title,
+            "purpose": item.title,
+            "sql": item.sql,
             "sql_generated_by_safe_engine": item.sql,
-            "row_count": len(item.rows),
-            "execution_status": item.execution_status,
+            "columns": list(item.columns),
+            "rows": list(item.rows),
+            "sample_rows": list(item.rows),
+            "row_count": item.row_count,
             "zero_row_result": item.zero_row_result,
             "evidence_semantics": item.evidence_semantics,
             "supports_claim": item.supports_claim,
-            "scan_policy_decision": item.scan_policy_decision,
-            "sample_rows": item.rows[:5],
-            "error": item.error,
+            "included_in_prompt": item.included_in_prompt,
+            "truncated": item.truncated,
         }
-        for index, item in enumerate(evidence, start=1)
+        for item in canonical_evidence
+        if item.type in {"SQL_RESULT", "COLLECTED_EVIDENCE"}
     ]
     procedure_items = [
         {
@@ -476,6 +497,7 @@ def _build_llm_payload_unmasked(
             "risks": deterministic_reasoning.risks,
         },
         "evidence_refs": {
+            "canonical": [item.to_prompt_dict() for item in canonical_evidence],
             "sql": evidence_items,
             "procedures": procedure_items,
             "documents": document_items,
@@ -493,6 +515,14 @@ def _build_llm_payload_unmasked(
         if evidence_focus
         else None,
         "required_json_schema": {
+            "claims": [{
+                "claim_id": "CL-001",
+                "statement": "string",
+                "claim_type": "VERIFIED_FINDING | EVIDENCE_GAP",
+                "evidence_ids": ["SQL-1"],
+                "evidence_gap": None,
+                "recommended_action": None,
+            }],
             "summary": "string",
             "verified_findings": [{"finding": "string", "evidence_refs": ["SQL-1", "PROC-1", "EV-1"]}],
             "verified_absences": [{"finding": "string", "evidence_refs": ["SQL-1"]}],
@@ -686,6 +716,8 @@ def _merge_llm_reasoning(
     llm_json: dict[str, Any],
     *,
     evidence_records: list[EvidenceResult] | None = None,
+    correlated_evidence: list[CorrelatedEvidence] | None = None,
+    procedure_analysis: list[ProcedureAnalysis] | None = None,
     debug_trace: dict[str, Any] | None = None,
 ) -> ReasoningResult:
     """
@@ -709,62 +741,94 @@ def _merge_llm_reasoning(
         The LLM must reason only over collected evidence and must never connect to databases or run SQL.
     """
     validation: dict[str, list[Any]] = {"accepted": [], "rejected": []}
-    cited_root_causes = _cited_items(llm_json.get("likely_root_causes"), "conclusion", validation=validation)
-    raw_root_causes = llm_json.get("likely_root_causes")
-    generated_claim_count = len(
-        [
-            item
-            for item in (raw_root_causes if isinstance(raw_root_causes, list) else [])
-            if isinstance(item, dict) and str(item.get("conclusion") or "").strip()
-        ]
+    raw_root_causes = (
+        llm_json.get("claims")
+        if isinstance(llm_json.get("claims"), list)
+        else llm_json.get("likely_root_causes")
     )
+    raw_root_causes = raw_root_causes if isinstance(raw_root_causes, list) else []
+    registry = build_evidence_registry(
+        evidence_records or [],
+        procedure_analysis or [],
+        correlated_evidence or [],
+    )
+    claim_diagnostics: list[dict[str, Any]] = []
+    root_causes: list[RootCauseClaim] = []
+    evidence_gap_claims: list[str] = []
+    for index, raw_claim in enumerate(raw_root_causes, start=1):
+        parsed = parse_structured_claim(raw_claim, index)
+        if parsed is None:
+            continue
+        decision = verify_claim(parsed, registry)
+        diagnostic = decision.to_dict()
+        if not _domain_compatible(parsed.statement, evidence_records or []):
+            diagnostic.update(
+                verification_result="REJECTED",
+                rejection_code="domain_mismatch",
+                rejection_detail=(
+                    "Claim terminology does not match the investigation evidence domain."
+                ),
+            )
+            claim_diagnostics.append(diagnostic)
+            validation["rejected"].append(
+                {
+                    "claim": parsed.statement,
+                    "claim_id": parsed.claim_id,
+                    "decision": "excluded_from_report",
+                    "reason": "domain_mismatch",
+                    "detail": diagnostic["rejection_detail"],
+                    "missing_evidence_refs": [],
+                    "contradictory_evidence_ids": [],
+                }
+            )
+            continue
+        claim_diagnostics.append(diagnostic)
+        if decision.verification_result == "VERIFIED":
+            root_causes.append(
+                RootCauseClaim(
+                    conclusion=parsed.statement,
+                    evidence_refs=list(decision.evidence_ids_resolved),
+                    status=RootCauseSupportStatus.VERIFIED,
+                )
+            )
+            validation["accepted"].append(
+                {
+                    "claim": parsed.statement,
+                    "claim_id": parsed.claim_id,
+                    "evidence_refs": list(decision.evidence_ids_resolved),
+                }
+            )
+        elif decision.verification_result == "EVIDENCE_GAP":
+            evidence_gap_claims.append(parsed.evidence_gap or parsed.statement)
+        else:
+            validation["rejected"].append(
+                {
+                    "claim": parsed.statement,
+                    "claim_id": parsed.claim_id,
+                    "decision": "excluded_from_report",
+                    "reason": decision.rejection_code,
+                    "detail": decision.rejection_detail,
+                    "missing_evidence_refs": [
+                        ref
+                        for ref in decision.evidence_ids_requested
+                        if ref not in decision.evidence_ids_resolved
+                    ],
+                    "contradictory_evidence_ids": list(
+                        decision.contradictory_evidence_ids
+                    ),
+                }
+            )
+    generated_claim_count = len(claim_diagnostics)
     root_causes = [
         claim
-        for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else [])
-        if isinstance(raw_claim, dict) and raw_claim.get("evidence_refs")
-        for claim in [convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])]
-        if (
-            claim is not None
-            and claim.status == RootCauseSupportStatus.VERIFIED
-            and _domain_compatible(claim.conclusion, evidence_records or [])
-        )
+        for claim in root_causes
+        if _domain_compatible(claim.conclusion, evidence_records or [])
     ]
-    verified_root_text = {claim.conclusion for claim in root_causes}
-    validation["accepted"] = [
-        item
-        for item in validation["accepted"]
-        if item.get("claim") in verified_root_text
-    ]
-    for raw_claim in (raw_root_causes if isinstance(raw_root_causes, list) else []):
-        if not isinstance(raw_claim, dict):
-            continue
-        conclusion = str(raw_claim.get("conclusion") or "").strip()
-        if not conclusion or conclusion in verified_root_text:
-            continue
-        converted = convert_llm_claim_to_root_cause_claim(raw_claim, evidence_records or [])
-        validation["rejected"].append({
-            "claim": conclusion,
-            "claim_id": str(raw_claim.get("claim_id") or ""),
-            "decision": "excluded_from_report",
-            "reason": (
-                "domain_mismatch"
-                if converted is not None
-                and converted.status == RootCauseSupportStatus.VERIFIED
-                and not _domain_compatible(conclusion, evidence_records or [])
-                else
-                "missing_evidence_refs"
-                if converted is None or not converted.evidence_refs
-                else "invalid_evidence_refs"
-            ),
-            "missing_evidence_refs": (
-                converted.evidence_refs
-                if converted is not None
-                else []
-            ),
-        })
     verified_claim_count = len([claim for claim in root_causes if claim.status == RootCauseSupportStatus.VERIFIED])
-    rejected_claim_count = max(generated_claim_count - verified_claim_count, 0)
-    available_evidence_ids = {item.evidence_id for item in (evidence_records or [])}
+    rejected_claim_count = sum(
+        item["verification_result"] == "REJECTED" for item in claim_diagnostics
+    )
+    available_evidence_ids = {item.evidence_id for item in registry}
     fixes = _safeguard_remediation_steps(
         _cited_items(
             llm_json.get("recommended_fix"),
@@ -801,6 +865,36 @@ def _merge_llm_reasoning(
     if debug_trace is not None:
         debug_trace["validated_citations"] = validation["accepted"]
         debug_trace["rejected_or_unsupported_claims"] = validation["rejected"]
+        debug_trace["claim_verification_diagnostics"] = claim_diagnostics
+        debug_trace["evidence_reference_registry"] = [
+            {
+                "evidence_id": item.evidence_id,
+                "type": item.type,
+                "title": item.title,
+                "columns": list(item.columns),
+                "row_count": item.row_count,
+                "zero_row_result": item.zero_row_result,
+                "included_in_prompt": item.included_in_prompt,
+                "truncated": item.truncated,
+            }
+            for item in registry
+        ]
+        debug_trace["evidence_items_created"] = len(registry)
+        debug_trace["evidence_items_sent_to_llm"] = sum(
+            item.included_in_prompt and not item.truncated for item in registry
+        )
+        debug_trace["evidence_items_truncated"] = sum(
+            item.truncated or not item.included_in_prompt for item in registry
+        )
+        debug_trace["claims_generated"] = generated_claim_count
+        debug_trace["claims_parsed"] = len(claim_diagnostics)
+        debug_trace["claims_verified"] = verified_claim_count
+        debug_trace["claims_rejected"] = rejected_claim_count
+        debug_trace["citation_resolution_failures"] = sum(
+            item["rejection_code"]
+            in {"EVIDENCE_ID_NOT_FOUND", "MISSING_CITATIONS", "EVIDENCE_NOT_IN_PROMPT"}
+            for item in claim_diagnostics
+        )
         debug_trace["llm_invoked"] = bool(debug_trace.get("ai_reasoning_invoked"))
         debug_trace["generated_claim_count"] = generated_claim_count
         debug_trace["verified_claim_count"] = verified_claim_count
@@ -815,14 +909,15 @@ def _merge_llm_reasoning(
             debug_trace["skip_reason"] = "llm_claims_unverified_or_missing_citations"
             debug_trace["verification_status"] = "none_verified"
         elif rejected_claim_count > 0:
-            debug_trace["invocation_status"] = "completed_with_partial_verification"
+            debug_trace["invocation_status"] = "completed_partial_verification"
             debug_trace["skip_reason"] = "none"
             debug_trace["verification_status"] = "partial"
         else:
             debug_trace["invocation_status"] = "completed"
             debug_trace["skip_reason"] = "none"
             debug_trace["verification_status"] = "verified"
-    if not cited_root_causes or not root_causes:
+        debug_trace["final_reasoning_status"] = debug_trace["invocation_status"]
+    if not root_causes:
         return base
     # Raw provider narrative is audit-only. Visible prose is composed from the
     # deterministic summary and claims that passed evidence-reference validation.
@@ -834,7 +929,11 @@ def _merge_llm_reasoning(
         base,
         summary=" ".join(summary_parts),
         likely_root_causes=root_causes,
-        missing_evidence=_string_list(llm_json.get("missing_evidence")) or base.missing_evidence,
+        missing_evidence=(
+            evidence_gap_claims
+            or _string_list(llm_json.get("missing_evidence"))
+            or base.missing_evidence
+        ),
         recommended_fix=fixes or base.recommended_fix,
         test_cases=test_cases or base.test_cases,
         proof_of_fix=proof or base.proof_of_fix,

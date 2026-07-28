@@ -210,7 +210,7 @@ def _execute_lookup(connector, targets: list[tuple[TableMetadata, str]], value: 
 
 def _business_key_columns(table: TableMetadata) -> list[str]:
     primary = set(table.primary_key or [])
-    return list(dict.fromkeys(
+    columns = list(dict.fromkeys(
         column for column in table.columns
         if column in primary
         or re.search(
@@ -219,6 +219,22 @@ def _business_key_columns(table: TableMetadata) -> list[str]:
             re.I,
         )
     ))
+    return sorted(columns, key=_identifier_column_rank)
+
+
+def _identifier_column_rank(column: str) -> tuple[int, str]:
+    normalized = column.casefold().replace("_", "")
+    if normalized == "businesskey":
+        return (0, normalized)
+    if normalized.endswith("number"):
+        return (1, normalized)
+    if normalized.endswith(("code", "key", "reference", "ref")):
+        return (2, normalized)
+    if normalized.endswith("id"):
+        return (3, normalized)
+    if normalized.endswith("name"):
+        return (5, normalized)
+    return (4, normalized)
 
 
 def _safe_candidate_columns(table: TableMetadata, key_column: str) -> list[str]:

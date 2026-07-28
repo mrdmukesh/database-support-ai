@@ -78,6 +78,38 @@ def test_camel_case_business_key_is_used_for_sql_server_lookup() -> None:
     assert result.resolutions[0].matched_value == "SHP-5001"
 
 
+def test_employee_identifier_prefers_business_key_or_number_over_name() -> None:
+    table = TableMetadata(
+        "dbo.Employee",
+        ["EmployeeId", "EmployeeName", "EmployeeNumber", "BusinessKey", "Status"],
+        10,
+        ["EmployeeId"],
+        [],
+        [],
+    )
+    result = resolve_entities(
+        FakeConnector(
+            {
+                "BusinessKey AS NVARCHAR(MAX)) = 'EMP-1001'": [
+                    {"BusinessKey": "EMP-1001", "Status": "Active"}
+                ],
+                "EmployeeNumber AS NVARCHAR(MAX)) = 'EMP-1001'": [
+                    {"EmployeeNumber": "EMP-1001", "Status": "Active"}
+                ],
+                "EmployeeName AS NVARCHAR(MAX)) = 'EMP-1001'": [
+                    {"EmployeeName": "EMP-1001", "Status": "Wrong target"}
+                ],
+            }
+        ),
+        metadata(table),
+        extract_entities("Investigate employee EMP-1001"),
+    )
+
+    assert result.status == "resolved"
+    assert result.resolutions[0].resolved_column in {"BusinessKey", "EmployeeNumber"}
+    assert result.resolutions[0].resolved_column != "EmployeeName"
+
+
 def test_one_partial_candidate_is_resolved_and_recorded() -> None:
     result = resolve_entities(
         FakeConnector({"LIKE '%RUN-2026%'": [{"record_id": "RUN-2026-07-A", "record_status": "DONE"}]}),

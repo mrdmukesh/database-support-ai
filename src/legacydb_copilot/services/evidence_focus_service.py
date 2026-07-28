@@ -288,6 +288,7 @@ def _infer_business_key(intent: InvestigationIntent, affected_object: str, entit
         if not _is_primary_key(column, table)
         and re.search(r"(_number|_code|_ref|_key|name)$", column.lower())
     ]
+    natural_cols.sort(key=_business_key_column_rank)
     duplicate_cols = _duplicate_group_columns(evidence)
     for column in duplicate_cols:
         if column in table.columns and not _is_primary_key(column, table):
@@ -304,6 +305,19 @@ def _selected_business_key_value(entities: EntityExtractionResult, affected_obje
     if "transfer" not in leaf:
         return None
     return typed_transfer_identifier(entities)
+
+
+def _business_key_column_rank(column: str) -> tuple[int, str]:
+    normalized = column.casefold().replace("_", "")
+    if normalized == "businesskey":
+        return (0, normalized)
+    if normalized.endswith("number"):
+        return (1, normalized)
+    if normalized.endswith(("code", "key", "ref", "reference")):
+        return (2, normalized)
+    if normalized.endswith("name"):
+        return (4, normalized)
+    return (3, normalized)
 
 
 def _parent_business_key_from_duplicate_evidence(evidence: list[EvidenceResult]) -> str | None:

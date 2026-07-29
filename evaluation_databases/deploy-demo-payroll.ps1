@@ -153,3 +153,22 @@ try {
 } finally {
     $env:SQLCMDPASSWORD = $previousSqlCmdPassword
 }
+
+$previousSqlCmdPassword = $env:SQLCMDPASSWORD
+$env:SQLCMDPASSWORD = $env:EVAL_DEMO_PAYROLL_READER_PASSWORD
+try {
+    & sqlcmd -S $server -U $ReaderPrincipal -N -b -d $database -Q @'
+SET NOCOUNT ON;
+IF DB_NAME() <> N'EvalDemoPayrollV2'
+    THROW 51140, 'Reader validation refused: unexpected database identity', 1;
+SELECT
+    DB_NAME() AS DatabaseName,
+    COUNT_BIG(*) AS EmployeeRowCount
+FROM dbo.Employee;
+'@
+    if ($LASTEXITCODE -ne 0) {
+        throw 'EvalDemoPayrollV2 reader table-access validation failed.'
+    }
+} finally {
+    $env:SQLCMDPASSWORD = $previousSqlCmdPassword
+}

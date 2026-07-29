@@ -205,6 +205,10 @@ def test_lifecycle_requires_explicit_database_allowlist(
 def test_lifecycle_requires_exact_host_allowlist(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv(
+        "EVAL_DEMO_PAYROLL_ALLOWED_SQL_HOSTS",
+        raising=False,
+    )
     monkeypatch.setenv("EVAL_SQL_SERVER", "evaluation.example.test,1433")
     monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
     monkeypatch.setenv("EVAL_SQL_PASSWORD", "not-a-real-secret")
@@ -221,6 +225,56 @@ def test_lifecycle_requires_exact_host_allowlist(
 
     with pytest.raises(ValueError, match="explicitly listed"):
         build_demo_payroll_lifecycle()
+
+
+def test_lifecycle_focused_host_allowlist_takes_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_SQL_SERVER",
+        "focused.example.test,1433",
+    )
+    monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_ALLOWED_SQL_HOSTS",
+        "focused.example.test",
+    )
+    monkeypatch.setenv("EVAL_ALLOWED_SQL_HOSTS", "other.example.test")
+    monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
+    monkeypatch.setenv("EVAL_SQL_PASSWORD", "admin-secret")
+    monkeypatch.setenv("EVAL_ALLOWED_DATABASES", "EvalDemoPayrollV2")
+    monkeypatch.setenv("EVAL_DEMO_PAYROLL_READER", "dedicated_reader")
+    monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_READER_PASSWORD",
+        "reader-secret",
+    )
+
+    lifecycle = build_demo_payroll_lifecycle()
+
+    assert lifecycle.allowed_hosts == {"focused.example.test"}
+
+
+def test_lifecycle_uses_general_host_allowlist_when_focused_is_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv(
+        "EVAL_DEMO_PAYROLL_ALLOWED_SQL_HOSTS",
+        raising=False,
+    )
+    monkeypatch.delenv("EVAL_DEMO_PAYROLL_SQL_SERVER", raising=False)
+    monkeypatch.setenv("EVAL_SQL_SERVER", "general.example.test,1433")
+    monkeypatch.setenv("EVAL_ALLOWED_SQL_HOSTS", "general.example.test")
+    monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
+    monkeypatch.setenv("EVAL_SQL_PASSWORD", "admin-secret")
+    monkeypatch.setenv("EVAL_ALLOWED_DATABASES", "EvalDemoPayrollV2")
+    monkeypatch.setenv("EVAL_DEMO_PAYROLL_READER", "dedicated_reader")
+    monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_READER_PASSWORD",
+        "reader-secret",
+    )
+
+    lifecycle = build_demo_payroll_lifecycle()
+
+    assert lifecycle.allowed_hosts == {"general.example.test"}
 
 
 @pytest.mark.parametrize("same_field", ["username", "password"])
@@ -335,3 +389,13 @@ def test_deployment_does_not_emit_or_persist_secrets() -> None:
     assert "Set-Content" not in deploy
     assert "Add-Content" not in deploy
     assert "Out-File" not in deploy
+
+
+def test_reader_validation_aggregates_without_grouping_by_database_name() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    assert "DB_NAME() AS DatabaseName" in deploy
+    assert "COUNT_BIG(*) AS EmployeeRowCount" in deploy
+    assert not re.search(r"\bAS\s+RowCount\b", deploy, re.I)
+    assert "FROM dbo.Employee" in deploy
+    assert not re.search(r"GROUP\s+BY\s+DB_NAME\s*\(", deploy, re.I)

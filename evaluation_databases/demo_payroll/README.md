@@ -28,6 +28,12 @@ Provision Azure SQL with:
   -ConfirmIsolatedEvaluationTarget
 ```
 
+`-ResourceGroup` may be supplied by `EVAL_DEMO_PAYROLL_RESOURCE_GROUP`. It is
+required and is never auto-discovered. The deployment creates or validates the
+contained SQL user named by `EVAL_DEMO_PAYROLL_READER` using
+`EVAL_DEMO_PAYROLL_READER_PASSWORD`. Existing contained users are authenticated
+with that credential; their passwords are never reset.
+
 Add `EvalDemoPayrollV2` to `EVAL_ALLOWED_DATABASES`. Configure a separate
 application registration and connection ID under an opt-in focused-pack
 configuration; do not repoint the existing payroll connection.
@@ -37,6 +43,7 @@ The focused lifecycle reads:
 - `EVAL_DEMO_PAYROLL_SQL_SERVER` (or `EVAL_SQL_SERVER`)
 - `EVAL_DEMO_PAYROLL_ALLOWED_SQL_HOSTS` (or `EVAL_ALLOWED_SQL_HOSTS`)
 - `EVAL_SQL_ADMIN` and `EVAL_SQL_PASSWORD` for reset/setup/cleanup
+- `EVAL_DEMO_PAYROLL_RESOURCE_GROUP`
 - `EVAL_DEMO_PAYROLL_READER` and the required
   `EVAL_DEMO_PAYROLL_READER_PASSWORD` for application visibility checks
 

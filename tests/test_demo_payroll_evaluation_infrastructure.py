@@ -16,6 +16,7 @@ from evaluation.demo_payroll_config import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SQL_ROOT = ROOT / "evaluation_databases" / "demo_payroll" / "sql"
+DEPLOY_PATH = ROOT / "evaluation_databases" / "deploy-demo-payroll.ps1"
 
 
 def test_isolated_database_package_has_complete_repeatable_lifecycle() -> None:
@@ -159,6 +160,10 @@ def test_lifecycle_reuses_guarded_sqlcmd_runner(
     monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
     monkeypatch.setenv("EVAL_SQL_PASSWORD", "not-a-real-secret")
     monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_READER",
+        "dedicated_reader",
+    )
+    monkeypatch.setenv(
         "EVAL_DEMO_PAYROLL_READER_PASSWORD",
         "not-a-real-reader-secret",
     )
@@ -183,6 +188,10 @@ def test_lifecycle_requires_explicit_database_allowlist(
     monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
     monkeypatch.setenv("EVAL_SQL_PASSWORD", "not-a-real-secret")
     monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_READER",
+        "dedicated_reader",
+    )
+    monkeypatch.setenv(
         "EVAL_DEMO_PAYROLL_READER_PASSWORD",
         "not-a-real-reader-secret",
     )
@@ -199,6 +208,10 @@ def test_lifecycle_requires_exact_host_allowlist(
     monkeypatch.setenv("EVAL_SQL_SERVER", "evaluation.example.test,1433")
     monkeypatch.setenv("EVAL_SQL_ADMIN", "evaluation_admin")
     monkeypatch.setenv("EVAL_SQL_PASSWORD", "not-a-real-secret")
+    monkeypatch.setenv(
+        "EVAL_DEMO_PAYROLL_READER",
+        "dedicated_reader",
+    )
     monkeypatch.setenv(
         "EVAL_DEMO_PAYROLL_READER_PASSWORD",
         "not-a-real-reader-secret",
@@ -233,10 +246,36 @@ def test_lifecycle_rejects_administrator_reader_credentials(
         build_demo_payroll_lifecycle()
 
 
+@pytest.mark.parametrize(
+    "missing_name",
+    [
+        "EVAL_DEMO_PAYROLL_READER",
+        "EVAL_DEMO_PAYROLL_READER_PASSWORD",
+    ],
+)
+def test_lifecycle_requires_both_reader_settings(
+    monkeypatch: pytest.MonkeyPatch,
+    missing_name: str,
+) -> None:
+    settings = {
+        "EVAL_SQL_SERVER": "evaluation.example.test,1433",
+        "EVAL_SQL_ADMIN": "evaluation_admin",
+        "EVAL_SQL_PASSWORD": "admin-secret",
+        "EVAL_ALLOWED_SQL_HOSTS": "evaluation.example.test",
+        "EVAL_ALLOWED_DATABASES": "EvalDemoPayrollV2",
+        "EVAL_DEMO_PAYROLL_READER": "dedicated_reader",
+        "EVAL_DEMO_PAYROLL_READER_PASSWORD": "reader-secret",
+    }
+    for name, value in settings.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv(missing_name)
+
+    with pytest.raises(KeyError):
+        build_demo_payroll_lifecycle()
+
+
 def test_deployment_targets_only_isolated_database() -> None:
-    deploy = (
-        ROOT / "evaluation_databases" / "deploy-demo-payroll.ps1"
-    ).read_text(encoding="utf-8")
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
 
     assert "$database = 'EvalDemoPayrollV2'" in deploy
     assert "$sourceDatabase = 'DemoPayrollV2'" in deploy
@@ -246,3 +285,53 @@ def test_deployment_targets_only_isolated_database() -> None:
     assert "-d $sourceDatabase" not in deploy
     assert "06_configure_reader.sql" in deploy
     assert "ConfigureReader" not in deploy
+
+
+def test_deployment_requires_reader_settings_and_distinct_credentials() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    assert "EVAL_DEMO_PAYROLL_READER" in deploy
+    assert "EVAL_DEMO_PAYROLL_READER_PASSWORD" in deploy
+    assert "EVAL_SQL_ADMIN" in deploy
+    assert "EVAL_SQL_PASSWORD" in deploy
+    assert "must differ from administrator credentials" in deploy
+
+
+def test_deployment_requires_exact_host_and_database() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    assert "$database = 'EvalDemoPayrollV2'" in deploy
+    assert "$sqlHost -notin $allowedHosts" in deploy
+    assert "DB_NAME() <> N'EvalDemoPayrollV2'" in deploy
+    assert "EVAL_DEMO_PAYROLL_RESOURCE_GROUP" in deploy
+    assert "az sql server list" not in deploy
+
+
+def test_contained_reader_precedes_permission_configuration() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    creation = deploy.index("CREATE USER ")
+    validation = deploy.index("$readerConnection.Open()")
+    permissions = deploy.index("06_configure_reader.sql")
+
+    assert creation < validation < permissions
+
+
+def test_existing_reader_is_validated_without_password_reset() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    assert "authentication_type_desc" in deploy
+    assert "Existing reader principal is not a contained SQL user" in deploy
+    assert "ALTER USER" not in deploy
+    assert "could not be validated with the approved credential" in deploy
+
+
+def test_deployment_does_not_emit_or_persist_secrets() -> None:
+    deploy = DEPLOY_PATH.read_text(encoding="utf-8")
+
+    assert not re.search(r"@authArgs.*['\"]-P['\"]", deploy)
+    assert "Write-Output $env:EVAL_SQL_PASSWORD" not in deploy
+    assert "Write-Output $env:EVAL_DEMO_PAYROLL_READER_PASSWORD" not in deploy
+    assert "Set-Content" not in deploy
+    assert "Add-Content" not in deploy
+    assert "Out-File" not in deploy

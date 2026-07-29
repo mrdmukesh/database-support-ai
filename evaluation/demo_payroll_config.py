@@ -126,10 +126,7 @@ def build_demo_payroll_lifecycle() -> SqlCmdDatabaseLifecycle:
         )
     admin_username = os.environ["EVAL_SQL_ADMIN"]
     admin_password = os.environ["EVAL_SQL_PASSWORD"]
-    reader_username = os.getenv(
-        "EVAL_DEMO_PAYROLL_READER",
-        "eval_demo_payroll_reader",
-    )
+    reader_username = os.environ["EVAL_DEMO_PAYROLL_READER"]
     reader_password = os.environ["EVAL_DEMO_PAYROLL_READER_PASSWORD"]
     if (
         reader_username.casefold() == admin_username.casefold()

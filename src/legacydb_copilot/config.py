@@ -32,11 +32,11 @@ class Settings:
     llm_model: str = "gpt-4.1-mini"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-    llm_request_timeout_seconds: float = 30.0
+    llm_request_timeout_seconds: float = 60.0
     llm_retry_attempts: int = 2
     llm_retry_backoff_seconds: float = 0.5
     llm_retry_jitter_seconds: float = 0.25
-    llm_total_timeout_seconds: float = 65.0
+    llm_total_timeout_seconds: float = 125.0
     llm_input_cost_per_million: float = 0.0
     llm_output_cost_per_million: float = 0.0
     llm_circuit_breaker_threshold: int = 5
@@ -99,11 +99,15 @@ class Settings:
             llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-            llm_request_timeout_seconds=float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "30")),
+            llm_request_timeout_seconds=float(
+                os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "60")
+            ),
             llm_retry_attempts=max(1, int(os.getenv("LLM_RETRY_ATTEMPTS", "2"))),
             llm_retry_backoff_seconds=max(0.0, float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5"))),
             llm_retry_jitter_seconds=max(0.0, float(os.getenv("LLM_RETRY_JITTER_SECONDS", "0.25"))),
-            llm_total_timeout_seconds=max(0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "65"))),
+            llm_total_timeout_seconds=max(
+                0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "125"))
+            ),
             llm_input_cost_per_million=max(0.0, float(os.getenv("LLM_INPUT_COST_PER_MILLION", "0"))),
             llm_output_cost_per_million=max(0.0, float(os.getenv("LLM_OUTPUT_COST_PER_MILLION", "0"))),
             llm_circuit_breaker_threshold=max(1, int(os.getenv("LLM_CIRCUIT_BREAKER_THRESHOLD", "5"))),

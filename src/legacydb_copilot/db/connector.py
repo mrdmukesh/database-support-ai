@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-import logging
 import hashlib
 import json
+import logging
 import time
 from typing import Any
 
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.engine import Engine
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Engine, make_url
 
 from legacydb_copilot.common import DomainError
 from legacydb_copilot.databases import DatabaseEngine
@@ -102,6 +100,7 @@ class DatabaseConnector:
         try:
             conn_string, connect_args = self._build_connection_config()
             engine_options: dict[str, Any] = {}
+            pool_pre_ping = True
             if self.database_engine == DatabaseEngine.SQL_SERVER:
                 # Investigation connections execute read-only statements. Azure SQL/ODBC can
                 # otherwise hang while SQLAlchemy rolls back an inspector connection on close.
@@ -109,16 +108,24 @@ class DatabaseConnector:
                     isolation_level="AUTOCOMMIT",
                     pool_reset_on_return=None,
                     skip_autocommit_rollback=True,
+                    pool_recycle=60,
                 )
+                pool_pre_ping = False
             self._engine = create_engine(
                 conn_string,
                 pool_size=5,
                 max_overflow=10,
-                pool_pre_ping=True,
+                pool_pre_ping=pool_pre_ping,
                 connect_args=connect_args,
                 echo=False,
                 **engine_options,
             )
+            if self.database_engine == DatabaseEngine.SQL_SERVER:
+                @event.listens_for(self._engine, "connect")
+                def _set_sql_server_query_timeout(dbapi_connection, connection_record):
+                    del connection_record
+                    dbapi_connection.timeout = 30
+
             # Test the connection
             with self._engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
@@ -217,7 +224,12 @@ class DatabaseConnector:
         try:
             adapter = self.get_adapter()
 
-            if table_name not in adapter.list_tables():
+            known_tables = (
+                self._schema_metadata_cache.tables
+                if self._schema_metadata_cache is not None
+                else adapter.list_tables()
+            )
+            if table_name not in known_tables:
                 raise DomainError(f"Table not found: {table_name}")
 
             # Get columns
@@ -263,6 +275,29 @@ class DatabaseConnector:
             raise
         except Exception as exc:
             raise DatabaseConnectionError(f"Failed to get table schema: {str(exc)}") from exc
+
+    def get_table_columns(self, table_name: str) -> list[dict[str, Any]]:
+        """Get lightweight column metadata without reflecting keys and indexes."""
+        try:
+            return self.get_adapter().list_columns(table_name)
+        except Exception as exc:
+            raise DatabaseConnectionError(
+                f"Failed to get table columns: {str(exc)}"
+            ) from exc
+
+    def get_table_search_schema(self, table_name: str) -> dict[str, Any]:
+        """Return metadata needed for candidate search without optional SQL Server catalogs."""
+        if self.database_engine != DatabaseEngine.SQL_SERVER:
+            return self.get_table_schema(table_name)
+        return {
+            "table_name": table_name,
+            "columns": self.get_table_columns(table_name),
+            "primary_key": [],
+            "foreign_keys": [],
+            "indexes": [],
+            "enrichment_loaded": False,
+            "relationship_metadata_status": "not_loaded",
+        }
 
     def execute_select_query(self, sql: str, limit: int = 1000) -> list[dict[str, Any]]:
         """Execute a SELECT query safely with result limiting."""

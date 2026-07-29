@@ -2107,6 +2107,24 @@ def test_explicit_missing_table_does_not_fallback_to_semantic_alternatives() -> 
     assert result.exact_procedures_found == []
 
 
+def test_procedure_connector_word_is_not_treated_as_explicit_object() -> None:
+    connector = _SchemaConnector(
+        {
+            "employees": {
+                "columns": [{"name": "employee_id"}, {"name": "date_of_birth"}],
+                "primary_key": ["employee_id"],
+            },
+        },
+        procedures=["usp_get_employee_age"],
+    )
+    question = "Trace the date of birth and relevant stored procedure or query logic."
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert not result.target_object_not_found
+    assert result.exact_procedures_requested == []
+
+
 def test_connection_pool_recreates_when_database_changes_for_same_connection_id() -> None:
     pool = ConnectionPool()
     first = pool.get_or_create("conn-1", DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_a")

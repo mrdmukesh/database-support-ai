@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import nullcontext
+from unittest.mock import Mock
 
 from legacydb_copilot.agents.entity_extraction_agent import extract_entities
 from legacydb_copilot.databases import DatabaseEngine
@@ -151,3 +152,157 @@ def test_connector_and_existing_metadata_consumers_keep_qualified_names(monkeypa
     assert result.tables[0].name == "eval.transport_work_orders"
     assert result.tables[0].foreign_keys[0]["referred_table"] == "eval.shipments"
     assert result.views == ["eval.vw_shipping_operations_1"]
+
+
+def test_table_schema_reuses_cached_object_inventory(monkeypatch):
+    adapter = _adapter(monkeypatch)
+    connector = DatabaseConnector(DatabaseEngine.SQL_SERVER, "unused")
+    connector._engine = adapter.engine
+    connector._adapter = adapter
+    connector._schema_metadata_cache = SchemaMetadata(
+        "sql_server",
+        ["eval.transport_work_orders"],
+        [],
+        [],
+        "test",
+    )
+    connector._schema_metadata_cached_at = 1.0
+
+    def unexpected_inventory_refresh():
+        raise AssertionError("cached table inventory must not be re-enumerated")
+
+    monkeypatch.setattr(adapter, "list_tables", unexpected_inventory_refresh)
+
+    schema = connector.get_table_schema("eval.transport_work_orders")
+
+    assert schema["table_name"] == "eval.transport_work_orders"
+
+
+def test_lightweight_columns_do_not_reflect_keys_or_indexes(monkeypatch):
+    adapter = _adapter(monkeypatch)
+    connector = DatabaseConnector(DatabaseEngine.SQL_SERVER, "unused")
+    connector._engine = adapter.engine
+    connector._adapter = adapter
+
+    monkeypatch.setattr(
+        adapter,
+        "list_foreign_keys",
+        lambda name: (_ for _ in ()).throw(AssertionError("foreign keys reflected")),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "list_indexes",
+        lambda name: (_ for _ in ()).throw(AssertionError("indexes reflected")),
+    )
+
+    columns = connector.get_table_columns("eval.transport_work_orders")
+
+    assert [column["name"] for column in columns] == ["ShipmentsId"]
+
+    search_schema = connector.get_table_search_schema(
+        "eval.transport_work_orders"
+    )
+    assert search_schema["foreign_keys"] == []
+    assert search_schema["indexes"] == []
+    assert search_schema["enrichment_loaded"] is False
+    assert search_schema["relationship_metadata_status"] == "not_loaded"
+
+
+def test_sql_server_candidate_search_skips_relationship_enrichment(monkeypatch):
+    adapter = _adapter(monkeypatch)
+    connector = DatabaseConnector(DatabaseEngine.SQL_SERVER, "unused")
+    connector._engine = adapter.engine
+    connector._adapter = adapter
+    foreign_key_calls = []
+    index_calls = []
+    monkeypatch.setattr(
+        adapter,
+        "list_foreign_keys",
+        lambda name: foreign_key_calls.append(name),
+    )
+    monkeypatch.setattr(
+        adapter,
+        "list_indexes",
+        lambda name: index_calls.append(name),
+    )
+    metadata = SchemaMetadata(
+        "sql_server",
+        adapter.list_tables(),
+        adapter.list_views(),
+        adapter.list_procedures(),
+        "test",
+    )
+
+    result = search_metadata(
+        connector,
+        "Investigate transport work order processing",
+        extract_entities("Investigate transport work order processing"),
+        schema_metadata=metadata,
+    )
+
+    selected = next(
+        table
+        for table in result.tables
+        if table.name == "eval.transport_work_orders"
+    )
+    assert selected.column_types == {"ShipmentsId": "BIGINT"}
+    assert selected.enrichment_loaded is False
+    assert selected.relationship_metadata_status == "not_loaded"
+    assert foreign_key_calls == []
+    assert index_calls == []
+    trace = next(
+        item
+        for item in result.candidate_trace
+        if item["name"] == "eval.transport_work_orders"
+    )
+    assert trace["relationship_metadata_status"] == "not_loaded"
+
+
+def test_non_sql_server_search_schema_keeps_detailed_reflection(monkeypatch):
+    connector = DatabaseConnector(DatabaseEngine.POSTGRESQL, "unused")
+    detailed = {
+        "table_name": "public.orders",
+        "columns": [{"name": "id", "type": "INTEGER"}],
+        "primary_key": ["id"],
+        "foreign_keys": [{"name": "fk_customer"}],
+        "indexes": [{"name": "ix_orders"}],
+    }
+    monkeypatch.setattr(connector, "get_table_schema", lambda name: detailed)
+
+    assert connector.get_table_search_schema("public.orders") is detailed
+
+
+def test_sql_server_connections_receive_a_bounded_query_timeout(monkeypatch):
+    dbapi_connection = Mock()
+    engine = Mock()
+    engine.connect.return_value = nullcontext(
+        Mock(execute=Mock(return_value=Mock()))
+    )
+    listener = {}
+
+    engine_options = {}
+
+    def create_test_engine(*args, **kwargs):
+        engine_options.update(kwargs)
+        return engine
+
+    monkeypatch.setattr(
+        "legacydb_copilot.db.connector.create_engine",
+        create_test_engine,
+    )
+    monkeypatch.setattr(
+        "legacydb_copilot.db.connector.event.listens_for",
+        lambda target, name: lambda callback: listener.setdefault(name, callback),
+    )
+    monkeypatch.setattr(
+        "legacydb_copilot.db.connector.adapter_for",
+        lambda database_engine, created_engine: Mock(),
+    )
+
+    connector = DatabaseConnector(DatabaseEngine.SQL_SERVER, "unused")
+    connector.connect()
+    listener["connect"](dbapi_connection, Mock())
+
+    assert dbapi_connection.timeout == 30
+    assert engine_options["pool_pre_ping"] is False
+    assert engine_options["pool_recycle"] == 60

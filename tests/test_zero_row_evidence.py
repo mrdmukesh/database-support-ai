@@ -116,7 +116,7 @@ def test_successful_zero_row_query_is_explicit_verified_absence(monkeypatch) -> 
     ("error", "expected_status"),
     [
         (RuntimeError("database unavailable"), "failed"),
-        (PermissionError("query blocked by policy"), "blocked"),
+        (PermissionError("permission denied"), "permission_denied"),
         (TimeoutError("query timed out"), "timed_out"),
     ],
 )

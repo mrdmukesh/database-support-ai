@@ -2900,6 +2900,25 @@ def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadat
                             sql,
                             rows,
                             evidence_id=f"SQL-{len(evidence) + len(related) + 1}",
+                            evidence_semantics=(
+                                "null_value"
+                                if any(
+                                    value is None
+                                    for row in rows
+                                    for value in row.values()
+                                )
+                                else "positive_rows"
+                            ),
+                            supports_claim=(
+                                "Returned correlated rows verify one or more NULL source values."
+                                if any(
+                                    value is None
+                                    for row in rows
+                                    for value in row.values()
+                                )
+                                else f"{len(rows)} verified correlated row(s) were returned."
+                            ),
+                            evidence_relevance="relevant",
                         )
                     )
             except Exception:

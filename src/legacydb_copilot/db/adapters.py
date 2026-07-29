@@ -316,7 +316,12 @@ class BaseDatabaseAdapter(ABC):
             result = conn.execute(text(explain_sql))
             return [dict(row._mapping) for row in result.fetchall()]
 
-    def execute_read_only_query(self, sql: str, limit: int = 1000) -> list[dict[str, Any]]:
+    def execute_read_only_query(
+        self,
+        sql: str,
+        limit: int = 1000,
+        parameters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Owner: Mukesh Dabi
         Purpose:
@@ -339,7 +344,7 @@ class BaseDatabaseAdapter(ABC):
         """
         sql = self.apply_limit(sql, limit)
         with self.engine.connect() as conn:
-            result = conn.execute(text(sql))
+            result = conn.execute(text(sql), parameters or {})
             return [dict(row._mapping) for row in result.fetchall()]
 
     def apply_limit(self, sql: str, limit: int) -> str:

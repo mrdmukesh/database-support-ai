@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 from dataclasses import dataclass, field
@@ -34,12 +35,19 @@ class EvidenceResult:
     original_sql: str | None = None
     safety_note: str | None = None
     evidence_id: str = field(default_factory=_next_evidence_id)
-    execution_status: Literal["succeeded", "failed", "blocked", "timed_out"] = "succeeded"
+    execution_status: Literal[
+        "succeeded",
+        "failed",
+        "blocked",
+        "permission_denied",
+        "timed_out",
+    ] = "succeeded"
     evidence_semantics: Literal[
         "positive_rows",
         "verified_absence",
         "aggregate",
         "metadata",
+        "null_value",
         "procedure_definition",
         "not_applicable",
         "execution_failure",
@@ -109,14 +117,15 @@ def execute_evidence_plan(
     for index, query in enumerate(plan, start=1):
         policy_decision: dict[str, Any] = {}
         try:
+            execution_sql = query.execution_sql or query.sql
             validate_sql_dialect(
-                query.sql,
+                execution_sql,
                 dialect,
                 planner_step="evidence_execution_preflight",
                 query_id=query.query_id or f"Q-{index}",
             )
-            validate_read_only_sql(query.sql)
-            safe_read = validator.validate(query.sql)
+            validate_read_only_sql(execution_sql)
+            safe_read = validator.validate(execution_sql)
             policy_decision = (
                 safe_read.policy_decision.to_dict()
                 if safe_read.policy_decision is not None
@@ -139,7 +148,12 @@ def execute_evidence_plan(
                 policy_decision.get("reason", "read_only_validation_passed"),
                 "ProductionReadSafetyValidator",
             )
-            rows = connector.execute_read_only_query(safe_read.sql, limit=settings.max_investigation_rows)
+            rows = _execute_read_only_query(
+                connector,
+                safe_read.sql,
+                settings.max_investigation_rows,
+                query.parameters,
+            )
             semantics, supports_claim = _successful_evidence_semantics(query, safe_read.sql, rows)
             if plan_statuses is not None:
                 plan_statuses.append(
@@ -201,12 +215,29 @@ def execute_evidence_plan(
     return evidence
 
 
+def _execute_read_only_query(
+    connector,
+    sql: str,
+    limit: int,
+    parameters: dict[str, Any],
+) -> list[dict[str, Any]]:
+    execute = connector.execute_read_only_query
+    if "parameters" in inspect.signature(execute).parameters:
+        return execute(
+            sql,
+            limit=limit,
+            parameters=parameters,
+        )
+    return execute(sql, limit=limit)
+
+
 def _successful_evidence_semantics(
     query: PlannedQuery,
     sql: str,
     rows: list[dict[str, Any]],
 ) -> tuple[str, str]:
     normalized = f"{query.purpose} {sql}".casefold()
+    declared = getattr(query, "evidence_semantics", "not_applicable")
     if re.search(r"\b(count\s*\(|exists\s*\(|not\s+exists\b)", sql, re.I):
         values = [value for row in rows for value in row.values()]
         zero = bool(values) and all(
@@ -218,12 +249,29 @@ def _successful_evidence_semantics(
             else f"The aggregate/existence query completed for: {query.purpose}."
         )
     if rows:
+        null_columns = sorted(
+            {
+                str(column)
+                for row in rows
+                for column, value in row.items()
+                if value is None
+            }
+        )
+        if declared == "null_value" or null_columns:
+            detail = (
+                f" (NULL columns: {', '.join(null_columns)})"
+                if null_columns
+                else ""
+            )
+            return (
+                "null_value",
+                f"Returned rows verify NULL source data{detail} for: {query.purpose}.",
+            )
         return "positive_rows", f"{len(rows)} verified row(s) support: {query.purpose}."
     absence_markers = (
         "missing", "without", "orphan", "not exist", "no matching", "downstream",
         "related record", "duplicate", "absence",
     )
-    declared = getattr(query, "evidence_semantics", "not_applicable")
     if declared == "verified_absence" or any(marker in normalized for marker in absence_markers):
         return "verified_absence", (
             f"The query executed successfully and found no matching rows for: {query.purpose}."
@@ -231,11 +279,24 @@ def _successful_evidence_semantics(
     return "not_applicable", ""
 
 
-def _failed_execution_status(exc: Exception) -> Literal["failed", "blocked", "timed_out"]:
+def _failed_execution_status(
+    exc: Exception,
+) -> Literal["failed", "blocked", "permission_denied", "timed_out"]:
     text = f"{type(exc).__name__} {exc}".casefold()
     if "timeout" in text or "timed out" in text:
         return "timed_out"
     if isinstance(exc, PermissionError) or any(
+        marker in text
+        for marker in (
+            "access denied",
+            "insufficient privilege",
+            "permission denied",
+            "permission was denied",
+            "not authorized",
+        )
+    ):
+        return "permission_denied"
+    if any(
         marker in text for marker in (
             "blocked", "rejected", "safety", "policy",
             "only select", "read-only", "read only",

@@ -313,7 +313,12 @@ class DatabaseConnector:
         except Exception as exc:
             raise DatabaseConnectionError(f"Query execution failed: {str(exc)}") from exc
 
-    def execute_read_only_query(self, sql: str, limit: int = 1000) -> list[dict[str, Any]]:
+    def execute_read_only_query(
+        self,
+        sql: str,
+        limit: int = 1000,
+        parameters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute a read-only statement through the database adapter."""
         try:
             query_upper = sql.strip().upper()
@@ -321,7 +326,11 @@ class DatabaseConnector:
                 raise DomainError("Only read-only queries are allowed")
             if query_upper.startswith("EXPLAIN"):
                 return self.explain_query(sql)
-            return self.get_adapter().execute_read_only_query(sql, limit)
+            return self.get_adapter().execute_read_only_query(
+                sql,
+                limit,
+                parameters=parameters,
+            )
         except DomainError:
             raise
         except Exception as exc:

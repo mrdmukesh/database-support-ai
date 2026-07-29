@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
@@ -31,6 +31,8 @@ class PlannedQuery:
     risk: str = "Read-only"
     query_id: str = ""
     evidence_semantics: str = "not_applicable"
+    execution_sql: str = ""
+    parameters: dict[str, Any] = field(default_factory=dict)
 
 
 def _record_plan_event(events: list[dict[str, Any]] | None, *, query: PlannedQuery, status: str, reason: str = "") -> None:
@@ -655,11 +657,7 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
     filters: list[str] = []
-    business_values = [
-        entity.value
-        for entity in entities.entities
-        if entity.entity_type in {"business_key", "exact_id_or_code", "business_identifier"}
-    ]
+    business_values = _business_key_values(entities)
     for value in business_values:
         escaped = value.replace("'", "''")
         column_filters = []
@@ -669,7 +667,7 @@ def _where_for_table(table: TableMetadata, entities: EntityExtractionResult, eng
                 column_l == "id"
                 or column_l.endswith("_id")
                 or any(term in column_l for term in ("number", "code", "key", "reference"))
-            ):
+            ) and _column_accepts_value(table, column, value):
                 column_filters.append(f"{_cast_to_text(column, engine_type)} = '{escaped}'")
         if column_filters:
             filters.append("(" + " OR ".join(column_filters[:6]) + ")")
@@ -764,10 +762,25 @@ def _duplicate_target_terms(entities: EntityExtractionResult) -> set[str]:
 
 
 def _business_key_values(entities: EntityExtractionResult) -> list[str]:
+    values = list(
+        dict.fromkeys(
+            entity.value
+            for entity in entities.entities
+            if entity.entity_type
+            in {"business_key", "exact_id_or_code", "business_identifier"}
+        )
+    )
     return [
-        entity.value
-        for entity in entities.entities
-        if entity.entity_type in {"business_key", "exact_id_or_code", "business_identifier"}
+        value
+        for value in values
+        if not any(
+            other != value
+            and any(
+                other.casefold().endswith(separator + value.casefold())
+                for separator in ("-", "_", "/")
+            )
+            for other in values
+        )
     ]
 
 
@@ -1009,6 +1022,7 @@ def _entity_and_condition_queries(metadata: MetadataSearchResult, entities: Enti
                 PlannedQuery(
                     purpose=f"Prove reported condition on {table.name}.{column}",
                     sql=f"SELECT {', '.join(dict.fromkeys([column, *table.columns[:7]]))} FROM {table.name} WHERE {' AND '.join(filters)}",
+                    evidence_semantics="null_value",
                 )
             )
     return planned
@@ -1018,17 +1032,46 @@ def _natural_key_columns(table: TableMetadata) -> list[str]:
     priority = []
     for column in table.columns:
         lowered = column.lower()
+        normalized = re.sub(r"[^a-z0-9]", "", lowered)
         if lowered.endswith("_id") or lowered == "id" or column in (table.primary_key or []):
             continue
-        if lowered == "reference_key":
+        if normalized == "referencekey":
             priority.append((0, column))
-        elif lowered.endswith("_number"):
+        elif normalized.endswith("number"):
             priority.append((1, column))
-        elif lowered.endswith("_code"):
+        elif normalized.endswith("code"):
             priority.append((2, column))
-        elif lowered.endswith("_key") or lowered.endswith("_ref") or "reference" in lowered:
+        elif (
+            normalized.endswith(("key", "ref"))
+            or "reference" in normalized
+        ):
             priority.append((3, column))
     return [column for _, column in sorted(priority, key=lambda item: (item[0], item[1]))]
+
+
+def _column_accepts_value(
+    table: TableMetadata,
+    column: str,
+    value: str,
+) -> bool:
+    """Reject known numeric columns for non-numeric business identifiers."""
+    declared_type = table.column_types.get(column, "").casefold()
+    if not declared_type:
+        return True
+    numeric_markers = (
+        "bigint",
+        "decimal",
+        "double",
+        "float",
+        "int",
+        "numeric",
+        "real",
+        "smallint",
+        "tinyint",
+    )
+    if any(marker in declared_type for marker in numeric_markers):
+        return bool(re.fullmatch(r"[+-]?\d+(?:\.\d+)?", value.strip()))
+    return True
 
 
 def _header_rank(table: TableMetadata) -> int:
@@ -1418,6 +1461,13 @@ def _missing_relationship_candidates(
     for parent in metadata.tables:
         for child in metadata.tables:
             if parent.name == child.name:
+                continue
+            if (
+                not parent.enrichment_loaded
+                or parent.relationship_metadata_status != "loaded"
+                or not child.enrichment_loaded
+                or child.relationship_metadata_status != "loaded"
+            ):
                 continue
             for parent_col, child_col in _shared_relationship_columns(parent, child):
                 phrase_score = _relationship_phrase_score(parent, child, parent_terms, child_terms, resolved_child)
@@ -2141,13 +2191,30 @@ def plan_safe_queries(
                     )
                 )
     staged: list[PlannedQuery] = []
+    parameter_values = [
+        entity.value
+        for entity in entities.entities
+        if entity.entity_type
+        in {
+            "business_identifier",
+            "business_key",
+            "exact_id_or_code",
+            "status_or_code",
+        }
+    ]
     for index, query in enumerate(planned, start=1):
+        execution_sql, parameters = _parameterize_values(
+            query.sql,
+            parameter_values,
+        )
         staged_query = PlannedQuery(
             purpose=query.purpose,
             sql=query.sql,
             risk=query.risk,
             query_id=f"Q-{index}",
             evidence_semantics=_planned_evidence_semantics(intent, query),
+            execution_sql=execution_sql,
+            parameters=parameters,
         )
         _record_plan_event(debug_events, query=staged_query, status="planned", reason="candidate_created")
         logger.info("evidence_plan planned %s %s", staged_query.query_id, staged_query.purpose)
@@ -2160,6 +2227,8 @@ def plan_safe_queries(
                 risk=staged_query.risk,
                 query_id=staged_query.query_id,
                 evidence_semantics=staged_query.evidence_semantics,
+                execution_sql=ensure_limit(staged_query.execution_sql),
+                parameters=staged_query.parameters,
             )
         staged.append(staged_query)
 
@@ -2208,6 +2277,24 @@ def plan_safe_queries(
         )
         logger.info("evidence_plan rejected %s max_query_limit", dropped.query_id)
     return safe
+
+
+def _parameterize_values(
+    sql: str,
+    values: list[str],
+) -> tuple[str, dict[str, Any]]:
+    """Create deterministic bind parameters for extracted runtime values."""
+    parameterized = sql
+    parameters: dict[str, Any] = {}
+    for sequence, value in enumerate(dict.fromkeys(values), start=1):
+        escaped = value.replace("'", "''")
+        literal = f"'{escaped}'"
+        if literal not in parameterized:
+            continue
+        name = f"investigation_value_{sequence}"
+        parameterized = parameterized.replace(literal, f":{name}")
+        parameters[name] = value
+    return parameterized, parameters
 
 
 def _planned_evidence_semantics(

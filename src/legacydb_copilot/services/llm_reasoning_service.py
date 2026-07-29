@@ -63,7 +63,8 @@ Restrictions:
 - Do not infer facts that are not supported by verified evidence.
 - Never override deterministic SQL evidence, metadata evidence, stored procedure analysis,
   workflow analysis, or Evidence Gate decisions.
-- Treat successful zero-row results as verified absence evidence when supplied by the evidence package.
+- Treat a successful zero-row result as verified absence only when its evidence_semantics is
+  explicitly verified_absence. Otherwise describe it as an evidence gap, not proof of absence.
 - Distinguish clearly between verified findings, verified absence, evidence gaps, inference, and hypothesis.
 - If deterministic evidence contradicts a possible explanation, reject that explanation.
 - Never fabricate a root cause.
@@ -82,6 +83,8 @@ Recommendations:
 Evidence traceability:
 - Every finding, root cause, recommendation, validation test, and proof-of-fix step must reference
   one or more evidence_refs.
+- Use only exact citation IDs listed in citation_contract.valid_evidence_ids. Correlated context has
+  no independent citation ID and must never be cited with an invented alias.
 
 Output:
 - Return only valid JSON matching the requested schema.
@@ -157,6 +160,25 @@ def convert_llm_claim_to_root_cause_claim(
     evidence_refs = [ref.strip() for ref in candidates if isinstance(ref, str) and ref.strip()]
     claim = RootCauseClaim(conclusion=conclusion, evidence_refs=evidence_refs)
     return evaluate_claim_support_status(claim, evidence_records)
+
+
+def _root_cause_evidence_issue(
+    claim: RootCauseClaim | None,
+    evidence_records: list[EvidenceResult],
+) -> str:
+    """Reject causal claims that rely on failed or semantically unverified evidence."""
+    if claim is None or claim.status is not RootCauseSupportStatus.VERIFIED:
+        return ""
+    evidence_by_id = {item.evidence_id: item for item in evidence_records}
+    cited = [evidence_by_id[ref] for ref in claim.evidence_refs if ref in evidence_by_id]
+    if any(item.execution_status != "succeeded" for item in cited):
+        return "unsuccessful_evidence"
+    if any(
+        item.zero_row_result and item.evidence_semantics != "verified_absence"
+        for item in cited
+    ):
+        return "unverified_negative_evidence"
+    return ""
 
 
 def llm_reasoning_enabled(settings: Settings | None = None) -> bool:
@@ -450,7 +472,6 @@ def _build_llm_payload_unmasked(
     ]
     correlated_items = [
         {
-            "ref": f"EV-{index}",
             "type": item.evidence_type,
             "subject": item.subject,
             "finding": item.finding,
@@ -503,6 +524,21 @@ def _build_llm_payload_unmasked(
             "documents": document_items,
             "correlated": correlated_items,
         },
+        "citation_contract": {
+            "valid_evidence_ids": list(
+                dict.fromkeys(
+                    [
+                        *[str(item["ref"]) for item in evidence_items],
+                        *[str(item["ref"]) for item in procedure_items],
+                    ]
+                )
+            ),
+            "instruction": (
+                "Use only the exact IDs in valid_evidence_ids for evidence_refs. "
+                "Correlated entries are explanatory context derived from persisted evidence "
+                "and are not independently citable. Never invent, alias, or renumber an ID."
+            ),
+        },
         "evidence_focus": {
             "affected_object": evidence_focus.affected_object,
             "affected_object_reason": evidence_focus.affected_object_reason,
@@ -524,9 +560,9 @@ def _build_llm_payload_unmasked(
                 "recommended_action": None,
             }],
             "summary": "string",
-            "verified_findings": [{"finding": "string", "evidence_refs": ["SQL-1", "PROC-1", "EV-1"]}],
+            "verified_findings": [{"finding": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
             "verified_absences": [{"finding": "string", "evidence_refs": ["SQL-1"]}],
-            "evidence_gaps": [{"gap": "string", "evidence_refs": ["SQL-1", "PROC-1", "EV-1"]}],
+            "evidence_gaps": [{"gap": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
             "senior_engineer_explanation": "string",
             "confidence_note": "string",
             "likely_root_causes": [{"conclusion": "string", "evidence_refs": ["SQL-1", "PROC-1"]}],
@@ -755,6 +791,10 @@ def _merge_llm_reasoning(
     claim_diagnostics: list[dict[str, Any]] = []
     root_causes: list[RootCauseClaim] = []
     evidence_gap_claims: list[str] = []
+    supported_observations: list[str] = []
+    evidence_by_id = {
+        item.evidence_id: item for item in (evidence_records or [])
+    }
     for index, raw_claim in enumerate(raw_root_causes, start=1):
         parsed = parse_structured_claim(raw_claim, index)
         if parsed is None:
@@ -762,6 +802,16 @@ def _merge_llm_reasoning(
         decision = verify_claim(parsed, registry)
         diagnostic = decision.to_dict()
         if not _domain_compatible(parsed.statement, evidence_records or []):
+            supported_observations.extend(
+                observation
+                for ref in decision.evidence_ids_resolved
+                for observation in [
+                    str(evidence_by_id.get(ref).supports_claim or "").strip()
+                    if evidence_by_id.get(ref)
+                    else ""
+                ]
+                if observation
+            )
             diagnostic.update(
                 verification_result="REJECTED",
                 rejection_code="domain_mismatch",
@@ -801,18 +851,36 @@ def _merge_llm_reasoning(
         elif decision.verification_result == "EVIDENCE_GAP":
             evidence_gap_claims.append(parsed.evidence_gap or parsed.statement)
         else:
+            supported_observations.extend(
+                observation
+                for ref in decision.evidence_ids_resolved
+                for observation in [
+                    str(evidence_by_id.get(ref).supports_claim or "").strip()
+                    if evidence_by_id.get(ref)
+                    else ""
+                ]
+                if observation
+            )
             validation["rejected"].append(
                 {
                     "claim": parsed.statement,
                     "claim_id": parsed.claim_id,
                     "decision": "excluded_from_report",
-                    "reason": decision.rejection_code,
+                    "reason": (
+                        "unverified_negative_evidence"
+                        if decision.rejection_code
+                        == "UNVERIFIED_NEGATIVE_EVIDENCE"
+                        else decision.rejection_code
+                    ),
                     "detail": decision.rejection_detail,
                     "missing_evidence_refs": [
                         ref
                         for ref in decision.evidence_ids_requested
                         if ref not in decision.evidence_ids_resolved
                     ],
+                    "valid_evidence_refs": list(
+                        decision.evidence_ids_resolved
+                    ),
                     "contradictory_evidence_ids": list(
                         decision.contradictory_evidence_ids
                     ),
@@ -917,8 +985,15 @@ def _merge_llm_reasoning(
             debug_trace["skip_reason"] = "none"
             debug_trace["verification_status"] = "verified"
         debug_trace["final_reasoning_status"] = debug_trace["invocation_status"]
+    narrowed_facts = list(
+        dict.fromkeys([*base.confirmed_facts, *supported_observations])
+    )
     if not root_causes:
-        return base
+        return (
+            replace(base, confirmed_facts=narrowed_facts)
+            if narrowed_facts != base.confirmed_facts
+            else base
+        )
     # Raw provider narrative is audit-only. Visible prose is composed from the
     # deterministic summary and claims that passed evidence-reference validation.
     summary_parts = [base.summary]
@@ -929,6 +1004,7 @@ def _merge_llm_reasoning(
         base,
         summary=" ".join(summary_parts),
         likely_root_causes=root_causes,
+        confirmed_facts=narrowed_facts,
         missing_evidence=(
             evidence_gap_claims
             or _string_list(llm_json.get("missing_evidence"))

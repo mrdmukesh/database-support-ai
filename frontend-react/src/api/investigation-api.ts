@@ -4,6 +4,7 @@ import type {
   InvestigationSubmitRequest,
   InvestigationSubmitResponse,
   InvestigationSummary,
+  InvestigationProgress,
   SavedInvestigation,
 } from "../models/investigation";
 import { ApiClientError, apiRequest } from "./client";
@@ -91,4 +92,25 @@ export async function loadInvestigationMetadata(
   signal?: AbortSignal,
 ): Promise<SavedInvestigation> {
   return loadSavedInvestigation(investigationId, signal);
+}
+
+export async function loadInvestigationProgress(
+  investigationId: string,
+  signal?: AbortSignal,
+): Promise<InvestigationProgress> {
+  const response = await apiRequest<InvestigationProgress>(
+    `/investigations/${encodeURIComponent(investigationId)}/progress`,
+    { signal },
+  );
+  if (!response) throw new ApiClientError("Investigation progress returned an empty response.", 200);
+  return response;
+}
+
+export async function cancelAgenticInvestigation(
+  investigationId: string,
+): Promise<void> {
+  await apiRequest(
+    `/investigations/${encodeURIComponent(investigationId)}/cancel`,
+    { method: "POST" },
+  );
 }

@@ -249,6 +249,22 @@ def verify_claim(
             rejection_code="EVIDENCE_NOT_IN_PROMPT",
             rejection_detail=f"Evidence was truncated or not sent: {', '.join(truncated)}",
         )
+    unverified_zero_rows = [
+        item
+        for item in prompted
+        if item.zero_row_result
+        and item.evidence_semantics != "verified_absence"
+    ]
+    if unverified_zero_rows:
+        return ClaimVerification(
+            **base,
+            verification_result="REJECTED",
+            rejection_code="UNVERIFIED_NEGATIVE_EVIDENCE",
+            rejection_detail=(
+                "A successful zero-row query is not absence evidence unless its "
+                "scope and semantics are explicitly verified."
+            ),
+        )
     supporting = [item for item in prompted if _reference_supports_statement(claim.statement, item)]
     contradictory = tuple(
         item.evidence_id
@@ -280,7 +296,17 @@ def _normalized(value: Any) -> str:
 def _reference_supports_statement(statement: str, evidence: EvidenceReference) -> bool:
     normalized = _normalized(statement)
     if evidence.zero_row_result:
-        absence_terms = (" no ", "not found", "none", "zero", "no matching")
+        if evidence.evidence_semantics != "verified_absence":
+            return False
+        absence_terms = (
+            " no ",
+            "not found",
+            "none",
+            "zero",
+            "no matching",
+            "absent",
+            "missing",
+        )
         return any(term in normalized for term in absence_terms)
     if not evidence.rows:
         return False

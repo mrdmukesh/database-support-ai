@@ -20,7 +20,10 @@ from legacydb_copilot.agents.intent_agent import InvestigationIntent, detect_int
 from legacydb_copilot.agents.investigation_planner_agent import build_investigation_plan
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
 from legacydb_copilot.agents.recommendation_agent import recommend_actions
-from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
+from legacydb_copilot.agents.reasoning_agent import (
+    RootCauseSupportStatus,
+    reason_about_evidence,
+)
 from legacydb_copilot.agents.report_composer_agent import compose_report
 from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.config import Settings
@@ -331,13 +334,23 @@ def _metadata_context_for_connection(
 
 
 def _active_database_name(connector, expected_engine: DatabaseEngine) -> str:
-    if expected_engine != DatabaseEngine.MYSQL:
+    query = {
+        DatabaseEngine.MYSQL: "SELECT DATABASE() AS active_database",
+        DatabaseEngine.SQL_SERVER: "SELECT DB_NAME() AS active_database",
+    }.get(expected_engine)
+    if not query:
         return ""
-    rows = connector.execute_read_only_query("SELECT DATABASE() AS active_database", limit=1)
+    rows = connector.execute_read_only_query(query, limit=1)
     if not rows:
         return ""
     row = rows[0]
-    return str(row.get("active_database") or row.get("DATABASE()") or next(iter(row.values()), "") or "")
+    return str(
+        row.get("active_database")
+        or row.get("DATABASE()")
+        or row.get("DB_NAME()")
+        or next(iter(row.values()), "")
+        or ""
+    )
 
 
 def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine):
@@ -662,6 +675,9 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
     elif provenance == "AI_INVOCATION_FAILED":
         trace.setdefault("ai_reasoning_invoked", True)
         trace.setdefault("ai_outcome", "provider_failure")
+    elif provenance == "AI_REASONING_UNVERIFIED":
+        trace.setdefault("ai_reasoning_invoked", True)
+        trace.setdefault("ai_outcome", "completed_no_verified_claims")
     elif provenance in {"AI_ANSWERED", "AI_SUMMARIZED_NOT_REPRODUCED"}:
         trace.setdefault("ai_reasoning_invoked", True)
         trace.setdefault(
@@ -694,6 +710,18 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
     trace.setdefault("verified_claim_count", verified_from_legacy)
     trace.setdefault("rejected_claim_count", rejected_from_legacy)
     trace.setdefault("skip_reason", trace.get("ai_skip_reason") or "none")
+    trace.setdefault(
+        "reasoning_mode",
+        trace.get("selected_reasoning_mode")
+        or (
+            "SKIP_NO_VERIFIED_EVIDENCE"
+            if not llm_invoked
+            else "NORMAL_ROOT_CAUSE"
+        ),
+    )
+    trace.setdefault("selected_reasoning_mode", trace["reasoning_mode"])
+    trace.setdefault("input_tokens", 0)
+    trace.setdefault("output_tokens", 0)
     trace.setdefault("error_category", trace.get("ai_reasoning_error") or trace.get("provider_error_type"))
 
     if not llm_invoked:
@@ -733,6 +761,30 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
         if value is not None:
             trace.setdefault(key, value)
     return trace
+
+
+def _answer_provenance(
+    reasoning_mode: ReasoningMode,
+    *,
+    llm_used: bool,
+    trace: dict[str, Any],
+    ai_reasoning_enabled: bool,
+) -> str:
+    """Separate provider completion from evidence-verification acceptance."""
+    if reasoning_mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED and llm_used:
+        return "AI_SUMMARIZED_NOT_REPRODUCED"
+    if reasoning_mode == ReasoningMode.SKIP:
+        return "AI_SKIPPED_BY_EVIDENCE_GATE"
+    if llm_used:
+        return "AI_ANSWERED"
+    if str(trace.get("invocation_status") or "") in {
+        "completed_zero_claims",
+        "completed_no_verified_claims",
+    }:
+        return "AI_REASONING_UNVERIFIED"
+    if trace.get("ai_reasoning_invoked"):
+        return "AI_INVOCATION_FAILED"
+    return "AI_SKIPPED_BY_POLICY" if ai_reasoning_enabled else "DETERMINISTIC_ANSWERED"
 
 
 def _detected_intent_with_planning_status(base_intent: str, plan_statuses: list[dict[str, Any]]) -> str:
@@ -2150,7 +2202,12 @@ def _run_dynamic_investigation(
         documents=context.documents,
         evidence_focus=evidence_focus,
     )
-    reasoning_dispatch = dispatch_reasoning(evidence_gate)
+    reasoning_dispatch = dispatch_reasoning(
+        evidence_gate,
+        factual_request=(
+            intent.intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
+        ),
+    )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
     if reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
@@ -2247,7 +2304,15 @@ def _run_dynamic_investigation(
             ),
             reasoning_mode=reasoning_dispatch.mode,
         )
-        llm_used = enhanced_reasoning is not reasoning
+        llm_used = enhanced_reasoning is not reasoning and (
+            reasoning_dispatch.mode
+            in {
+                ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+                ReasoningMode.EVIDENCE_GAP_SUMMARY,
+                ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
+            }
+            or int(ai_debug_trace.get("verified_claim_count") or 0) > 0
+        )
         reasoning = enhanced_reasoning
         if llm_used and reasoning_dispatch.mode in {
             ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
@@ -2284,6 +2349,10 @@ def _run_dynamic_investigation(
     )
     if ai_debug_trace is not None:
         ai_debug_trace.update({
+            "root_cause_requirements_satisfied": any(
+                item.status is RootCauseSupportStatus.VERIFIED
+                for item in reasoning.likely_root_causes
+            ),
             "metadata_cache": getattr(active_schema_metadata, "cache_diagnostics", {}),
             "raw_metadata_objects": {
                 "tables": active_schema_metadata.tables,
@@ -2596,18 +2665,11 @@ def _run_dynamic_investigation(
         + "\n\n## Missing Information / Clarifying Questions\n"
         + "\n".join(f"- {item}" for item in reasoning.missing_evidence)
     )
-    answer_provenance = (
-        "AI_SUMMARIZED_NOT_REPRODUCED"
-        if reasoning_dispatch.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED and llm_used
-        else "AI_SKIPPED_BY_EVIDENCE_GATE"
-        if reasoning_dispatch.mode == ReasoningMode.SKIP
-        else "AI_ANSWERED"
-        if llm_used
-        else "AI_INVOCATION_FAILED"
-        if ai_debug_trace and ai_debug_trace.get("ai_reasoning_invoked")
-        else "AI_SKIPPED_BY_POLICY"
-        if Settings.from_env().ai_reasoning_enabled
-        else "DETERMINISTIC_ANSWERED"
+    answer_provenance = _answer_provenance(
+        reasoning_dispatch.mode,
+        llm_used=llm_used,
+        trace=ai_debug_trace or {},
+        ai_reasoning_enabled=Settings.from_env().ai_reasoning_enabled,
     )
     relationship_proof = [
         item for item in evidence_gate.confirmed_facts
@@ -2855,6 +2917,25 @@ def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadat
                             sql,
                             rows,
                             evidence_id=f"SQL-{len(evidence) + len(related) + 1}",
+                            evidence_semantics=(
+                                "null_value"
+                                if any(
+                                    value is None
+                                    for row in rows
+                                    for value in row.values()
+                                )
+                                else "positive_rows"
+                            ),
+                            supports_claim=(
+                                "Returned correlated rows verify one or more NULL source values."
+                                if any(
+                                    value is None
+                                    for row in rows
+                                    for value in row.values()
+                                )
+                                else f"{len(rows)} verified correlated row(s) were returned."
+                            ),
+                            evidence_relevance="relevant",
                         )
                     )
             except Exception:
@@ -3039,11 +3120,55 @@ def ask_chat_question(
         from legacydb_copilot.services.investigation_state_machine import (
             InvestigationStateService,
         )
-
-        InvestigationStateService(db).initialize(
-            investigation,
-            reason="Agentic state tracking initialized after the existing investigation completed.",
+        from legacydb_copilot.services.terminal_outcome_service import (
+            persist_canonical_terminal_outcome,
+            resolve_canonical_terminal_outcome,
         )
+
+        state_service = InvestigationStateService(db)
+        state_service.initialize(
+            investigation,
+            reason=(
+                "Agentic state tracking initialized after the existing "
+                "investigation completed."
+            ),
+        )
+        persisted_evidence = json.loads(investigation.evidence_json or "[]")
+        verified_evidence_count = terminal_ai_trace.get(
+            "verified_evidence_count"
+        )
+        if verified_evidence_count is None:
+            verified_evidence_count = sum(
+                str(item.get("execution_status") or "").casefold()
+                == "succeeded"
+                for item in persisted_evidence
+                if isinstance(item, dict)
+            )
+        canonical_outcome = resolve_canonical_terminal_outcome(
+            reproduction_status=terminal_ai_trace.get("reproduction_status"),
+            reasoning_mode=terminal_ai_trace.get("reasoning_mode"),
+            ai_outcome=terminal_ai_trace.get("ai_outcome"),
+            workflow_status=investigation_status,
+            policy_blocked=investigation_status == "AI_SKIPPED_BY_POLICY",
+            insufficient_evidence=(
+                str(investigation.detected_intent).startswith(
+                    "INSUFFICIENT_DATABASE_EVIDENCE:"
+                )
+                or investigation.detected_intent == "EVIDENCE_PLANNING_FAILED"
+            ),
+            reasoning_permission=terminal_ai_trace.get("reasoning_permission"),
+            verified_evidence_count=verified_evidence_count,
+            root_cause_requirements_satisfied=terminal_ai_trace.get(
+                "root_cause_requirements_satisfied"
+            ),
+        )
+        if canonical_outcome is not None:
+            persist_canonical_terminal_outcome(
+                state_service,
+                investigation,
+                canonical_outcome,
+                reason="Resolved from structured synchronous investigation signals.",
+            )
     record_audit_event(
         db,
         organization_id=payload.organization_id,

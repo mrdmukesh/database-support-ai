@@ -70,3 +70,48 @@ export interface SavedInvestigation extends Omit<InvestigationSummary, "confiden
   report: ReportLinks;
   [key: string]: unknown;
 }
+
+export interface ProgressEvidence {
+  evidence_id: string;
+  purpose: string;
+  execution_status: string;
+  evidence_semantics: string;
+  row_count: number;
+  supports_claim: string;
+}
+
+export interface InvestigationProgressStep {
+  iteration: number;
+  state: string;
+  action: string;
+  reason: string;
+  result: string;
+  created_evidence: ProgressEvidence[];
+  created_at: string;
+}
+
+export interface InvestigationProgress {
+  investigation_id: string;
+  agentic: boolean;
+  current_state: string;
+  iteration_number: number;
+  terminal: boolean;
+  stop_reason: string;
+  budget: Record<string, number>;
+  resolved_entities: Array<{
+    entity_type: string;
+    value: string;
+    status: string;
+    confidence?: number | null;
+    evidence_refs: string[];
+  }>;
+  question_counts: Record<"open" | "answered" | "partial" | "blocked", number>;
+  questions: Array<Record<string, unknown>>;
+  completed_steps: InvestigationProgressStep[];
+  failed_actions: InvestigationProgressStep[];
+  verified_absence: ProgressEvidence[];
+  root_cause_status: string;
+  fix_readiness_state: string;
+  source_badges: string[];
+  can_cancel: boolean;
+}

@@ -27,6 +27,7 @@ def reference(
     row_count: int | None = None,
     zero: bool = False,
     truncated: bool = False,
+    evidence_semantics: str = "",
 ) -> EvidenceReference:
     return EvidenceReference(
         evidence_id=evidence_id,
@@ -38,6 +39,7 @@ def reference(
         row_count=len(rows) if row_count is None else row_count,
         zero_row_result=zero,
         truncated=truncated,
+        evidence_semantics=evidence_semantics,
     )
 
 
@@ -145,7 +147,12 @@ def test_row_count_only_cannot_verify_value_but_zero_rows_verify_tested_absence(
         claim({"statement": "PayrollStatus is Ready.", "evidence_ids": ["SQL-1"]}),
         [count_only],
     ).rejection_code == "INSUFFICIENT_EVIDENCE_CONTENT"
-    zero = reference(rows=(), row_count=0, zero=True)
+    zero = reference(
+        rows=(),
+        row_count=0,
+        zero=True,
+        evidence_semantics="verified_absence",
+    )
     assert verify_claim(
         claim({"statement": "No matching deduction record was found.", "evidence_ids": ["SQL-1"]}),
         [zero],

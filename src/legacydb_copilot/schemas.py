@@ -381,6 +381,78 @@ class InvestigationStateHistoryRead(BaseModel):
     transitions: list[InvestigationStateTransitionRead]
 
 
+class InvestigationAgenticStepRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    iteration_number: int
+    state: str
+    action_fingerprint: str
+    evidence_request_json: str
+    planned_queries_json: str
+    evidence_json: str
+    gap_analysis_json: str
+    budget_json: str
+    outcome: str
+    reason: str
+    duration_ms: int
+    created_at: datetime
+
+
+class ExecutionPathTraceRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    affected_entity: str
+    status: str
+    expected_path_json: str
+    nodes_json: str
+    edges_json: str
+    verified_completed_steps_json: str
+    last_successful_step: str
+    first_failed_or_missing_step: str
+    responsible_component: str
+    remaining_gap: str
+    created_at: datetime
+
+
+class FixReadinessAssessmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    investigation_id: str
+    state: str
+    score: int
+    criteria_json: str
+    blockers_json: str
+    recommended_next_evidence_json: str
+    confirmed_hypothesis_ids_json: str
+    decision_reason: str
+    created_at: datetime
+
+
+class InvestigationProgressRead(BaseModel):
+    investigation_id: str
+    agentic: bool
+    current_state: str
+    iteration_number: int
+    terminal: bool
+    stop_reason: str
+    budget: dict
+    resolved_entities: list[dict]
+    question_counts: dict[str, int]
+    questions: list[dict]
+    completed_steps: list[dict]
+    failed_actions: list[dict]
+    verified_absence: list[dict]
+    root_cause_status: str
+    fix_readiness_state: str
+    source_badges: list[str]
+    can_cancel: bool
+
+
 class InvestigationFeedbackCreate(BaseModel):
     rating: FeedbackRating
     actual_root_cause: str = ""

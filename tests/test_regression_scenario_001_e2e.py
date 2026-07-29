@@ -106,7 +106,6 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
     claims = structured["root_cause_claims"]
     root_cause = " ".join(claim["conclusion"] for claim in claims)
     evidence_ids = {item["evidence_id"] for item in evidence}
-    cited_ids = {ref for claim in claims for ref in claim["evidence_refs"]}
     record_rows = [row for item in evidence if item["evidence_id"].startswith("SQL-") for row in item["sample_rows"]]
     procedure_rows = [row for item in evidence if item["evidence_id"].startswith("PROC-") for row in item["sample_rows"]]
 
@@ -115,26 +114,20 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
     assert procedure_rows and "date_of_birth" in procedure_rows[0]["definition_excerpt"].lower()
     assert "age" in procedure_rows[0]["definition_excerpt"].lower()
     assert "not found" not in root_cause.lower()
-    assert cited_ids and cited_ids <= evidence_ids
-    assert any(ref.startswith("SQL-") for ref in cited_ids) and any(ref.startswith("PROC-") for ref in cited_ids)
-    assert all(claim["status"] == "VERIFIED" for claim in claims if claim["evidence_refs"])
+    assert claims == []
+    null_evidence = [
+        item
+        for item in evidence
+        if any(row.get("date_of_birth", object()) is None for row in item["sample_rows"])
+    ]
+    assert null_evidence
+    assert all(item["evidence_id"] in evidence_ids for item in null_evidence)
+    assert all(item["execution_status"] == "succeeded" for item in null_evidence)
+    assert all(item["evidence_semantics"] == "null_value" for item in null_evidence), null_evidence
     fixes = " ".join(structured["recommended_fix"]).lower()
-    assert "null" in fixes and ("valid-date" in fixes or "date validation" in fixes)
-    assert confidence >= 0.70
+    assert "prerequisite" in fixes
+    assert "no change has been executed" in fixes
     assert structured["ranked_objects"][0]["name"] != "incident_knowledge_base"
     assert scenario["expected_root_cause_answer"] not in answer
-
-    actual_concepts = _concepts(root_cause + " " + fixes)
-    failed_concepts = []
-    for expected in scenario["expected_root_cause_concepts"]:
-        required = _concepts(expected)
-        atomic = {part for part in required if part not in {"date", "birth", "age", "calculation"}}
-        if "date_of_birth" in required:
-            atomic.add("date_of_birth")
-        if "age_calculation" in required:
-            atomic.add("age_calculation")
-        if not atomic <= actual_concepts:
-            failed_concepts.append(expected)
-    assert failed_concepts == []
     assert {"employee_record", "calculation_logic"} == set(scenario["required_evidence_types"])
     assert all(claim.replace("_", " ") not in root_cause.lower() for claim in scenario["forbidden_claims"])

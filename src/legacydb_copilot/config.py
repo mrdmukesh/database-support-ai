@@ -32,11 +32,11 @@ class Settings:
     llm_model: str = "gpt-4.1-mini"
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
-    llm_request_timeout_seconds: float = 30.0
+    llm_request_timeout_seconds: float = 60.0
     llm_retry_attempts: int = 2
     llm_retry_backoff_seconds: float = 0.5
     llm_retry_jitter_seconds: float = 0.25
-    llm_total_timeout_seconds: float = 65.0
+    llm_total_timeout_seconds: float = 125.0
     llm_input_cost_per_million: float = 0.0
     llm_output_cost_per_million: float = 0.0
     llm_circuit_breaker_threshold: int = 5
@@ -52,6 +52,13 @@ class Settings:
     feature_audit_logging_enabled: bool = True
     feature_keyvault_secrets_enabled: bool = False
     feature_agentic_investigation_enabled: bool = False
+    agentic_max_iterations: int = 8
+    agentic_max_sql_queries: int = 16
+    agentic_max_total_rows: int = 1000
+    agentic_max_execution_seconds: float = 120.0
+    agentic_max_llm_calls: int = 8
+    agentic_max_tokens: int = 32000
+    agentic_max_retries: int = 1
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
 
@@ -92,11 +99,15 @@ class Settings:
             llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
-            llm_request_timeout_seconds=float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "30")),
+            llm_request_timeout_seconds=float(
+                os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "60")
+            ),
             llm_retry_attempts=max(1, int(os.getenv("LLM_RETRY_ATTEMPTS", "2"))),
             llm_retry_backoff_seconds=max(0.0, float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "0.5"))),
             llm_retry_jitter_seconds=max(0.0, float(os.getenv("LLM_RETRY_JITTER_SECONDS", "0.25"))),
-            llm_total_timeout_seconds=max(0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "65"))),
+            llm_total_timeout_seconds=max(
+                0.1, float(os.getenv("LLM_TOTAL_TIMEOUT_SECONDS", "125"))
+            ),
             llm_input_cost_per_million=max(0.0, float(os.getenv("LLM_INPUT_COST_PER_MILLION", "0"))),
             llm_output_cost_per_million=max(0.0, float(os.getenv("LLM_OUTPUT_COST_PER_MILLION", "0"))),
             llm_circuit_breaker_threshold=max(1, int(os.getenv("LLM_CIRCUIT_BREAKER_THRESHOLD", "5"))),
@@ -133,6 +144,15 @@ class Settings:
                 "false",
             ).lower()
             in {"1", "true", "yes", "on"},
+            agentic_max_iterations=max(1, int(os.getenv("AGENTIC_MAX_ITERATIONS", "8"))),
+            agentic_max_sql_queries=max(1, int(os.getenv("AGENTIC_MAX_SQL_QUERIES", "16"))),
+            agentic_max_total_rows=max(1, int(os.getenv("AGENTIC_MAX_TOTAL_ROWS", "1000"))),
+            agentic_max_execution_seconds=max(
+                0.1, float(os.getenv("AGENTIC_MAX_EXECUTION_SECONDS", "120"))
+            ),
+            agentic_max_llm_calls=max(0, int(os.getenv("AGENTIC_MAX_LLM_CALLS", "8"))),
+            agentic_max_tokens=max(0, int(os.getenv("AGENTIC_MAX_TOKENS", "32000"))),
+            agentic_max_retries=max(0, int(os.getenv("AGENTIC_MAX_RETRIES", "1"))),
             llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
         )

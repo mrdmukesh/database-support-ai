@@ -1,8 +1,8 @@
 """Add deterministic investigation state transition history."""
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "0013_investigation_state"
 down_revision = "0012_env_investigation"
@@ -20,7 +20,7 @@ def upgrade() -> None:
         sa.Column("previous_state", sa.String(80), nullable=False, server_default=""),
         sa.Column("current_state", sa.String(80), nullable=False),
         sa.Column("transitioned_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("reason", sa.Text(), nullable=False, server_default=""),
+        sa.Column("reason", sa.Text(), nullable=False, server_default=sa.text("('')")),
         sa.Column("iteration_number", sa.Integer(), nullable=False, server_default="0"),
         sa.ForeignKeyConstraint(
             ["investigation_id"],

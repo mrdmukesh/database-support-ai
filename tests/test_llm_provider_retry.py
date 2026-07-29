@@ -41,6 +41,19 @@ def settings(**overrides) -> Settings:
     return Settings(**values)
 
 
+def test_default_provider_timeout_budget_allows_two_full_attempts(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_REQUEST_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("LLM_TOTAL_TIMEOUT_SECONDS", raising=False)
+
+    configured = Settings.from_env()
+
+    assert configured.llm_request_timeout_seconds == 60
+    assert configured.llm_total_timeout_seconds == 125
+    assert configured.llm_total_timeout_seconds >= (
+        configured.llm_request_timeout_seconds * configured.llm_retry_attempts
+    )
+
+
 @pytest.fixture(autouse=True)
 def reset_provider_circuit() -> None:
     service._PROVIDER_CIRCUIT.reset()

@@ -67,7 +67,7 @@ foreach ($entry in $databases.GetEnumerator()) {
 
 $permissionsSql = Join-Path $runtime 'database-permissions.sql'
 $permissionBatches = ($databases.Values | ForEach-Object {
-    "USE [$_];`nGO`nIF USER_ID('evaladmin') IS NULL CREATE USER [evaladmin] FOR LOGIN [evaladmin];`nGO`nALTER ROLE db_owner ADD MEMBER [evaladmin];`nGO`nIF USER_ID('evalreader') IS NULL CREATE USER [evalreader] FOR LOGIN [evalreader];`nGO`nALTER ROLE db_datareader ADD MEMBER [evalreader];`nGO"
+    "USE [$_];`nGO`nIF USER_ID('evaladmin') IS NULL CREATE USER [evaladmin] FOR LOGIN [evaladmin];`nGO`nALTER ROLE db_owner ADD MEMBER [evaladmin];`nGO`nIF USER_ID('evalreader') IS NULL CREATE USER [evalreader] FOR LOGIN [evalreader];`nGO`nALTER ROLE db_datareader ADD MEMBER [evalreader];`nGO`nGRANT VIEW DEFINITION TO [evalreader];`nGO`nDENY EXECUTE TO [evalreader];`nGO"
 }) -join "`n"
 [System.IO.File]::WriteAllText($permissionsSql, $permissionBatches, (New-Object System.Text.UTF8Encoding($false)))
 docker cp $permissionsSql "${container}:/tmp/database-permissions.sql" | Out-Null

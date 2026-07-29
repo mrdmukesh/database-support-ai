@@ -1,8 +1,8 @@
 """Persist deterministic evidence-gap analysis."""
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision = "0014_evidence_gaps"
 down_revision = "0013_investigation_state"
@@ -17,7 +17,7 @@ def upgrade() -> None:
             "evidence_gap_analysis_json",
             sa.Text(),
             nullable=False,
-            server_default='{"status":"NOT_ANALYZED","gaps":[]}',
+            server_default=sa.text("""('{"status":"NOT_ANALYZED","gaps":[]}')"""),
         ),
     )
 

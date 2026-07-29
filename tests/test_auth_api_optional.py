@@ -319,6 +319,46 @@ def test_chat_safe_question_is_saved_with_history(client: TestClient) -> None:
     assert body["investigation_id"]
 
 
+def test_synchronous_chat_persists_canonical_terminal_outcome(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FEATURE_AGENTIC_INVESTIGATION_ENABLED", "true")
+    org, user, workspace, connection, headers = _create_chat_fixture(client)
+
+    response = client.post(
+        "/chat/ask",
+        json={
+            "organization_id": org["id"],
+            "workspace_id": workspace["id"],
+            "connection_id": connection["id"],
+            "user_id": user["id"],
+            "question": "Investigate this condition using available evidence.",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 201
+    investigation_id = response.json()["investigation_id"]
+    detail = client.get(
+        f"/learning/investigations/{investigation_id}",
+        headers=headers,
+    )
+    state = client.get(
+        f"/investigations/{investigation_id}/state",
+        headers=headers,
+    )
+
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "AI_ANSWERED"
+    assert state.status_code == 200
+    assert state.json()["current_state"] == "INSUFFICIENT_EVIDENCE", {
+        "detected_intent": detail.json()["detected_intent"],
+        "trace": detail.json()["trace"],
+        "state": state.json(),
+    }
+
+
 def test_feedback_requires_approval_before_knowledge_creation(client: TestClient) -> None:
     org, user, workspace, connection, headers = _create_chat_fixture(client)
     chat_response = client.post(

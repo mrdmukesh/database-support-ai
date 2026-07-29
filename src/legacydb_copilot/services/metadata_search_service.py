@@ -31,6 +31,9 @@ class TableMetadata:
     primary_key: list[str] | None = None
     foreign_keys: list[dict[str, Any]] | None = None
     indexes: list[dict[str, Any]] | None = None
+    column_types: dict[str, str] = field(default_factory=dict)
+    enrichment_loaded: bool = True
+    relationship_metadata_status: str = "loaded"
 
 
 @dataclass(frozen=True)
@@ -194,6 +197,25 @@ def _requires_diagnostic_objects(tokens: set[str]) -> bool:
     })
 
 
+_NON_OBJECT_TOKENS = {
+    "a",
+    "an",
+    "and",
+    "for",
+    "from",
+    "in",
+    "or",
+    "the",
+    "to",
+    "with",
+    "without",
+}
+
+
+def _is_explicit_object_name(value: str) -> bool:
+    return value.lower() not in _NON_OBJECT_TOKENS
+
+
 def _explicit_names(question: str, label: str) -> set[str]:
     names: set[str] = set()
     identifier = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
@@ -211,6 +233,7 @@ def _explicit_names(question: str, label: str) -> set[str]:
         names.update(
             match.group(1).lower()
             for match in re.finditer(pattern, question, re.I)
+            if _is_explicit_object_name(match.group(1))
         )
     return names
 
@@ -300,6 +323,7 @@ def search_metadata(
         entity.value.lower()
         for entity in entities.entities
         if entity.entity_type == "stored_procedure"
+        and _is_explicit_object_name(entity.value)
     }
     resolved_tables = resolve_qualified_object_names(metadata.tables, explicit_tables)
     exact_table_matches = {name.lower() for name in resolved_tables.values()}
@@ -371,18 +395,48 @@ def search_metadata(
             exact_procedures_requested=sorted(explicit_procedures),
             exact_procedures_found=sorted(exact_proc_matches),
         )
+    use_lightweight_candidate_search = (
+        metadata.engine_type == "sql_server"
+    )
     for table_name in metadata.tables:
+        column_types: dict[str, str] = {}
+        enrichment_loaded = True
+        relationship_metadata_status = "loaded"
         try:
-            schema = connector.get_table_schema(table_name)
-            columns = [column["name"] for column in schema["columns"]]
-            primary_key = schema.get("primary_key", [])
-            foreign_keys = schema.get("foreign_keys", [])
-            indexes = schema.get("indexes", [])
+            lightweight_columns = (
+                getattr(connector, "get_table_columns", None)
+                if use_lightweight_candidate_search
+                else None
+            )
+            if callable(lightweight_columns):
+                raw_columns = lightweight_columns(table_name)
+                columns = [column["name"] for column in raw_columns]
+                column_types = {
+                    str(column["name"]): str(column.get("type") or "unknown")
+                    for column in raw_columns
+                }
+                primary_key = []
+                foreign_keys = []
+                indexes = []
+                enrichment_loaded = False
+                relationship_metadata_status = "not_loaded"
+            else:
+                schema = connector.get_table_schema(table_name)
+                columns = [column["name"] for column in schema["columns"]]
+                column_types = {
+                    str(column["name"]): str(column.get("type") or "unknown")
+                    for column in schema["columns"]
+                }
+                primary_key = schema.get("primary_key", [])
+                foreign_keys = schema.get("foreign_keys", [])
+                indexes = schema.get("indexes", [])
         except Exception:
             columns = []
             primary_key = []
             foreign_keys = []
             indexes = []
+            enrichment_loaded = False
+            relationship_metadata_status = "unavailable"
         components = _table_score_components(
             table_name=table_name,
             columns=columns,
@@ -409,6 +463,8 @@ def search_metadata(
                 "decision": decision,
                 "reason": "; ".join(reason_bits),
                 "components": components,
+                "enrichment_loaded": enrichment_loaded,
+                "relationship_metadata_status": relationship_metadata_status,
             }
         )
         if table_name.lower() in exact_table_matches:
@@ -422,6 +478,55 @@ def search_metadata(
             trace[-1]["reason"] += "; exact user table match exists, so semantic alternative was not selected"
             continue
         if score > 0:
+            if callable(lightweight_columns):
+                try:
+                    search_schema = (
+                        connector.get_table_schema
+                        if table_name.lower() in exact_table_matches
+                        else getattr(
+                            connector,
+                            "get_table_search_schema",
+                            connector.get_table_schema,
+                        )
+                    )
+                    schema = search_schema(table_name)
+                    columns = [column["name"] for column in schema["columns"]]
+                    column_types = {
+                        str(column["name"]): str(column.get("type") or "unknown")
+                        for column in schema["columns"]
+                    }
+                    primary_key = schema.get("primary_key", [])
+                    foreign_keys = schema.get("foreign_keys", [])
+                    indexes = schema.get("indexes", [])
+                    enrichment_loaded = bool(
+                        schema.get("enrichment_loaded", True)
+                    )
+                    relationship_metadata_status = str(
+                        schema.get("relationship_metadata_status", "loaded")
+                    )
+                    components = _table_score_components(
+                        table_name=table_name,
+                        columns=columns,
+                        primary_key=primary_key,
+                        foreign_keys=foreign_keys,
+                        question_tokens=tokens,
+                        concept_tokens=concepts,
+                        business_ids=business_ids,
+                    )
+                    score = round(sum(components.values()), 2)
+                    if table_name.lower() in exact_table_matches:
+                        score += 100.0
+                    trace[-1]["components"] = components
+                    trace[-1]["score"] = score
+                    trace[-1]["enrichment_loaded"] = enrichment_loaded
+                    trace[-1]["relationship_metadata_status"] = (
+                        relationship_metadata_status
+                    )
+                except Exception:
+                    enrichment_loaded = False
+                    relationship_metadata_status = "unavailable"
+                    trace[-1]["enrichment_loaded"] = False
+                    trace[-1]["relationship_metadata_status"] = "unavailable"
             tables.append(
                 TableMetadata(
                     name=table_name,
@@ -430,6 +535,9 @@ def search_metadata(
                     primary_key=primary_key,
                     foreign_keys=foreign_keys,
                     indexes=indexes,
+                    column_types=column_types,
+                    enrichment_loaded=enrichment_loaded,
+                    relationship_metadata_status=relationship_metadata_status,
                 )
             )
     tables.sort(key=lambda item: (item.score, item.name), reverse=True)
@@ -461,6 +569,7 @@ def search_metadata(
         entity.value.lower()
         for entity in entities.entities
         if entity.entity_type == "stored_procedure"
+        and _is_explicit_object_name(entity.value)
     }
     selected_table_tokens = {part for table in tables[:8] for part in _identifier_parts(table.name)}
     procedures = [

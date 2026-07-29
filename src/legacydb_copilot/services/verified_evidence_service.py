@@ -33,6 +33,8 @@ def normalize_verified_evidence(
             gaps.add(
                 "policy_blocked_query"
                 if item.execution_status == "blocked"
+                else "permission_denied_query"
+                if item.execution_status == "permission_denied"
                 else "timed_out_query"
                 if item.execution_status == "timed_out"
                 else "failed_query"
@@ -81,6 +83,8 @@ def _verified_category(
         return "aggregate"
     if semantics == "metadata":
         return "metadata"
+    if semantics == "null_value" and item.rows:
+        return "null_value_rows"
     if semantics == "procedure_definition":
         return "procedure_definition"
     if (

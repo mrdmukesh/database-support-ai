@@ -19,6 +19,8 @@ from legacydb_copilot.services.report_generator import (
     new_investigation_id,
     now_label,
 )
+from legacydb_copilot.services.fix_readiness_service import FixReadinessState
+from legacydb_copilot.services.root_cause_hypothesis_service import HypothesisStatus
 
 
 @dataclass(frozen=True)
@@ -64,11 +66,27 @@ def _verified_report_input(
             and bundle.report_version == REPORT_VERSION
         )
     )
-    verified_claims = tuple(
-        claim.conclusion
-        for claim in bundle.reasoning.likely_root_causes
-        if claim.status is RootCauseSupportStatus.VERIFIED
-    ) if identity_valid else ()
+    verification = getattr(bundle, "root_cause_verification", None)
+    if verification is not None:
+        verified_claims = tuple(
+            item.hypothesis.description
+            for item in verification.verifications
+            if item.status is HypothesisStatus.CONFIRMED
+            and item.visible_in_report
+        )
+    else:
+        verified_claims = tuple(
+            claim.conclusion
+            for claim in bundle.reasoning.likely_root_causes
+            if claim.status is RootCauseSupportStatus.VERIFIED
+        )
+    if not identity_valid:
+        verified_claims = ()
+    rejected_claims_count = int(trace.get("rejected_claim_count") or 0)
+    if verification is not None:
+        rejected_claims_count = len(
+            verification.rejected_hypothesis_ids
+        )
     gate = bundle.evidence_gate
     return VerifiedReportInput(
         investigation_id=investigation_id,
@@ -76,7 +94,7 @@ def _verified_report_input(
         evidence_package_hash=bundle.evidence_package_hash,
         deterministic_findings=tuple(bundle.reasoning.confirmed_facts),
         verified_claims=verified_claims,
-        rejected_claims_count=int(trace.get("rejected_claim_count") or 0),
+        rejected_claims_count=rejected_claims_count,
         reproduction_status="reproduced" if gate and gate.reproduced else "not_reproduced",
         root_cause_support="supported" if verified_claims else "not_supported",
         evidence_gaps=tuple(bundle.reasoning.missing_evidence),
@@ -211,6 +229,97 @@ def _structured_evidence_gap_section(
                     "Recommended Next Evidence",
                     "Reason",
                 ],
+                rows=rows,
+            )
+        ],
+    )
+
+
+def _execution_path_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    trace = getattr(bundle, "execution_path_trace", None)
+    if trace is None:
+        return ReportSection(
+            title="Execution Path Timeline",
+            items=["Execution path tracing was not available for this investigation."],
+        )
+    return ReportSection(
+        title="Execution Path Timeline",
+        items=[
+            f"Last verified successful step: {trace.last_successful_step or 'None'}",
+            (
+                "First failed, missing, or inconsistent step: "
+                f"{trace.first_failed_or_missing_step or 'None'}"
+            ),
+            f"Responsible component: {trace.responsible_component or 'Not established'}",
+            f"Remaining gap: {trace.remaining_gap or 'None'}",
+        ],
+        tables=[
+            ReportTable(
+                title="Evidence-Supported Processing Timeline",
+                columns=[
+                    "sequence",
+                    "step",
+                    "expected_state",
+                    "actual_state",
+                    "verification",
+                    "outcome",
+                    "component",
+                    "timestamp",
+                    "evidence_refs",
+                    "reason",
+                ],
+                rows=trace.report_timeline(),
+            )
+        ],
+    )
+
+
+def _fix_readiness_section(bundle: DynamicInvestigationBundle) -> ReportSection:
+    assessment = getattr(bundle, "fix_readiness_assessment", None)
+    if assessment is None:
+        verification = getattr(bundle, "root_cause_verification", None)
+        confirmed = bool(verification and verification.root_cause_confirmed)
+        state = (
+            FixReadinessState.ROOT_CAUSE_CONFIRMED.value
+            if confirmed
+            else FixReadinessState.INVESTIGATION_INCOMPLETE.value
+        )
+        return ReportSection(
+            title="Fix Readiness Assessment",
+            items=[
+                f"Readiness: {state} (backward-compatible fallback)",
+                "Run the deterministic AG-08 assessment to obtain criterion-level blockers.",
+            ],
+        )
+    rows = [
+        {
+            "Criterion": item.name,
+            "Status": item.status.value,
+            "Evidence Refs": "; ".join(item.evidence_refs),
+            "Reason": item.reason,
+        }
+        for item in assessment.criteria
+    ]
+    ready_for_change = assessment.state in {
+        FixReadinessState.FIX_PROPOSAL_READY,
+        FixReadinessState.PROOF_OF_FIX_READY,
+    }
+    return ReportSection(
+        title="Fix Readiness Assessment",
+        items=[
+            f"Readiness: {assessment.state.value}",
+            f"Informational score: {assessment.score}% (prerequisites remain authoritative)",
+            f"SQL developer may prepare a controlled change: {'Yes' if ready_for_change else 'No'}",
+            f"Decision: {assessment.decision_reason}",
+            *(
+                [f"Blocker: {item}" for item in assessment.blockers]
+                or ["No readiness blockers remain."]
+            ),
+        ],
+        tables=[
+            ReportTable(
+                title="Deterministic Readiness Criteria",
+                columns=["Criterion", "Status", "Evidence Refs", "Reason"],
                 rows=rows,
             )
         ],
@@ -1069,6 +1178,16 @@ def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> Repor
     )
 
 
+def _report_completion_status(bundle: DynamicInvestigationBundle) -> str:
+    trace = bundle.ai_debug_trace or {}
+    invocation_status = str(trace.get("invocation_status") or "")
+    if invocation_status == "provider_failure":
+        return "AI Invocation Failed — Deterministic Fallback Report Generated"
+    if invocation_status in {"completed_zero_claims", "completed_no_verified_claims"}:
+        return "Reasoning Incomplete — Deterministic Fallback Report Generated"
+    return "Investigation Complete"
+
+
 def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]:
     trace = bundle.ai_debug_trace or {}
     ai_enabled = bool(trace.get("ai_enabled"))
@@ -1077,6 +1196,16 @@ def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]
     generated = int(trace.get("generated_claim_count") or 0)
     verified = int(trace.get("verified_claim_count") or 0)
     skip_reason = str(trace.get("skip_reason") or "none")
+
+    verification = getattr(bundle, "root_cause_verification", None)
+    if verification is not None:
+        confirmed = [
+            item.hypothesis.description
+            for item in verification.verifications
+            if item.status is HypothesisStatus.CONFIRMED
+            and item.visible_in_report
+        ]
+        return confirmed[:3] or ["Root cause not established from verified evidence."]
 
     claims = [
         claim
@@ -1356,6 +1485,7 @@ def compose_report(
         }
         for item in bundle.procedure_analysis
     ]
+    root_verification = getattr(bundle, "root_cause_verification", None)
     hypothesis_rows = [
         {
             "Hypothesis": item.hypothesis_id,
@@ -1381,6 +1511,35 @@ def compose_report(
         }
         for index, item in enumerate(bundle.hypothesis_reasoning.ranked_root_causes, start=1)
     ]
+    if root_verification is not None:
+        visible = root_verification.visible_hypotheses
+        hypothesis_rows = [
+            {
+                "Hypothesis": item.hypothesis.hypothesis_id,
+                "Description": item.hypothesis.description,
+                "Initial Confidence": "Causally verified",
+                "Required Evidence": "; ".join(
+                    link.link_name for link in item.verification_matrix
+                ),
+                "Tables": "",
+                "Procedures": item.hypothesis.responsible_component.value,
+                "Logs": "",
+            }
+            for item in visible
+        ]
+        evaluation_rows = [
+            {
+                "Rank": index,
+                "Hypothesis": item.hypothesis.hypothesis_id,
+                "Description": item.hypothesis.description,
+                "Confidence": "Confirmed",
+                "Supporting Evidence": "; ".join(item.valid_evidence_refs),
+                "Contradicting Evidence": "",
+                "Missing Evidence": "",
+                "Reason": item.decision_reason,
+            }
+            for index, item in enumerate(visible, start=1)
+        ]
     process_rows = [
         {"From": source, "To": target}
         for source, target in bundle.hypothesis_reasoning.process_graph
@@ -1405,6 +1564,19 @@ def compose_report(
         }
         for hypothesis in bundle.hypothesis_reasoning.hypotheses
     ]
+    if root_verification is not None:
+        plan_rows = [
+            {
+                "Hypothesis": item.hypothesis.hypothesis_id,
+                "Objects To Inspect": item.hypothesis.responsible_component.value,
+                "Evidence Required": "; ".join(
+                    link.link_name for link in item.verification_matrix
+                ),
+                "SQL Focus": "No new SQL generated by hypothesis verification.",
+                "Confidence Impact": item.decision_reason,
+            }
+            for item in root_verification.visible_hypotheses
+        ]
     focus = bundle.evidence_focus
     self_validation_rows = (
         [{"Question": item.split("?", 1)[0] + "?", "Answer": item.split("?", 1)[1].strip() if "?" in item else item} for item in focus.self_validation]
@@ -1442,7 +1614,19 @@ def compose_report(
     ]
     fact_rows = [{"Type": "Confirmed Fact", "Finding": item} for item in (bundle.reasoning.confirmed_facts or [])]
     fact_rows.extend({"Type": "Inferred Finding", "Finding": item} for item in (bundle.reasoning.inferred_findings or []))
-    fact_rows.extend({"Type": "Hypothesis", "Finding": item} for item in (bundle.reasoning.hypotheses or []))
+    if root_verification is not None:
+        fact_rows.extend(
+            {
+                "Type": "Confirmed Root Cause",
+                "Finding": item.hypothesis.description,
+            }
+            for item in root_verification.visible_hypotheses
+        )
+    else:
+        fact_rows.extend(
+            {"Type": "Hypothesis", "Finding": item}
+            for item in (bundle.reasoning.hypotheses or [])
+        )
     safe_input = _verified_report_input(
         bundle,
         investigation_id or bundle.investigation_id,
@@ -1455,11 +1639,18 @@ def compose_report(
             and not safe_input.verified_claims
         )
     )
-    executive_summary_text = (
-        _evidence_only_summary(bundle)
-        if evidence_only
-        else bundle.reasoning.summary
-    )
+    if root_verification is not None:
+        executive_summary_text = (
+            "Verified root cause: " + "; ".join(safe_input.verified_claims)
+            if safe_input.verified_claims
+            else _evidence_only_summary(bundle)
+        )
+    else:
+        executive_summary_text = (
+            _evidence_only_summary(bundle)
+            if evidence_only
+            else bundle.reasoning.summary
+        )
     confidence_items = [f"Overall confidence: {int(bundle.confidence * 100)}%"]
     confidence_items.extend(bundle.confidence_factors or ["Based on available evidence; no unsupported objects were fabricated."])
     recommended_fix_section = ReportSection(title="Recommended Fix", items=[
@@ -1524,6 +1715,8 @@ def compose_report(
         *rollback_sections,
         ReportSection(title="Missing Evidence", items=_missing_evidence_items(bundle.reasoning)),
         _structured_evidence_gap_section(bundle),
+        _execution_path_section(bundle),
+        _fix_readiness_section(bundle),
         ReportSection(title="Stage 1 - Understand the Question", items=[
             f"Investigation Mode: {bundle.investigation_mode}",
             f"Mode Rationale: {bundle.mode_rationale or 'Default full investigation path selected.'}",
@@ -1571,7 +1764,14 @@ def compose_report(
         *_missing_record_sections(bundle),
         ReportSection(title="Evidence Correlation", tables=[ReportTable(title="Correlated Evidence", columns=["Type", "Subject", "Finding", "Support", "Confidence"], rows=correlated_rows or [{"Type": "None", "Subject": "", "Finding": "No correlated evidence", "Support": "", "Confidence": ""}])]),
         ReportSection(title="Diagnostic Hypothesis Evaluation", paragraphs=["Diagnostic only. Final root-cause ranking below is driven by evidence-first affected-object and write-path analysis."], tables=[ReportTable(title="Ranked Hypotheses", columns=["Rank", "Hypothesis", "Description", "Confidence", "Supporting Evidence", "Contradicting Evidence", "Missing Evidence", "Reason"], rows=evaluation_rows)]),
-        ReportSection(title="Why It Happened", items=bundle.hypothesis_reasoning.event_chain),
+        ReportSection(
+            title="Why It Happened",
+            items=(
+                list(safe_input.verified_claims)
+                if root_verification is not None
+                else bundle.hypothesis_reasoning.event_chain
+            ),
+        ),
         ReportSection(title="Business Process Graph", paragraphs=["Execution-order graph inferred from stored procedure read/write metadata only."], tables=[ReportTable(title="Inferred Execution Graph", columns=["From", "To"], rows=process_rows or [{"From": "Unable to infer", "To": "Additional procedure read/write evidence required"}])]),
         *_intent_sections(bundle),
         ReportSection(title="Recommended Investigation SQL", sql_blocks=_sql_blocks(bundle)),
@@ -1599,7 +1799,7 @@ def compose_report(
             recommendation_summary=(
                 _executive_fix_items(bundle) or ["No recommendation is supported for executive display."]
             )[0],
-            status="Investigation Complete",
+            status=_report_completion_status(bundle),
         ),
         sections=sections,
     )

@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.db.base import utc_now
@@ -70,6 +71,8 @@ ALLOWED_TRANSITIONS: dict[InvestigationState, frozenset[InvestigationState]] = {
     }),
     InvestigationState.ACTION_SELECTION: frozenset({
         InvestigationState.PLANNING,
+        InvestigationState.INSUFFICIENT_EVIDENCE,
+        InvestigationState.BLOCKED_BY_MISSING_SOURCE,
         InvestigationState.QUERY_BUDGET_EXHAUSTED,
         InvestigationState.ITERATION_BUDGET_EXHAUSTED,
         InvestigationState.POLICY_BLOCKED,
@@ -77,11 +80,13 @@ ALLOWED_TRANSITIONS: dict[InvestigationState, frozenset[InvestigationState]] = {
     }),
     InvestigationState.PLANNING: frozenset({
         InvestigationState.VALIDATION,
+        InvestigationState.STATE_UPDATE,
         InvestigationState.POLICY_BLOCKED,
         *_FAIL_OR_CANCEL,
     }),
     InvestigationState.VALIDATION: frozenset({
         InvestigationState.EXECUTION,
+        InvestigationState.STATE_UPDATE,
         InvestigationState.POLICY_BLOCKED,
         *_FAIL_OR_CANCEL,
     }),
@@ -121,6 +126,7 @@ class StateTransition:
     transitioned_at: datetime
     reason: str
     iteration_number: int
+    sequence_number: int
 
 
 def validate_transition(
@@ -138,6 +144,8 @@ def validate_transition(
 
 
 class InvestigationStateService:
+    _SEQUENCE_ALLOCATION_ATTEMPTS = 3
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -194,8 +202,7 @@ class InvestigationStateService:
             select(InvestigationStateTransitionModel)
             .where(InvestigationStateTransitionModel.investigation_id == investigation_id)
             .order_by(
-                InvestigationStateTransitionModel.transitioned_at.desc(),
-                InvestigationStateTransitionModel.id.desc(),
+                InvestigationStateTransitionModel.sequence_number.desc(),
             )
             .limit(1)
         ).first()
@@ -206,8 +213,7 @@ class InvestigationStateService:
             select(InvestigationStateTransitionModel)
             .where(InvestigationStateTransitionModel.investigation_id == investigation_id)
             .order_by(
-                InvestigationStateTransitionModel.transitioned_at.asc(),
-                InvestigationStateTransitionModel.id.asc(),
+                InvestigationStateTransitionModel.sequence_number.asc(),
             )
         ).all()
         return [_to_transition(row) for row in rows]
@@ -221,19 +227,13 @@ class InvestigationStateService:
         reason: str,
         iteration_number: int,
     ) -> StateTransition:
-        timestamp = utc_now()
-        row = InvestigationStateTransitionModel(
-            organization_id=investigation.organization_id,
-            workspace_id=investigation.workspace_id,
-            investigation_id=investigation.id,
-            previous_state=previous_state.value if previous_state else "",
-            current_state=current_state.value,
-            transitioned_at=timestamp,
-            reason=reason.strip(),
+        row = self._persist_with_sequence_retry(
+            investigation,
+            previous_state=previous_state,
+            current_state=current_state,
+            reason=reason,
             iteration_number=iteration_number,
         )
-        self.db.add(row)
-        self.db.flush()
         record_audit_event(
             self.db,
             organization_id=investigation.organization_id,
@@ -251,6 +251,92 @@ class InvestigationStateService:
         )
         return _to_transition(row)
 
+    def _persist_with_sequence_retry(
+        self,
+        investigation: InvestigationModel,
+        *,
+        previous_state: InvestigationState | None,
+        current_state: InvestigationState,
+        reason: str,
+        iteration_number: int,
+    ) -> InvestigationStateTransitionModel:
+        last_collision: IntegrityError | None = None
+        for _attempt in range(self._SEQUENCE_ALLOCATION_ATTEMPTS):
+            self._lock_investigation(investigation.id)
+            sequence_number = self._next_sequence_number(investigation.id)
+            row = InvestigationStateTransitionModel(
+                organization_id=investigation.organization_id,
+                workspace_id=investigation.workspace_id,
+                investigation_id=investigation.id,
+                previous_state=previous_state.value if previous_state else "",
+                current_state=current_state.value,
+                transitioned_at=utc_now(),
+                reason=reason.strip(),
+                iteration_number=iteration_number,
+                sequence_number=sequence_number,
+            )
+            try:
+                with self.db.begin_nested():
+                    self.db.add(row)
+                    self.db.flush()
+                return row
+            except IntegrityError as exc:
+                if not self._is_sequence_collision(exc):
+                    raise
+                last_collision = exc
+                self.db.expire_all()
+                latest = self.current(investigation.id)
+                if latest is None:
+                    raise InvalidInvestigationTransition(
+                        "Investigation state is not initialized"
+                    ) from exc
+                try:
+                    validate_transition(latest.current_state, current_state)
+                except (InvalidInvestigationTransition, TerminalInvestigationState) as invalid:
+                    raise InvalidInvestigationTransition(
+                        "Investigation state changed during transition allocation: "
+                        f"{latest.current_state.value} -> {current_state.value}"
+                    ) from invalid
+                previous_state = latest.current_state
+                iteration_number = latest.iteration_number
+                if (
+                    latest.current_state is InvestigationState.STOP_EVALUATION
+                    and current_state is InvestigationState.EVIDENCE_ASSESSMENT
+                ):
+                    iteration_number += 1
+        assert last_collision is not None
+        raise last_collision
+
+    def _lock_investigation(self, investigation_id: str) -> None:
+        bind = self.db.get_bind()
+        if bind.dialect.name not in {"postgresql", "mysql"}:
+            return
+        self.db.execute(
+            select(InvestigationModel.id)
+            .where(InvestigationModel.id == investigation_id)
+            .with_for_update()
+        ).scalar_one()
+
+    def _next_sequence_number(self, investigation_id: str) -> int:
+        maximum = self.db.scalar(
+            select(func.max(InvestigationStateTransitionModel.sequence_number)).where(
+                InvestigationStateTransitionModel.investigation_id == investigation_id
+            )
+        )
+        return int(maximum or 0) + 1
+
+    @staticmethod
+    def _is_sequence_collision(exc: IntegrityError) -> bool:
+        detail = str(exc.orig).casefold()
+        return (
+            "uq_investigation_state_transition_sequence" in detail
+            or (
+                "unique" in detail
+                and "investigation_id" in detail
+                and "sequence_number" in detail
+            )
+        )
+
 
 def _to_transition(row: InvestigationStateTransitionModel) -> StateTransition:
     return StateTransition(
@@ -260,4 +346,5 @@ def _to_transition(row: InvestigationStateTransitionModel) -> StateTransition:
         transitioned_at=row.transitioned_at,
         reason=row.reason,
         iteration_number=row.iteration_number,
+        sequence_number=row.sequence_number,
     )

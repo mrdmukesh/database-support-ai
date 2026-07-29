@@ -79,6 +79,19 @@ def test_evaluation_bootstrap_is_explicit_and_migration_does_not_infer_names() -
     assert 'environment_type="evaluation"' in bootstrap
 
 
+def test_local_sql_server_bootstrap_sets_evaluation_policy_and_read_only_metadata_access() -> None:
+    configure = Path("scripts/evaluation/configure_local_sqlserver.py").read_text(
+        encoding="utf-8"
+    )
+    provision = Path("scripts/evaluation/start-local-sqlserver.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'record.environment_type = "evaluation"' in configure
+    assert "GRANT VIEW DEFINITION TO [evalreader]" in provision
+    assert "DENY EXECUTE TO [evalreader]" in provision
+
+
 def test_container_runs_migrations_before_starting_the_api() -> None:
     dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
 

@@ -49,6 +49,10 @@ ui*.err.log
 /reports/
 /storage/
 /uploads/
+/evaluation/results/
+/.tmp/migration-backups/
+/.tmp/local-evaluation/worker.pid
+/.tmp/local-evaluation/worker-runtime.json
 
 # OS and editor files
 .DS_Store
@@ -73,6 +77,7 @@ yarn-error.log*
 /.tmp/pytest-*/
 /.tmp/fixture-framework-*/
 /.tmp/react-static-task*/
+/.tmp/ag10-*/
 /pytest*_tmp/
 /pytest_*/
 /tmp/pytest-*/

@@ -243,54 +243,28 @@ def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
     return False
 
 
-def _null_dependency_claim(
+def _verified_null_fields(
     evidence: list[EvidenceResult],
-    procedure_analysis: list[ProcedureAnalysis],
-) -> tuple[str, list[str], str] | None:
-    """Find a generic missing-value cause supported by row and calculation-logic evidence."""
+) -> dict[str, list[str]]:
+    """Return nullable fields proved NULL by successful, relevant row evidence."""
     null_fields: dict[str, list[str]] = {}
     for item in evidence:
-        if not item.rows:
+        if (
+            item.execution_status != "succeeded"
+            or item.error
+            or item.evidence_semantics != "null_value"
+            or item.evidence_relevance == "irrelevant"
+            or not item.rows
+        ):
             continue
         for row in item.rows:
             for column, value in row.items():
                 if value is None:
-                    null_fields.setdefault(str(column).lower(), []).append(item.evidence_id)
-    if not null_fields:
-        return None
-
-    calculation_terms = ("age", "date", "datediff", "extract", "year", "calculate", "convert")
-    for procedure in procedure_analysis:
-        definition = procedure.definition_excerpt.lower()
-        if not definition or not any(term in definition for term in calculation_terms):
-            continue
-        for column, row_refs in null_fields.items():
-            variants = {column, column.replace("_", "")}
-            compact_definition = definition.replace("_", "")
-            if not any(value in definition or value in compact_definition for value in variants):
-                continue
-            escaped_column = re.escape(column)
-            has_null_guard = bool(
-                re.search(
-                    rf"(?:{escaped_column}\s+is\s+(?:not\s+)?null|coalesce\s*\(\s*{escaped_column}|ifnull\s*\(\s*{escaped_column})",
-                    definition,
-                )
-            )
-            if has_null_guard:
-                continue
-            logic_refs = [
-                item.evidence_id
-                for item in evidence
-                if item.purpose == f"Inspect calculation logic in {procedure.name}" and item.rows
-            ]
-            if not logic_refs:
-                continue
-            conclusion = (
-                f"The confirmed record has missing {column}, and {procedure.name} depends on that field "
-                "for date/age calculation without safe null validation; this causes the calculation failure."
-            )
-            return conclusion, list(dict.fromkeys([*row_refs, *logic_refs])), column
-    return None
+                    null_fields.setdefault(str(column), []).append(item.evidence_id)
+    return {
+        column: list(dict.fromkeys(refs))
+        for column, refs in null_fields.items()
+    }
 
 
 def reason_about_evidence(
@@ -337,11 +311,15 @@ def reason_about_evidence(
     missing = [f"{item.purpose}: {item.error or 'no rows returned'}" for item in evidence if not item.rows]
     root_causes: list[str] = []
     root_cause_refs: dict[str, list[str]] = {}
-    null_dependency = _null_dependency_claim(evidence, procedure_analysis)
-    if null_dependency:
-        conclusion, refs, _ = null_dependency
-        root_causes.append(conclusion)
-        root_cause_refs[conclusion] = refs
+    verified_nulls = _verified_null_fields(evidence)
+    null_findings = [
+        f"{column} is verified as NULL. Evidence: {', '.join(refs)}."
+        for column, refs in verified_nulls.items()
+    ]
+    for column, refs in verified_nulls.items():
+        supporting.append(
+            f"Verified finding: {column} is NULL. Evidence: {', '.join(refs)}."
+        )
     if evidence_focus:
         write_procs = [
             proc
@@ -355,8 +333,8 @@ def reason_about_evidence(
         "duplicate" in item.purpose.lower() or (item.rows and "duplicate" in item.sql.lower())
         for item in evidence
     )
-    if null_dependency:
-        pass
+    if verified_nulls:
+        response_type = "inconclusive_verified_null"
     elif duplicate_like:
         if evidence_focus and evidence_focus.confirmed_facts:
             duplicate_facts = [fact for fact in evidence_focus.confirmed_facts if " has " in fact and evidence_focus.affected_object in fact]
@@ -467,15 +445,28 @@ def reason_about_evidence(
                 "change approval, rollback planning, and duplicate checks."
             ),
         ]
-    if null_dependency:
-        _, refs, column = null_dependency
-        ref_text = ", ".join(refs)
+    if verified_nulls:
+        field_list = ", ".join(verified_nulls)
+        ref_text = ", ".join(
+            dict.fromkeys(ref for refs in verified_nulls.values() for ref in refs)
+        )
         fix = [
-            f"Correct the missing or invalid {column} through the approved data process after source verification. Evidence: {ref_text}.",
-            f"Add explicit null and valid-date validation before date or age calculation, with a controlled error path. Evidence: {ref_text}.",
-            "Re-run the read-only record and calculation-logic checks before and after the approved change.",
+            (
+                f"Entering valid source data for {field_list}, through the approved data "
+                f"process after source verification, is a prerequisite for any dependent "
+                f"calculation. No change has been executed. Evidence: {ref_text}."
+            ),
+            (
+                "Verify the data origin and validation path before proposing a corrective "
+                "change; the current evidence does not establish why the value is NULL."
+            ),
         ]
     proof_of_fix = ["Run proof SQL after the fix; expected result depends on the failure type and should show no duplicate/missing/failed condition remains."]
+    if verified_nulls:
+        proof_of_fix = [
+            "No fix was executed or proved. After an approved change, rerun the same "
+            "read-only evidence query and the dependent calculation as separate checks."
+        ]
     if intent.intent == InvestigationIntent.MISSING_DATA and _rows_for_purpose(evidence, "Confirmed Missing Related Record Candidates"):
         proof_of_fix = [
             "Verify the affected parent record still exists and has the expected business/status state.",
@@ -484,13 +475,36 @@ def reason_about_evidence(
             "Verify no new relevant error-log or job-history failure rows were created after the fix, when those logs are available.",
         ]
     missing_evidence = missing or ["No obvious missing evidence from executed read-only checks."]
+    if verified_nulls:
+        missing_evidence = [
+            "The evidence verifies the NULL value but does not establish its origin.",
+            "Dependent behavior cannot be concluded unless its definition or "
+            "execution result is verified.",
+        ]
     if intent.intent == InvestigationIntent.MISSING_DATA and _rows_for_purpose(evidence, "Confirmed Missing Related Record Candidates"):
         missing_evidence = missing or [
             "Check the write procedure or job definition to confirm the exact guard condition that creates the child record.",
             "Check recent error-log, audit-log, or job-history rows after the attempted fix.",
         ]
+    requested_calculation = (
+        "age calculation"
+        if re.search(r"\bage\b", question, re.I)
+        else "requested calculation"
+    )
+    summary = (
+        "Verified findings: database evidence contains one or more NULL source values. "
+        f"Interpretation: the {requested_calculation} cannot be completed without its "
+        "required valid input. Evidence gap: the origin of the NULL and any downstream "
+        "root cause remain unproven."
+        if verified_nulls
+        else (
+            "Investigation generated dynamically from detected intent, extracted "
+            "entities, ranked database objects, stored procedure analysis, retrieved "
+            "documents, approved knowledge, and safe SQL evidence."
+        )
+    )
     return ReasoningResult(
-        summary="Investigation generated dynamically from detected intent, extracted entities, ranked database objects, stored procedure analysis, retrieved documents, approved knowledge, and safe SQL evidence.",
+        summary=summary,
         likely_root_causes=[
             claim
             for item in root_causes
@@ -514,7 +528,14 @@ def reason_about_evidence(
         proof_of_fix=proof_of_fix,
         rollback_plan=["Capture before-state rows.", "Apply fix through versioned script or approved deployment.", "If validation fails, restore previous procedure/config/index state using the rollback script.", "Re-run proof SQL and attach output."],
         risks=["Business impact depends on the affected process and returned evidence.", "Technical risk increases if manual data repair is attempted without dependency checks."],
-        confirmed_facts=evidence_focus.confirmed_facts if evidence_focus else supporting,
+        confirmed_facts=list(
+            dict.fromkeys(
+                [
+                    *(evidence_focus.confirmed_facts if evidence_focus else supporting),
+                    *null_findings,
+                ]
+            )
+        ),
         inferred_findings=evidence_focus.inferred_findings if evidence_focus else root_causes,
         hypotheses=evidence_focus.hypotheses if evidence_focus else root_causes,
         response_type=response_type,

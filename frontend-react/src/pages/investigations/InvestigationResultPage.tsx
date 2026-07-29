@@ -13,6 +13,7 @@ import type { SavedInvestigation } from "../../models/investigation";
 import { extractSection, extractSectionBullets, parseLegacyAssistantMessage } from "../../utils/investigation-parser";
 import { Alert, Card, ConfidenceBadge, EvidenceTable, PageHeader, RiskBadge, SkeletonLoader, SqlCodeBlock, StatusBadge, humanize } from "../../components/ui";
 import { EnvironmentNotice, environmentLabel } from "../../components/investigation/EnvironmentNotice";
+import { InvestigationProgressPanel } from "../../components/investigation/InvestigationProgressPanel";
 
 type LoadState =
   | { status: "loading" }
@@ -122,6 +123,7 @@ export function InvestigationResultPage() {
         <dl><dt>Investigation ID</dt><dd>{result.id}</dd><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Environment</dt><dd>{result.environment_type ? environmentLabel(result.environment_type) : "Unresolved"}</dd><dt>Generated</dt><dd>{new Date(result.created_at).toLocaleString()}</dd><dt>Report version</dt><dd>1.0</dd><dt>Policy</dt><dd>{result.policy_name ?? "Unresolved"} ({result.policy_version ?? "unknown"})</dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd></dl>
       </Card>
       <EnvironmentNotice environment={result.environment_type} />
+      <InvestigationProgressPanel investigationId={result.id} />
       <div className="investigation-result-grid">
         <RootCauseSection rootCauses={parsed.rootCauses} />
         <ExecutiveSummarySection summary={extractSection(parsed.raw, "Stage 6 - Reason") || "No executive summary was returned."} />

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from evaluation.cli.__main__ import execute
-from evaluation.preflight import run_preflight
+from evaluation.preflight import _worker_health, run_preflight
 from evaluation.runners.contracts import UnsafeSQLError
 from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
 
@@ -20,6 +21,56 @@ def test_preflight_reports_blocking_configuration_gaps(monkeypatch):
     assert not report.passed
     assert {item.status for item in report.checks} <= {"PASS", "FAIL", "WARNING"}
     assert any(item.name == "125 scenario manifests" and item.status == "PASS" for item in report.checks)
+
+
+def test_worker_health_fails_when_pid_file_is_missing(tmp_path):
+    ok, detail = _worker_health(tmp_path / "worker.pid")
+
+    assert ok is False
+    assert detail == "worker pid file missing"
+
+
+def test_worker_health_fails_for_stale_pid(tmp_path, monkeypatch):
+    pid_file = tmp_path / "worker.pid"
+    pid_file.write_text("12345", encoding="utf-8")
+    monkeypatch.setattr("evaluation.preflight._process_is_running", lambda _pid: False)
+
+    ok, detail = _worker_health(pid_file)
+
+    assert ok is False
+    assert detail == "process 12345 is not running"
+
+
+def test_worker_health_passes_for_live_pid(tmp_path, monkeypatch):
+    pid_file = tmp_path / "worker.pid"
+    pid_file.write_text("12345", encoding="utf-8")
+    monkeypatch.setattr("evaluation.preflight._process_is_running", lambda _pid: True)
+
+    ok, detail = _worker_health(pid_file)
+
+    assert ok is True
+    assert detail == "process 12345 is running"
+
+
+def test_worker_runtime_files_are_ignored_and_untracked():
+    runtime_files = (
+        ".tmp/local-evaluation/worker.pid",
+        ".tmp/local-evaluation/worker-runtime.json",
+    )
+
+    for runtime_file in runtime_files:
+        ignored = subprocess.run(
+            ["git", "check-ignore", "--quiet", runtime_file],
+            check=False,
+        )
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", runtime_file],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        assert ignored.returncode == 0
+        assert tracked.returncode != 0
 
 
 def test_sql_lifecycle_rejects_unlisted_database():

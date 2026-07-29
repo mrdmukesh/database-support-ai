@@ -8,6 +8,8 @@ import type {
   SavedInvestigation,
 } from "../models/investigation";
 import {
+  cancelAgenticInvestigation,
+  loadInvestigationProgress,
   loadConversationMessages,
   loadConversations,
   loadInvestigationHistory,
@@ -146,5 +148,42 @@ describe("investigation API", () => {
     expect(metadata.detected_intent).toBe("duplicate_data");
     expect(metadata.report).toEqual(report);
     expect(metadata.ai_answer).toBe(legacyContent);
+  });
+
+  it("loads sanitized agentic progress and posts cancellation", async () => {
+    const progress = {
+      investigation_id: "INV/1",
+      agentic: true,
+      current_state: "EXECUTION",
+      iteration_number: 2,
+      terminal: false,
+      stop_reason: "",
+      budget: {},
+      resolved_entities: [],
+      question_counts: { open: 0, answered: 0, partial: 0, blocked: 0 },
+      questions: [],
+      completed_steps: [],
+      failed_actions: [],
+      verified_absence: [],
+      root_cause_status: "NOT_ASSESSED",
+      fix_readiness_state: "NOT_ASSESSED",
+      source_badges: [],
+      can_cancel: true,
+    };
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(response(progress))
+      .mockResolvedValueOnce(response({ current_state: "CANCELLED" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadInvestigationProgress("INV/1")).resolves.toEqual(progress);
+    await cancelAgenticInvestigation("INV/1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "http://127.0.0.1:8001/investigations/INV%2F1/progress",
+    );
+    expect(fetchMock.mock.calls[1]).toMatchObject([
+      "http://127.0.0.1:8001/investigations/INV%2F1/cancel",
+      expect.objectContaining({ method: "POST" }),
+    ]);
   });
 });

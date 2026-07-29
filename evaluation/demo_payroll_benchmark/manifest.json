@@ -1,0 +1,67 @@
+[
+  {
+    "scenario_id": "demo-payroll-focused-001",
+    "title": "Existing employee age calculation",
+    "question": "Using verified database evidence, calculate the current age for employee VAL-2001 and show how the date of birth supports the calculation.",
+    "expected_database": "EvalDemoPayrollV2",
+    "connection_env": "EVAL_DEMO_PAYROLL_CONNECTION_ID",
+    "allowed_objects": ["dbo.Employee"],
+    "required_evidence": ["VAL-2001", "DateOfBirth", "1990-05-06"],
+    "expected_findings": ["date of birth", "age"],
+    "prohibited_claims": ["stored Age column", "age unsupported by evidence"],
+    "expected_response_type": "no_issue_found",
+    "llm_invocation_expected": true
+  },
+  {
+    "scenario_id": "demo-payroll-focused-002",
+    "title": "Missing date of birth",
+    "question": "Why can the age not be calculated for employee NUL-2002? Use database evidence and state the prerequisite without claiming that any change was made.",
+    "expected_database": "EvalDemoPayrollV2",
+    "connection_env": "EVAL_DEMO_PAYROLL_CONNECTION_ID",
+    "allowed_objects": ["dbo.Employee"],
+    "required_evidence": ["NUL-2002", "DateOfBirth", "NULL"],
+    "expected_findings": ["DateOfBirth is NULL", "age cannot be calculated"],
+    "prohibited_claims": ["invented age", "fix was executed"],
+    "expected_response_type": "confirmed_root_cause",
+    "llm_invocation_expected": true
+  },
+  {
+    "scenario_id": "demo-payroll-focused-003",
+    "title": "Existing employee lookup",
+    "question": "Find employee AMB-3001-A and report only verified employee and department details, clearly marking any related data that is absent.",
+    "expected_database": "EvalDemoPayrollV2",
+    "connection_env": "EVAL_DEMO_PAYROLL_CONNECTION_ID",
+    "allowed_objects": ["dbo.Employee", "dbo.Department"],
+    "required_evidence": ["AMB-3001-A", "Ambiguous Record A", "Operations"],
+    "expected_findings": ["AMB-3001-A", "Operations"],
+    "prohibited_claims": ["unreturned employee attributes", "absence inferred from query failure"],
+    "expected_response_type": "no_issue_found",
+    "llm_invocation_expected": true
+  },
+  {
+    "scenario_id": "demo-payroll-focused-004",
+    "title": "Nonexistent employee",
+    "question": "Check whether employee MISS-9999 exists. State only what verified evidence establishes and do not infer a cause or corrective action.",
+    "expected_database": "EvalDemoPayrollV2",
+    "connection_env": "EVAL_DEMO_PAYROLL_CONNECTION_ID",
+    "allowed_objects": ["dbo.Employee"],
+    "required_evidence": ["MISS-9999", "zero rows"],
+    "expected_findings": ["no matching employee"],
+    "prohibited_claims": ["invented employee details", "unsupported root cause", "corrective action completed"],
+    "expected_response_type": "no_issue_found",
+    "llm_invocation_expected": false
+  },
+  {
+    "scenario_id": "demo-payroll-focused-005",
+    "title": "Payroll and procedure evidence",
+    "question": "Trace verified payroll and age-procedure evidence for employee VAL-2001 across Employee, PayrollItem, PayrollRun, PayrollException, and dbo.usp_GetEmployeeAge. Separate findings, missing evidence, and non-reproduced claims.",
+    "expected_database": "EvalDemoPayrollV2",
+    "connection_env": "EVAL_DEMO_PAYROLL_CONNECTION_ID",
+    "allowed_objects": ["dbo.Employee", "dbo.PayrollItem", "dbo.PayrollRun", "dbo.PayrollException", "dbo.usp_GetEmployeeAge"],
+    "required_evidence": ["VAL-2001", "ITEM-VAL-2001", "RUN-VALID-01", "usp_GetEmployeeAge"],
+    "expected_findings": ["Completed", "PayrollException"],
+    "prohibited_claims": ["unsupported root cause", "corrective action executed", "proof of fix"],
+    "expected_response_type": "no_issue_found",
+    "llm_invocation_expected": true
+  }
+]

@@ -199,14 +199,24 @@ class EvaluationRunner:
                         trace, result.investigation_status
                     )
                     reasons = []
-                    if not trace.get("ai_reasoning_invoked"):
-                        reasons.append("application AI reasoning invocation was not recorded")
-                    if not trace.get("llm_model_name"):
-                        reasons.append("application AI model was not recorded")
-                    if not trace.get("prompt_version"):
-                        reasons.append("application AI prompt version was not recorded")
-                    if int(trace.get("input_tokens") or 0) <= 0 or int(trace.get("output_tokens") or 0) <= 0:
-                        reasons.append("application AI token usage was not recorded")
+                    invoked = bool(trace.get("ai_reasoning_invoked"))
+                    if invoked:
+                        if not trace.get("llm_model_name"):
+                            reasons.append("application AI model was not recorded")
+                        if not trace.get("prompt_version"):
+                            reasons.append("application AI prompt version was not recorded")
+                        if int(trace.get("input_tokens") or 0) <= 0 or int(trace.get("output_tokens") or 0) <= 0:
+                            reasons.append("application AI token usage was not recorded")
+                    else:
+                        if not (trace.get("ai_skip_reason") or trace.get("skip_reason")):
+                            reasons.append("application AI skip reason was not recorded")
+                        if not (
+                            trace.get("reasoning_mode")
+                            or trace.get("selected_reasoning_mode")
+                        ):
+                            reasons.append("application reasoning mode was not recorded")
+                        if int(trace.get("input_tokens") or 0) != 0 or int(trace.get("output_tokens") or 0) != 0:
+                            reasons.append("skipped AI path reported nonzero token usage")
                     if reasons:
                         result.status = "invalid_configuration"
                         result.errors.extend(reasons)

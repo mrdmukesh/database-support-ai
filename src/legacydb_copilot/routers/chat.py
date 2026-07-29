@@ -710,6 +710,18 @@ def _terminal_ai_trace(investigation_metadata: dict[str, Any]) -> dict[str, Any]
     trace.setdefault("verified_claim_count", verified_from_legacy)
     trace.setdefault("rejected_claim_count", rejected_from_legacy)
     trace.setdefault("skip_reason", trace.get("ai_skip_reason") or "none")
+    trace.setdefault(
+        "reasoning_mode",
+        trace.get("selected_reasoning_mode")
+        or (
+            "SKIP_NO_VERIFIED_EVIDENCE"
+            if not llm_invoked
+            else "NORMAL_ROOT_CAUSE"
+        ),
+    )
+    trace.setdefault("selected_reasoning_mode", trace["reasoning_mode"])
+    trace.setdefault("input_tokens", 0)
+    trace.setdefault("output_tokens", 0)
     trace.setdefault("error_category", trace.get("ai_reasoning_error") or trace.get("provider_error_type"))
 
     if not llm_invoked:
@@ -2190,7 +2202,12 @@ def _run_dynamic_investigation(
         documents=context.documents,
         evidence_focus=evidence_focus,
     )
-    reasoning_dispatch = dispatch_reasoning(evidence_gate)
+    reasoning_dispatch = dispatch_reasoning(
+        evidence_gate,
+        factual_request=(
+            intent.intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
+        ),
+    )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
     if reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:

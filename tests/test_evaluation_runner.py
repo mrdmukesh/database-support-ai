@@ -147,7 +147,8 @@ def test_ai_enabled_run_is_invalid_without_application_invocation_proof(tmp_path
     app.config = replace(app.config, ai_enabled=True)
     result = app.run_scenario("RUN", scenario())
     assert result.status == "invalid_configuration"
-    assert "application AI reasoning invocation was not recorded" in result.errors
+    assert "application AI skip reason was not recorded" in result.errors
+    assert "application reasoning mode was not recorded" in result.errors
     assert result.extracted_result["ai_diagnostic_category"] == "missing_ai_instrumentation"
 
 
@@ -173,6 +174,24 @@ def test_ai_enabled_run_accepts_complete_application_trace(tmp_path):
     class Reader:
         def read(self, *_args, **_kwargs):
             return {"debug_trace": {"ai_reasoning_invoked": True, "llm_model_name": "gpt-test", "prompt_version": "v1", "input_tokens": 10, "output_tokens": 5}}
+
+    app = runner(tmp_path, result_reader=Reader())
+    app.config = replace(app.config, ai_enabled=True)
+    assert app.run_scenario("RUN", scenario()).status == "completed"
+
+
+def test_ai_enabled_run_accepts_complete_skipped_trace_with_zero_tokens(tmp_path):
+    class Reader:
+        def read(self, *_args, **_kwargs):
+            return {
+                "debug_trace": {
+                    "ai_reasoning_invoked": False,
+                    "ai_skip_reason": "no_verified_evidence",
+                    "reasoning_mode": "SKIP_NO_VERIFIED_EVIDENCE",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                }
+            }
 
     app = runner(tmp_path, result_reader=Reader())
     app.config = replace(app.config, ai_enabled=True)

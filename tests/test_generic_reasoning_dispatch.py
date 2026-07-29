@@ -79,6 +79,16 @@ def test_reasoning_decision_table_is_independent_of_domain_and_question_wording(
     assert decision.mode == mode
 
 
+def test_factual_request_uses_evidence_summary_instead_of_root_cause() -> None:
+    decision = dispatch_reasoning(
+        _gate(verified=True, reproduced=True),
+        factual_request=True,
+    )
+
+    assert decision.mode == ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
+    assert decision.reproduction_status.value == "not_reproduced"
+
+
 def test_verified_reported_condition_routes_to_root_cause_when_legacy_reproduced_flag_is_false() -> None:
     decision = dispatch_reasoning(
         _gate(verified=True, reproduced=False, reported_condition_exists=True)

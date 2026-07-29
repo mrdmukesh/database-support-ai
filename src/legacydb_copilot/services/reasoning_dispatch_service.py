@@ -46,7 +46,9 @@ class ReasoningDispatchDecision:
     evidence_gaps: list[str]
 
 
-def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
+def dispatch_reasoning(
+    gate: EvidenceGateResult, *, factual_request: bool = False
+) -> ReasoningDispatchDecision:
     """Select reasoning from normalized evidence availability, independently of wording."""
     verified_count = gate.verified_evidence_count or int(gate.verified_evidence)
     permission = (
@@ -76,7 +78,7 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
             evidence_categories=gate.evidence_categories,
             evidence_gaps=gate.evidence_gaps or gate.missing_evidence,
         )
-    if condition_verified:
+    if condition_verified and not factual_request:
         return ReasoningDispatchDecision(
             permission=permission,
             mode=ReasoningMode.NORMAL_ROOT_CAUSE,
@@ -92,6 +94,7 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
     mode = (
         ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED
         if reproduction_status == ReproductionStatus.NOT_REPRODUCED
+        or factual_request
         else ReasoningMode.EVIDENCE_GAP_SUMMARY
     )
     return ReasoningDispatchDecision(
@@ -104,7 +107,11 @@ def dispatch_reasoning(gate: EvidenceGateResult) -> ReasoningDispatchDecision:
         ),
         invoke_llm=True,
         verified_evidence_count=verified_count,
-        reproduction_status=reproduction_status,
+        reproduction_status=(
+            ReproductionStatus.NOT_REPRODUCED
+            if factual_request
+            else reproduction_status
+        ),
         root_cause_support=RootCauseSupport.NOT_SUPPORTED,
         reason_code=(
             "VERIFIED_EVIDENCE_NOT_REPRODUCED"

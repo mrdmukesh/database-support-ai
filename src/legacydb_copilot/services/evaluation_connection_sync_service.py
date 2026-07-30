@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import ArgumentError
 
 from legacydb_copilot.config import Settings
 from legacydb_copilot.db.models import DatabaseConnectionModel
@@ -33,16 +34,36 @@ def sync_azure_evaluation_connections(settings: Settings | None = None) -> int:
     if not evaluation_connection_sync_enabled():
         return 0
     resolved = settings or Settings.from_env()
+    reader_password = os.getenv("EVAL_READER_PASSWORD", "")
     validated: dict[str, str] = {}
     for domain, database in AZURE_EVALUATION_DATABASES.items():
         variable = f"EVAL_APP_SQL_URL_{domain}"
         secret = os.getenv(variable, "")
         connection_id = os.getenv(f"EVAL_CONNECTION_ID_{domain}", "")
-        if not secret or not connection_id:
+        try:
+            url = make_url(secret)
+        except ArgumentError:
+            url = None
+        if url is None and reader_password:
+            url = URL.create(
+                "mssql+pyodbc",
+                username=AZURE_EVALUATION_READER,
+                password=reader_password,
+                host=AZURE_EVALUATION_SERVER,
+                port=1433,
+                database=database,
+                query={
+                    "driver": "ODBC Driver 18 for SQL Server",
+                    "Encrypt": "yes",
+                    "TrustServerCertificate": "no",
+                },
+            )
+            # Keep the credential process-local. Only the env:// reference is persisted.
+            os.environ[variable] = url.render_as_string(hide_password=False)
+        if url is None or not connection_id:
             raise RuntimeError(
                 f"Azure evaluation configuration is incomplete for {domain.casefold()}"
             )
-        url = make_url(secret)
         if (
             url.host != AZURE_EVALUATION_SERVER
             or (url.port or 1433) != 1433

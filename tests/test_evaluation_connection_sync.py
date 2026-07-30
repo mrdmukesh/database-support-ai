@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -71,6 +72,35 @@ def test_sync_rejects_wrong_server_before_persistence(monkeypatch):
 
     with pytest.raises(RuntimeError, match="identity is invalid"):
         service.sync_azure_evaluation_connections(Settings(environment=Environment.TESTING))
+
+
+def test_sync_constructs_urls_in_memory_from_managed_reader_password(monkeypatch):
+    configure(monkeypatch)
+    database = Database()
+    monkeypatch.setenv("EVAL_READER_PASSWORD", "managed-secret")
+    for domain in service.AZURE_EVALUATION_DATABASES:
+        monkeypatch.setenv(f"EVAL_APP_SQL_URL_{domain}", "secret-placeholder")
+    monkeypatch.setattr(
+        service,
+        "create_session_factory",
+        lambda _url: lambda: database,
+    )
+
+    assert (
+        service.sync_azure_evaluation_connections(
+            Settings(environment=Environment.TESTING)
+        )
+        == 5
+    )
+    for domain, expected_database in service.AZURE_EVALUATION_DATABASES.items():
+        url = service.make_url(os.environ[f"EVAL_APP_SQL_URL_{domain}"])
+        assert url.host == service.AZURE_EVALUATION_SERVER
+        assert url.database == expected_database
+        assert url.username == service.AZURE_EVALUATION_READER
+        assert url.password == "managed-secret"
+        assert database.records[f"id-{domain.casefold()}"].secret_ref == (
+            f"env://EVAL_APP_SQL_URL_{domain}"
+        )
 
 
 def test_sync_is_disabled_by_default(monkeypatch):

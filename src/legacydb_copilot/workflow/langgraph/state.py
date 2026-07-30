@@ -66,6 +66,8 @@ class DatabaseObjectRef(StateRecord):
     relationship_verification: RelationshipVerification | None = None
     inspection_only: bool = False
     contains_mutation: bool = False
+    contains_dynamic_sql: bool = False
+    unsafe_to_execute: bool = False
 
     @property
     def qualified_name(self) -> str:

@@ -46,6 +46,26 @@ class EvidenceDrivenWorkflowHandlers:
 
 
 @dataclass(frozen=True)
+class ReasoningReportingWorkflowHandlers:
+    initialize: NodeHandler
+    resolve_entity: NodeHandler
+    discover_objects: NodeHandler
+    create_plan: NodeHandler
+    validate_sql: NodeHandler
+    execute_sql: NodeHandler
+    preserve_evidence: NodeHandler
+    classify_results: NodeHandler
+    check_coverage: NodeHandler
+    assess_evidence: NodeHandler
+    apply_evidence_gate: NodeHandler
+    invoke_reasoning: NodeHandler
+    validate_reasoning: NodeHandler
+    compose_report: NodeHandler
+    validate_report: NodeHandler
+    finalize: NodeHandler
+
+
+@dataclass(frozen=True)
 class NodeTelemetryEvent:
     investigation_id: str
     node_name: str
@@ -68,6 +88,22 @@ class NodeTelemetryEvent:
     replan_reason: str = ""
     limit_reached: bool = False
     no_progress_detected: bool = False
+    evidence_gate_decision: str = ""
+    reasoning_mode: str = ""
+    provider_call_required: bool = False
+    invocation_id: str = ""
+    model: str = ""
+    provider: str = ""
+    prompt_hash: str = ""
+    prompt_evidence_count: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    estimated_cost: float = 0.0
+    reasoning_validation_outcome: str = ""
+    unsupported_claim_count: int = 0
+    report_validation_outcome: str = ""
+    report_artifact_id: str = ""
+    deterministic_fallback_reason: str = ""
 
 
 class TelemetryRecorder(Protocol):

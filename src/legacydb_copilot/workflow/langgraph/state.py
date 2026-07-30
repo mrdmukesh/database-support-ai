@@ -342,6 +342,20 @@ class InvestigationState(TypedDict):
     reasoning_result: dict[str, Any] | None
     llm_invocation_ids: list[str]
     llm_skip_reason: str
+    evidence_gate_decision: dict[str, Any]
+    ai_reasoning_invoked: bool
+    reasoning_validation_errors: list[str]
+    reasoning_claim_validations: list[dict[str, Any]]
+    reasoning_persisted: bool
+    llm_audit_complete: bool
+    reasoning_provider: str
+    reasoning_model: str
+    prompt_hash: str
+    prompt_evidence_count: int
+    input_tokens: int
+    output_tokens: int
+    estimated_cost: float
+    deterministic_fallback_reason: str
     # Reporting
     structured_report: dict[str, Any] | None
     report_validation_errors: list[str]
@@ -466,6 +480,20 @@ def create_initial_investigation_state(
         "reasoning_result": None,
         "llm_invocation_ids": [],
         "llm_skip_reason": "",
+        "evidence_gate_decision": {},
+        "ai_reasoning_invoked": False,
+        "reasoning_validation_errors": [],
+        "reasoning_claim_validations": [],
+        "reasoning_persisted": False,
+        "llm_audit_complete": False,
+        "reasoning_provider": "",
+        "reasoning_model": "",
+        "prompt_hash": "",
+        "prompt_evidence_count": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "estimated_cost": 0.0,
+        "deterministic_fallback_reason": "",
         "structured_report": None,
         "report_validation_errors": [],
         "report_artifact_ids": [],

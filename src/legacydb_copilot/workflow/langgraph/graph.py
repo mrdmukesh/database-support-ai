@@ -15,6 +15,7 @@ from legacydb_copilot.workflow.langgraph.contracts import (
     NodeTelemetryEvent,
     NullTelemetryRecorder,
     OperationalNodeError,
+    ReasoningReportingWorkflowHandlers,
     TelemetryRecorder,
 )
 from legacydb_copilot.workflow.langgraph.enums import WorkflowTerminalStatus
@@ -144,6 +145,24 @@ def _event(
         replan_reason=state["replan_reason"],
         limit_reached=state["coverage_status"].value == "LIMIT_REACHED",
         no_progress_detected=state["no_progress_rounds"] >= state["no_progress_limit"],
+        evidence_gate_decision=str(state["evidence_gate_decision"].get("reason_code", "")),
+        reasoning_mode=state["reasoning_mode"].value,
+        provider_call_required=state["provider_call_required"],
+        invocation_id=state["llm_invocation_ids"][-1] if state["llm_invocation_ids"] else "",
+        model=state["reasoning_model"],
+        provider=state["reasoning_provider"],
+        prompt_hash=state["prompt_hash"],
+        prompt_evidence_count=state["prompt_evidence_count"],
+        input_tokens=state["input_tokens"],
+        output_tokens=state["output_tokens"],
+        estimated_cost=state["estimated_cost"],
+        reasoning_validation_outcome=(
+            "FAILED" if state["reasoning_validation_errors"] else "PASSED"
+        ),
+        unsupported_claim_count=len(state["reasoning_validation_errors"]),
+        report_validation_outcome=("FAILED" if state["report_validation_errors"] else "PASSED"),
+        report_artifact_id=state["report_artifact_ids"][-1] if state["report_artifact_ids"] else "",
+        deterministic_fallback_reason=state["deterministic_fallback_reason"],
     )
 
 
@@ -314,5 +333,58 @@ def build_evidence_driven_graph(
     )
     builder.add_edge("assess_evidence", "compose_report")
     builder.add_edge("compose_report", "finalize")
+    builder.add_edge("finalize", END)
+    return builder.compile()
+
+
+def _reasoning_route(state: InvestigationState) -> str:
+    return "invoke_reasoning" if state["provider_call_required"] else "compose_report"
+
+
+def build_reasoning_reporting_graph(
+    handlers: ReasoningReportingWorkflowHandlers,
+    *,
+    telemetry: TelemetryRecorder | None = None,
+):
+    """Compile LG-07 reasoning/reporting flow without activating production routing."""
+    recorder = telemetry or NullTelemetryRecorder()
+    names = tuple(ReasoningReportingWorkflowHandlers.__dataclass_fields__)
+    builder = StateGraph(InvestigationState)
+    for node_name in names:
+        builder.add_node(
+            node_name,
+            wrap_node(node_name, getattr(handlers, node_name), telemetry=recorder),
+        )
+    for source, target in (
+        (START, "initialize"),
+        ("initialize", "resolve_entity"),
+        ("resolve_entity", "discover_objects"),
+        ("discover_objects", "create_plan"),
+        ("create_plan", "validate_sql"),
+        ("validate_sql", "execute_sql"),
+        ("execute_sql", "preserve_evidence"),
+        ("preserve_evidence", "classify_results"),
+        ("classify_results", "check_coverage"),
+    ):
+        builder.add_edge(source, target)
+    builder.add_conditional_edges(
+        "check_coverage",
+        coverage_route,
+        {
+            "create_plan": "create_plan",
+            "assess_evidence": "assess_evidence",
+            "finalize": "finalize",
+        },
+    )
+    builder.add_edge("assess_evidence", "apply_evidence_gate")
+    builder.add_conditional_edges(
+        "apply_evidence_gate",
+        _reasoning_route,
+        {"invoke_reasoning": "invoke_reasoning", "compose_report": "compose_report"},
+    )
+    builder.add_edge("invoke_reasoning", "validate_reasoning")
+    builder.add_edge("validate_reasoning", "compose_report")
+    builder.add_edge("compose_report", "validate_report")
+    builder.add_edge("validate_report", "finalize")
     builder.add_edge("finalize", END)
     return builder.compile()

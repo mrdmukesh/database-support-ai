@@ -108,7 +108,12 @@ class EvaluationRunner:
             "application_version": app_version,
             "feature_flags": {name: os.getenv(name) for name in flag_names},
             "llm_provider": os.getenv("LLM_PROVIDER", "openai"),
-            "llm_model": os.getenv("LLM_MODEL", "gpt-4.1-mini"),
+            "llm_model": os.getenv(
+                "LLM_REASONING_MODEL", os.getenv("LLM_MODEL", "gpt-4.1-mini")
+            ),
+            "llm_fallback_model": os.getenv("LLM_FALLBACK_MODEL", "gpt-4.1-mini"),
+            "llm_reasoning_effort": os.getenv("LLM_REASONING_EFFORT", "medium"),
+            "llm_max_output_tokens": int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "4000")),
             "started_at": time.time(),
             "orchestrator": self.config.orchestrator,
         }

@@ -117,6 +117,18 @@ def select_orchestration_mode(
         return RoutingDecision(
             OrchestrationMode.LEGACY, bucket, key_hash, "langgraph_disabled", False
         )
+    if (
+        context.reasoning_enabled
+        and settings.ai_reasoning_enabled
+        and not settings.llm_model_access_verified
+    ):
+        return RoutingDecision(
+            OrchestrationMode.LEGACY,
+            bucket,
+            key_hash,
+            "model_access_not_verified",
+            False,
+        )
     if context.environment.casefold() not in {
         value.casefold() for value in settings.langgraph_allowed_environments
     }:

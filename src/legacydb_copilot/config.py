@@ -4,6 +4,11 @@ import os
 from dataclasses import dataclass
 
 from legacydb_copilot.common import Environment
+from legacydb_copilot.services.llm_model_configuration import (
+    DEFAULT_LLM_MODEL,
+    normalize_reasoning_effort,
+    safe_model_selection,
+)
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -61,6 +66,12 @@ class Settings:
     llm_enabled: bool = False
     llm_provider: str = "openai"
     llm_model: str = "gpt-4.1-mini"
+    llm_reasoning_model: str = "gpt-4.1-mini"
+    llm_fallback_model: str | None = "gpt-4.1-mini"
+    llm_reasoning_effort: str = "medium"
+    llm_max_output_tokens: int = 4000
+    llm_provider_timeout_seconds: float = 60.0
+    llm_model_access_verified: bool = False
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     llm_request_timeout_seconds: float = 60.0
@@ -117,10 +128,34 @@ class Settings:
     langgraph_fallback_on_validation_failure: bool = True
     langgraph_compare_response_source: str = "legacy"
 
+    @property
+    def selected_reasoning_model(self) -> str:
+        if self.llm_reasoning_model != DEFAULT_LLM_MODEL:
+            return self.llm_reasoning_model
+        return self.llm_model
+
+    @property
+    def selected_provider_timeout_seconds(self) -> float:
+        if self.llm_provider_timeout_seconds != 60.0:
+            return self.llm_provider_timeout_seconds
+        return self.llm_request_timeout_seconds
+
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
+        environment = Environment(os.getenv("APP_ENV", Environment.DEVELOPMENT))
+        environment_default = (
+            DEFAULT_LLM_MODEL
+            if environment in {Environment.DEVELOPMENT, Environment.TESTING}
+            else "gpt-5.1"
+        )
+        requested_model = os.getenv(
+            "LLM_REASONING_MODEL", os.getenv("LLM_MODEL", environment_default)
+        )
+        fallback_raw = os.getenv("LLM_FALLBACK_MODEL")
+        fallback = DEFAULT_LLM_MODEL if fallback_raw is None else fallback_raw
+        selected_model, selected_fallback = safe_model_selection(requested_model, fallback)
         return cls(
-            environment=Environment(os.getenv("APP_ENV", Environment.DEVELOPMENT)),
+            environment=environment,
             database_url=os.getenv(
                 "DATABASE_URL",
                 "postgresql+psycopg://legacydb:legacydb@localhost:5432/legacydb_copilot",
@@ -151,7 +186,20 @@ class Settings:
             ).lower()
             in {"1", "true", "yes", "on"},
             llm_provider=os.getenv("LLM_PROVIDER", "openai"),
-            llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
+            llm_model=selected_model,
+            llm_reasoning_model=selected_model,
+            llm_fallback_model=selected_fallback,
+            llm_reasoning_effort=normalize_reasoning_effort(
+                os.getenv("LLM_REASONING_EFFORT", "medium")
+            ),
+            llm_max_output_tokens=_env_int(
+                "LLM_MAX_OUTPUT_TOKENS", 4000, minimum=1, maximum=128000
+            ),
+            llm_provider_timeout_seconds=_env_float(
+                "LLM_PROVIDER_TIMEOUT_SECONDS",
+                _env_float("LLM_REQUEST_TIMEOUT_SECONDS", 60.0),
+            ),
+            llm_model_access_verified=_env_bool("LLM_MODEL_ACCESS_VERIFIED", False),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
             llm_request_timeout_seconds=float(

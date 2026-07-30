@@ -38,6 +38,7 @@ def configure(monkeypatch):
             f"{service.AZURE_EVALUATION_SERVER}:1433/{database}"
             "?driver=ODBC+Driver+18+for+SQL+Server",
         )
+    monkeypatch.setattr(service, "validate_azure_evaluation_connections", lambda: ())
 
 
 def test_sync_persists_only_approved_identity_and_secret_references(monkeypatch):

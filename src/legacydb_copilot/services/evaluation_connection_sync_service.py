@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from dataclasses import asdict, dataclass
 
+from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import ArgumentError
 
@@ -18,6 +20,19 @@ AZURE_EVALUATION_DATABASES = {
     "BANKING": "EvalBanking",
     "SHIPPING": "EvalShipping",
 }
+
+
+@dataclass(frozen=True)
+class AzureReaderValidation:
+    domain: str
+    server: str
+    port: int
+    database: str
+    login: str
+    database_user: str
+    metadata_objects: int
+    select_allowed: bool
+    write_allowed: bool
 
 
 def evaluation_connection_sync_enabled() -> bool:
@@ -76,6 +91,7 @@ def sync_azure_evaluation_connections(settings: Settings | None = None) -> int:
             )
         validated[domain] = connection_id
 
+    validate_azure_evaluation_connections()
     session_factory = create_session_factory(resolved.database_url)
     with session_factory() as db:
         for domain, connection_id in validated.items():
@@ -93,3 +109,95 @@ def sync_azure_evaluation_connections(settings: Settings | None = None) -> int:
             record.is_active = True
         db.commit()
     return len(validated)
+
+
+def validate_azure_evaluation_connections() -> tuple[AzureReaderValidation, ...]:
+    """Exercise each approved reader without exposing its connection string."""
+    results = []
+    for domain, expected_database in AZURE_EVALUATION_DATABASES.items():
+        url = make_url(os.environ[f"EVAL_APP_SQL_URL_{domain}"])
+        with create_engine(url, pool_pre_ping=True).connect() as connection:
+            identity = connection.execute(
+                text("SELECT DB_NAME(), ORIGINAL_LOGIN(), USER_NAME()")
+            ).one()
+            metadata_objects = int(
+                connection.execute(
+                    text(
+                        "SELECT "
+                        "(SELECT COUNT(*) FROM sys.tables) + "
+                        "(SELECT COUNT(*) FROM sys.columns) + "
+                        "(SELECT COUNT(*) FROM sys.schemas) + "
+                        "(SELECT COUNT(*) FROM sys.foreign_keys) + "
+                        "(SELECT COUNT(*) FROM sys.indexes)"
+                    )
+                ).scalar_one()
+            )
+            (
+                select_allowed,
+                insert_allowed,
+                update_allowed,
+                delete_allowed,
+                execute_allowed,
+                alter_allowed,
+                control_allowed,
+            ) = (
+                bool(value)
+                for value in connection.execute(
+                    text(
+                        "SELECT "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'SELECT'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'INSERT'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'UPDATE'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'DELETE'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'EXECUTE'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER'), "
+                        "HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL')"
+                    )
+                ).one()
+            )
+        write_allowed = any(
+            (
+                insert_allowed,
+                update_allowed,
+                delete_allowed,
+                execute_allowed,
+                alter_allowed,
+                control_allowed,
+            )
+        )
+        if (
+            url.host != AZURE_EVALUATION_SERVER
+            or (url.port or 1433) != 1433
+            or identity[0] != expected_database
+            or identity[1] != AZURE_EVALUATION_READER
+            or identity[2] != AZURE_EVALUATION_READER
+            or metadata_objects <= 0
+            or not select_allowed
+            or write_allowed
+        ):
+            raise RuntimeError(
+                f"Azure evaluation reader validation failed for {domain.casefold()}"
+            )
+        results.append(
+            AzureReaderValidation(
+                domain=domain.casefold(),
+                server=url.host or "",
+                port=url.port or 1433,
+                database=identity[0],
+                login=identity[1],
+                database_user=identity[2],
+                metadata_objects=metadata_objects,
+                select_allowed=select_allowed,
+                write_allowed=write_allowed,
+            )
+        )
+    return tuple(results)
+
+
+def main() -> None:
+    for result in validate_azure_evaluation_connections():
+        print(asdict(result))
+
+
+if __name__ == "__main__":
+    main()

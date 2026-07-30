@@ -289,6 +289,8 @@ jobs:
               "LANGGRAPH_SHADOW_PERCENT=0"
               "LANGGRAPH_SHADOW_LLM_ENABLED=false"
               "EVALUATION_AZURE_CONNECTION_SYNC_ENABLED=true"
+              "EVAL_SQL_READER=legacydb_eval_reader"
+              "EVAL_SQL_READER_PASSWORD=secretref:eval-reader-password"
               "OPENAI_BASE_URL=$OPENAI_BASE_URL"
             )
             if [ -n "$OPENAI_API_KEY_VALUE" ]; then

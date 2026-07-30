@@ -9,6 +9,10 @@ from sqlalchemy.engine import make_url
 
 from legacydb_copilot import __version__
 from legacydb_copilot.config import Settings
+from legacydb_copilot.workflow.langgraph.composition import (
+    get_production_langgraph_orchestrator,
+    langgraph_health,
+)
 
 
 def _git_commit() -> str:
@@ -28,6 +32,7 @@ def _git_commit() -> str:
 def effective_runtime_configuration(process_name: str, *, started_at: str | None = None) -> dict[str, object]:
     settings = Settings.from_env()
     database = make_url(settings.database_url)
+    langgraph_available = get_production_langgraph_orchestrator() is not None
     return {
         "process_name": process_name,
         "process_id": os.getpid(),
@@ -55,6 +60,11 @@ def effective_runtime_configuration(process_name: str, *, started_at: str | None
         "evidence_collection_enabled": True,
         "evidence_verification_enabled": settings.verification_agent_enabled,
         "report_composition_enabled": True,
+        "langgraph": langgraph_health(
+            settings,
+            production_dependencies_available=langgraph_available,
+            graph_compiles=langgraph_available,
+        ),
     }
 
 

@@ -6,6 +6,37 @@ from dataclasses import dataclass
 from legacydb_copilot.common import Environment
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int | None = None) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    value = max(minimum, value)
+    return min(value, maximum) if maximum is not None else value
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.1) -> float:
+    try:
+        return max(minimum, float(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_csv(name: str, default: str = "") -> tuple[str, ...]:
+    return tuple(
+        item.strip()
+        for item in os.getenv(name, default).split(",")
+        if item.strip()
+    )
+
+
 @dataclass(frozen=True)
 class Settings:
     environment: Environment
@@ -61,6 +92,30 @@ class Settings:
     agentic_max_retries: int = 1
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
+    investigation_orchestrator_mode: str = "LEGACY"
+    langgraph_enabled: bool = False
+    langgraph_fallback_to_legacy: bool = True
+    langgraph_shadow_percent: int = 0
+    langgraph_rollout_percent: int = 0
+    langgraph_shadow_llm_enabled: bool = False
+    langgraph_compare_persist_results: bool = True
+    langgraph_kill_switch: bool = False
+    langgraph_allowed_environments: tuple[str, ...] = (
+        "development",
+        "test",
+        "testing",
+        "staging",
+    )
+    langgraph_allowed_workspace_ids: tuple[str, ...] = ()
+    langgraph_allowed_user_ids: tuple[str, ...] = ()
+    langgraph_max_concurrent_runs: int = 2
+    langgraph_timeout_seconds: float = 120.0
+    langgraph_shadow_timeout_seconds: float = 120.0
+    langgraph_fallback_on_timeout: bool = True
+    langgraph_fallback_on_provider_failure: bool = False
+    langgraph_fallback_on_persistence_failure: bool = False
+    langgraph_fallback_on_validation_failure: bool = True
+    langgraph_compare_response_source: str = "legacy"
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -155,4 +210,56 @@ class Settings:
             agentic_max_retries=max(0, int(os.getenv("AGENTIC_MAX_RETRIES", "1"))),
             llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
+            investigation_orchestrator_mode=os.getenv(
+                "INVESTIGATION_ORCHESTRATOR_MODE", "LEGACY"
+            ).strip().upper(),
+            langgraph_enabled=_env_bool("LANGGRAPH_ENABLED", False),
+            langgraph_fallback_to_legacy=_env_bool("LANGGRAPH_FALLBACK_TO_LEGACY", True),
+            langgraph_shadow_percent=_env_int(
+                "LANGGRAPH_SHADOW_PERCENT", 0, maximum=100
+            ),
+            langgraph_rollout_percent=_env_int(
+                "LANGGRAPH_ROLLOUT_PERCENT", 0, maximum=100
+            ),
+            langgraph_shadow_llm_enabled=_env_bool(
+                "LANGGRAPH_SHADOW_LLM_ENABLED", False
+            ),
+            langgraph_compare_persist_results=_env_bool(
+                "LANGGRAPH_COMPARE_PERSIST_RESULTS", True
+            ),
+            langgraph_kill_switch=_env_bool("LANGGRAPH_KILL_SWITCH", False),
+            langgraph_allowed_environments=_env_csv(
+                "LANGGRAPH_ALLOWED_ENVIRONMENTS", "development,test,testing,staging"
+            ),
+            langgraph_allowed_workspace_ids=_env_csv(
+                "LANGGRAPH_ALLOWED_WORKSPACE_IDS"
+            ),
+            langgraph_allowed_user_ids=_env_csv("LANGGRAPH_ALLOWED_USER_IDS"),
+            langgraph_max_concurrent_runs=_env_int(
+                "LANGGRAPH_MAX_CONCURRENT_RUNS", 2, minimum=1
+            ),
+            langgraph_timeout_seconds=_env_float("LANGGRAPH_TIMEOUT_SECONDS", 120.0),
+            langgraph_shadow_timeout_seconds=_env_float(
+                "LANGGRAPH_SHADOW_TIMEOUT_SECONDS", 120.0
+            ),
+            langgraph_fallback_on_timeout=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_TIMEOUT", True
+            ),
+            langgraph_fallback_on_provider_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_PROVIDER_FAILURE", False
+            ),
+            langgraph_fallback_on_persistence_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_PERSISTENCE_FAILURE", False
+            ),
+            langgraph_fallback_on_validation_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_VALIDATION_FAILURE", True
+            ),
+            langgraph_compare_response_source=(
+                "langgraph"
+                if os.getenv(
+                    "LANGGRAPH_COMPARE_RESPONSE_SOURCE", "legacy"
+                ).strip().casefold()
+                == "langgraph"
+                else "legacy"
+            ),
         )

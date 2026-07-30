@@ -110,6 +110,7 @@ class EvaluationRunner:
             "llm_provider": os.getenv("LLM_PROVIDER", "openai"),
             "llm_model": os.getenv("LLM_MODEL", "gpt-4.1-mini"),
             "started_at": time.time(),
+            "orchestrator": self.config.orchestrator,
         }
         return extracted
 

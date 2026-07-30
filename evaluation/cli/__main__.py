@@ -119,6 +119,7 @@ def build_runner(args) -> EvaluationRunner:
         concurrency=args.concurrency,
         ai_enabled=os.getenv("AI_REASONING_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
         database_engine=os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower(),
+        orchestrator=getattr(args, "orchestrator", "legacy"),
     )
     if os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower() == "mysql":
         database = MySQLDatabaseLifecycle(
@@ -229,6 +230,7 @@ def execute(args) -> None:
             "api_endpoint": os.getenv("EVAL_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/") + "/chat/ask",
             "stages": ["database reset", "defect injection", "defect verification", "public investigation API", "bounded polling", "result persistence", "cleanup"],
             "judging_configured": bool(os.getenv("OPENAI_API_KEY") and os.getenv("EVAL_JUDGE_MODEL")),
+            "orchestrator": getattr(args, "orchestrator", "legacy"),
         }, indent=2))
         return
     store = build_store()
@@ -385,6 +387,12 @@ def parser() -> argparse.ArgumentParser:
     common.add_argument("--poll-interval", type=float, default=float(os.getenv("EVAL_POLL_INTERVAL_SECONDS", "2")))
     common.add_argument("--api-retries", type=int, default=int(os.getenv("EVAL_API_MAX_RETRIES", "3")))
     common.add_argument("--run-name", default="pilot-v1")
+    common.add_argument(
+        "--orchestrator",
+        choices=("legacy", "langgraph"),
+        default="legacy",
+        help="Records the preconfigured API orchestration candidate used by this run.",
+    )
     commands = root.add_subparsers(dest="command", required=True)
     command = commands.add_parser("run-scenario", parents=[common])
     command.add_argument("--scenario-id", required=True)

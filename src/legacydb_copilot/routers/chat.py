@@ -94,6 +94,16 @@ from legacydb_copilot.services.metadata_search_service import (
     resolve_qualified_object_names,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
+from legacydb_copilot.workflow.langgraph.activation import (
+    CallableOrchestrator,
+    DisabledInvestigationError,
+    InvestigationOrchestratorRouter,
+    OrchestrationContext,
+    OrchestrationResult,
+)
+from legacydb_copilot.workflow.langgraph.composition import (
+    get_production_langgraph_orchestrator,
+)
 from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, payload_hash
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
@@ -3001,13 +3011,32 @@ def ask_chat_question(
         investigation_metadata = _empty_investigation_metadata()
     else:
         try:
-            answer, sources, confidence, report_links, investigation_metadata = _run_dynamic_investigation(
-                db,
-                payload,
-                current_user.email or current_user.full_name or current_user.id,
-                environment_snapshot=environment_snapshot,
-                resolved_scan_policy=selected_policy,
+            orchestration_context = OrchestrationContext(
+                environment=environment_snapshot.environment_type.value,
+                workspace_id=payload.workspace_id,
+                user_id=current_user.id,
+                question=payload.question,
             )
+            legacy = CallableOrchestrator(
+                lambda _context: OrchestrationResult(
+                    payload=_run_dynamic_investigation(
+                        db,
+                        payload,
+                        current_user.email or current_user.full_name or current_user.id,
+                        environment_snapshot=environment_snapshot,
+                        resolved_scan_policy=selected_policy,
+                    ),
+                    source="legacy",
+                )
+            )
+            routed = InvestigationOrchestratorRouter(
+                settings=Settings.from_env(),
+                legacy=legacy,
+                langgraph=get_production_langgraph_orchestrator(),
+            ).run(orchestration_context)
+            answer, sources, confidence, report_links, investigation_metadata = routed.payload
+        except DisabledInvestigationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=500,

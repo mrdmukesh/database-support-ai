@@ -673,6 +673,28 @@ def _call_openai_responses(
                 output_cost_per_million=settings.llm_output_cost_per_million,
             ))
             _PROVIDER_CIRCUIT.success()
+            incomplete_reason = (
+                response_json.get("incomplete_details", {}).get("reason")
+                if isinstance(response_json.get("incomplete_details"), dict)
+                else None
+            )
+            if (
+                response_json.get("status") == "incomplete"
+                and incomplete_reason == "max_output_tokens"
+                and attempt < attempts
+                and isinstance(body.get("reasoning"), dict)
+                and body["reasoning"].get("effort") != "low"
+            ):
+                if debug_trace is not None:
+                    debug_trace["provider_attempts"].append({
+                        "attempt": attempt,
+                        "outcome": "incomplete",
+                        "reason": incomplete_reason,
+                        "duration_ms": int((time.monotonic() - attempt_started) * 1000),
+                    })
+                    debug_trace["provider_retry_count"] = attempt
+                body["reasoning"] = {"effort": "low"}
+                continue
             if debug_trace is not None:
                 debug_trace["provider_attempts"].append({
                     "attempt": attempt, "outcome": "success",

@@ -52,6 +52,21 @@ def test_worker_health_passes_for_live_pid(tmp_path, monkeypatch):
     assert detail == "process 12345 is running"
 
 
+def test_worker_health_requires_ready_runtime_dependencies(tmp_path, monkeypatch):
+    pid_file = tmp_path / "worker.pid"
+    pid_file.write_text("12345", encoding="utf-8")
+    (tmp_path / "worker-runtime.json").write_text(
+        json.dumps({"readiness": {"status": "not_ready"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("evaluation.preflight._process_is_running", lambda _pid: True)
+
+    ok, detail = _worker_health(pid_file, require_runtime=True)
+
+    assert ok is False
+    assert detail == "worker dependencies are not ready"
+
+
 def test_worker_runtime_files_are_ignored_and_untracked():
     runtime_files = (
         ".tmp/local-evaluation/worker.pid",
@@ -106,6 +121,51 @@ def test_sql_lifecycle_requires_marker(monkeypatch):
     query = calls[0][calls[0].index("-Q") + 1]
     assert "eval.evaluation_marker" in query
     assert "EvalPayroll" in query
+
+
+@pytest.mark.parametrize(
+    ("server", "allowed"),
+    [
+        ("tcp:EVAL-SQL.example.test,1433", {"eval-sql.example.test"}),
+        ("eval-sql.example.test:1433", {"EVAL-SQL.EXAMPLE.TEST:1433"}),
+    ],
+)
+def test_sql_lifecycle_accepts_only_canonical_approved_target(monkeypatch, server, allowed):
+    monkeypatch.setattr(
+        "evaluation.runners.sqlcmd_database.subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(stdout="evaluation_target_safe", stderr=""),
+    )
+    lifecycle = SqlCmdDatabaseLifecycle(
+        server=server,
+        username="reader",
+        password="secret",
+        databases={"payroll": "EvalPayroll"},
+        allowed_hosts=allowed,
+        allowed_databases={"EvalPayroll"},
+    )
+    lifecycle.assert_safe_target("payroll")
+
+
+@pytest.mark.parametrize(
+    ("server", "allowed"),
+    [
+        ("evil-eval-sql.example.test", {"eval-sql.example.test"}),
+        ("eval-sql.example.test,1444", {"eval-sql.example.test"}),
+        ("eval-sql.example.test", {"approved-alias.example.test"}),
+        ("", {"eval-sql.example.test"}),
+    ],
+)
+def test_sql_lifecycle_rejects_unapproved_target_identity(server, allowed):
+    lifecycle = SqlCmdDatabaseLifecycle(
+        server=server,
+        username="reader",
+        password="secret",
+        databases={"payroll": "EvalPayroll"},
+        allowed_hosts=allowed,
+        allowed_databases={"EvalPayroll"},
+    )
+    with pytest.raises(UnsafeSQLError):
+        lifecycle.assert_safe_target("payroll")
 
 
 def test_dry_run_does_not_require_live_configuration(capsys):

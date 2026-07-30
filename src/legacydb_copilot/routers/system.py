@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from legacydb_copilot.ai import disclaimer_text
 from legacydb_copilot.app import create_container
+from legacydb_copilot.config import Settings
 from legacydb_copilot.dependencies import get_current_user
 from legacydb_copilot.runtime_diagnostics import effective_runtime_configuration
-from legacydb_copilot.config import Settings
+from legacydb_copilot.services.readiness_service import application_readiness
 from legacydb_copilot.workflow.langgraph.composition import (
     get_production_langgraph_orchestrator,
     langgraph_health,
@@ -31,6 +33,16 @@ def health() -> dict[str, object]:
             graph_compiles=available,
         ),
     }
+
+
+@router.get("/ready")
+def ready() -> JSONResponse:
+    available = get_production_langgraph_orchestrator() is not None
+    snapshot = application_readiness(
+        Settings.from_env(),
+        langgraph_available=available,
+    )
+    return JSONResponse(snapshot.to_dict(), status_code=200 if snapshot.ready else 503)
 
 
 @router.get("/ai/disclaimer")

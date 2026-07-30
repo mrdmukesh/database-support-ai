@@ -5,8 +5,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from evaluation.framework.contracts import ScenarioContract
 from evaluation.fixtures.validation import manifest_sql_consistency, validate_identifiers
+from evaluation.framework.contracts import ScenarioContract
 from evaluation.runners.contracts import SetupFailedError, UnsafeSQLError
 
 
@@ -16,7 +16,9 @@ class SqlCmdDatabaseLifecycle:
         self.username = username
         self.password = password
         self.databases = databases
-        self.allowed_hosts = {self._host(item) for item in (allowed_hosts or {"localhost", "127.0.0.1"})}
+        self.allowed_hosts = {
+            self._target(item) for item in (allowed_hosts or {"localhost", "127.0.0.1"})
+        }
         self.allowed_databases = allowed_databases or set(databases.values())
         self.reader_username = reader_username
         self.reader_password = reader_password or password
@@ -63,15 +65,33 @@ class SqlCmdDatabaseLifecycle:
 
     @staticmethod
     def _host(server: str) -> str:
-        return server.removeprefix("tcp:").split(",", 1)[0].strip().lower()
+        return SqlCmdDatabaseLifecycle._target(server).split(":", 1)[0]
+
+    @staticmethod
+    def _target(server: str) -> str:
+        value = server.strip().casefold()
+        if value.startswith("tcp:"):
+            value = value[4:]
+        if "," in value:
+            host, port = value.split(",", 1)
+        elif value.count(":") == 1:
+            host, port = value.split(":", 1)
+        else:
+            host, port = value, "1433"
+        host = host.strip().rstrip(".")
+        port = port.strip() or "1433"
+        if not port.isdigit() or not host:
+            return ""
+        return f"{host}:{int(port)}"
 
     def assert_safe_target(self, domain: str) -> None:
         database = self.databases.get(domain, "")
+        target = self._target(self.server)
         host = self._host(self.server)
         if database not in self.allowed_databases or not database.lower().startswith("eval"):
             raise UnsafeSQLError(f"Database {database!r} is not in the evaluation allowlist")
-        if host not in self.allowed_hosts or re.search(r"(^|[-_.])(prod|production)([-_.]|$)", host):
-            raise UnsafeSQLError(f"Host {host!r} is not an allowed evaluation host")
+        if target not in self.allowed_hosts or re.search(r"(^|[-_.])(prod|production)([-_.]|$)", host):
+            raise UnsafeSQLError(f"Host {target!r} is not an allowed evaluation host")
         escaped_domain = domain.replace("'", "''")
         escaped_database = database.replace("'", "''")
         query = (

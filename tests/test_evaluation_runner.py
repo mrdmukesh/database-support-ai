@@ -5,6 +5,7 @@ import threading
 import time
 from dataclasses import replace
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -140,6 +141,46 @@ def test_successful_scenario_execution(tmp_path):
     assert result.investigation_id == "INV-1"
     assert result.extracted_result["evidence"] == []
     assert len(store.records) == 1
+
+
+def test_benchmark_rejects_runtime_orchestrator_mismatch(tmp_path):
+    class HealthAPI(FakeAPI):
+        def health(self):
+            return {
+                "status": "ok",
+                "langgraph": {
+                    "orchestrator_mode": "LEGACY",
+                    "langgraph_enabled": False,
+                    "langgraph_graph_compiles": False,
+                    "production_dependencies_available": False,
+                },
+            }, 200
+
+    app = runner(tmp_path, api=HealthAPI())
+    app.config = replace(app.config, orchestrator="langgraph")
+
+    with pytest.raises(RuntimeError, match="orchestrator mismatch"):
+        app.create_run("protected")
+
+
+def test_benchmark_rejects_unavailable_langgraph_composition(tmp_path):
+    class HealthAPI(FakeAPI):
+        def health(self):
+            return {
+                "status": "ok",
+                "langgraph": {
+                    "orchestrator_mode": "LANGGRAPH",
+                    "langgraph_enabled": True,
+                    "langgraph_graph_compiles": False,
+                    "production_dependencies_available": False,
+                },
+            }, 200
+
+    app = runner(tmp_path, api=HealthAPI())
+    app.config = replace(app.config, orchestrator="langgraph")
+
+    with pytest.raises(RuntimeError, match="composition is unavailable"):
+        app.create_run("protected")
 
 
 def test_ai_enabled_run_is_invalid_without_application_invocation_proof(tmp_path):

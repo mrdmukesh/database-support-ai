@@ -250,7 +250,7 @@ def test_lifecycle_focused_host_allowlist_takes_precedence(
 
     lifecycle = build_demo_payroll_lifecycle()
 
-    assert lifecycle.allowed_hosts == {"focused.example.test"}
+    assert lifecycle.allowed_hosts == {"focused.example.test:1433"}
 
 
 def test_lifecycle_uses_general_host_allowlist_when_focused_is_absent(
@@ -274,7 +274,7 @@ def test_lifecycle_uses_general_host_allowlist_when_focused_is_absent(
 
     lifecycle = build_demo_payroll_lifecycle()
 
-    assert lifecycle.allowed_hosts == {"general.example.test"}
+    assert lifecycle.allowed_hosts == {"general.example.test:1433"}
 
 
 @pytest.mark.parametrize("same_field", ["username", "password"])

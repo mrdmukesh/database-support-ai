@@ -120,3 +120,12 @@ Known limitations: production service facade registration is deployment-specific
 persistence needs an approved existing repository; shadow runs are request-bound rather than
 worker-supervised; configuration refresh requires the application’s normal environment refresh
 or restart; no distributed circuit breaker was introduced.
+
+`GET /health` remains a liveness summary. `GET /ready` is the fail-closed dependency gate and
+checks the control database, Alembic head, provider/model configuration, credential presence when
+reasoning is enabled, the legacy route, and LangGraph composition when LangGraph is enabled.
+Worker runtime diagnostics contain the same sanitized readiness snapshot.
+
+Protected benchmark labels are not routing evidence. Before creating a run, the runner requires
+the requested orchestrator to match API health. A LangGraph run additionally requires enabled,
+compiled, registered composition. `--orchestrator langgraph` cannot relabel a legacy API run.

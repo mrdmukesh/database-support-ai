@@ -40,6 +40,9 @@ Production deployment never changes flags automatically. A protected benchmark i
 must already be authorized and configured for the candidate. Validate the recorded orchestrator
 metadata before accepting results.
 
+The runner enforces this against `/health` and stops before creating a run on a mode mismatch or
+missing LangGraph composition. Run `/ready` first and accept only HTTP 200 with `status=ready`.
+
 Post-rollout, verify one authorized request and one non-cohort request, confirm exactly one
 user-visible response, inspect audit/evidence correlation, and retain comparison artifacts under
 existing access and retention policy.

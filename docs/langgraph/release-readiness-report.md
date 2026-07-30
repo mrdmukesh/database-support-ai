@@ -54,3 +54,44 @@ sanitized preflight with the deployment account, review benchmark comparison art
 `LLM_MODEL_ACCESS_VERIFIED=true` only for an approved environment after access and release
 evidence have been verified. The successful local account probe does not verify a future
 container deployment identity and does not clear the protected benchmark gate.
+
+## LG-10 recovery and validation
+
+Decision: `NOT_READY`
+
+Captured 2026-07-31 on `feature/langgraph-workflow-evidence` from LG-09 commit
+`48abe6afbf74207f5755c4601bd0fe35b4b2cc6f`.
+
+- API: restored at `http://127.0.0.1:8000`; `/health` is `ok`; `/ready` is `ready` in
+  legacy mode. The control database is reachable and migration `0021` matches repository head.
+- Worker: restored and polling with the same commit/configuration and ready control dependencies.
+- Azure SQL: the intended exact server and five `Eval*` databases are online. Read-only
+  diagnostics verified identities and metadata catalogs using the evaluation administrator.
+- Allowlist/markers: pass with exact process-only Azure host and five-database configuration.
+  Wrong host, database, port, alias, and missing identity remain rejected by tests.
+- Application connections: fail. Their records and secret URLs target the stopped local SQL
+  instance. Both Azure contained reader users exist with read-only roles, but available
+  credential sources do not authenticate. No reader password was reset and no DDL was executed.
+- Model: `gpt-5.1` passed `/v1/responses` structured parsing with 18 input and 36 output tokens.
+  Estimated cost was `0.0` because application-model pricing was not configured in the probe
+  shell; this is not benchmark cost evidence.
+- LangGraph composition: unavailable and disabled. Legacy is available, but real LangGraph smoke
+  and benchmark execution cannot occur.
+- Smoke investigations: not run because the five connection gates did not pass.
+- Protected benchmark: not run because preflight failed. The runner now rejects a LangGraph label
+  when the runtime is legacy or lacks registered composition.
+- Comparisons: no baseline/candidate scores, latency, token, or cost results were fabricated.
+- Candidate artifact/deployment/production activation: not performed. Local Docker was
+  unavailable and release gates failed, so no candidate image was published or deployed.
+- Validation: 87 focused LG-09/LG-10/LangGraph tests passed; full backend 1,661 passed
+  with five existing protected-resource skips; `pip check` passed; frontend 209 passed;
+  TypeScript and production build passed; ESLint reported zero errors and eight existing
+  warnings; changed-scope Ruff passed. Repository-wide Ruff still has unrelated legacy findings.
+- Rollback artifact: commit/image `47dad9433529c5232165e92b232c4eb68084a284`,
+  digest `sha256:85a34cac69b6c696c0ad83f7f09c38b53ed886d123539f3f4bca402dcb171a8f`,
+  revision `ca-database-support-ai-dev--0000154`.
+
+Release remains blocked until a DBA supplies or rotates the least-privilege contained reader
+credential, the five application secrets/records pass connectivity tests, and reviewed
+production LangGraph facades are registered. Then repeat preflight, smoke, fallback/kill-switch,
+and separate protected baseline/candidate benchmarks.

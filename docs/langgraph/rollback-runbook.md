@@ -32,6 +32,27 @@ comparison records.
 No migration was added by LG-08, so database downgrade is unnecessary. Code rollback is secondary
 and must target the last reviewed production commit.
 
+LG-10 rollback baseline captured on 2026-07-31:
+
+- commit/image tag: `47dad9433529c5232165e92b232c4eb68084a284`
+- image digest:
+  `sha256:85a34cac69b6c696c0ad83f7f09c38b53ed886d123539f3f4bca402dcb171a8f`
+- Azure revision: `ca-database-support-ai-dev--0000154`
+- control-database migration: `0021`
+
+Restore the immutable image and legacy configuration:
+
+```powershell
+az containerapp update --name ca-database-support-ai-dev `
+  --resource-group rg-database-support-ai-dev `
+  --image ghcr.io/mrdmukesh/legacydb-support-copilot@sha256:85a34cac69b6c696c0ad83f7f09c38b53ed886d123539f3f4bca402dcb171a8f `
+  --set-env-vars INVESTIGATION_ORCHESTRATOR_MODE=LEGACY LANGGRAPH_ENABLED=false `
+    LANGGRAPH_ROLLOUT_PERCENT=0 LANGGRAPH_SHADOW_PERCENT=0 `
+    LANGGRAPH_SHADOW_LLM_ENABLED=false LLM_REASONING_MODEL=gpt-4.1-mini
+```
+
+No LG-10 migration was added. Never apply control migrations to protected evaluation databases.
+
 Communication template: “LangGraph traffic was disabled at `<time>` for `<reason>`. Legacy
 investigations remain available. `<count>` requests are under review. Evidence and audit records
 were preserved. Next update: `<time>`.”

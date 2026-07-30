@@ -77,8 +77,28 @@ class EvaluationRunner:
         self.clock = clock
 
     def create_run(self, run_name: str) -> str:
+        self._validate_orchestrator_runtime()
         metadata = self.run_metadata()
         return self.store.create_run(run_name=run_name, metadata=metadata)
+
+    def _validate_orchestrator_runtime(self) -> None:
+        health = getattr(self.api, "health", None)
+        if health is None:
+            return
+        payload, status = health()
+        graph = payload.get("langgraph", {}) if isinstance(payload, dict) else {}
+        mode = str(graph.get("orchestrator_mode") or "").casefold()
+        expected = self.config.orchestrator.casefold()
+        if status != 200 or mode != expected:
+            raise RuntimeError(
+                f"Benchmark orchestrator mismatch: expected={expected}; runtime={mode or 'unknown'}"
+            )
+        if expected == "langgraph" and not (
+            graph.get("langgraph_enabled")
+            and graph.get("langgraph_graph_compiles")
+            and graph.get("production_dependencies_available")
+        ):
+            raise RuntimeError("LangGraph benchmark blocked: runtime composition is unavailable")
 
     def run_metadata(self) -> dict[str, Any]:
         try:

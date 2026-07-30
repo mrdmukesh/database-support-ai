@@ -74,6 +74,13 @@ def _worker_health(
     *,
     require_runtime: bool = False,
 ) -> tuple[bool, str]:
+    if os.getenv("EVALUATION_WORKER_ENABLED", "").casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return True, "embedded evaluation worker is enabled in the API process"
     if not pid_file.is_file():
         return False, "worker pid file missing"
     try:

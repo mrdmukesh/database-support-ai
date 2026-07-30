@@ -195,6 +195,7 @@ def validate_azure_evaluation_connections() -> tuple[AzureReaderValidation, ...]
 
 
 def main() -> None:
+    sync_azure_evaluation_connections()
     for result in validate_azure_evaluation_connections():
         print(asdict(result))
 

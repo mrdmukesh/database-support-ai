@@ -7,7 +7,9 @@ name = "legacydb-support-copilot"
 version = "0.1.0"
 description = "Enterprise SaaS backend modules for LegacyDB Support Copilot."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+  "langgraph==1.2.9",
+]
 
 [project.optional-dependencies]
 dev = [

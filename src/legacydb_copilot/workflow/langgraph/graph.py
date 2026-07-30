@@ -7,7 +7,9 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from legacydb_copilot.workflow.langgraph.adapters.coverage import coverage_route
 from legacydb_copilot.workflow.langgraph.contracts import (
+    EvidenceDrivenWorkflowHandlers,
     InvestigationWorkflowHandlers,
     NodeHandler,
     NodeTelemetryEvent,
@@ -36,6 +38,20 @@ NODE_ORDER = (
     "finalize",
 )
 EDGE_SEQUENCE = tuple(zip((START, *NODE_ORDER), (*NODE_ORDER, END), strict=True))
+EVIDENCE_NODE_ORDER = (
+    "initialize",
+    "resolve_entity",
+    "discover_objects",
+    "create_plan",
+    "validate_sql",
+    "execute_sql",
+    "preserve_evidence",
+    "classify_results",
+    "check_coverage",
+    "assess_evidence",
+    "compose_report",
+    "finalize",
+)
 IDENTITY_FIELDS = frozenset({"investigation_id", "workspace_id", "correlation_id", "question"})
 TERMINAL_FAILURES = frozenset(
     {
@@ -96,6 +112,16 @@ def _event(
     success: bool | None = None,
     error_code: str = "",
 ) -> NodeTelemetryEvent:
+    query = (
+        state["query_results"][-1]
+        if state["query_results"]
+        else state["approved_queries"][-1]
+        if state["approved_queries"]
+        else state["rejected_queries"][-1]
+        if state["rejected_queries"]
+        else None
+    )
+    finding = state["findings"][-1] if state["findings"] else None
     return NodeTelemetryEvent(
         investigation_id=state["investigation_id"],
         node_name=node_name,
@@ -106,6 +132,18 @@ def _event(
         success=success,
         error_code=error_code,
         workflow_iteration=state["workflow_iteration"],
+        planning_round=state["planning_round"],
+        query_id=query.query_id if query else "",
+        plan_step_id=query.plan_step_id if query else "",
+        validation_outcome=query.validation_status.value if query else "",
+        execution_outcome=query.execution_status.value if query else "",
+        evidence_id=query.evidence_id if query else "",
+        evidence_classification=finding.finding_type.value if finding else "",
+        coverage_percentage=state["coverage_percentage"],
+        missing_object_count=len(state["missing_required_objects"]),
+        replan_reason=state["replan_reason"],
+        limit_reached=state["coverage_status"].value == "LIMIT_REACHED",
+        no_progress_detected=state["no_progress_rounds"] >= state["no_progress_limit"],
     )
 
 
@@ -122,6 +160,14 @@ def wrap_node(
     def wrapped(state: InvestigationState) -> dict[str, Any]:
         if state["terminal_status"] in TERMINAL_FAILURES:
             return {}
+        if state["cancel_requested"] and node_name not in {"initialize", "finalize"}:
+            return {
+                "previous_node": state["current_node"],
+                "current_node": node_name,
+                "updated_at": wall_clock(),
+                "stop_reason": "Cancellation requested.",
+                "terminal_status": WorkflowTerminalStatus.CANCELLED,
+            }
         if node_name == "initialize":
             _validate_initialize_state(state)
 
@@ -228,4 +274,45 @@ def build_investigation_graph(
         )
     for source, target in EDGE_SEQUENCE:
         builder.add_edge(source, target)
+    return builder.compile()
+
+
+def build_evidence_driven_graph(
+    handlers: EvidenceDrivenWorkflowHandlers,
+    *,
+    telemetry: TelemetryRecorder | None = None,
+):
+    """Compile the isolated bounded evidence loop without production activation."""
+    recorder = telemetry or NullTelemetryRecorder()
+    builder = StateGraph(InvestigationState)
+    for node_name in EVIDENCE_NODE_ORDER:
+        builder.add_node(
+            node_name,
+            wrap_node(node_name, getattr(handlers, node_name), telemetry=recorder),
+        )
+    linear = (
+        (START, "initialize"),
+        ("initialize", "resolve_entity"),
+        ("resolve_entity", "discover_objects"),
+        ("discover_objects", "create_plan"),
+        ("create_plan", "validate_sql"),
+        ("validate_sql", "execute_sql"),
+        ("execute_sql", "preserve_evidence"),
+        ("preserve_evidence", "classify_results"),
+        ("classify_results", "check_coverage"),
+    )
+    for source, target in linear:
+        builder.add_edge(source, target)
+    builder.add_conditional_edges(
+        "check_coverage",
+        coverage_route,
+        {
+            "create_plan": "create_plan",
+            "assess_evidence": "assess_evidence",
+            "finalize": "finalize",
+        },
+    )
+    builder.add_edge("assess_evidence", "compose_report")
+    builder.add_edge("compose_report", "finalize")
+    builder.add_edge("finalize", END)
     return builder.compile()

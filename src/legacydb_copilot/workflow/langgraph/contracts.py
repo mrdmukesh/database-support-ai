@@ -30,6 +30,22 @@ class InvestigationWorkflowHandlers:
 
 
 @dataclass(frozen=True)
+class EvidenceDrivenWorkflowHandlers:
+    initialize: NodeHandler
+    resolve_entity: NodeHandler
+    discover_objects: NodeHandler
+    create_plan: NodeHandler
+    validate_sql: NodeHandler
+    execute_sql: NodeHandler
+    preserve_evidence: NodeHandler
+    classify_results: NodeHandler
+    check_coverage: NodeHandler
+    assess_evidence: NodeHandler
+    compose_report: NodeHandler
+    finalize: NodeHandler
+
+
+@dataclass(frozen=True)
 class NodeTelemetryEvent:
     investigation_id: str
     node_name: str
@@ -40,6 +56,18 @@ class NodeTelemetryEvent:
     success: bool | None
     error_code: str
     workflow_iteration: int
+    planning_round: int = 0
+    query_id: str = ""
+    plan_step_id: str = ""
+    validation_outcome: str = ""
+    execution_outcome: str = ""
+    evidence_id: str = ""
+    evidence_classification: str = ""
+    coverage_percentage: float = 0.0
+    missing_object_count: int = 0
+    replan_reason: str = ""
+    limit_reached: bool = False
+    no_progress_detected: bool = False
 
 
 class TelemetryRecorder(Protocol):

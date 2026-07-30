@@ -104,6 +104,9 @@ class InvestigationPlanStep(StateRecord):
     required_objects: tuple[str, ...] = ()
     expected_evidence: str = ""
     validation_status: QueryValidationStatus = QueryValidationStatus.NOT_VALIDATED
+    inspection_only: bool = False
+    planning_round: int = Field(default=0, ge=0)
+    action_fingerprint: str = ""
 
 
 _PROHIBITED_CONTEXT_KEYS = {
@@ -140,6 +143,38 @@ class QueryRecord(StateRecord):
     execution_duration_ms: int = Field(default=0, ge=0)
     error_classification: str = ""
     evidence_id: str = ""
+    target_database: str = ""
+    referenced_objects: tuple[str, ...] = ()
+    read_only: bool = False
+    rejection_code: str = ""
+    validated_at: datetime | None = None
+    truncated: bool = False
+    result_reference: str = ""
+    result_summary: tuple[dict[str, Any], ...] = ()
+    executed_at: datetime | None = None
+
+    @field_validator("rejection_reason", "error_classification")
+    @classmethod
+    def sanitize_diagnostic_text(cls, value: str) -> str:
+        return str(sanitize_ai_trace(value))
+
+    @field_validator("result_summary")
+    @classmethod
+    def sanitize_result_summary(
+        cls, value: tuple[dict[str, Any], ...]
+    ) -> tuple[dict[str, Any], ...]:
+        sanitized: list[dict[str, Any]] = []
+        for row in value[:5]:
+            safe_row = _sanitized_mapping(row)
+            sanitized.append(
+                {
+                    str(key)[:128]: item
+                    if item is None or isinstance(item, (bool, int, float))
+                    else str(item)[:500]
+                    for key, item in safe_row.items()
+                }
+            )
+        return tuple(sanitized)
 
     @field_validator("parameter_metadata")
     @classmethod
@@ -267,6 +302,14 @@ class InvestigationState(TypedDict):
     approved_queries: list[QueryRecord]
     rejected_queries: list[QueryRecord]
     query_results: list[QueryRecord]
+    plan_fingerprints: list[str]
+    rejected_query_hashes: list[str]
+    no_progress_rounds: int
+    replan_reason: str
+    max_planning_rounds: int
+    max_queries: int
+    max_objects: int
+    no_progress_limit: int
     # Evidence
     evidence_ids: list[str]
     verified_evidence_ids: list[str]
@@ -387,6 +430,14 @@ def create_initial_investigation_state(
         "approved_queries": [],
         "rejected_queries": [],
         "query_results": [],
+        "plan_fingerprints": [],
+        "rejected_query_hashes": [],
+        "no_progress_rounds": 0,
+        "replan_reason": "",
+        "max_planning_rounds": 3,
+        "max_queries": 10,
+        "max_objects": 20,
+        "no_progress_limit": 1,
         "evidence_ids": [],
         "verified_evidence_ids": [],
         "unverified_evidence_ids": [],

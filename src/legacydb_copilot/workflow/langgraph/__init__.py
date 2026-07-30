@@ -12,6 +12,11 @@ from legacydb_copilot.workflow.langgraph.enums import (
     WorkflowReproductionStatus,
     WorkflowTerminalStatus,
 )
+from legacydb_copilot.workflow.langgraph.graph import (
+    EDGE_SEQUENCE,
+    NODE_ORDER,
+    build_investigation_graph,
+)
 from legacydb_copilot.workflow.langgraph.state import (
     ClaimEvidenceLink,
     DatabaseObjectRef,
@@ -55,7 +60,10 @@ __all__ = [
     "WorkflowReasoningMode",
     "WorkflowReproductionStatus",
     "WorkflowTerminalStatus",
+    "EDGE_SEQUENCE",
+    "NODE_ORDER",
     "append_evidence_reference",
+    "build_investigation_graph",
     "calculate_coverage",
     "create_initial_investigation_state",
     "deserialize_investigation_state",

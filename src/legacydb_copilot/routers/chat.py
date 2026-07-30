@@ -104,6 +104,9 @@ from legacydb_copilot.workflow.langgraph.activation import (
 from legacydb_copilot.workflow.langgraph.composition import (
     get_production_langgraph_orchestrator,
 )
+from legacydb_copilot.workflow.langgraph.production_facade import (
+    bind_production_investigation,
+)
 from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, payload_hash
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
@@ -3017,23 +3020,27 @@ def ask_chat_question(
                 user_id=current_user.id,
                 question=payload.question,
             )
+            def run_production_investigation() -> tuple:
+                return _run_dynamic_investigation(
+                    db,
+                    payload,
+                    current_user.email or current_user.full_name or current_user.id,
+                    environment_snapshot=environment_snapshot,
+                    resolved_scan_policy=selected_policy,
+                )
+
             legacy = CallableOrchestrator(
                 lambda _context: OrchestrationResult(
-                    payload=_run_dynamic_investigation(
-                        db,
-                        payload,
-                        current_user.email or current_user.full_name or current_user.id,
-                        environment_snapshot=environment_snapshot,
-                        resolved_scan_policy=selected_policy,
-                    ),
+                    payload=run_production_investigation(),
                     source="legacy",
                 )
             )
-            routed = InvestigationOrchestratorRouter(
-                settings=Settings.from_env(),
-                legacy=legacy,
-                langgraph=get_production_langgraph_orchestrator(),
-            ).run(orchestration_context)
+            with bind_production_investigation(run_production_investigation):
+                routed = InvestigationOrchestratorRouter(
+                    settings=Settings.from_env(),
+                    legacy=legacy,
+                    langgraph=get_production_langgraph_orchestrator(),
+                ).run(orchestration_context)
             answer, sources, confidence, report_links, investigation_metadata = routed.payload
         except DisabledInvestigationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc

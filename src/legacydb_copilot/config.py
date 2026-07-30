@@ -116,6 +116,7 @@ class Settings:
         "test",
         "testing",
         "staging",
+        "evaluation",
     )
     langgraph_allowed_workspace_ids: tuple[str, ...] = ()
     langgraph_allowed_user_ids: tuple[str, ...] = ()
@@ -277,7 +278,8 @@ class Settings:
             ),
             langgraph_kill_switch=_env_bool("LANGGRAPH_KILL_SWITCH", False),
             langgraph_allowed_environments=_env_csv(
-                "LANGGRAPH_ALLOWED_ENVIRONMENTS", "development,test,testing,staging"
+                "LANGGRAPH_ALLOWED_ENVIRONMENTS",
+                "development,test,testing,staging,evaluation",
             ),
             langgraph_allowed_workspace_ids=_env_csv(
                 "LANGGRAPH_ALLOWED_WORKSPACE_IDS"

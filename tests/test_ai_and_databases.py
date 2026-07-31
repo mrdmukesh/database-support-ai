@@ -2125,6 +2125,65 @@ def test_procedure_connector_word_is_not_treated_as_explicit_object() -> None:
     assert result.exact_procedures_requested == []
 
 
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Determine whether this is a stored-procedure defect",
+        "Confirm no stored-procedure defect was reproduced",
+        "Confirm the procedure correctly returns NULL for missing source data",
+    ],
+)
+def test_procedure_defect_language_is_not_an_explicit_object(question: str) -> None:
+    connector = _SchemaConnector(
+        {
+            "dbo.Employee": {
+                "columns": [{"name": "EmployeeId"}, {"name": "DateOfBirth"}],
+                "primary_key": ["EmployeeId"],
+            },
+        },
+        procedures=["dbo.usp_GetEmployeeAge"],
+    )
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert not result.target_object_not_found
+    assert result.exact_procedures_requested == []
+
+
+@pytest.mark.parametrize(
+    "question, expected_requested",
+    [
+        ("Inspect dbo.usp_GetEmployeeAge for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect [dbo].[usp_GetEmployeeAge] for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect procedure dbo.usp_GetEmployeeAge for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect stored procedure usp_GetEmployeeAge for EMP-1001.", "usp_getemployeeage"),
+    ],
+)
+def test_qualified_procedure_is_still_an_explicit_object(
+    question: str,
+    expected_requested: str,
+) -> None:
+    connector = _SchemaConnector({}, procedures=["dbo.usp_GetEmployeeAge"])
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert not result.target_object_not_found
+    assert result.exact_procedures_requested == [expected_requested]
+    assert result.exact_procedures_found == ["dbo.usp_getemployeeage"]
+
+
+def test_genuinely_missing_explicit_procedure_is_rejected() -> None:
+    connector = _SchemaConnector({}, procedures=["dbo.usp_GetEmployeeAge"])
+    question = "Inspect procedure dbo.usp_MissingEmployeeAge."
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert result.target_object_not_found
+    assert result.exact_procedures_requested == ["dbo.usp_missingemployeeage"]
+    assert result.exact_procedures_found == []
+    assert "dbo.usp_missingemployeeage" in result.failure_reason
+
+
 def test_connection_pool_recreates_when_database_changes_for_same_connection_id() -> None:
     pool = ConnectionPool()
     first = pool.get_or_create("conn-1", DatabaseEngine.MYSQL, "mysql+pymysql://user:pw@localhost:3306/db_a")

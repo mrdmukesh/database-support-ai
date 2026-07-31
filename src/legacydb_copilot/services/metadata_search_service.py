@@ -4,7 +4,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
+from legacydb_copilot.agents.entity_extraction_agent import (
+    EntityExtractionResult,
+    is_explicit_routine_identifier,
+)
 from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 
 _NOISE_TOKENS = {
@@ -209,6 +212,9 @@ _NON_OBJECT_TOKENS = {
     "to",
     "with",
     "without",
+    "bug",
+    "defect",
+    "issue",
 }
 
 
@@ -220,7 +226,7 @@ def _explicit_names(question: str, label: str) -> set[str]:
     names: set[str] = set()
     identifier = r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
     labels = (
-        ("stored procedure", "procedure", "function", "view", "trigger")
+        ("stored procedure", "stored-procedure", "procedure", "function", "view", "trigger")
         if label == "procedure"
         else (label,)
     )
@@ -234,6 +240,7 @@ def _explicit_names(question: str, label: str) -> set[str]:
             match.group(1).lower()
             for match in re.finditer(pattern, question, re.I)
             if _is_explicit_object_name(match.group(1))
+            and (label != "procedure" or is_explicit_routine_identifier(match.group(1)))
         )
     return names
 
@@ -324,6 +331,7 @@ def search_metadata(
         for entity in entities.entities
         if entity.entity_type == "stored_procedure"
         and _is_explicit_object_name(entity.value)
+        and is_explicit_routine_identifier(entity.value)
     }
     resolved_tables = resolve_qualified_object_names(metadata.tables, explicit_tables)
     exact_table_matches = {name.lower() for name in resolved_tables.values()}

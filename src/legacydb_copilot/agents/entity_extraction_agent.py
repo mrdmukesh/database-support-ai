@@ -19,6 +19,15 @@ class EntityExtractionResult:
     business_keywords: list[str] | None = None
 
 
+def is_explicit_routine_identifier(value: str) -> bool:
+    """Return whether a token has the shape of an explicitly named SQL routine."""
+    return bool(
+        "." in value
+        or "_" in value
+        or re.search(r"[a-z][A-Z]", value)
+    )
+
+
 def _unique(entities: list[ExtractedEntity]) -> list[ExtractedEntity]:
     """
     Owner: Mukesh Dabi
@@ -151,12 +160,24 @@ def extract_entities(question: str) -> EntityExtractionResult:
         r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?"
     )
     routine_pattern = (
-        rf"\b(?:stored\s+procedure|procedure|function|view|trigger)"
+        rf"\b(?:stored(?:\s+|-)procedure|procedure|function|view|trigger)"
         rf"\s+(?:named\s+|called\s+)?({routine_identifier})\b"
     )
-    routines = re.findall(routine_pattern, question, re.I)
+    routines = [
+        value
+        for value in re.findall(routine_pattern, question, re.I)
+        if is_explicit_routine_identifier(value)
+    ]
     routines.extend(
-        re.findall(r"\b(?:sp|usp|fn|tr)_[a-zA-Z0-9_]+\b", question, re.I)
+        ".".join(value)
+        for value in re.findall(
+            r"\[?([a-zA-Z_][a-zA-Z0-9_]*)\]?\.\[?((?:sp|usp|fn|tr)_[a-zA-Z0-9_]+)\]?",
+            question,
+            re.I,
+        )
+    )
+    routines.extend(
+        re.findall(r"(?<![.\w\[])(?:sp|usp|fn|tr)_[a-zA-Z0-9_]+\b", question, re.I)
     )
     for value in dict.fromkeys(routines):
         entities.append(ExtractedEntity("stored_procedure", value))

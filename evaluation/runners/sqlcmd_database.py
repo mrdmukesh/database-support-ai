@@ -90,7 +90,9 @@ class SqlCmdDatabaseLifecycle:
         host = self._host(self.server)
         if database not in self.allowed_databases or not database.lower().startswith("eval"):
             raise UnsafeSQLError(f"Database {database!r} is not in the evaluation allowlist")
-        if target not in self.allowed_hosts or re.search(r"(^|[-_.])(prod|production)([-_.]|$)", host):
+        if target not in self.allowed_hosts or re.search(
+            r"(^|[-_.])(prod|production)([-_.]|$)", host
+        ):
             raise UnsafeSQLError(f"Host {target!r} is not an allowed evaluation host")
         escaped_domain = domain.replace("'", "''")
         escaped_database = database.replace("'", "''")

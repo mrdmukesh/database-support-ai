@@ -32,7 +32,11 @@ class ReadinessSnapshot:
         return {
             "status": "ready" if self.ready else "not_ready",
             "checks": [
-                {"name": item.name, "status": "ready" if item.ready else "not_ready", "detail": item.detail}
+                {
+                    "name": item.name,
+                    "status": "ready" if item.ready else "not_ready",
+                    "detail": item.detail,
+                }
                 for item in self.checks
             ],
         }

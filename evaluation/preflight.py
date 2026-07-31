@@ -265,7 +265,10 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     add(
         "non-production SQL target allowlist",
         safe_config,
-        f"target={target or 'missing'}; databases={','.join(sorted(allowed_databases)) or 'missing'}",
+        (
+            f"target={target or 'missing'}; "
+            f"databases={','.join(sorted(allowed_databases)) or 'missing'}"
+        ),
     )
     sql_auth = (
         ["EVAL_MYSQL_HOST", "EVAL_MYSQL_USER", "EVAL_MYSQL_PASSWORD"]

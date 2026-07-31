@@ -124,7 +124,17 @@ from legacydb_copilot.services.report_generator import (
 from legacydb_copilot.services.report_snapshot_service import report_from_dict, report_to_dict
 from legacydb_copilot.services.reasoning_dispatch_service import (
     ReasoningMode,
+    ReasoningDispatchDecision,
+    ReasoningPermission,
+    ReproductionStatus,
+    RootCauseSupport,
     dispatch_reasoning,
+)
+from legacydb_copilot.services.read_only_procedure_execution_service import (
+    ProcedureExecutionApproval,
+    execute_approved_procedures,
+    expected_null_behavior_reasoning,
+    verified_expected_null_behavior,
 )
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
@@ -2136,6 +2146,28 @@ def _run_dynamic_investigation(
                 evidence_id=f"PROC-{index}",
             )
         )
+    if environment_snapshot is not None and environment_snapshot.procedure_execution_permitted:
+        explicit_procedures = set(ranking.metadata.exact_procedures_found)
+        evidence.extend(
+            execute_approved_procedures(
+                connector,
+                procedure_analysis,
+                explicit_procedure_names=explicit_procedures,
+                known_objects=set(active_schema_metadata.tables)
+                | set(active_schema_metadata.views),
+                seed_evidence=evidence,
+                approval=ProcedureExecutionApproval(
+                    workspace_id=payload.workspace_id,
+                    database_name=environment_snapshot.selected_database_name,
+                    approved_workspace_ids=frozenset({payload.workspace_id}),
+                    approved_database_names=frozenset(
+                        {environment_snapshot.selected_database_name}
+                    ),
+                    timeout_seconds=min(scan_policy.query_timeout_seconds, 30),
+                    row_limit=min(scan_policy.max_rows, 100),
+                ),
+            )
+        )
     evidence.extend(
         _expand_related_id_evidence(
             connector,
@@ -2221,9 +2253,37 @@ def _run_dynamic_investigation(
             intent.intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
         ),
     )
+    expected_null_behavior = verified_expected_null_behavior(
+        evidence,
+        procedure_analysis,
+    )
+    if expected_null_behavior is not None:
+        execution_evidence, expected_procedure = expected_null_behavior
+        reasoning_dispatch = ReasoningDispatchDecision(
+            permission=ReasoningPermission.ALLOW_REASONING,
+            mode=ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+            reason="Verified procedure execution matched inspected NULL-handling behavior.",
+            invoke_llm=False,
+            verified_evidence_count=reasoning_dispatch.verified_evidence_count,
+            reproduction_status=ReproductionStatus.NOT_REPRODUCED,
+            root_cause_support=RootCauseSupport.SUPPORTED,
+            reason_code="EXPECTED_SOURCE_DATA_BEHAVIOR",
+            evidence_categories=[
+                *reasoning_dispatch.evidence_categories,
+                "procedure_execution",
+            ],
+            evidence_gaps=[
+                "No separate verified evidence proves a stored-procedure defect."
+            ],
+        )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
-    if reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
+    if expected_null_behavior is not None:
+        reasoning = expected_null_behavior_reasoning(
+            execution_evidence,
+            expected_procedure,
+        )
+    elif reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
         reasoning = reason_about_evidence(
             payload.question,
             intent,

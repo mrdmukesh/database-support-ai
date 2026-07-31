@@ -49,6 +49,7 @@ class EvidenceResult:
         "metadata",
         "null_value",
         "procedure_definition",
+        "procedure_execution",
         "not_applicable",
         "execution_failure",
     ] = "not_applicable"

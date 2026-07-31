@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
@@ -275,12 +275,11 @@ def rank_relevant_objects(
     ]
     return ObjectRankingResult(
         objects=objects,
-        metadata=MetadataSearchResult(
+        metadata=replace(
+            metadata,
             tables=selected_tables,
             views=views,
             procedures=procedures,
-            version=metadata.version,
-            engine_type=metadata.engine_type,
             candidate_trace=candidate_trace,
         ),
     )

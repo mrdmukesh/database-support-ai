@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://legacydb-copilot.local/schemas/accuracy-ground-truth-v1.json",
+  "title": "Investigation Accuracy Ground Truth",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "expected_entity",
+    "expected_database",
+    "expected_tables",
+    "expected_sql_evidence",
+    "expected_reproduction_status",
+    "expected_root_cause",
+    "expected_evidence",
+    "expected_gaps",
+    "expected_corrective_action_boundaries",
+    "forbidden_claims"
+  ],
+  "properties": {
+    "scenario_id": {"type": "string", "minLength": 1},
+    "expected_entity": {"type": "string", "minLength": 1},
+    "expected_database": {"type": "string", "minLength": 1},
+    "expected_tables": {"type": "array", "items": {"type": "string"}},
+    "expected_sql_evidence": {"type": "array", "items": {"type": "string"}},
+    "expected_reproduction_status": {
+      "enum": ["reproduced", "not_reproduced", "insufficient_evidence"]
+    },
+    "expected_root_cause": {"type": ["string", "null"]},
+    "expected_evidence": {"type": "array", "items": {"type": "string"}},
+    "expected_gaps": {"type": "array", "items": {"type": "string"}},
+    "expected_corrective_action_boundaries": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "forbidden_claims": {"type": "array", "items": {"type": "string"}}
+  }
+}

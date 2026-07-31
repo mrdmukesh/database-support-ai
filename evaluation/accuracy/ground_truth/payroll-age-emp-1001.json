@@ -1,0 +1,35 @@
+{
+  "scenario_id": "payroll-age-emp-1001",
+  "expected_entity": "EMP-1001",
+  "expected_database": "DemoPayrollV2",
+  "expected_tables": [
+    "dbo.Employee"
+  ],
+  "expected_sql_evidence": [
+    "dbo.Employee EMP-1001 DateOfBirth NULL",
+    "dbo.usp_GetEmployeeAge EMP-1001 Age NULL"
+  ],
+  "expected_reproduction_status": "not_reproduced",
+  "expected_root_cause": "EMP-1001 has a NULL DateOfBirth, so age cannot be calculated and the stored procedure returning NULL age is expected from the source data.",
+  "expected_evidence": [
+    "Employee EMP-1001 exists.",
+    "EMP-1001 DateOfBirth is NULL.",
+    "Age cannot be calculated when DateOfBirth is NULL.",
+    "The stored procedure returns NULL age for EMP-1001 as expected from the source data."
+  ],
+  "expected_gaps": [
+    "No separate verified evidence proves a stored-procedure defect."
+  ],
+  "expected_corrective_action_boundaries": [
+    "Populate or correct DateOfBirth only through an authorized process.",
+    "Do not claim that a correction has already been implemented."
+  ],
+  "forbidden_claims": [
+    "The stored procedure is defective.",
+    "The employee has a specific inferred age.",
+    "A DateOfBirth value was inferred.",
+    "The employee record was updated.",
+    "The problem has already been fixed.",
+    "The issue was reproduced as a code defect."
+  ]
+}

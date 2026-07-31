@@ -24,6 +24,7 @@ WRITE_SQL = re.compile(
     r"(?i)\b(insert|update|delete|merge|drop|alter|truncate|create|grant|revoke|exec(?:ute)?)\b"
 )
 WORD = re.compile(r"[a-z0-9_]+")
+IDENTIFIER = re.compile(r"\b(?=[a-z0-9_-]*\d)[a-z0-9_]+(?:-[a-z0-9_]+)+\b")
 
 
 class AccuracyValidator:
@@ -222,13 +223,23 @@ def _concept_coverage(expected: tuple[str, ...], actual: str) -> float:
     actual_terms = set(WORD.findall(actual.casefold()))
     matched = 0
     for item in expected:
+        identifiers = set(IDENTIFIER.findall(item.casefold()))
+        if identifiers and not identifiers.issubset(
+            set(IDENTIFIER.findall(actual.casefold()))
+        ):
+            continue
         wanted = set(WORD.findall(item.casefold()))
         matched += bool(wanted) and len(wanted & actual_terms) / len(wanted) >= 0.6
     return matched / len(expected)
 
 
 def _matched_phrases(expected: tuple[str, ...], actual: str) -> list[str]:
-    return [item for item in expected if _concept_coverage((item,), actual) >= 1.0]
+    normalized_actual = " ".join(WORD.findall(actual.casefold()))
+    return [
+        item
+        for item in expected
+        if " ".join(WORD.findall(item.casefold())) in normalized_actual
+    ]
 
 
 def _same(left: str, right: str) -> bool:

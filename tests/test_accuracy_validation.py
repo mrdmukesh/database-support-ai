@@ -170,6 +170,31 @@ def test_secret_gate_reports_only_the_gate_name() -> None:
     assert secret not in serialized
 
 
+def test_entity_identifiers_cannot_receive_generic_partial_credit() -> None:
+    value = actual()
+    value["evidence"][0]["summary"] = "Employee EMP-9999 exists."
+    specific_truth = truth().to_dict()
+    specific_truth["expected_evidence"] = ["Employee EMP-1042 exists.", "no payroll item"]
+
+    result = AccuracyValidator().validate(
+        AccuracyGroundTruth.from_dict(specific_truth),
+        value,
+    )
+
+    assert result.evidence_coverage == 50
+
+
+def test_scattered_forbidden_words_do_not_create_hallucination() -> None:
+    value = actual()
+    value["report"]["summary"] = (
+        "The stored procedure was inspected. No defect is established."
+    )
+
+    result = AccuracyValidator().validate(truth(), value)
+
+    assert "The stored procedure is defective." not in result.hallucination_findings
+
+
 def test_json_schema_fields_match_python_contract() -> None:
     schema_path = (
         Path(__file__).parents[1]

@@ -6,7 +6,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.session import create_db_engine
 
-
 _KNOWLEDGE_COLUMNS: dict[str, str] = {
     "body": "TEXT NOT NULL DEFAULT ''",
     "module_name": "VARCHAR(120) NOT NULL DEFAULT ''",
@@ -36,6 +35,20 @@ _INVESTIGATION_COLUMNS: dict[str, str] = {
     "ai_debug_trace_json": "TEXT NOT NULL DEFAULT ''",
     "llm_audit_outcome": "VARCHAR(80) NOT NULL DEFAULT ''",
     "llm_audit_reason": "TEXT NOT NULL DEFAULT ''",
+    "workflow_engine": "VARCHAR(40) NOT NULL DEFAULT 'Legacy'",
+    "execution_mode": "VARCHAR(40) NOT NULL DEFAULT 'LEGACY'",
+    "graph_version": "VARCHAR(80) NOT NULL DEFAULT ''",
+    "graph_execution_id": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "requested_model": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "effective_model": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "execution_provider": "VARCHAR(80) NOT NULL DEFAULT ''",
+    "reasoning_effort": "VARCHAR(40) NOT NULL DEFAULT ''",
+    "selected_by": "VARCHAR(40) NOT NULL DEFAULT 'Automatic'",
+    "execution_policy_version": "VARCHAR(40) NOT NULL DEFAULT ''",
+    "fallback_used": "BOOLEAN NOT NULL DEFAULT 0",
+    "fallback_reason": "TEXT NOT NULL DEFAULT ''",
+    "execution_started_at": "TIMESTAMP",
+    "execution_ended_at": "TIMESTAMP",
 }
 
 _AUDIT_COLUMNS: dict[str, str] = {

@@ -657,6 +657,9 @@ h1 {
 .ui-badge[data-tone="success"] { border-color: #9bcdb6; color: #166443; background: #eaf8f1; }
 .ui-badge[data-tone="warning"] { border-color: #dec486; color: #72530c; background: #fff8df; }
 .ui-badge[data-tone="danger"] { border-color: #e5aaaa; color: #852c2c; background: #fff0f0; }
+.execution-metadata-grid { display:grid; grid-template-columns:minmax(10rem,.4fr) 1fr; gap:.55rem 1rem; margin:0; }
+.execution-metadata-grid dt { color:#536d76; font-weight:700; }
+.execution-metadata-grid dd { margin:0; overflow-wrap:anywhere; }
 .ui-alert { display: grid; gap: .2rem; padding: .85rem 1rem; border: 1px solid #e3aaaa; border-left-width: .3rem; border-radius: .55rem; color: #752828; background: #fff4f4; }
 .ui-alert[data-tone="info"] { border-color: #9bc8d5; color: #23596a; background: #eef8fb; }
 .ui-alert[data-tone="success"] { border-color: #9bcdb6; color: #166443; background: #effaf4; }

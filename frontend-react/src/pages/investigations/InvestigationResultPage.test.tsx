@@ -78,12 +78,43 @@ describe("InvestigationResultPage route and loading", () => {
     expect(screen.getByRole("heading", { name: "Supporting evidence" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recommended Next Step" })).toBeInTheDocument();
     expect(screen.getByText("Confidence 0%")).toBeInTheDocument();
+    expect(screen.getByText("Legacy Workflow")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Execution metadata" })).toBeInTheDocument();
     const header = screen.getByRole("heading", { name: "Investigation INV-7" }).closest("header");
     expect(header).toContainElement(screen.getByRole("button", { name: "Download PDF" }));
     expect(header).toContainElement(screen.getByRole("button", { name: "Copy investigation ID" }));
     expect(header).toContainElement(screen.getByRole("button", { name: "Print" }));
     expect(header).toContainElement(screen.getByRole("link", { name: "Back to investigations" }));
     expect(screen.queryByRole("heading", { name: "Reports" })).not.toBeInTheDocument();
+  });
+
+  it("shows LangGraph metadata and an explicit legacy fallback reason", async () => {
+    loadSavedInvestigation.mockResolvedValueOnce({
+      ...saved,
+      execution_metadata: {
+        workflow_engine: "Legacy",
+        execution_mode: "FALLBACK",
+        graph_version: "langgraph-v1",
+        graph_execution_id: "GRAPH-1",
+        requested_model: "gpt-5.1",
+        effective_model: "gpt-5.1",
+        provider: "openai",
+        reasoning_effort: "medium",
+        selected_by: "Admin",
+        policy_version: "v1",
+        fallback_used: true,
+        fallback_reason: "timeout",
+        execution_started_at: "2026-07-12T00:00:00Z",
+        execution_ended_at: "2026-07-12T00:00:01Z",
+        badge: "Legacy Fallback",
+      },
+    });
+
+    renderRoute();
+
+    expect(await screen.findByText("Legacy Fallback")).toBeInTheDocument();
+    expect(screen.getByText("timeout")).toBeInTheDocument();
+    expect(screen.getByText("GRAPH-1")).toBeInTheDocument();
   });
 
   it.each([

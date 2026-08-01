@@ -267,6 +267,24 @@ class ChatConversationRead(BaseModel):
     title: str
 
 
+class ExecutionMetadataRead(BaseModel):
+    workflow_engine: str = "Legacy"
+    execution_mode: str = "LEGACY"
+    graph_version: str = ""
+    graph_execution_id: str = ""
+    requested_model: str = ""
+    effective_model: str = ""
+    provider: str = ""
+    reasoning_effort: str = ""
+    selected_by: str = "Automatic"
+    policy_version: str = ""
+    fallback_used: bool = False
+    fallback_reason: str = ""
+    execution_started_at: datetime | None = None
+    execution_ended_at: datetime | None = None
+    badge: str = "Legacy Workflow"
+
+
 class ChatAskResponse(BaseModel):
     conversation: ChatConversationRead
     user_message: ChatMessageRead
@@ -284,6 +302,7 @@ class ChatAskResponse(BaseModel):
     policy_version: str
     safety_profile: str
     environment_source: str
+    execution_metadata: ExecutionMetadataRead
 
 
 class VerificationCheckRead(BaseModel):
@@ -356,6 +375,20 @@ class InvestigationRead(BaseModel):
     environment_telemetry_json: str
     policy_version: str
     policy_audit_json: str
+    workflow_engine: str = "Legacy"
+    execution_mode: str = "LEGACY"
+    graph_version: str = ""
+    graph_execution_id: str = ""
+    requested_model: str = ""
+    effective_model: str = ""
+    execution_provider: str = ""
+    reasoning_effort: str = ""
+    selected_by: str = "Automatic"
+    execution_policy_version: str = ""
+    fallback_used: bool = False
+    fallback_reason: str = ""
+    execution_started_at: datetime | None = None
+    execution_ended_at: datetime | None = None
     user_question: str
     detected_intent: str
     evidence_gap_analysis_json: str

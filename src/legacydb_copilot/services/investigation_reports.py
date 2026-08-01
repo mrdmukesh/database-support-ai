@@ -14,7 +14,6 @@ from legacydb_copilot.services.report_generator import (
 )
 from legacydb_copilot.services.storage_service import get_app_storage
 
-
 _REPORT_CONTENT_TYPES = {
     ".html": "text/html",
     ".pdf": "application/pdf",
@@ -107,6 +106,7 @@ def generate_investigation_report_files(report: InvestigationReport) -> Generate
 def _executive_report(report: InvestigationReport) -> InvestigationReport:
     priority_titles = [
         "Executive Summary",
+        "Execution Metadata",
         "Question",
         "AI Status",
         "Key Findings",

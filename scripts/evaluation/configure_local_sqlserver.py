@@ -13,7 +13,6 @@ from legacydb_copilot.config import Settings
 from legacydb_copilot.db.models import DatabaseConnectionModel
 from legacydb_copilot.db.session import create_session_factory
 
-
 DATABASES = {
     "payroll": "EvalPayroll",
     "clinic": "EvalClinic",
@@ -31,7 +30,7 @@ def main() -> None:
     updates = {
         "EVAL_DATABASE_ENGINE": "sql_server",
         "EVAL_SQL_SERVER": "127.0.0.1,14333",
-        "EVAL_ALLOWED_SQL_HOSTS": "127.0.0.1,localhost",
+        "EVAL_ALLOWED_SQL_HOSTS": "127.0.0.1:14333,localhost:14333",
         "EVAL_ALLOWED_DATABASES": ",".join(DATABASES.values()),
         "LOCAL_SQLSERVER_HOST": "127.0.0.1",
         "LOCAL_SQLSERVER_PORT": "14333",

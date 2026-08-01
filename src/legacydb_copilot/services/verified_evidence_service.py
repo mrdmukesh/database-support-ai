@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 
@@ -73,8 +74,7 @@ def _verified_category(
         and item.zero_row_result
         and (
             item.evidence_relevance == "relevant"
-            or
-            relevant_absence_ids is None
+            or relevant_absence_ids is None
             or item.evidence_id in relevant_absence_ids
         )
     ):
@@ -96,6 +96,15 @@ def _verified_category(
         if any(marker in text for marker in ("workflow", "job", "history", "step", "instance")):
             return "workflow_rows"
         return "positive_sql_rows"
-    if semantics == "not_applicable" and item.rows and item.sql.strip():
+    if (
+        semantics == "not_applicable"
+        and item.rows
+        and item.sql.strip()
+        and item.evidence_relevance != "irrelevant"
+    ):
+        # Backward-compatible factual availability: older persisted/external
+        # evidence lacks semantic annotations.  It may unlock a constrained
+        # evidence summary, but confidence and claim verification still require
+        # explicit relevance and support.
         return "positive_sql_rows"
     return ""

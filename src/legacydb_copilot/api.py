@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +14,11 @@ def _static_root() -> Path | None:
         Path.cwd(),
         Path("/app"),
         Path(__file__).resolve().parents[2],
-        Path(__file__).resolve().parents[3] if len(Path(__file__).resolve().parents) > 3 else Path.cwd(),
+        (
+            Path(__file__).resolve().parents[3]
+            if len(Path(__file__).resolve().parents) > 3
+            else Path.cwd()
+        ),
     ]
     for candidate in candidates:
         if (candidate / "app.html").exists():
@@ -76,7 +80,10 @@ def create_fastapi_app() -> Any:
         app_page = project_root / "app.html" if project_root else None
         if app_page and app_page.exists():
             return FileResponse(str(app_page))
-        return PlainTextResponse("UI file app.html was not found in the deployed container.", status_code=500)
+        return PlainTextResponse(
+            "UI file app.html was not found in the deployed container.",
+            status_code=500,
+        )
 
     @app.get("/index.html", include_in_schema=False)
     def _serve_index() -> Any:
@@ -100,10 +107,8 @@ def create_fastapi_app() -> Any:
 
     from legacydb_copilot.config import Settings
     from legacydb_copilot.db.schema import initialize_application_schema
-    from legacydb_copilot.services.evaluation_worker_runtime import EvaluationWorkerRuntime, evaluation_worker_enabled
     from legacydb_copilot.routers import (
         admin,
-        llm_audit,
         auth,
         billing,
         chat,
@@ -115,23 +120,42 @@ def create_fastapi_app() -> Any:
         incidents,
         investigation_states,
         learning,
+        llm_audit,
         organizations,
         reports,
         system,
         workspaces,
     )
+    from legacydb_copilot.services.evaluation_worker_runtime import (
+        EvaluationWorkerRuntime,
+        evaluation_worker_enabled,
+    )
 
     @app.on_event("startup")
     def _initialize_database_schema() -> None:
         from legacydb_copilot.runtime_diagnostics import write_runtime_diagnostic
-        started_at = datetime.now(timezone.utc).isoformat()
+        from legacydb_copilot.services.evaluation_connection_sync_service import (
+            sync_azure_evaluation_connections,
+        )
+        from legacydb_copilot.workflow.langgraph.production_facade import (
+            configure_production_langgraph,
+        )
+        started_at = datetime.now(UTC).isoformat()
         app.state.process_started_at = started_at
+        settings = Settings.from_env()
+        initialize_application_schema(settings.database_url)
+        sync_azure_evaluation_connections(settings)
+        configure_production_langgraph(settings)
         write_runtime_diagnostic(
             "api",
-            Path(os.getenv("EVAL_API_RUNTIME_DIAGNOSTIC", ".tmp/local-evaluation/api-runtime.json")),
+            Path(
+                os.getenv(
+                    "EVAL_API_RUNTIME_DIAGNOSTIC",
+                    ".tmp/local-evaluation/api-runtime.json",
+                )
+            ),
             started_at=started_at,
         )
-        initialize_application_schema(Settings.from_env().database_url)
         if evaluation_worker_enabled():
             runtime = EvaluationWorkerRuntime()
             runtime.start()

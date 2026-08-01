@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
 from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
+from legacydb_copilot.services.problem_phrase_service import (
+    parse_problem_phrase,
+    resolve_table_from_terms,
+)
 
 _NOISE_TOKENS = {
     "analyze",
@@ -275,12 +278,11 @@ def rank_relevant_objects(
     ]
     return ObjectRankingResult(
         objects=objects,
-        metadata=MetadataSearchResult(
+        metadata=replace(
+            metadata,
             tables=selected_tables,
             views=views,
             procedures=procedures,
-            version=metadata.version,
-            engine_type=metadata.engine_type,
             candidate_trace=candidate_trace,
         ),
     )

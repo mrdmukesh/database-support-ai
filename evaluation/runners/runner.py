@@ -77,8 +77,28 @@ class EvaluationRunner:
         self.clock = clock
 
     def create_run(self, run_name: str) -> str:
+        self._validate_orchestrator_runtime()
         metadata = self.run_metadata()
         return self.store.create_run(run_name=run_name, metadata=metadata)
+
+    def _validate_orchestrator_runtime(self) -> None:
+        health = getattr(self.api, "health", None)
+        if health is None:
+            return
+        payload, status = health()
+        graph = payload.get("langgraph", {}) if isinstance(payload, dict) else {}
+        mode = str(graph.get("orchestrator_mode") or "").casefold()
+        expected = self.config.orchestrator.casefold()
+        if status != 200 or mode != expected:
+            raise RuntimeError(
+                f"Benchmark orchestrator mismatch: expected={expected}; runtime={mode or 'unknown'}"
+            )
+        if expected == "langgraph" and not (
+            graph.get("langgraph_enabled")
+            and graph.get("langgraph_graph_compiles")
+            and graph.get("production_dependencies_available")
+        ):
+            raise RuntimeError("LangGraph benchmark blocked: runtime composition is unavailable")
 
     def run_metadata(self) -> dict[str, Any]:
         try:
@@ -108,8 +128,14 @@ class EvaluationRunner:
             "application_version": app_version,
             "feature_flags": {name: os.getenv(name) for name in flag_names},
             "llm_provider": os.getenv("LLM_PROVIDER", "openai"),
-            "llm_model": os.getenv("LLM_MODEL", "gpt-4.1-mini"),
+            "llm_model": os.getenv(
+                "LLM_REASONING_MODEL", os.getenv("LLM_MODEL", "gpt-4.1-mini")
+            ),
+            "llm_fallback_model": os.getenv("LLM_FALLBACK_MODEL", "gpt-4.1-mini"),
+            "llm_reasoning_effort": os.getenv("LLM_REASONING_EFFORT", "medium"),
+            "llm_max_output_tokens": int(os.getenv("LLM_MAX_OUTPUT_TOKENS", "4000")),
             "started_at": time.time(),
+            "orchestrator": self.config.orchestrator,
         }
         return extracted
 

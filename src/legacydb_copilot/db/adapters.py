@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import ABC
 import re
+from abc import ABC
 from typing import Any
 
 from sqlalchemy import inspect, text
@@ -752,6 +752,41 @@ class SQLServerAdapter(BaseDatabaseAdapter):
         with self.engine.connect() as conn:
             row = conn.execute(text("SELECT OBJECT_DEFINITION(OBJECT_ID(:name))"), {"name": procedure_name}).first()
             return row[0] if row and row[0] else ""
+
+    def execute_read_only_procedure(
+        self,
+        procedure_name: str,
+        *,
+        parameters: dict[str, Any],
+        timeout_seconds: int,
+        row_limit: int,
+    ) -> list[dict[str, Any]]:
+        """Execute a policy-approved SQL Server procedure with bound parameters."""
+        schema, name = self._split_qualified_name(procedure_name)
+        schema = schema or "dbo"
+        identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+        if not identifier.fullmatch(schema) or not identifier.fullmatch(name):
+            raise ValueError("Invalid stored procedure identifier")
+        parameter_names = list(parameters)
+        if any(not re.fullmatch(r"@[A-Za-z_][A-Za-z0-9_]*", item) for item in parameter_names):
+            raise ValueError("Invalid stored procedure parameter")
+        assignments = ", ".join(f"{item}=?" for item in parameter_names)
+        statement = f"EXEC [{schema}].[{name}]" + (f" {assignments}" if assignments else "")
+        raw_connection = self.engine.raw_connection()
+        try:
+            cursor = raw_connection.cursor()
+            cursor.timeout = timeout_seconds
+            cursor.execute(statement, tuple(parameters[item] for item in parameter_names))
+            while cursor.description is None and cursor.nextset():
+                pass
+            if cursor.description is None:
+                return []
+            columns = [item[0] for item in cursor.description]
+            rows = cursor.fetchmany(row_limit)
+            return [dict(zip(columns, row, strict=True)) for row in rows]
+        finally:
+            raw_connection.rollback()
+            raw_connection.close()
 
     def get_version(self) -> str:
         """

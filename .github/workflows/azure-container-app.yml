@@ -20,7 +20,11 @@ env:
   AZURE_STORAGE_ACCOUNT_PREFIX: stdsai
   AZURE_STORAGE_CONTAINER: app-artifacts
   AZURE_KEY_VAULT_PREFIX: kv-dsai-dev
-  LLM_MODEL: gpt-4.1-mini
+  LLM_REASONING_MODEL: gpt-5.1
+  LLM_FALLBACK_MODEL: gpt-4.1-mini
+  LLM_REASONING_EFFORT: medium
+  LLM_MAX_OUTPUT_TOKENS: "4000"
+  LLM_PROVIDER_TIMEOUT_SECONDS: "60"
   OPENAI_BASE_URL: https://api.openai.com/v1
 
 jobs:
@@ -273,7 +277,20 @@ jobs:
               "AI_REASONING_ENABLED=true"
               "LLM_ENABLED=true"
               "LLM_PROVIDER=openai"
-              "LLM_MODEL=$LLM_MODEL"
+              "LLM_REASONING_MODEL=$LLM_REASONING_MODEL"
+              "LLM_FALLBACK_MODEL=$LLM_FALLBACK_MODEL"
+              "LLM_REASONING_EFFORT=$LLM_REASONING_EFFORT"
+              "LLM_MAX_OUTPUT_TOKENS=$LLM_MAX_OUTPUT_TOKENS"
+              "LLM_PROVIDER_TIMEOUT_SECONDS=$LLM_PROVIDER_TIMEOUT_SECONDS"
+              "LLM_MODEL_ACCESS_VERIFIED=true"
+              "INVESTIGATION_ORCHESTRATOR_MODE=LEGACY"
+              "LANGGRAPH_ENABLED=false"
+              "LANGGRAPH_ROLLOUT_PERCENT=0"
+              "LANGGRAPH_SHADOW_PERCENT=0"
+              "LANGGRAPH_SHADOW_LLM_ENABLED=false"
+              "EVALUATION_AZURE_CONNECTION_SYNC_ENABLED=true"
+              "EVAL_SQL_READER=legacydb_eval_reader"
+              "EVAL_SQL_READER_PASSWORD=secretref:eval-reader-password"
               "OPENAI_BASE_URL=$OPENAI_BASE_URL"
             )
             if [ -n "$OPENAI_API_KEY_VALUE" ]; then

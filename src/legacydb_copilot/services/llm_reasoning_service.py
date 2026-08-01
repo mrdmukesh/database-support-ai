@@ -1,42 +1,46 @@
 from __future__ import annotations
 
 import json
-import re
 import random
+import re
 import threading
 import time
 from dataclasses import replace
 from typing import Any
 from urllib import error
 from uuid import uuid4
+
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.agents.intent_agent import IntentResult
 from legacydb_copilot.agents.reasoning_agent import (
+    ReasoningResult,
     RootCauseClaim,
     RootCauseSupportStatus,
-    ReasoningResult,
     evaluate_claim_support_status,
 )
 from legacydb_copilot.config import Settings
-from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.claim_verification_service import (
     build_evidence_registry,
     parse_structured_claim,
     verify_claim,
 )
+from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
-from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
-from legacydb_copilot.services.reasoning_dispatch_service import ReasoningMode
-from legacydb_copilot.services.llm_invocation_audit_service import (
-    InvocationContext,
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
+from legacydb_copilot.services.llm_model_configuration import build_reasoning_parameters
+from legacydb_copilot.services.llm_provider_client import (
+    AuditedLLMProviderClient,
+    ProviderRequest,
 )
-from legacydb_copilot.services.llm_provider_client import AuditedLLMProviderClient, ProviderRequest
-from legacydb_copilot.services.llm_provider_client import request  # compatibility for provider retry tests
+from legacydb_copilot.services.llm_provider_client import (
+    request as request,  # noqa: F401 - compatibility for provider retry tests
+)
+from legacydb_copilot.services.pii_masking_service import mask_llm_payload, sanitize_ai_trace
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
+from legacydb_copilot.services.reasoning_dispatch_service import ReasoningMode
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
-
 
 SYSTEM_PROMPT = """You are the evidence-grounded database investigation reasoning layer.
 
@@ -253,7 +257,7 @@ def enhance_reasoning_with_llm(
     if debug_trace is not None:
         debug_trace.setdefault("ai_enabled", bool(settings.ai_reasoning_enabled))
         debug_trace.setdefault("provider", settings.llm_provider)
-        debug_trace.setdefault("model", settings.llm_model)
+        debug_trace.setdefault("model", settings.selected_reasoning_model)
         debug_trace.setdefault("llm_invoked", False)
         debug_trace.setdefault("invocation_status", "not_invoked")
         debug_trace.setdefault("generated_claim_count", 0)
@@ -290,7 +294,7 @@ def enhance_reasoning_with_llm(
     if debug_trace is not None:
         debug_trace.update(
             {
-                "llm_model_name": settings.llm_model,
+                "llm_model_name": settings.selected_reasoning_model,
                 "prompt_version": AI_REASONING_PROMPT_VERSION,
                 "ai_reasoning_invoked": False,
                 "input_tokens": 0,
@@ -354,7 +358,7 @@ def enhance_reasoning_with_llm(
             debug_trace["failure_stage"] = "provider_request_or_response"
             debug_trace["request_submitted"] = bool(debug_trace.get("ai_reasoning_invoked"))
             debug_trace["provider"] = settings.llm_provider
-            debug_trace["model_requested"] = settings.llm_model
+            debug_trace["model_requested"] = settings.selected_reasoning_model
             debug_trace["sanitized_error_reason"] = type(exc).__name__
             debug_trace["llm_invoked"] = bool(debug_trace.get("ai_reasoning_invoked"))
             debug_trace["invocation_status"] = "provider_failure"
@@ -606,15 +610,26 @@ def _call_openai_responses(
     Safety considerations:
         The LLM must reason only over collected evidence and must never connect to databases or run SQL.
     """
+    request_parameters, unsupported_parameters = build_reasoning_parameters(
+        model=settings.selected_reasoning_model,
+        reasoning_effort=settings.llm_reasoning_effort,
+        max_output_tokens=settings.llm_max_output_tokens,
+    )
     body = {
-        "model": settings.llm_model,
+        "model": settings.selected_reasoning_model,
         "input": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": json.dumps(evidence_payload, default=str)},
         ],
-        "temperature": 0.1,
-        "max_output_tokens": 2500,
+        **request_parameters,
     }
+    if "reasoning" not in request_parameters:
+        body["temperature"] = 0.1
+    if debug_trace is not None:
+        debug_trace["reasoning_effort"] = (
+            settings.llm_reasoning_effort if "reasoning" in request_parameters else None
+        )
+        debug_trace["unsupported_model_parameters"] = list(unsupported_parameters)
     if audit_context is not None and audit_context.logical_request_id is None:
         audit_context = replace(audit_context, logical_request_id=str(uuid4()))
     provider_client = AuditedLLMProviderClient(db=audit_db, context=audit_context)
@@ -636,14 +651,14 @@ def _call_openai_responses(
         remaining = deadline - now
         if remaining <= 0:
             raise TimeoutError("LLM provider total timeout exhausted")
-        request_timeout = min(settings.llm_request_timeout_seconds, remaining)
+        request_timeout = min(settings.selected_provider_timeout_seconds, remaining)
         if debug_trace is not None:
             debug_trace["provider_attempt_count"] = attempt
         attempt_started = time.monotonic()
         try:
             response_json = provider_client.invoke_json(ProviderRequest(
                 provider=settings.llm_provider,
-                model=settings.llm_model,
+                model=settings.selected_reasoning_model,
                 endpoint=f"{settings.openai_base_url}/responses",
                 api_key=settings.openai_api_key or "",
                 body=body,
@@ -658,6 +673,28 @@ def _call_openai_responses(
                 output_cost_per_million=settings.llm_output_cost_per_million,
             ))
             _PROVIDER_CIRCUIT.success()
+            incomplete_reason = (
+                response_json.get("incomplete_details", {}).get("reason")
+                if isinstance(response_json.get("incomplete_details"), dict)
+                else None
+            )
+            if (
+                response_json.get("status") == "incomplete"
+                and incomplete_reason == "max_output_tokens"
+                and attempt < attempts
+                and isinstance(body.get("reasoning"), dict)
+                and body["reasoning"].get("effort") != "low"
+            ):
+                if debug_trace is not None:
+                    debug_trace["provider_attempts"].append({
+                        "attempt": attempt,
+                        "outcome": "incomplete",
+                        "reason": incomplete_reason,
+                        "duration_ms": int((time.monotonic() - attempt_started) * 1000),
+                    })
+                    debug_trace["provider_retry_count"] = attempt
+                body["reasoning"] = {"effort": "low"}
+                continue
             if debug_trace is not None:
                 debug_trace["provider_attempts"].append({
                     "attempt": attempt, "outcome": "success",

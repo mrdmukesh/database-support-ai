@@ -12,21 +12,22 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from legacydb_copilot.ai import SafetyFinding, analyze_prompt
 from legacydb_copilot.agents.context_discovery_agent import discover_context
 from legacydb_copilot.agents.entity_extraction_agent import ExtractedEntity, extract_entities
 from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
 from legacydb_copilot.agents.intent_agent import InvestigationIntent, detect_intent
 from legacydb_copilot.agents.investigation_planner_agent import build_investigation_plan
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
-from legacydb_copilot.agents.recommendation_agent import recommend_actions
 from legacydb_copilot.agents.reasoning_agent import (
     RootCauseSupportStatus,
+    finalize_evidence_backed_response_type,
     reason_about_evidence,
 )
+from legacydb_copilot.agents.recommendation_agent import recommend_actions
 from legacydb_copilot.agents.report_composer_agent import compose_report
-from legacydb_copilot.databases import DatabaseEngine
+from legacydb_copilot.ai import SafetyFinding, analyze_prompt
 from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.db.connector import DatabaseConnectionError, get_connection_pool
 from legacydb_copilot.db.models import (
     ChatConversationModel,
@@ -37,10 +38,14 @@ from legacydb_copilot.db.models import (
     VerificationCheckModel,
     WorkspaceModel,
 )
-from legacydb_copilot.dependencies import assert_same_organization, assert_same_user, require_permission
 from legacydb_copilot.db.session import get_db_session
-from legacydb_copilot.routers.databases import _build_connection_string
+from legacydb_copilot.dependencies import (
+    assert_same_organization,
+    assert_same_user,
+    require_permission,
+)
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
+from legacydb_copilot.routers.databases import _build_connection_string
 from legacydb_copilot.schemas import (
     ChatAskRequest,
     ChatAskResponse,
@@ -55,34 +60,47 @@ from legacydb_copilot.security.access_control import (
     require_workspace_access,
 )
 from legacydb_copilot.services.audit_service import record_audit_event
-from legacydb_copilot.services.confidence_scoring_service import confidence_factors, score_confidence
-from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
-from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
-from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
-from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
-from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
-from legacydb_copilot.services.evidence_verification_agent import execute_verification_check, suggest_verification_checks
-from legacydb_copilot.services.environment_resolution_service import (
-    EnvironmentResolutionError,
-    EnvironmentSnapshot,
-    resolve_environment,
+from legacydb_copilot.services.confidence_scoring_service import (
+    confidence_factors,
+    score_confidence,
 )
+from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.entity_resolution_service import (
     EntityResolutionResult,
     metadata_with_resolved_tables,
     resolution_metadata_for_schema,
     resolve_entities,
 )
-from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
-from legacydb_copilot.services.investigation_reports import (
-    generate_investigation_report_files,
-    report_storage_references,
+from legacydb_copilot.services.environment_resolution_service import (
+    EnvironmentResolutionError,
+    EnvironmentSnapshot,
+    resolve_environment,
+)
+from legacydb_copilot.services.evidence_correlation_service import correlate_evidence
+from legacydb_copilot.services.evidence_execution_service import (
+    EvidenceResult,
+    execute_evidence_plan,
+)
+from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
+from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
+from legacydb_copilot.services.evidence_gate_service import (
+    run_evidence_gate,
+    unreproduced_reasoning,
+)
+from legacydb_copilot.services.evidence_verification_agent import (
+    execute_verification_check,
+    suggest_verification_checks,
 )
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     ModeClassification,
     classify_investigation_mode,
 )
+from legacydb_copilot.services.investigation_reports import (
+    generate_investigation_report_files,
+    report_storage_references,
+)
+from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, payload_hash
 from legacydb_copilot.services.llm_reasoning_service import (
     AI_REASONING_PROMPT_VERSION,
     enhance_reasoning_with_llm,
@@ -90,31 +108,58 @@ from legacydb_copilot.services.llm_reasoning_service import (
 )
 from legacydb_copilot.services.metadata_search_service import (
     MetadataSearchContext,
+    MetadataSearchResult,
     query_relevance_terms,
     resolve_qualified_object_names,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext, payload_hash
-from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
+from legacydb_copilot.services.problem_phrase_service import (
+    parse_problem_phrase,
+    resolve_table_from_terms,
+)
 from legacydb_copilot.services.rag_retrieval_service import KnowledgeQuery, get_knowledge_retriever
-from legacydb_copilot.services.scan_policy_service import resolve_connection_scan_policy
+from legacydb_copilot.services.read_only_procedure_execution_service import (
+    ProcedureExecutionApproval,
+    execute_approved_procedures,
+    expected_null_behavior_reasoning,
+    verified_expected_null_behavior,
+)
+from legacydb_copilot.services.reasoning_dispatch_service import (
+    ReasoningDispatchDecision,
+    ReasoningMode,
+    ReasoningPermission,
+    ReproductionStatus,
+    RootCauseSupport,
+    dispatch_reasoning,
+)
 from legacydb_copilot.services.report_generator import (
+    REPORT_VERSION,
     ExecutiveSummary,
     InvestigationReport,
     ReportCover,
     ReportSection,
     ReportTable,
-    REPORT_VERSION,
     new_investigation_id,
     now_label,
 )
 from legacydb_copilot.services.report_snapshot_service import report_from_dict, report_to_dict
-from legacydb_copilot.services.reasoning_dispatch_service import (
-    ReasoningMode,
-    dispatch_reasoning,
-)
+from legacydb_copilot.services.safe_sql_service import PlannedQuery
+from legacydb_copilot.services.scan_policy_service import resolve_connection_scan_policy
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
+from legacydb_copilot.workflow.langgraph.activation import (
+    CallableOrchestrator,
+    DisabledInvestigationError,
+    InvestigationOrchestratorRouter,
+    OrchestrationContext,
+    OrchestrationResult,
+)
+from legacydb_copilot.workflow.langgraph.composition import (
+    get_production_langgraph_orchestrator,
+)
+from legacydb_copilot.workflow.langgraph.production_facade import (
+    bind_production_investigation,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
@@ -603,8 +648,16 @@ def _evidence_to_json(evidence) -> str:
                 "zero_row_result": item.zero_row_result,
                 "evidence_semantics": item.evidence_semantics,
                 "supports_claim": item.supports_claim,
+                "evidence_relevance": item.evidence_relevance,
                 "scan_policy_decision": item.scan_policy_decision,
+                # Keep the complete bounded result as the canonical persisted
+                # evidence.  sample_rows remains for backwards-compatible
+                # readers and compact evaluation displays.
+                "rows": item.rows,
                 "sample_rows": item.rows[:10],
+                "rows_truncated": False,
+                "original_sql": item.original_sql,
+                "safety_note": item.safety_note,
                 "error": getattr(item, "error", None),
             }
             for item in evidence
@@ -2123,12 +2176,38 @@ def _run_dynamic_investigation(
                 evidence_id=f"PROC-{index}",
             )
         )
+    if environment_snapshot is not None and environment_snapshot.procedure_execution_permitted:
+        explicit_procedures = set(ranking.metadata.exact_procedures_found)
+        evidence.extend(
+            execute_approved_procedures(
+                connector,
+                procedure_analysis,
+                explicit_procedure_names=explicit_procedures,
+                known_objects=set(active_schema_metadata.tables)
+                | set(active_schema_metadata.views),
+                seed_evidence=evidence,
+                approval=ProcedureExecutionApproval(
+                    workspace_id=payload.workspace_id,
+                    database_name=environment_snapshot.selected_database_name,
+                    approved_workspace_ids=frozenset({payload.workspace_id}),
+                    approved_database_names=frozenset(
+                        {environment_snapshot.selected_database_name}
+                    ),
+                    timeout_seconds=min(scan_policy.query_timeout_seconds, 30),
+                    row_limit=min(scan_policy.max_rows, 100),
+                ),
+            )
+        )
     evidence.extend(
         _expand_related_id_evidence(
             connector,
             ranking.metadata,
             evidence,
             active_metadata=resolution_metadata,
+            provider=connection.engine,
+            scan_policy=scan_policy,
+            workspace_id=payload.workspace_id,
+            connection_id=connection.id,
         )
     )
     correlated_evidence = correlate_evidence(
@@ -2208,9 +2287,37 @@ def _run_dynamic_investigation(
             intent.intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
         ),
     )
+    expected_null_behavior = verified_expected_null_behavior(
+        evidence,
+        procedure_analysis,
+    )
+    if expected_null_behavior is not None:
+        execution_evidence, expected_procedure = expected_null_behavior
+        reasoning_dispatch = ReasoningDispatchDecision(
+            permission=ReasoningPermission.ALLOW_REASONING,
+            mode=ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
+            reason="Verified procedure execution matched inspected NULL-handling behavior.",
+            invoke_llm=False,
+            verified_evidence_count=reasoning_dispatch.verified_evidence_count,
+            reproduction_status=ReproductionStatus.NOT_REPRODUCED,
+            root_cause_support=RootCauseSupport.SUPPORTED,
+            reason_code="EXPECTED_SOURCE_DATA_BEHAVIOR",
+            evidence_categories=[
+                *reasoning_dispatch.evidence_categories,
+                "procedure_execution",
+            ],
+            evidence_gaps=[
+                "No separate verified evidence proves a stored-procedure defect."
+            ],
+        )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
-    if reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
+    if expected_null_behavior is not None:
+        reasoning = expected_null_behavior_reasoning(
+            execution_evidence,
+            expected_procedure,
+        )
+    elif reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
         reasoning = reason_about_evidence(
             payload.question,
             intent,
@@ -2235,7 +2342,13 @@ def _run_dynamic_investigation(
                 response_type="evidence_gap_summary",
             )
 
-    reasoning_allowed = reasoning_dispatch.invoke_llm
+    deterministic_root_cause_verified = any(
+        claim.status is RootCauseSupportStatus.VERIFIED
+        for claim in reasoning.likely_root_causes
+    )
+    reasoning_allowed = (
+        reasoning_dispatch.invoke_llm and not deterministic_root_cause_verified
+    )
     ai_debug_trace = {
         "ai_enabled": bool(settings.ai_reasoning_enabled),
         "evidence_package_valid": evidence_gate.verified_evidence,
@@ -2323,11 +2436,35 @@ def _run_dynamic_investigation(
             ai_debug_trace.pop("ai_skip_reason", None)
     else:
         llm_used = False
-        ai_debug_trace.update({
-            "ai_skip_reason": "evidence_gate_denied_reasoning",
-            "ai_outcome": "evidence_gate",
-            "ai_skip_branch": "reasoning_dispatch.permission_denied",
-        })
+        ai_debug_trace.update(
+            {
+                "ai_skip_reason": (
+                    "deterministic_verified_root_cause"
+                    if deterministic_root_cause_verified
+                    else "evidence_gate_denied_reasoning"
+                ),
+                "ai_outcome": (
+                    "deterministic_verified_root_cause"
+                    if deterministic_root_cause_verified
+                    else "evidence_gate"
+                ),
+                "ai_skip_branch": (
+                    "reasoning.deterministic_verified_root_cause"
+                    if deterministic_root_cause_verified
+                    else "reasoning_dispatch.permission_denied"
+                ),
+            }
+        )
+    reasoning = finalize_evidence_backed_response_type(
+        reasoning,
+        reproduced=evidence_gate.reproduced,
+        evidence_required=evidence_gate.required,
+        rejected_claim_count=int(ai_debug_trace.get("rejected_claim_count") or 0),
+        execution_failure_count=sum(
+            item.execution_status != "succeeded" or bool(item.error)
+            for item in evidence
+        ),
+    )
     logger.info(
         "evidence_gate_decision investigation_id=%s run_id=%s entity_key=%s database=%s "
         "evidence_item_count=%s sql_count=%s successful_sql_count=%s row_count=%s "
@@ -2391,8 +2528,24 @@ def _run_dynamic_investigation(
         reasoning=reasoning,
         correlated_evidence=correlated_evidence,
     )
-    confidence = score_confidence(ranking.metadata, evidence, context.documents, evidence_focus)
-    confidence_notes = confidence_factors(ranking.metadata, evidence, context.documents, evidence_focus)
+    confidence = score_confidence(
+        ranking.metadata,
+        evidence,
+        context.documents,
+        evidence_focus,
+        evidence_gate=evidence_gate,
+        reasoning=reasoning,
+        rejected_claim_count=int(ai_debug_trace.get("rejected_claim_count") or 0),
+    )
+    confidence_notes = confidence_factors(
+        ranking.metadata,
+        evidence,
+        context.documents,
+        evidence_focus,
+        evidence_gate=evidence_gate,
+        reasoning=reasoning,
+        rejected_claim_count=int(ai_debug_trace.get("rejected_claim_count") or 0),
+    )
     if planning_warning:
         confidence = min(confidence, 0.35)
         confidence_notes.append(f"- {planning_warning}")
@@ -2476,7 +2629,7 @@ def _run_dynamic_investigation(
         hypothesis_reasoning=hypothesis_reasoning,
     )
     ranked_text = "\n".join(f"- {item.object_type}: {item.name} ({item.score}) - {item.reason}" for item in ranking.objects[:8]) or "- No ranked objects"
-    correlated_text = "\n".join(f"- {item.evidence_type} {item.subject}: {item.finding}" for item in correlated_evidence[:8]) or "- No correlated evidence"
+    correlated_text = "\n".join(f"- {item.evidence_type} {item.subject}: {item.finding}" for item in correlated_evidence) or "- No correlated evidence"
     selected_candidates = [
         item for item in ranking.metadata.candidate_trace if item.get("decision") == "selected"
     ][:10]
@@ -2606,7 +2759,7 @@ def _run_dynamic_investigation(
         "## Stage 4 - Plan Investigation\n"
         + "\n".join(
             f"- {item.purpose}: expected read-only evidence from generated SQL"
-            for item in evidence[:8]
+            for item in evidence
         )
         + "\n\n## Stage 5 - Collect Evidence\n"
         f"{correlated_text}\n\n"
@@ -2652,7 +2805,7 @@ def _run_dynamic_investigation(
         + "\n\n## Supporting Evidence\n"
         + "\n".join(f"- {item}" for item in reasoning.supporting_evidence)
         + "\n\n## Recommended Next SQL\n"
-        + "\n\n".join(_evidence_sql_block(item) for item in evidence[:5])
+        + "\n\n".join(_evidence_sql_block(item) for item in evidence)
         + "\n\n## Recommendation\n"
         + recommendation_text
         + "\n\n## Self Validation\n"
@@ -2842,7 +2995,17 @@ def _entity_resolution_blocked_answer(connection_name: str, entities, result: En
     return message, [connection_name], 0.0, None, metadata
 
 
-def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadata=None):
+def _expand_related_id_evidence(
+    connector,
+    metadata,
+    evidence,
+    *,
+    active_metadata=None,
+    provider=None,
+    scan_policy=None,
+    workspace_id: str = "",
+    connection_id: str = "",
+):
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -2864,6 +3027,8 @@ def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadat
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
     related = []
+    expansion_plan: list[PlannedQuery] = []
+    expansion_context: list[dict[str, Any]] = []
     seen_sql = {item.sql for item in evidence}
     id_values: dict[str, set[Any]] = {}
     for item in evidence:
@@ -2906,41 +3071,73 @@ def _expand_related_id_evidence(connector, metadata, evidence, *, active_metadat
             if sql in seen_sql:
                 continue
             seen_sql.add(sql)
-            try:
-                rows = connector.execute_read_only_query(sql, limit=25)
-                if rows:
-                    from legacydb_copilot.services.evidence_execution_service import EvidenceResult
-
-                    related.append(
-                        EvidenceResult(
-                            f"Inspect correlated rows by {column} in {table.name}",
-                            sql,
-                            rows,
-                            evidence_id=f"SQL-{len(evidence) + len(related) + 1}",
-                            evidence_semantics=(
-                                "null_value"
-                                if any(
-                                    value is None
-                                    for row in rows
-                                    for value in row.values()
-                                )
-                                else "positive_rows"
-                            ),
-                            supports_claim=(
-                                "Returned correlated rows verify one or more NULL source values."
-                                if any(
-                                    value is None
-                                    for row in rows
-                                    for value in row.values()
-                                )
-                                else f"{len(rows)} verified correlated row(s) were returned."
-                            ),
-                            evidence_relevance="relevant",
+            expansion_plan.append(
+                PlannedQuery(
+                    purpose=f"Inspect correlated rows by {column} in {table.name}",
+                    sql=sql,
+                    query_id=f"RELATED-{len(expansion_plan) + 1}",
+                )
+            )
+            expansion_context.append(
+                {
+                    "source": "related_id_expansion",
+                    "table": table.name,
+                    "column": column,
+                    "source_evidence_ids": [
+                        item.evidence_id
+                        for item in evidence
+                        if any(
+                            normalized_column
+                            == re.sub(r"[^a-z0-9]", "", key.casefold())
+                            and row.get(key) in values
+                            for row in item.rows
+                            for key in row
                         )
-                    )
-            except Exception:
-                continue
-    return related[:8]
+                    ],
+                }
+            )
+    executed = execute_evidence_plan(
+        connector,
+        expansion_plan[:8],
+        provider=(
+            provider
+            or metadata.engine_type
+            or getattr(connector, "database_engine", None)
+            or getattr(connector, "engine_type", None)
+            or "sql_server"
+        ),
+        scan_policy=scan_policy,
+        workspace_id=workspace_id,
+        connection_id=connection_id,
+    )
+    for index, item in enumerate(executed):
+        decision = dict(item.scan_policy_decision)
+        decision.update(
+            {
+                "audit_state": "audited" if decision else "unknown_compatibility",
+                "policy_applied": decision.get("policy", "unknown"),
+                "decision": decision.get(
+                    "decision",
+                    "allowed" if item.execution_status == "succeeded" else "blocked",
+                ),
+                "reason": decision.get(
+                    "reason",
+                    item.error or "legacy connector returned no policy detail",
+                ),
+                "original_sql_reference": item.original_sql or item.sql,
+                "executed_sql_reference": item.sql,
+                "execution_status": item.execution_status,
+                "row_expansion_context": expansion_context[index],
+            }
+        )
+        related.append(
+            replace(
+                item,
+                evidence_id=f"SQL-{len(evidence) + index + 1}",
+                scan_policy_decision=decision,
+            )
+        )
+    return related
 
 
 @router.post("/ask", response_model=ChatAskResponse, status_code=status.HTTP_201_CREATED)
@@ -3001,13 +3198,36 @@ def ask_chat_question(
         investigation_metadata = _empty_investigation_metadata()
     else:
         try:
-            answer, sources, confidence, report_links, investigation_metadata = _run_dynamic_investigation(
-                db,
-                payload,
-                current_user.email or current_user.full_name or current_user.id,
-                environment_snapshot=environment_snapshot,
-                resolved_scan_policy=selected_policy,
+            orchestration_context = OrchestrationContext(
+                environment=environment_snapshot.environment_type.value,
+                workspace_id=payload.workspace_id,
+                user_id=current_user.id,
+                question=payload.question,
             )
+            def run_production_investigation() -> tuple:
+                return _run_dynamic_investigation(
+                    db,
+                    payload,
+                    current_user.email or current_user.full_name or current_user.id,
+                    environment_snapshot=environment_snapshot,
+                    resolved_scan_policy=selected_policy,
+                )
+
+            legacy = CallableOrchestrator(
+                lambda _context: OrchestrationResult(
+                    payload=run_production_investigation(),
+                    source="legacy",
+                )
+            )
+            with bind_production_investigation(run_production_investigation):
+                routed = InvestigationOrchestratorRouter(
+                    settings=Settings.from_env(),
+                    legacy=legacy,
+                    langgraph=get_production_langgraph_orchestrator(),
+                ).run(orchestration_context)
+            answer, sources, confidence, report_links, investigation_metadata = routed.payload
+        except DisabledInvestigationError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(
                 status_code=500,

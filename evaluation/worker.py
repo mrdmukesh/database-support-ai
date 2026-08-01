@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import socket
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 
@@ -21,7 +21,12 @@ def build_worker() -> EvaluationJobWorker:
     )
 
 
-def run_worker(*, once: bool = False, poll_seconds: float = 5, stop_event: Event | None = None) -> None:
+def run_worker(
+    *,
+    once: bool = False,
+    poll_seconds: float = 5,
+    stop_event: Event | None = None,
+) -> None:
     worker = build_worker()
     worker.recover_stale_jobs()
     stop_event = stop_event or Event()
@@ -36,13 +41,26 @@ def run_worker(*, once: bool = False, poll_seconds: float = 5, stop_event: Event
 def main() -> None:
     parser = argparse.ArgumentParser(description="Durable evaluation job worker")
     parser.add_argument("--once", action="store_true")
-    parser.add_argument("--poll-seconds", type=float, default=float(os.getenv("EVALUATION_WORKER_POLL_SECONDS", "5")))
+    parser.add_argument(
+        "--poll-seconds",
+        type=float,
+        default=float(os.getenv("EVALUATION_WORKER_POLL_SECONDS", "5")),
+    )
     args = parser.parse_args()
     from legacydb_copilot.runtime_diagnostics import write_runtime_diagnostic
+    from legacydb_copilot.workflow.langgraph.production_facade import (
+        configure_production_langgraph,
+    )
+    configure_production_langgraph(Settings.from_env())
     write_runtime_diagnostic(
         "evaluation-worker",
-        Path(os.getenv("EVAL_WORKER_RUNTIME_DIAGNOSTIC", ".tmp/local-evaluation/worker-runtime.json")),
-        started_at=datetime.now(timezone.utc).isoformat(),
+        Path(
+            os.getenv(
+                "EVAL_WORKER_RUNTIME_DIAGNOSTIC",
+                ".tmp/local-evaluation/worker-runtime.json",
+            )
+        ),
+        started_at=datetime.now(UTC).isoformat(),
     )
     run_worker(once=args.once, poll_seconds=args.poll_seconds)
 

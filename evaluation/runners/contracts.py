@@ -39,6 +39,7 @@ class RunnerConfig:
     concurrency: int = 1
     ai_enabled: bool = False
     database_engine: str = ""
+    orchestrator: str = "legacy"
     recovery_root: Path = Path("research/results/recovery")
 
     def __post_init__(self) -> None:
@@ -46,6 +47,8 @@ class RunnerConfig:
             raise ValueError("concurrency must be at least 1")
         if self.timeout_seconds <= 0 or self.poll_interval_seconds < 0:
             raise ValueError("poll timing values are invalid")
+        if self.orchestrator not in {"legacy", "langgraph"}:
+            raise ValueError("orchestrator must be legacy or langgraph")
 
 
 @dataclass

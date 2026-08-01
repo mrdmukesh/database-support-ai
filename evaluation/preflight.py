@@ -69,7 +69,18 @@ def _process_is_running(process_id: int) -> bool:
     return True
 
 
-def _worker_health(pid_file: Path = Path(".tmp/local-evaluation/worker.pid")) -> tuple[bool, str]:
+def _worker_health(
+    pid_file: Path = Path(".tmp/local-evaluation/worker.pid"),
+    *,
+    require_runtime: bool = False,
+) -> tuple[bool, str]:
+    if os.getenv("EVALUATION_WORKER_ENABLED", "").casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        return True, "embedded evaluation worker is enabled in the API process"
     if not pid_file.is_file():
         return False, "worker pid file missing"
     try:
@@ -77,11 +88,18 @@ def _worker_health(pid_file: Path = Path(".tmp/local-evaluation/worker.pid")) ->
         running = _process_is_running(worker_pid)
     except (OSError, ValueError):
         return False, "worker process is not running"
-    return running, (
-        f"process {worker_pid} is running"
-        if running
-        else f"process {worker_pid} is not running"
-    )
+    if not running:
+        return False, f"process {worker_pid} is not running"
+    if require_runtime:
+        runtime_file = pid_file.with_name("worker-runtime.json")
+        try:
+            runtime = json.loads(runtime_file.read_text(encoding="utf-8"))
+            readiness = runtime.get("readiness", {})
+            if readiness.get("status") != "ready":
+                return False, "worker dependencies are not ready"
+        except (OSError, ValueError, TypeError):
+            return False, "worker runtime diagnostic is missing or invalid"
+    return True, f"process {worker_pid} is running"
 
 
 def run_preflight(*, check_live: bool = True) -> PreflightReport:
@@ -118,7 +136,7 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     else:
         add("application metadata database", False, "DATABASE_URL is missing")
 
-    worker_ok, worker_detail = _worker_health()
+    worker_ok, worker_detail = _worker_health(require_runtime=True)
     add("investigation worker health", worker_ok, worker_detail)
 
     base_url = os.getenv("EVAL_API_BASE_URL", "").rstrip("/")
@@ -147,10 +165,39 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
             rows = _http_json("GET", f"{base_url}/databases/connections?{query}", token)
             by_id = {str(row.get("id")): row for row in rows if isinstance(row, dict)}
             for domain, connection_id in connection_ids.items():
-                row = by_id.get(connection_id)
-                expected = DATABASES[domain]
-                ok = bool(row and row.get("database_name") == expected and row.get("workspace_id") == os.getenv("EVAL_WORKSPACE_ID"))
-                add(f"{domain} application connection", ok, f"expected database={expected}; connection={'found' if row else 'missing'}")
+                try:
+                    row = by_id.get(connection_id)
+                    expected = DATABASES[domain]
+                    identity_ok = bool(
+                        row
+                        and row.get("database_name") == expected
+                        and row.get("workspace_id") == os.getenv("EVAL_WORKSPACE_ID")
+                    )
+                    connectivity: object = {}
+                    if identity_ok:
+                        connectivity = _http_json(
+                            "POST",
+                            f"{base_url}/databases/connections/{connection_id}/test",
+                            token,
+                        )
+                    connection_ok = bool(
+                        isinstance(connectivity, dict) and connectivity.get("is_valid")
+                    )
+                    add(
+                        f"{domain} application connection",
+                        identity_ok and connection_ok,
+                        (
+                            f"expected database={expected}; "
+                            f"identity={'valid' if identity_ok else 'invalid'}; "
+                            f"connectivity={'verified' if connection_ok else 'failed'}"
+                        ),
+                    )
+                except Exception as exc:
+                    add(
+                        f"{domain} application connection",
+                        False,
+                        f"connectivity check failed: {type(exc).__name__}",
+                    )
         except Exception as exc:
             for domain in DOMAINS:
                 add(f"{domain} application connection", False, f"connection inventory failed: {type(exc).__name__}")
@@ -198,9 +245,31 @@ def run_preflight(*, check_live: bool = True) -> PreflightReport:
     server = os.getenv("EVAL_MYSQL_HOST" if mysql_mode else "EVAL_SQL_SERVER", "")
     allowed_hosts = _csv("EVAL_ALLOWED_MYSQL_HOSTS" if mysql_mode else "EVAL_ALLOWED_SQL_HOSTS")
     allowed_databases = _csv("EVAL_ALLOWED_DATABASES")
-    host = server.lower() if mysql_mode else (SqlCmdDatabaseLifecycle._host(server) if server else "")
-    safe_config = bool(host and host in {item.lower() for item in allowed_hosts} and not any(word in host for word in ("prod", "production")) and set(DATABASES.values()).issubset(allowed_databases))
-    add("non-production SQL target allowlist", safe_config, f"host={host or 'missing'}; databases={','.join(sorted(allowed_databases)) or 'missing'}")
+    target = (
+        server.casefold()
+        if mysql_mode
+        else (SqlCmdDatabaseLifecycle._target(server) if server else "")
+    )
+    approved_targets = (
+        {item.casefold() for item in allowed_hosts}
+        if mysql_mode
+        else {SqlCmdDatabaseLifecycle._target(item) for item in allowed_hosts}
+    )
+    host = server.casefold() if mysql_mode else SqlCmdDatabaseLifecycle._host(server)
+    safe_config = bool(
+        target
+        and target in approved_targets
+        and not any(word in host for word in ("prod", "production"))
+        and set(DATABASES.values()).issubset(allowed_databases)
+    )
+    add(
+        "non-production SQL target allowlist",
+        safe_config,
+        (
+            f"target={target or 'missing'}; "
+            f"databases={','.join(sorted(allowed_databases)) or 'missing'}"
+        ),
+    )
     sql_auth = (
         ["EVAL_MYSQL_HOST", "EVAL_MYSQL_USER", "EVAL_MYSQL_PASSWORD"]
         if mysql_mode

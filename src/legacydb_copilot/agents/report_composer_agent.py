@@ -5,21 +5,21 @@ import re
 from dataclasses import dataclass
 
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
-from legacydb_copilot.agents.recommendation_agent import Recommendation, RecommendationStatus
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult, RootCauseSupportStatus
+from legacydb_copilot.agents.recommendation_agent import Recommendation, RecommendationStatus
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
+from legacydb_copilot.services.fix_readiness_service import FixReadinessState
 from legacydb_copilot.services.report_generator import (
+    REPORT_VERSION,
     ExecutiveSummary,
     InvestigationReport,
     ReportCover,
     ReportSection,
     ReportSqlBlock,
     ReportTable,
-    REPORT_VERSION,
     new_investigation_id,
     now_label,
 )
-from legacydb_copilot.services.fix_readiness_service import FixReadinessState
 from legacydb_copilot.services.root_cause_hypothesis_service import HypothesisStatus
 
 
@@ -105,7 +105,7 @@ def _verified_report_input(
 
 def _evidence_only_summary(bundle: DynamicInvestigationBundle) -> str:
     observations: list[str] = []
-    for item in bundle.evidence[:6]:
+    for item in bundle.evidence:
         if item.execution_status != "succeeded":
             continue
         if item.zero_row_result:
@@ -1195,8 +1195,6 @@ def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]
     llm_invoked = bool(trace.get("llm_invoked"))
     generated = int(trace.get("generated_claim_count") or 0)
     verified = int(trace.get("verified_claim_count") or 0)
-    skip_reason = str(trace.get("skip_reason") or "none")
-
     verification = getattr(bundle, "root_cause_verification", None)
     if verification is not None:
         confirmed = [
@@ -1653,16 +1651,6 @@ def compose_report(
         )
     confidence_items = [f"Overall confidence: {int(bundle.confidence * 100)}%"]
     confidence_items.extend(bundle.confidence_factors or ["Based on available evidence; no unsupported objects were fabricated."])
-    recommended_fix_section = ReportSection(title="Recommended Fix", items=[
-        "Immediate Fix: " + " ".join(bundle.recommendation.immediate_fix),
-        "Permanent Fix: " + " ".join(bundle.recommendation.permanent_fix),
-        "Future Improvement: " + " ".join(bundle.recommendation.future_improvement),
-        f"Estimated Effort: {bundle.recommendation.estimated_effort}",
-        f"Risk: {bundle.recommendation.risk}",
-        f"Business Impact: {bundle.recommendation.business_impact}",
-        "Monitoring: " + " ".join(bundle.recommendation.monitoring),
-        "Modernization: " + " ".join(bundle.recommendation.modernization),
-    ])
     policy = bundle.investigation_policy or {}
     environment = str(policy.get("environment_type") or "").upper()
     environment_label = environment or "UNRESOLVED"

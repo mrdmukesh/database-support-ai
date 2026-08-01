@@ -75,6 +75,7 @@ yarn-error.log*
 
 # Local test sandboxes and linked worktrees
 /.tmp/pytest-*/
+/.tmp-pytest-*/
 /.tmp/fixture-framework-*/
 /.tmp/react-static-task*/
 /.tmp/ag10-*/

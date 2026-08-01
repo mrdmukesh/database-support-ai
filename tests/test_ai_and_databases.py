@@ -4,20 +4,48 @@ from types import SimpleNamespace
 
 import pytest
 
+from legacydb_copilot.agents.entity_extraction_agent import extract_entities
+from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
+from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent, detect_intent
+from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
+from legacydb_copilot.agents.reasoning_agent import ReasoningResult, reason_about_evidence
+from legacydb_copilot.agents.report_composer_agent import (
+    _executive_root_cause_items,
+    _possible_investigation_hypothesis_section,
+    _report_completion_status,
+    compose_report,
+)
 from legacydb_copilot.ai import (
     AI_DISCLAIMER_POINTS,
     SafetyFinding,
     analyze_prompt,
     disclaimer_text,
 )
-from legacydb_copilot.agents.entity_extraction_agent import extract_entities
-from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
-from legacydb_copilot.agents.intent_agent import InvestigationIntent, IntentResult, detect_intent
-from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
-from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
-from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
+from legacydb_copilot.common import DomainError, Environment
+from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import (
+    DatabaseEngine,
+    default_connector_registry,
+    validate_sql_for_execution,
+)
+from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
+from legacydb_copilot.routers.chat import (
+    _active_database_name,
+    _answer_provenance,
+    _detected_intent_with_planning_status,
+    _expand_related_id_evidence,
+    _metadata_with_active_diagnostics,
+    _terminal_ai_trace,
+)
+from legacydb_copilot.services.evidence_execution_service import (
+    EvidenceResult,
+    execute_evidence_plan,
+)
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
-from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
+from legacydb_copilot.services.evidence_gate_service import (
+    run_evidence_gate,
+    unreproduced_reasoning,
+)
 from legacydb_copilot.services.evidence_verification_agent import (
     adjust_confidence_with_verification,
     execute_verification_check,
@@ -28,56 +56,42 @@ from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     classify_investigation_mode,
 )
+from legacydb_copilot.services.investigation_reports import _executive_report
 from legacydb_copilot.services.llm_reasoning_service import (
     _build_llm_payload,
     _safeguard_remediation_steps,
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
-from legacydb_copilot.routers.chat import (
-    _active_database_name,
-    _answer_provenance,
-    _detected_intent_with_planning_status,
-    _expand_related_id_evidence,
-    _metadata_with_active_diagnostics,
-    _terminal_ai_trace,
+from legacydb_copilot.services.metadata_search_service import (
+    MetadataSearchContext,
+    MetadataSearchResult,
+    TableMetadata,
+    search_metadata,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
-from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.services.reasoning_dispatch_service import (
     ReasoningMode,
     ReasoningPermission,
     dispatch_reasoning,
 )
-from legacydb_copilot.agents.reasoning_agent import ReasoningResult
-from legacydb_copilot.agents.report_composer_agent import (
-    _executive_root_cause_items,
-    _possible_investigation_hypothesis_section,
-    _report_completion_status,
-    compose_report,
-)
-from legacydb_copilot.config import Settings
-from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
 from legacydb_copilot.services.report_generator import (
-    GeneratedReport,
     ExecutiveSummary,
+    GeneratedReport,
     InvestigationReport,
     ReportCover,
     ReportSection,
     render_html,
     report_file_stem,
 )
-from legacydb_copilot.services.investigation_reports import _executive_report
-from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
-from legacydb_copilot.common import DomainError
-from legacydb_copilot.common import Environment
-from legacydb_copilot.databases import (
-    DatabaseEngine,
-    default_connector_registry,
-    validate_sql_for_execution,
+from legacydb_copilot.services.safe_sql_service import (
+    PlannedQuery,
+    ProductionReadSafetyValidator,
+    plan_safe_queries,
+    validate_read_only_sql,
 )
+from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
 
 def _procedure(
@@ -2123,6 +2137,65 @@ def test_procedure_connector_word_is_not_treated_as_explicit_object() -> None:
 
     assert not result.target_object_not_found
     assert result.exact_procedures_requested == []
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Determine whether this is a stored-procedure defect",
+        "Confirm no stored-procedure defect was reproduced",
+        "Confirm the procedure correctly returns NULL for missing source data",
+    ],
+)
+def test_procedure_defect_language_is_not_an_explicit_object(question: str) -> None:
+    connector = _SchemaConnector(
+        {
+            "dbo.Employee": {
+                "columns": [{"name": "EmployeeId"}, {"name": "DateOfBirth"}],
+                "primary_key": ["EmployeeId"],
+            },
+        },
+        procedures=["dbo.usp_GetEmployeeAge"],
+    )
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert not result.target_object_not_found
+    assert result.exact_procedures_requested == []
+
+
+@pytest.mark.parametrize(
+    "question, expected_requested",
+    [
+        ("Inspect dbo.usp_GetEmployeeAge for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect [dbo].[usp_GetEmployeeAge] for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect procedure dbo.usp_GetEmployeeAge for EMP-1001.", "dbo.usp_getemployeeage"),
+        ("Inspect stored procedure usp_GetEmployeeAge for EMP-1001.", "usp_getemployeeage"),
+    ],
+)
+def test_qualified_procedure_is_still_an_explicit_object(
+    question: str,
+    expected_requested: str,
+) -> None:
+    connector = _SchemaConnector({}, procedures=["dbo.usp_GetEmployeeAge"])
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert not result.target_object_not_found
+    assert result.exact_procedures_requested == [expected_requested]
+    assert result.exact_procedures_found == ["dbo.usp_getemployeeage"]
+
+
+def test_genuinely_missing_explicit_procedure_is_rejected() -> None:
+    connector = _SchemaConnector({}, procedures=["dbo.usp_GetEmployeeAge"])
+    question = "Inspect procedure dbo.usp_MissingEmployeeAge."
+
+    result = search_metadata(connector, question, extract_entities(question))
+
+    assert result.target_object_not_found
+    assert result.exact_procedures_requested == ["dbo.usp_missingemployeeage"]
+    assert result.exact_procedures_found == []
+    assert "dbo.usp_missingemployeeage" in result.failure_reason
 
 
 def test_connection_pool_recreates_when_database_changes_for_same_connection_id() -> None:

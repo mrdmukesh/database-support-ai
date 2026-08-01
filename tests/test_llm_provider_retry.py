@@ -85,6 +85,41 @@ def test_timeout_then_success_retries_same_grounded_payload(monkeypatch) -> None
     assert trace["input_tokens"] == 10
 
 
+def test_gpt51_incomplete_reasoning_retries_at_low_effort(monkeypatch) -> None:
+    incomplete = {
+        "id": "truncated",
+        "status": "incomplete",
+        "incomplete_details": {"reason": "max_output_tokens"},
+        "usage": {"input_tokens": 17685, "output_tokens": 4000},
+        "output_text": '{"root_cause_claims":',
+    }
+    outcomes = [Response(incomplete), Response(success_payload())]
+    request_bodies = []
+
+    def urlopen(req, timeout):
+        request_bodies.append(json.loads(req.data))
+        return outcomes.pop(0)
+
+    monkeypatch.setattr(service.request, "urlopen", urlopen)
+    trace = {}
+    configured = settings(
+        llm_reasoning_model="gpt-5.1",
+        llm_reasoning_effort="medium",
+        llm_max_output_tokens=4000,
+    )
+
+    assert service._call_openai_responses(configured, {}, debug_trace=trace) == {}
+    assert request_bodies[0]["reasoning"] == {"effort": "medium"}
+    assert request_bodies[1]["reasoning"] == {"effort": "low"}
+    assert request_bodies[0]["max_output_tokens"] == 4000
+    assert request_bodies[1]["max_output_tokens"] == 4000
+    assert [item["outcome"] for item in trace["provider_attempts"]] == [
+        "incomplete",
+        "success",
+    ]
+    assert trace["provider_retry_count"] == 1
+
+
 def test_repeated_timeout_is_terminal_and_audited(monkeypatch) -> None:
     monkeypatch.setattr(service.request, "urlopen", lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError()))
     trace = {}

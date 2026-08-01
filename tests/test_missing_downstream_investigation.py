@@ -174,3 +174,65 @@ def test_failed_generation_diagnostic_supports_confirmed_response_type():
     assert result.response_type == "confirmed_root_cause"
     assert result.likely_root_causes[0].evidence_refs == ["SQL-1", "SQL-2", "SQL-3"]
     assert "transactional" in " ".join(result.recommended_fix).lower()
+
+
+def test_diagnostic_evidence_references_are_filtered_deduplicated_and_ordered():
+    question = "Order ORD-42 is complete; why is the fulfillment task missing?"
+    evidence = [
+        EvidenceResult(
+            "Verify upstream entity and current transition status",
+            "SELECT Status FROM ops.orders",
+            [{"Status": "Complete"}],
+            evidence_id="SQL-2",
+        ),
+        EvidenceResult(
+            "Confirmed Missing Related Record Candidates",
+            "SELECT issue_type FROM ops.orders",
+            [{"issue_type": "MISSING_RELATED_RECORD"}],
+            evidence_id="SQL-1",
+        ),
+        EvidenceResult(
+            "Inspect workflow exception evidence in ops.workflow_exceptions",
+            "SELECT Details FROM ops.workflow_exceptions",
+            [{"Details": "Downstream creation failed"}],
+            evidence_id="SQL-3",
+        ),
+        EvidenceResult(
+            "Inspect workflow exception evidence in ops.workflow_exceptions",
+            "SELECT Details FROM ops.workflow_exceptions",
+            [{"Details": "Downstream creation failed again"}],
+            evidence_id="SQL-3",
+        ),
+        EvidenceResult(
+            "Inspect workflow exception evidence in ops.workflow_exceptions",
+            "SELECT Details FROM ops.workflow_exceptions",
+            [{"Details": "Rejected downstream failure"}],
+            evidence_id="SQL-REJECTED",
+            evidence_relevance="irrelevant",
+        ),
+        EvidenceResult(
+            "Unrelated successful evidence",
+            "SELECT 1",
+            [{"Details": "Unrelated failure"}],
+            evidence_id="SQL-UNRELATED",
+        ),
+        EvidenceResult(
+            "Verify upstream entity and current transition status",
+            "SELECT Status FROM ops.orders",
+            [{"Status": "Complete"}],
+            error="query rejected",
+            evidence_id="SQL-FAILED",
+            execution_status="failed",
+        ),
+    ]
+
+    result = reason_about_evidence(
+        question,
+        IntentResult(InvestigationIntent.MISSING_DATA, 1.0, "test"),
+        extract_entities(question),
+        _metadata(),
+        evidence,
+        [],
+    )
+
+    assert result.likely_root_causes[0].evidence_refs == ["SQL-2", "SQL-1", "SQL-3"]

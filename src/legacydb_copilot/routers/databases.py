@@ -7,15 +7,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from legacydb_copilot.auth import Role
-from legacydb_copilot.databases import DatabaseEngine, default_connector_registry
 from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import DatabaseEngine, default_connector_registry
 from legacydb_copilot.db.connector import (
     DatabaseConnectionError,
     get_connection_pool,
 )
-from legacydb_copilot.dependencies import assert_same_organization, get_current_user, require_permission
 from legacydb_copilot.db.models import DatabaseConnectionModel, WorkspaceMembershipModel
 from legacydb_copilot.db.session import get_db_session
+from legacydb_copilot.dependencies import (
+    assert_same_organization,
+    get_current_user,
+)
 from legacydb_copilot.schemas import (
     DatabaseConnectionCreate,
     DatabaseConnectionRead,
@@ -296,7 +299,7 @@ def test_database_connection(
         return {
             "connection_id": connection_id,
             "is_valid": False,
-            "message": f"Connection error: {str(exc)}",
+            "message": f"Connection failed: {type(exc).__name__}",
         }
 
 
@@ -321,7 +324,7 @@ def get_database_schema(
 
         return metadata.to_dict()
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/connections/{connection_id}/table/{table_name}")
@@ -346,7 +349,7 @@ def get_table_schema(
 
         return schema
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/connections/{connection_id}/query")
@@ -379,4 +382,4 @@ def execute_query(
             "results": results,
         }
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

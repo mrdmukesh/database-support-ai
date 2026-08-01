@@ -22,6 +22,9 @@ class PublicInvestigationAPI:
     def retrieve(self, investigation_id: str) -> tuple[dict, int]:
         return self._request("GET", f"/learning/investigations/{investigation_id}")
 
+    def health(self) -> tuple[dict, int]:
+        return self._request("GET", "/health")
+
     def _request(self, method: str, path: str, payload: dict | None = None) -> tuple[dict, int]:
         return self._request_once(method, path, payload, allow_refresh=True)
 

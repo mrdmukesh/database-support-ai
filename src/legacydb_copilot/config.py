@@ -4,6 +4,42 @@ import os
 from dataclasses import dataclass
 
 from legacydb_copilot.common import Environment
+from legacydb_copilot.services.llm_model_configuration import (
+    DEFAULT_LLM_MODEL,
+    normalize_reasoning_effort,
+    safe_model_selection,
+)
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().casefold() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int, *, minimum: int = 0, maximum: int | None = None) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+    value = max(minimum, value)
+    return min(value, maximum) if maximum is not None else value
+
+
+def _env_float(name: str, default: float, *, minimum: float = 0.1) -> float:
+    try:
+        return max(minimum, float(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_csv(name: str, default: str = "") -> tuple[str, ...]:
+    return tuple(
+        item.strip()
+        for item in os.getenv(name, default).split(",")
+        if item.strip()
+    )
 
 
 @dataclass(frozen=True)
@@ -30,6 +66,12 @@ class Settings:
     llm_enabled: bool = False
     llm_provider: str = "openai"
     llm_model: str = "gpt-4.1-mini"
+    llm_reasoning_model: str = "gpt-4.1-mini"
+    llm_fallback_model: str | None = "gpt-4.1-mini"
+    llm_reasoning_effort: str = "medium"
+    llm_max_output_tokens: int = 4000
+    llm_provider_timeout_seconds: float = 60.0
+    llm_model_access_verified: bool = False
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
     llm_request_timeout_seconds: float = 60.0
@@ -61,11 +103,60 @@ class Settings:
     agentic_max_retries: int = 1
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
+    investigation_orchestrator_mode: str = "LEGACY"
+    langgraph_enabled: bool = False
+    langgraph_fallback_to_legacy: bool = True
+    langgraph_shadow_percent: int = 0
+    langgraph_rollout_percent: int = 0
+    langgraph_shadow_llm_enabled: bool = False
+    langgraph_compare_persist_results: bool = True
+    langgraph_kill_switch: bool = False
+    langgraph_allowed_environments: tuple[str, ...] = (
+        "development",
+        "test",
+        "testing",
+        "staging",
+        "evaluation",
+    )
+    langgraph_allowed_workspace_ids: tuple[str, ...] = ()
+    langgraph_allowed_user_ids: tuple[str, ...] = ()
+    langgraph_max_concurrent_runs: int = 2
+    langgraph_timeout_seconds: float = 120.0
+    langgraph_shadow_timeout_seconds: float = 120.0
+    langgraph_fallback_on_timeout: bool = True
+    langgraph_fallback_on_provider_failure: bool = False
+    langgraph_fallback_on_persistence_failure: bool = False
+    langgraph_fallback_on_validation_failure: bool = True
+    langgraph_compare_response_source: str = "legacy"
+
+    @property
+    def selected_reasoning_model(self) -> str:
+        if self.llm_reasoning_model != DEFAULT_LLM_MODEL:
+            return self.llm_reasoning_model
+        return self.llm_model
+
+    @property
+    def selected_provider_timeout_seconds(self) -> float:
+        if self.llm_provider_timeout_seconds != 60.0:
+            return self.llm_provider_timeout_seconds
+        return self.llm_request_timeout_seconds
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
+        environment = Environment(os.getenv("APP_ENV", Environment.DEVELOPMENT))
+        environment_default = (
+            DEFAULT_LLM_MODEL
+            if environment in {Environment.DEVELOPMENT, Environment.TESTING}
+            else "gpt-5.1"
+        )
+        requested_model = os.getenv(
+            "LLM_REASONING_MODEL", os.getenv("LLM_MODEL", environment_default)
+        )
+        fallback_raw = os.getenv("LLM_FALLBACK_MODEL")
+        fallback = DEFAULT_LLM_MODEL if fallback_raw is None else fallback_raw
+        selected_model, selected_fallback = safe_model_selection(requested_model, fallback)
         return cls(
-            environment=Environment(os.getenv("APP_ENV", Environment.DEVELOPMENT)),
+            environment=environment,
             database_url=os.getenv(
                 "DATABASE_URL",
                 "postgresql+psycopg://legacydb:legacydb@localhost:5432/legacydb_copilot",
@@ -96,7 +187,20 @@ class Settings:
             ).lower()
             in {"1", "true", "yes", "on"},
             llm_provider=os.getenv("LLM_PROVIDER", "openai"),
-            llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
+            llm_model=selected_model,
+            llm_reasoning_model=selected_model,
+            llm_fallback_model=selected_fallback,
+            llm_reasoning_effort=normalize_reasoning_effort(
+                os.getenv("LLM_REASONING_EFFORT", "medium")
+            ),
+            llm_max_output_tokens=_env_int(
+                "LLM_MAX_OUTPUT_TOKENS", 4000, minimum=1, maximum=128000
+            ),
+            llm_provider_timeout_seconds=_env_float(
+                "LLM_PROVIDER_TIMEOUT_SECONDS",
+                _env_float("LLM_REQUEST_TIMEOUT_SECONDS", 60.0),
+            ),
+            llm_model_access_verified=_env_bool("LLM_MODEL_ACCESS_VERIFIED", False),
             openai_api_key=os.getenv("OPENAI_API_KEY") or None,
             openai_base_url=os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
             llm_request_timeout_seconds=float(
@@ -155,4 +259,57 @@ class Settings:
             agentic_max_retries=max(0, int(os.getenv("AGENTIC_MAX_RETRIES", "1"))),
             llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
+            investigation_orchestrator_mode=os.getenv(
+                "INVESTIGATION_ORCHESTRATOR_MODE", "LEGACY"
+            ).strip().upper(),
+            langgraph_enabled=_env_bool("LANGGRAPH_ENABLED", False),
+            langgraph_fallback_to_legacy=_env_bool("LANGGRAPH_FALLBACK_TO_LEGACY", True),
+            langgraph_shadow_percent=_env_int(
+                "LANGGRAPH_SHADOW_PERCENT", 0, maximum=100
+            ),
+            langgraph_rollout_percent=_env_int(
+                "LANGGRAPH_ROLLOUT_PERCENT", 0, maximum=100
+            ),
+            langgraph_shadow_llm_enabled=_env_bool(
+                "LANGGRAPH_SHADOW_LLM_ENABLED", False
+            ),
+            langgraph_compare_persist_results=_env_bool(
+                "LANGGRAPH_COMPARE_PERSIST_RESULTS", True
+            ),
+            langgraph_kill_switch=_env_bool("LANGGRAPH_KILL_SWITCH", False),
+            langgraph_allowed_environments=_env_csv(
+                "LANGGRAPH_ALLOWED_ENVIRONMENTS",
+                "development,test,testing,staging,evaluation",
+            ),
+            langgraph_allowed_workspace_ids=_env_csv(
+                "LANGGRAPH_ALLOWED_WORKSPACE_IDS"
+            ),
+            langgraph_allowed_user_ids=_env_csv("LANGGRAPH_ALLOWED_USER_IDS"),
+            langgraph_max_concurrent_runs=_env_int(
+                "LANGGRAPH_MAX_CONCURRENT_RUNS", 2, minimum=1
+            ),
+            langgraph_timeout_seconds=_env_float("LANGGRAPH_TIMEOUT_SECONDS", 120.0),
+            langgraph_shadow_timeout_seconds=_env_float(
+                "LANGGRAPH_SHADOW_TIMEOUT_SECONDS", 120.0
+            ),
+            langgraph_fallback_on_timeout=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_TIMEOUT", True
+            ),
+            langgraph_fallback_on_provider_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_PROVIDER_FAILURE", False
+            ),
+            langgraph_fallback_on_persistence_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_PERSISTENCE_FAILURE", False
+            ),
+            langgraph_fallback_on_validation_failure=_env_bool(
+                "LANGGRAPH_FALLBACK_ON_VALIDATION_FAILURE", True
+            ),
+            langgraph_compare_response_source=(
+                "langgraph"
+                if os.getenv(
+                    "LANGGRAPH_COMPARE_RESPONSE_SOURCE", "legacy"
+                ).strip().casefold()
+                == "langgraph"
+                else "legacy"
+            ),
         )

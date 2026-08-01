@@ -6,6 +6,23 @@ import json
 import os
 from pathlib import Path
 
+from evaluation.framework.scenario_loader import load_scenarios
+from evaluation.judges.ai_judge import AIJudge, JudgeConfig
+from evaluation.judges.openai_client import OpenAIJudgeClient
+from evaluation.judges.store import AIJudgeService
+from evaluation.preflight import DATABASES, DOMAINS, print_report, run_preflight
+from evaluation.reporting.research_report import generate_research_report
+from evaluation.runners.contracts import RunnerConfig, RunnerContext
+from evaluation.runners.investigation_reader import InvestigationPersistenceReader
+from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
+from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
+from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
+from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
+from evaluation.runners.store import SQLAlchemyExecutionStore
+from evaluation.validators.store import DeterministicValidationService
+from legacydb_copilot.config import Settings
+from legacydb_copilot.db.session import create_session_factory
+
 
 def _load_local_evaluation_env() -> None:
     path = Path(os.getenv("EVAL_ENV_FILE", ".env.evaluation"))
@@ -20,22 +37,6 @@ def _load_local_evaluation_env() -> None:
 
 _load_local_evaluation_env()
 
-from evaluation.framework.scenario_loader import load_scenarios
-from evaluation.judges.ai_judge import AIJudge, JudgeConfig
-from evaluation.judges.openai_client import OpenAIJudgeClient
-from evaluation.judges.store import AIJudgeService
-from evaluation.runners.contracts import RunnerConfig, RunnerContext
-from evaluation.runners.investigation_reader import InvestigationPersistenceReader
-from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
-from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
-from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
-from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
-from evaluation.runners.store import SQLAlchemyExecutionStore
-from evaluation.preflight import DATABASES, DOMAINS, print_report, run_preflight
-from evaluation.reporting.research_report import generate_research_report
-from evaluation.validators.store import DeterministicValidationService
-from legacydb_copilot.config import Settings
-from legacydb_copilot.db.session import create_session_factory
 
 def all_scenarios():
     scenarios = []
@@ -119,6 +120,7 @@ def build_runner(args) -> EvaluationRunner:
         concurrency=args.concurrency,
         ai_enabled=os.getenv("AI_REASONING_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
         database_engine=os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower(),
+        orchestrator=getattr(args, "orchestrator", "legacy"),
     )
     if os.getenv("EVAL_DATABASE_ENGINE", "sql_server").lower() == "mysql":
         database = MySQLDatabaseLifecycle(
@@ -201,6 +203,21 @@ def suite_scenarios(name: str, scenarios: list) -> list:
             for domain in DOMAINS
             for item in [candidate for candidate in scenarios if candidate.domain == domain][:5]
         ]
+    if name == "official-validation-25":
+        manifest_path = Path(
+            "evaluation/validation-suites/official-validation-25.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        selected_ids = manifest.get("scenarios", [])
+        by_id = {item.scenario_id: item for item in scenarios}
+        if len(selected_ids) != 25 or len(set(selected_ids)) != 25:
+            raise SystemExit("Official validation suite must contain 25 unique scenarios")
+        missing = [scenario_id for scenario_id in selected_ids if scenario_id not in by_id]
+        if missing:
+            raise SystemExit(
+                "Official validation suite contains unknown scenarios: " + ", ".join(missing)
+            )
+        return [by_id[scenario_id] for scenario_id in selected_ids]
     if name == "full-125":
         return scenarios
     raise SystemExit(f"Unknown suite: {name}")
@@ -229,6 +246,7 @@ def execute(args) -> None:
             "api_endpoint": os.getenv("EVAL_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/") + "/chat/ask",
             "stages": ["database reset", "defect injection", "defect verification", "public investigation API", "bounded polling", "result persistence", "cleanup"],
             "judging_configured": bool(os.getenv("OPENAI_API_KEY") and os.getenv("EVAL_JUDGE_MODEL")),
+            "orchestrator": getattr(args, "orchestrator", "legacy"),
         }, indent=2))
         return
     store = build_store()
@@ -339,7 +357,8 @@ def execute(args) -> None:
         cleanup_failures = [row["scenario_id"] for row in rows if row["cleanup_status"] != "passed"]
         passed = all(result.status == "completed" for result in results) and not unexpected and not cleanup_failures and len(rows) == 5
         output = {"run_id": run_id, "run_name": args.run_name, "configuration_fingerprint": pilot_configuration_fingerprint(), "passed": passed, "cleanup_failures": cleanup_failures, "unexpected_connections": unexpected, "scenarios": rows}
-        root = Path(os.getenv("EVAL_ARTIFACT_ROOT", "research/results")); root.mkdir(parents=True, exist_ok=True)
+        root = Path(os.getenv("EVAL_ARTIFACT_ROOT", "research/results"))
+        root.mkdir(parents=True, exist_ok=True)
         (root / f"pilot-smoke-{run_id}.json").write_text(json.dumps(output, indent=2, default=str), encoding="utf-8")
         if passed:
             (root / ".pilot-smoke-passed.json").write_text(json.dumps(output, indent=2, default=str), encoding="utf-8")
@@ -385,6 +404,12 @@ def parser() -> argparse.ArgumentParser:
     common.add_argument("--poll-interval", type=float, default=float(os.getenv("EVAL_POLL_INTERVAL_SECONDS", "2")))
     common.add_argument("--api-retries", type=int, default=int(os.getenv("EVAL_API_MAX_RETRIES", "3")))
     common.add_argument("--run-name", default="pilot-v1")
+    common.add_argument(
+        "--orchestrator",
+        choices=("legacy", "langgraph"),
+        default="legacy",
+        help="Records the preconfigured API orchestration candidate used by this run.",
+    )
     commands = root.add_subparsers(dest="command", required=True)
     command = commands.add_parser("run-scenario", parents=[common])
     command.add_argument("--scenario-id", required=True)
@@ -398,7 +423,17 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("run-all", parents=[common])
     commands.add_parser("pilot-smoke", parents=[common])
     command = commands.add_parser("run", parents=[common])
-    command.add_argument("--suite", choices=("smoke-1", "smoke-5", "research-25", "full-125"), required=True)
+    command.add_argument(
+        "--suite",
+        choices=(
+            "smoke-1",
+            "smoke-5",
+            "research-25",
+            "official-validation-25",
+            "full-125",
+        ),
+        required=True,
+    )
     commands.add_parser("preflight")
     command = commands.add_parser("resume", parents=[common])
     command.add_argument("--run-id", required=True)

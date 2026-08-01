@@ -61,6 +61,7 @@ def score_confidence(
     *,
     evidence_gate=None,
     reasoning=None,
+    rejected_claim_count: int = 0,
 ) -> float:
     """
     Owner: Mukesh Dabi
@@ -122,6 +123,15 @@ def score_confidence(
         score += min(0.12, 0.04 * len(verified_claims))
     if unsupported_claims:
         score -= min(0.3, 0.1 * len(unsupported_claims))
+    if rejected_claim_count:
+        score -= min(0.3, 0.12 * rejected_claim_count)
+        if not verified_claims:
+            score = min(score, 0.4)
+    if getattr(reasoning, "response_type", "") in {
+        "insufficient_evidence",
+        "evidence_gap_summary",
+    }:
+        score = min(score, 0.35)
     if evidence_gate is not None:
         if getattr(evidence_gate, "required", False) and not getattr(
             evidence_gate, "reproduced", False
@@ -129,6 +139,10 @@ def score_confidence(
             score = min(score, 0.35)
         if getattr(evidence_gate, "evidence_gaps", None):
             score -= min(0.15, 0.04 * len(evidence_gate.evidence_gaps))
+        if getattr(evidence_gate, "required", False) and getattr(
+            evidence_gate, "reproduced", False
+        ) and not verified_claims:
+            score = min(score, 0.4)
     return round(max(0.1, min(score, 0.95)), 2)
 
 
@@ -140,6 +154,7 @@ def confidence_factors(
     *,
     evidence_gate=None,
     reasoning=None,
+    rejected_claim_count: int = 0,
 ) -> list[str]:
     """
     Owner: Mukesh Dabi
@@ -231,6 +246,15 @@ def confidence_factors(
         )
     if unsupported_claims:
         factors.append(f"- {len(unsupported_claims)} root-cause claim(s) were not fully verified.")
+    if rejected_claim_count:
+        factors.append(
+            f"- {rejected_claim_count} generated causal claim(s) failed verification."
+        )
+    if getattr(reasoning, "response_type", "") in {
+        "insufficient_evidence",
+        "evidence_gap_summary",
+    }:
+        factors.append("- Confidence is capped by the insufficient-evidence outcome.")
     if (
         evidence_gate is not None
         and getattr(evidence_gate, "required", False)

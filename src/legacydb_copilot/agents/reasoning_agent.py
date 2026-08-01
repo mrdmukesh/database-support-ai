@@ -149,6 +149,34 @@ class ReasoningResult:
         object.__setattr__(self, "likely_root_causes", claims)
 
 
+def finalize_evidence_backed_response_type(
+    reasoning: ReasoningResult,
+    *,
+    reproduced: bool,
+    evidence_required: bool,
+    rejected_claim_count: int = 0,
+    unresolved_contradiction_count: int = 0,
+    execution_failure_count: int = 0,
+) -> ReasoningResult:
+    """Derive the public response type from verified terminal evidence signals."""
+    verified_claims = [
+        claim
+        for claim in reasoning.likely_root_causes
+        if claim.status is RootCauseSupportStatus.VERIFIED
+    ]
+    if unresolved_contradiction_count or execution_failure_count:
+        response_type = "insufficient_evidence"
+    elif reproduced and verified_claims:
+        response_type = "confirmed_root_cause"
+    elif reproduced and (evidence_required or rejected_claim_count):
+        response_type = "insufficient_evidence"
+    elif evidence_required and not reproduced:
+        response_type = "evidence_summary_not_reproduced"
+    else:
+        return reasoning
+    return replace(reasoning, response_type=response_type)
+
+
 def _rows_for_purpose(evidence: list[EvidenceResult], purpose: str) -> list[dict]:
     """
     Owner: Mukesh Dabi
@@ -213,6 +241,45 @@ def _supports_failed_downstream_generation(item: EvidenceResult) -> bool:
     )
 
 
+def _diagnostic_causal_finding(
+    question: str,
+    evidence: list[EvidenceResult],
+) -> tuple[str, list[str]] | None:
+    """Build a cited causal finding from explicit operational failure details."""
+    causal_request = any(
+        term in question.casefold()
+        for term in ("why", "root cause", "caused", "failed", "failure", "retry")
+    )
+    if not causal_request:
+        return None
+    detail_markers = ("error", "message", "reason", "detail", "description", "status")
+    findings: list[str] = []
+    refs: list[str] = []
+    for item in evidence:
+        if not _supports_failed_downstream_generation(item):
+            continue
+        row_findings: list[str] = []
+        for row in item.rows:
+            details = [
+                f"{column}={value}"
+                for column, value in row.items()
+                if value not in (None, "")
+                and any(marker in str(column).casefold() for marker in detail_markers)
+            ]
+            if details:
+                row_findings.append(", ".join(details))
+        if row_findings:
+            findings.extend(row_findings[:2])
+            refs.append(item.evidence_id)
+    if not findings:
+        return None
+    return (
+        "Operational diagnostic evidence identifies the failed workflow condition: "
+        + "; ".join(dict.fromkeys(findings)),
+        list(dict.fromkeys(refs)),
+    )
+
+
 def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:
     """
     Owner: Mukesh Dabi
@@ -267,6 +334,34 @@ def _verified_null_fields(
     }
 
 
+def _causally_relevant_null_fields(
+    question: str,
+    null_fields: dict[str, list[str]],
+) -> dict[str, list[str]]:
+    """Limit NULL-driven conclusions to fields implicated by the request."""
+    normalized_question = re.sub(r"[^a-z0-9]+", "", question.casefold())
+    explicit_null_request = any(
+        marker in question.casefold()
+        for marker in (" null", "missing value", "not populated", "not set")
+    )
+    calculation_aliases = {
+        "age": {"birthdate", "dateofbirth", "dob"},
+    }
+    requested_aliases = {
+        alias
+        for request_term, aliases in calculation_aliases.items()
+        if request_term in question.casefold()
+        for alias in aliases
+    }
+    return {
+        column: refs
+        for column, refs in null_fields.items()
+        if explicit_null_request
+        or re.sub(r"[^a-z0-9]+", "", column.casefold()) in normalized_question
+        or re.sub(r"[^a-z0-9]+", "", column.casefold()) in requested_aliases
+    }
+
+
 def reason_about_evidence(
     question: str,
     intent: IntentResult,
@@ -304,6 +399,7 @@ def reason_about_evidence(
     diagnostic_evidence = [
         item for item in non_empty if _supports_failed_downstream_generation(item)
     ]
+    diagnostic_cause = _diagnostic_causal_finding(question, evidence)
     response_type = "multiple_possible_causes"
     supporting = [f"{item.evidence_type} - {item.subject}: {item.finding}" for item in correlated_evidence if item.confidence in {"High", "Medium"}]
     if not supporting:
@@ -312,6 +408,7 @@ def reason_about_evidence(
     root_causes: list[str] = []
     root_cause_refs: dict[str, list[str]] = {}
     verified_nulls = _verified_null_fields(evidence)
+    causal_nulls = _causally_relevant_null_fields(question, verified_nulls)
     null_findings = [
         f"{column} is verified as NULL. Evidence: {', '.join(refs)}."
         for column, refs in verified_nulls.items()
@@ -333,8 +430,13 @@ def reason_about_evidence(
         "duplicate" in item.purpose.lower() or (item.rows and "duplicate" in item.sql.lower())
         for item in evidence
     )
-    if verified_nulls:
+    if causal_nulls:
         response_type = "inconclusive_verified_null"
+    elif diagnostic_cause:
+        response_type = "confirmed_root_cause"
+        conclusion, refs = diagnostic_cause
+        root_causes.append(conclusion)
+        root_cause_refs[conclusion] = refs
     elif duplicate_like:
         if evidence_focus and evidence_focus.confirmed_facts:
             duplicate_facts = [fact for fact in evidence_focus.confirmed_facts if " has " in fact and evidence_focus.affected_object in fact]
@@ -445,10 +547,10 @@ def reason_about_evidence(
                 "change approval, rollback planning, and duplicate checks."
             ),
         ]
-    if verified_nulls:
-        field_list = ", ".join(verified_nulls)
+    if causal_nulls:
+        field_list = ", ".join(causal_nulls)
         ref_text = ", ".join(
-            dict.fromkeys(ref for refs in verified_nulls.values() for ref in refs)
+            dict.fromkeys(ref for refs in causal_nulls.values() for ref in refs)
         )
         fix = [
             (
@@ -462,7 +564,7 @@ def reason_about_evidence(
             ),
         ]
     proof_of_fix = ["Run proof SQL after the fix; expected result depends on the failure type and should show no duplicate/missing/failed condition remains."]
-    if verified_nulls:
+    if causal_nulls:
         proof_of_fix = [
             "No fix was executed or proved. After an approved change, rerun the same "
             "read-only evidence query and the dependent calculation as separate checks."
@@ -475,7 +577,7 @@ def reason_about_evidence(
             "Verify no new relevant error-log or job-history failure rows were created after the fix, when those logs are available.",
         ]
     missing_evidence = missing or ["No obvious missing evidence from executed read-only checks."]
-    if verified_nulls:
+    if causal_nulls:
         missing_evidence = [
             "The evidence verifies the NULL value but does not establish its origin.",
             "Dependent behavior cannot be concluded unless its definition or "
@@ -496,7 +598,7 @@ def reason_about_evidence(
         f"Interpretation: the {requested_calculation} cannot be completed without its "
         "required valid input. Evidence gap: the origin of the NULL and any downstream "
         "root cause remain unproven."
-        if verified_nulls
+        if causal_nulls
         else (
             "Investigation generated dynamically from detected intent, extracted "
             "entities, ranked database objects, stored procedure analysis, retrieved "

@@ -6,13 +6,15 @@ from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
-from legacydb_copilot.agents.reasoning_agent import ReasoningResult, build_deterministic_root_cause_claim
+from legacydb_copilot.agents.reasoning_agent import (
+    ReasoningResult,
+    build_deterministic_root_cause_claim,
+)
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
-from legacydb_copilot.services.verified_evidence_service import normalize_verified_evidence
 from legacydb_copilot.services.evidence_focus_service import EvidenceFocus
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
-
+from legacydb_copilot.services.verified_evidence_service import normalize_verified_evidence
 
 UNREPRODUCED_MESSAGE = "Reported issue could not be reproduced from connected database evidence."
 
@@ -167,6 +169,30 @@ class EvidenceGateResult:
     evidence_gaps: list[str] = field(default_factory=list)
 
 
+def _question_requires_causal_evidence(question: str) -> bool:
+    """Preserve causal evidence obligations independently of display intent."""
+    normalized = question.casefold()
+    return any(
+        marker in normalized
+        for marker in (
+            "why ",
+            "investigate",
+            "root cause",
+            "failed",
+            "failure",
+            "retry",
+            "duplicate",
+            "missing",
+            "interrupted",
+            "rollback",
+            "race condition",
+            "idempot",
+            "inconsisten",
+            "delayed",
+        )
+    )
+
+
 def run_evidence_gate(
     *,
     question: str,
@@ -207,7 +233,10 @@ def run_evidence_gate(
         InvestigationIntent.PERFORMANCE_INVESTIGATION,
         InvestigationIntent.PROCESS_FLOW_BREAK,
         InvestigationIntent.FAILED_BATCH_JOB,
-    }
+    } or (
+        intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
+        and _question_requires_causal_evidence(question)
+    )
     facts: list[str] = []
     blockers: list[str] = []
     status_notes: list[str] = []

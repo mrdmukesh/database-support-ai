@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,6 +11,12 @@ from legacydb_copilot.agents.intent_agent import (
     InvestigationIntent,
 )
 from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
+from legacydb_copilot.agents.reasoning_agent import (
+    RootCauseSupportStatus,
+    finalize_evidence_backed_response_type,
+)
+from legacydb_copilot.agents.report_composer_agent import _executive_root_cause_items
+from legacydb_copilot.services.confidence_scoring_service import score_confidence
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
 from legacydb_copilot.services.read_only_procedure_execution_service import (
@@ -246,8 +253,91 @@ def test_null_result_drives_expected_behavior_classification() -> None:
     assert verified is not None
     reasoning = expected_null_behavior_reasoning(*verified)
 
-    assert reasoning.response_type == "expected_source_data_not_reproduced"
+    assert reasoning.response_type == "confirmed_root_cause"
     assert "no stored-procedure defect was reproduced" in reasoning.summary.casefold()
-    assert "expected from the source data" in reasoning.likely_root_causes[0].conclusion
+    assert reasoning.likely_root_causes[0].conclusion == (
+        "Employee.DateOfBirth is NULL, so age cannot be calculated."
+    )
     assert reasoning.proof_of_fix == []
     assert all("direct database update" in item for item in reasoning.recommended_fix)
+
+
+def test_verified_null_date_of_birth_is_a_confirmed_deterministic_root_cause() -> None:
+    existence = EvidenceResult(
+        "Resolve employee",
+        "SELECT EmployeeNumber FROM dbo.Employee WHERE EmployeeNumber = :employee",
+        [{"EmployeeNumber": "EMP-1001"}],
+        evidence_id="SQL-1",
+        evidence_semantics="positive_rows",
+        evidence_relevance="relevant",
+        supports_claim="Employee exists.",
+    )
+    date_of_birth = EvidenceResult(
+        "Verify Employee.DateOfBirth",
+        "SELECT DateOfBirth FROM dbo.Employee WHERE EmployeeNumber = :employee",
+        [{"EmployeeNumber": "EMP-1001", "DateOfBirth": None}],
+        evidence_id="SQL-2",
+        evidence_semantics="null_value",
+        evidence_relevance="relevant",
+        supports_claim="Employee.DateOfBirth is NULL.",
+    )
+    execution = EvidenceResult(
+        "Execute dbo.usp_GetEmployeeAge",
+        "EXEC dbo.usp_GetEmployeeAge @EmployeeId = :employee_id",
+        [{"EmployeeNumber": "EMP-1001", "DateOfBirth": None, "Age": None}],
+        evidence_id="PROC-1",
+        evidence_semantics="procedure_execution",
+        evidence_relevance="relevant",
+        supports_claim="Age is NULL when DateOfBirth is NULL.",
+        scan_policy_decision={"procedure": "dbo.usp_GetEmployeeAge"},
+    )
+    evidence = [existence, date_of_birth, execution]
+
+    verified = verified_expected_null_behavior(evidence, [analysis()])
+    assert verified is not None
+    reasoning = expected_null_behavior_reasoning(*verified, evidence)
+    finalized = finalize_evidence_backed_response_type(
+        reasoning,
+        reproduced=False,
+        evidence_required=True,
+    )
+    claim = finalized.likely_root_causes[0]
+    gate = SimpleNamespace(required=True, reproduced=False, evidence_gaps=[])
+    confidence = score_confidence(
+        MetadataSearchResult([], [], [], "test"),
+        evidence,
+        [],
+        evidence_gate=gate,
+        reasoning=finalized,
+    )
+    bundle = SimpleNamespace(
+        reasoning=finalized,
+        root_cause_verification=None,
+        ai_debug_trace={
+            "ai_enabled": True,
+            "evidence_package_valid": True,
+            "llm_invoked": False,
+            "generated_claim_count": 0,
+            "verified_claim_count": 0,
+            "investigation_id": "INV-NULL-DOB",
+            "connection_id": "CONNECTION-1",
+            "evidence_package_hash": "hash-1",
+            "report_version": "report-1",
+        },
+        investigation_id="INV-NULL-DOB",
+        connection_id="CONNECTION-1",
+        evidence_package_hash="hash-1",
+        report_version="report-1",
+    )
+
+    assert date_of_birth.rows[0]["DateOfBirth"] is None
+    assert date_of_birth.evidence_semantics == "null_value"
+    assert finalized.response_type == "confirmed_root_cause"
+    assert claim.status is RootCauseSupportStatus.VERIFIED
+    assert claim.conclusion == "Employee.DateOfBirth is NULL, so age cannot be calculated."
+    assert claim.evidence_refs == ["SQL-1", "SQL-2", "PROC-1"]
+    assert finalized.missing_evidence == [
+        "The evidence does not establish why Employee.DateOfBirth is NULL."
+    ]
+    assert confidence >= 0.6
+    assert _executive_root_cause_items(bundle) == [claim]

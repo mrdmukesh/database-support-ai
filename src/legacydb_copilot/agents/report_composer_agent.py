@@ -1218,11 +1218,10 @@ def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]
         or str(trace.get("report_version") or "") != getattr(bundle, "report_version", "")
     ):
         return ["Root cause not established from verified evidence."]
-    if ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0):
-        return ["Root cause not established from verified evidence."]
-
     if claims:
         return claims[:3]
+    if ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0):
+        return ["Root cause not established from verified evidence."]
     hypotheses = [
         f"{item.hypothesis_id} ({int(item.confidence * 100)}%): {item.description} - {item.reason}"
         for item in bundle.hypothesis_reasoning.ranked_root_causes

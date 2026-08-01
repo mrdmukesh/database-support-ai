@@ -196,16 +196,33 @@ def verified_expected_null_behavior(
 def expected_null_behavior_reasoning(
     execution: EvidenceResult,
     analysis: ProcedureAnalysis,
+    evidence: list[EvidenceResult] | None = None,
 ) -> ReasoningResult:
-    conclusion = (
-        "EMP-1001 has a NULL DateOfBirth, so age cannot be calculated and "
-        f"{analysis.name} returning NULL Age is expected from the source data. "
-        "No stored-procedure defect was reproduced."
+    conclusion = "Employee.DateOfBirth is NULL, so age cannot be calculated."
+    evidence_records = evidence or [execution]
+    evidence_refs = list(
+        dict.fromkeys(
+            item.evidence_id
+            for item in evidence_records
+            if item.execution_status == "succeeded"
+            and not item.error
+            and item.evidence_relevance != "irrelevant"
+            and any(
+                str(row.get("EmployeeNumber") or row.get("BusinessKey") or "").casefold()
+                == "emp-1001"
+                and (
+                    "DateOfBirth" in row
+                    or "employee exists" in item.supports_claim.casefold()
+                    or item.evidence_id == execution.evidence_id
+                )
+                for row in item.rows
+            )
+        )
     )
     claim = build_deterministic_root_cause_claim(
         conclusion,
-        [execution.evidence_id],
-        [execution],
+        evidence_refs,
+        evidence_records,
     )
     return ReasoningResult(
         summary=(
@@ -219,7 +236,9 @@ def expected_null_behavior_reasoning(
             f"{analysis.name} explicitly returns NULL Age when DateOfBirth is NULL.",
             f"{execution.evidence_id} persisted EMP-1001, DateOfBirth = NULL, Age = NULL.",
         ],
-        missing_evidence=["No separate verified evidence proves a stored-procedure defect."],
+        missing_evidence=[
+            "The evidence does not establish why Employee.DateOfBirth is NULL."
+        ],
         recommended_fix=[
             "Populate or correct DateOfBirth only through an authorized source-data process; "
             "do not perform a direct database update from this investigation."
@@ -231,7 +250,7 @@ def expected_null_behavior_reasoning(
         confirmed_facts=[conclusion],
         inferred_findings=[],
         hypotheses=[],
-        response_type="expected_source_data_not_reproduced",
+        response_type="confirmed_root_cause",
     )
 
 

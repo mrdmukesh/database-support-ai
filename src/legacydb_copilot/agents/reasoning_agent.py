@@ -166,7 +166,9 @@ def finalize_evidence_backed_response_type(
     ]
     if unresolved_contradiction_count or execution_failure_count:
         response_type = "insufficient_evidence"
-    elif reproduced and verified_claims:
+    elif verified_claims and (
+        reasoning.response_type == "confirmed_root_cause" or reproduced
+    ):
         response_type = "confirmed_root_cause"
     elif reproduced and (evidence_required or rejected_claim_count):
         response_type = "insufficient_evidence"

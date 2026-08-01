@@ -132,10 +132,14 @@ def score_confidence(
         "evidence_gap_summary",
     }:
         score = min(score, 0.35)
+    verified_deterministic_cause = (
+        getattr(reasoning, "response_type", "") == "confirmed_root_cause"
+        and bool(verified_claims)
+    )
     if evidence_gate is not None:
         if getattr(evidence_gate, "required", False) and not getattr(
             evidence_gate, "reproduced", False
-        ):
+        ) and not verified_deterministic_cause:
             score = min(score, 0.35)
         if getattr(evidence_gate, "evidence_gaps", None):
             score -= min(0.15, 0.04 * len(evidence_gate.evidence_gaps))
@@ -143,6 +147,8 @@ def score_confidence(
             evidence_gate, "reproduced", False
         ) and not verified_claims:
             score = min(score, 0.4)
+    if verified_deterministic_cause and not error_results:
+        score = max(score, 0.6)
     return round(max(0.1, min(score, 0.95)), 2)
 
 
@@ -259,6 +265,10 @@ def confidence_factors(
         evidence_gate is not None
         and getattr(evidence_gate, "required", False)
         and not getattr(evidence_gate, "reproduced", False)
+        and not (
+            getattr(reasoning, "response_type", "") == "confirmed_root_cause"
+            and bool(verified_claims)
+        )
     ):
         factors.append("- Confidence is capped because the reported condition was not reproduced.")
     for gap in getattr(evidence_gate, "evidence_gaps", ()) if evidence_gate is not None else ():

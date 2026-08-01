@@ -2316,6 +2316,7 @@ def _run_dynamic_investigation(
         reasoning = expected_null_behavior_reasoning(
             execution_evidence,
             expected_procedure,
+            evidence,
         )
     elif reasoning_dispatch.mode == ReasoningMode.NORMAL_ROOT_CAUSE:
         reasoning = reason_about_evidence(
@@ -2549,7 +2550,18 @@ def _run_dynamic_investigation(
     if planning_warning:
         confidence = min(confidence, 0.35)
         confidence_notes.append(f"- {planning_warning}")
-    if evidence_gate.required and not evidence_gate.reproduced:
+    verified_deterministic_cause = (
+        reasoning.response_type == "confirmed_root_cause"
+        and any(
+            claim.status is RootCauseSupportStatus.VERIFIED
+            for claim in reasoning.likely_root_causes
+        )
+    )
+    if (
+        evidence_gate.required
+        and not evidence_gate.reproduced
+        and not verified_deterministic_cause
+    ):
         confidence = min(confidence, 0.35)
         confidence_notes.extend(f"- Evidence gate blocked root-cause analysis: {item}" for item in evidence_gate.blocking_reasons)
     verification_checks = []

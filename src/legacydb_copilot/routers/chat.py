@@ -626,8 +626,16 @@ def _evidence_to_json(evidence) -> str:
                 "zero_row_result": item.zero_row_result,
                 "evidence_semantics": item.evidence_semantics,
                 "supports_claim": item.supports_claim,
+                "evidence_relevance": item.evidence_relevance,
                 "scan_policy_decision": item.scan_policy_decision,
+                # Keep the complete bounded result as the canonical persisted
+                # evidence.  sample_rows remains for backwards-compatible
+                # readers and compact evaluation displays.
+                "rows": item.rows,
                 "sample_rows": item.rows[:10],
+                "rows_truncated": False,
+                "original_sql": item.original_sql,
+                "safety_note": item.safety_note,
                 "error": getattr(item, "error", None),
             }
             for item in evidence
@@ -2464,8 +2472,22 @@ def _run_dynamic_investigation(
         reasoning=reasoning,
         correlated_evidence=correlated_evidence,
     )
-    confidence = score_confidence(ranking.metadata, evidence, context.documents, evidence_focus)
-    confidence_notes = confidence_factors(ranking.metadata, evidence, context.documents, evidence_focus)
+    confidence = score_confidence(
+        ranking.metadata,
+        evidence,
+        context.documents,
+        evidence_focus,
+        evidence_gate=evidence_gate,
+        reasoning=reasoning,
+    )
+    confidence_notes = confidence_factors(
+        ranking.metadata,
+        evidence,
+        context.documents,
+        evidence_focus,
+        evidence_gate=evidence_gate,
+        reasoning=reasoning,
+    )
     if planning_warning:
         confidence = min(confidence, 0.35)
         confidence_notes.append(f"- {planning_warning}")
@@ -2549,7 +2571,7 @@ def _run_dynamic_investigation(
         hypothesis_reasoning=hypothesis_reasoning,
     )
     ranked_text = "\n".join(f"- {item.object_type}: {item.name} ({item.score}) - {item.reason}" for item in ranking.objects[:8]) or "- No ranked objects"
-    correlated_text = "\n".join(f"- {item.evidence_type} {item.subject}: {item.finding}" for item in correlated_evidence[:8]) or "- No correlated evidence"
+    correlated_text = "\n".join(f"- {item.evidence_type} {item.subject}: {item.finding}" for item in correlated_evidence) or "- No correlated evidence"
     selected_candidates = [
         item for item in ranking.metadata.candidate_trace if item.get("decision") == "selected"
     ][:10]
@@ -2679,7 +2701,7 @@ def _run_dynamic_investigation(
         "## Stage 4 - Plan Investigation\n"
         + "\n".join(
             f"- {item.purpose}: expected read-only evidence from generated SQL"
-            for item in evidence[:8]
+            for item in evidence
         )
         + "\n\n## Stage 5 - Collect Evidence\n"
         f"{correlated_text}\n\n"
@@ -2725,7 +2747,7 @@ def _run_dynamic_investigation(
         + "\n\n## Supporting Evidence\n"
         + "\n".join(f"- {item}" for item in reasoning.supporting_evidence)
         + "\n\n## Recommended Next SQL\n"
-        + "\n\n".join(_evidence_sql_block(item) for item in evidence[:5])
+        + "\n\n".join(_evidence_sql_block(item) for item in evidence)
         + "\n\n## Recommendation\n"
         + recommendation_text
         + "\n\n## Self Validation\n"

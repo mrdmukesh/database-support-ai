@@ -105,7 +105,7 @@ def _verified_report_input(
 
 def _evidence_only_summary(bundle: DynamicInvestigationBundle) -> str:
     observations: list[str] = []
-    for item in bundle.evidence[:6]:
+    for item in bundle.evidence:
         if item.execution_status != "succeeded":
             continue
         if item.zero_row_result:

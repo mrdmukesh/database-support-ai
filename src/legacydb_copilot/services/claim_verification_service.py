@@ -148,10 +148,7 @@ def parse_structured_claim(raw_claim: Any, index: int = 1) -> StructuredClaim | 
     if not isinstance(raw_claim, dict):
         return None
     statement = str(
-        raw_claim.get("statement")
-        or raw_claim.get("conclusion")
-        or raw_claim.get("finding")
-        or ""
+        raw_claim.get("statement") or raw_claim.get("conclusion") or raw_claim.get("finding") or ""
     ).strip()
     evidence_gap = raw_claim.get("evidence_gap")
     if not statement and not evidence_gap:
@@ -167,15 +164,17 @@ def parse_structured_claim(raw_claim: Any, index: int = 1) -> StructuredClaim | 
         references = []
     evidence_ids = tuple(
         dict.fromkeys(
-            normalized
-            for value in references
-            if (normalized := normalize_evidence_id(value))
+            normalized for value in references if (normalized := normalize_evidence_id(value))
         )
     )
-    claim_type = str(
-        raw_claim.get("claim_type")
-        or ("EVIDENCE_GAP" if evidence_gap and not statement else "VERIFIED_FINDING")
-    ).strip().upper()
+    claim_type = (
+        str(
+            raw_claim.get("claim_type")
+            or ("EVIDENCE_GAP" if evidence_gap and not statement else "VERIFIED_FINDING")
+        )
+        .strip()
+        .upper()
+    )
     return StructuredClaim(
         claim_id=str(raw_claim.get("claim_id") or f"CL-{index:03d}"),
         statement=statement,
@@ -238,9 +237,7 @@ def verify_claim(
         )
     prompted = [references[ref] for ref in resolved]
     truncated = tuple(
-        item.evidence_id
-        for item in prompted
-        if item.truncated or not item.included_in_prompt
+        item.evidence_id for item in prompted if item.truncated or not item.included_in_prompt
     )
     if truncated:
         return ClaimVerification(
@@ -252,8 +249,7 @@ def verify_claim(
     unverified_zero_rows = [
         item
         for item in prompted
-        if item.zero_row_result
-        and item.evidence_semantics != "verified_absence"
+        if item.zero_row_result and item.evidence_semantics != "verified_absence"
     ]
     if unverified_zero_rows:
         return ClaimVerification(
@@ -266,9 +262,13 @@ def verify_claim(
             ),
         )
     supporting = [item for item in prompted if _reference_supports_statement(claim.statement, item)]
+    # Claims are checked against the complete evidence package, not only the
+    # references selected by the claimant.  This prevents citation
+    # cherry-picking from discarding conflicting collected evidence.
     contradictory = tuple(
         item.evidence_id
-        for item in prompted
+        for item in references.values()
+        if item.included_in_prompt and not item.truncated
         if _reference_contradicts_statement(claim.statement, item)
     )
     if contradictory:
@@ -320,9 +320,7 @@ def _reference_supports_statement(statement: str, evidence: EvidenceReference) -
                     return True
                 continue
             value_text = _normalized(value)
-            column_mentioned = (
-                column_text.replace(" ", "") in normalized.replace(" ", "")
-            )
+            column_mentioned = column_text.replace(" ", "") in normalized.replace(" ", "")
             if (
                 value_text
                 and len(value_text) >= 2

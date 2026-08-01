@@ -52,6 +52,19 @@ def test_official_validation_suite_contains_release_risk_cases() -> None:
     } <= selected
 
 
+def test_cli_resolves_exact_official_validation_suite_in_manifest_order(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("EVAL_ENV_FILE", str(ROOT / "does-not-exist.env"))
+    from evaluation.cli.__main__ import all_scenarios, suite_scenarios
+
+    expected = json.loads(SUITE.read_text(encoding="utf-8"))["scenarios"]
+
+    selected = suite_scenarios("official-validation-25", all_scenarios())
+
+    assert [item.scenario_id for item in selected] == expected
+
+
 def test_shipping_duplicate_fixture_proves_two_correlated_messages() -> None:
     fixture = ROOT / "evaluation_scenarios" / "shipping" / "shipping-benchmark-005"
     injection = (fixture / "inject.sql").read_text(encoding="utf-8")

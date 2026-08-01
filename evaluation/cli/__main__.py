@@ -202,6 +202,21 @@ def suite_scenarios(name: str, scenarios: list) -> list:
             for domain in DOMAINS
             for item in [candidate for candidate in scenarios if candidate.domain == domain][:5]
         ]
+    if name == "official-validation-25":
+        manifest_path = Path(
+            "evaluation/validation-suites/official-validation-25.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        selected_ids = manifest.get("scenarios", [])
+        by_id = {item.scenario_id: item for item in scenarios}
+        if len(selected_ids) != 25 or len(set(selected_ids)) != 25:
+            raise SystemExit("Official validation suite must contain 25 unique scenarios")
+        missing = [scenario_id for scenario_id in selected_ids if scenario_id not in by_id]
+        if missing:
+            raise SystemExit(
+                "Official validation suite contains unknown scenarios: " + ", ".join(missing)
+            )
+        return [by_id[scenario_id] for scenario_id in selected_ids]
     if name == "full-125":
         return scenarios
     raise SystemExit(f"Unknown suite: {name}")
@@ -406,7 +421,17 @@ def parser() -> argparse.ArgumentParser:
     commands.add_parser("run-all", parents=[common])
     commands.add_parser("pilot-smoke", parents=[common])
     command = commands.add_parser("run", parents=[common])
-    command.add_argument("--suite", choices=("smoke-1", "smoke-5", "research-25", "full-125"), required=True)
+    command.add_argument(
+        "--suite",
+        choices=(
+            "smoke-1",
+            "smoke-5",
+            "research-25",
+            "official-validation-25",
+            "full-125",
+        ),
+        required=True,
+    )
     commands.add_parser("preflight")
     command = commands.add_parser("resume", parents=[common])
     command.add_argument("--run-id", required=True)

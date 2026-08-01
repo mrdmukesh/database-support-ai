@@ -27,19 +27,20 @@ def correlate_evidence(
     Owner: Mukesh Dabi
     Purpose:
         Handles correlate evidence within the Database Support AI application flow.
-    
+
     Input:
         Function parameters declared in the signature.
-    
+
     Output:
         Return value declared by the type hints or route response model.
-    
+
     How it is called:
         Investigation, reporting, verification, or knowledge workflows as needed.
-    
+
     Where it fits in the flow:
-        Application orchestration -> service function -> structured result for the next workflow step.
-    
+        Application orchestration -> service function -> structured result for the
+        next workflow step.
+
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
@@ -57,11 +58,39 @@ def correlate_evidence(
                     "High",
                 )
             )
+        elif (
+            item.evidence_semantics == "verified_absence" and item.evidence_relevance == "relevant"
+        ):
+            correlated.append(
+                CorrelatedEvidence(
+                    "SQL",
+                    item.purpose,
+                    "Verified absence: no matching rows returned",
+                    item.supports_claim or item.sql,
+                    "High",
+                )
+            )
         else:
-            correlated.append(CorrelatedEvidence("SQL", item.purpose, "No rows returned", item.sql, "Medium"))
+            correlated.append(
+                CorrelatedEvidence(
+                    "SQL",
+                    item.purpose,
+                    "No rows returned; absence was not verified",
+                    item.sql,
+                    "Low",
+                )
+            )
     for proc in procedure_analysis:
         if not proc.definition_available:
-            correlated.append(CorrelatedEvidence("Procedure", proc.name, "Procedure definition was not available from metadata privileges", "Metadata only", "Low"))
+            correlated.append(
+                CorrelatedEvidence(
+                    "Procedure",
+                    proc.name,
+                    "Procedure definition was not available from metadata privileges",
+                    "Metadata only",
+                    "Low",
+                )
+            )
             continue
         finding = (
             f"Reads {len(proc.tables_read)} table(s), writes {len(proc.tables_written)} table(s), "
@@ -79,7 +108,15 @@ def correlate_evidence(
         )
         correlated.append(CorrelatedEvidence("Procedure", proc.name, finding, support, "High"))
     for doc in documents[:5]:
-        correlated.append(CorrelatedEvidence("Document", doc.title, "Retrieved as supporting documentation", doc.snippet or "Document title matched question context", "Medium"))
+        correlated.append(
+            CorrelatedEvidence(
+                "Document",
+                doc.title,
+                "Retrieved as supporting documentation",
+                doc.snippet or "Document title matched question context",
+                "Medium",
+            )
+        )
     return correlated
 
 
@@ -88,19 +125,20 @@ def _sample_row(rows: list[dict[str, Any]]) -> str:
     Owner: Mukesh Dabi
     Purpose:
         Internal helper for sample row within evidence_correlation_service.py.
-    
+
     Input:
         Function parameters declared in the signature.
-    
+
     Output:
         Return value declared by the type hints or route response model.
-    
+
     How it is called:
         Internal callers in evidence_correlation_service.py.
-    
+
     Where it fits in the flow:
-        Application orchestration -> service function -> structured result for the next workflow step.
-    
+        Application orchestration -> service function -> structured result for the
+        next workflow step.
+
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """

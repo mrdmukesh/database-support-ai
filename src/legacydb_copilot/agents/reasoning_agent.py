@@ -276,8 +276,37 @@ def _diagnostic_causal_finding(
     return (
         "Operational diagnostic evidence identifies the failed workflow condition: "
         + "; ".join(dict.fromkeys(findings)),
-        list(dict.fromkeys(refs)),
+        _diagnostic_evidence_refs(evidence, refs),
     )
+
+
+def _diagnostic_evidence_refs(
+    evidence: list[EvidenceResult],
+    diagnostic_refs: list[str],
+) -> list[str]:
+    """Return the verified evidence chain for a downstream diagnostic cause."""
+    accepted_purposes = {
+        "Verify upstream entity and current transition status",
+        "Confirmed Missing Related Record Candidates",
+    }
+    diagnostic_ref_set = set(diagnostic_refs)
+    refs: list[str] = []
+    for item in evidence:
+        is_relevant_chain_item = (
+            item.purpose in accepted_purposes
+            or item.evidence_id in diagnostic_ref_set
+        )
+        if (
+            not is_relevant_chain_item
+            or item.execution_status != "succeeded"
+            or item.error
+            or not item.rows
+            or item.evidence_relevance == "irrelevant"
+        ):
+            continue
+        if item.evidence_id not in refs:
+            refs.append(item.evidence_id)
+    return refs
 
 
 def _has_explain_or_row_estimate(evidence: list[EvidenceResult]) -> bool:

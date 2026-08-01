@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import ABC
 import re
+from abc import ABC
 from typing import Any
 
 from sqlalchemy import inspect, text

@@ -6,6 +6,23 @@ import json
 import os
 from pathlib import Path
 
+from evaluation.framework.scenario_loader import load_scenarios
+from evaluation.judges.ai_judge import AIJudge, JudgeConfig
+from evaluation.judges.openai_client import OpenAIJudgeClient
+from evaluation.judges.store import AIJudgeService
+from evaluation.preflight import DATABASES, DOMAINS, print_report, run_preflight
+from evaluation.reporting.research_report import generate_research_report
+from evaluation.runners.contracts import RunnerConfig, RunnerContext
+from evaluation.runners.investigation_reader import InvestigationPersistenceReader
+from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
+from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
+from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
+from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
+from evaluation.runners.store import SQLAlchemyExecutionStore
+from evaluation.validators.store import DeterministicValidationService
+from legacydb_copilot.config import Settings
+from legacydb_copilot.db.session import create_session_factory
+
 
 def _load_local_evaluation_env() -> None:
     path = Path(os.getenv("EVAL_ENV_FILE", ".env.evaluation"))
@@ -20,22 +37,6 @@ def _load_local_evaluation_env() -> None:
 
 _load_local_evaluation_env()
 
-from evaluation.framework.scenario_loader import load_scenarios
-from evaluation.judges.ai_judge import AIJudge, JudgeConfig
-from evaluation.judges.openai_client import OpenAIJudgeClient
-from evaluation.judges.store import AIJudgeService
-from evaluation.runners.contracts import RunnerConfig, RunnerContext
-from evaluation.runners.investigation_reader import InvestigationPersistenceReader
-from evaluation.runners.mysql_database import MySQLDatabaseLifecycle
-from evaluation.runners.public_api import EvaluationServiceTokenProvider, PublicInvestigationAPI
-from evaluation.runners.runner import FAILED_STATUSES, EvaluationRunner
-from evaluation.runners.sqlcmd_database import SqlCmdDatabaseLifecycle
-from evaluation.runners.store import SQLAlchemyExecutionStore
-from evaluation.preflight import DATABASES, DOMAINS, print_report, run_preflight
-from evaluation.reporting.research_report import generate_research_report
-from evaluation.validators.store import DeterministicValidationService
-from legacydb_copilot.config import Settings
-from legacydb_copilot.db.session import create_session_factory
 
 def all_scenarios():
     scenarios = []
@@ -356,7 +357,8 @@ def execute(args) -> None:
         cleanup_failures = [row["scenario_id"] for row in rows if row["cleanup_status"] != "passed"]
         passed = all(result.status == "completed" for result in results) and not unexpected and not cleanup_failures and len(rows) == 5
         output = {"run_id": run_id, "run_name": args.run_name, "configuration_fingerprint": pilot_configuration_fingerprint(), "passed": passed, "cleanup_failures": cleanup_failures, "unexpected_connections": unexpected, "scenarios": rows}
-        root = Path(os.getenv("EVAL_ARTIFACT_ROOT", "research/results")); root.mkdir(parents=True, exist_ok=True)
+        root = Path(os.getenv("EVAL_ARTIFACT_ROOT", "research/results"))
+        root.mkdir(parents=True, exist_ok=True)
         (root / f"pilot-smoke-{run_id}.json").write_text(json.dumps(output, indent=2, default=str), encoding="utf-8")
         if passed:
             (root / ".pilot-smoke-passed.json").write_text(json.dumps(output, indent=2, default=str), encoding="utf-8")

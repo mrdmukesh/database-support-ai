@@ -324,7 +324,7 @@ def get_database_schema(
 
         return metadata.to_dict()
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/connections/{connection_id}/table/{table_name}")
@@ -349,7 +349,7 @@ def get_table_schema(
 
         return schema
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/connections/{connection_id}/query")
@@ -382,4 +382,4 @@ def execute_query(
             "results": results,
         }
     except DatabaseConnectionError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

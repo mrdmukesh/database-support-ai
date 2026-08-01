@@ -201,8 +201,8 @@ def test_ai_diagnostic_categories_do_not_weaken_validation(tmp_path):
     ]
     for trace, status, expected_category in cases:
         class Reader:
-            def read(self, *_args, **_kwargs):
-                return {"debug_trace": trace}
+            def read(self, *_args, debug_trace=trace, **_kwargs):
+                return {"debug_trace": debug_trace}
 
         app = runner(tmp_path, api=FakeAPI(detail={"id": "INV-1", "status": status, "ai_answer": "fallback"}), result_reader=Reader())
         app.config = replace(app.config, ai_enabled=True)

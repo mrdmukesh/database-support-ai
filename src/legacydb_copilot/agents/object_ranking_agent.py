@@ -7,7 +7,10 @@ from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResu
 from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent
 from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
+from legacydb_copilot.services.problem_phrase_service import (
+    parse_problem_phrase,
+    resolve_table_from_terms,
+)
 
 _NOISE_TOKENS = {
     "analyze",

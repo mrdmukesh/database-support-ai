@@ -4,20 +4,48 @@ from types import SimpleNamespace
 
 import pytest
 
+from legacydb_copilot.agents.entity_extraction_agent import extract_entities
+from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
+from legacydb_copilot.agents.intent_agent import IntentResult, InvestigationIntent, detect_intent
+from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
+from legacydb_copilot.agents.reasoning_agent import ReasoningResult, reason_about_evidence
+from legacydb_copilot.agents.report_composer_agent import (
+    _executive_root_cause_items,
+    _possible_investigation_hypothesis_section,
+    _report_completion_status,
+    compose_report,
+)
 from legacydb_copilot.ai import (
     AI_DISCLAIMER_POINTS,
     SafetyFinding,
     analyze_prompt,
     disclaimer_text,
 )
-from legacydb_copilot.agents.entity_extraction_agent import extract_entities
-from legacydb_copilot.agents.hypothesis_agent import run_hypothesis_investigation
-from legacydb_copilot.agents.intent_agent import InvestigationIntent, IntentResult, detect_intent
-from legacydb_copilot.agents.object_ranking_agent import rank_relevant_objects
-from legacydb_copilot.agents.reasoning_agent import reason_about_evidence
-from legacydb_copilot.services.evidence_execution_service import EvidenceResult, execute_evidence_plan
+from legacydb_copilot.common import DomainError, Environment
+from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import (
+    DatabaseEngine,
+    default_connector_registry,
+    validate_sql_for_execution,
+)
+from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
+from legacydb_copilot.routers.chat import (
+    _active_database_name,
+    _answer_provenance,
+    _detected_intent_with_planning_status,
+    _expand_related_id_evidence,
+    _metadata_with_active_diagnostics,
+    _terminal_ai_trace,
+)
+from legacydb_copilot.services.evidence_execution_service import (
+    EvidenceResult,
+    execute_evidence_plan,
+)
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
-from legacydb_copilot.services.evidence_gate_service import run_evidence_gate, unreproduced_reasoning
+from legacydb_copilot.services.evidence_gate_service import (
+    run_evidence_gate,
+    unreproduced_reasoning,
+)
 from legacydb_copilot.services.evidence_verification_agent import (
     adjust_confidence_with_verification,
     execute_verification_check,
@@ -28,56 +56,42 @@ from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
     classify_investigation_mode,
 )
+from legacydb_copilot.services.investigation_reports import _executive_report
 from legacydb_copilot.services.llm_reasoning_service import (
     _build_llm_payload,
     _safeguard_remediation_steps,
     enhance_reasoning_with_llm,
     llm_reasoning_enabled,
 )
-from legacydb_copilot.routers.chat import (
-    _active_database_name,
-    _answer_provenance,
-    _detected_intent_with_planning_status,
-    _expand_related_id_evidence,
-    _metadata_with_active_diagnostics,
-    _terminal_ai_trace,
+from legacydb_copilot.services.metadata_search_service import (
+    MetadataSearchContext,
+    MetadataSearchResult,
+    TableMetadata,
+    search_metadata,
 )
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
-from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, TableMetadata, search_metadata
-from legacydb_copilot.services.safe_sql_service import PlannedQuery, ProductionReadSafetyValidator, plan_safe_queries, validate_read_only_sql
 from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase
 from legacydb_copilot.services.reasoning_dispatch_service import (
     ReasoningMode,
     ReasoningPermission,
     dispatch_reasoning,
 )
-from legacydb_copilot.agents.reasoning_agent import ReasoningResult
-from legacydb_copilot.agents.report_composer_agent import (
-    _executive_root_cause_items,
-    _possible_investigation_hypothesis_section,
-    _report_completion_status,
-    compose_report,
-)
-from legacydb_copilot.config import Settings
-from legacydb_copilot.db.connector import ConnectionPool, DatabaseConnectionError
 from legacydb_copilot.services.report_generator import (
-    GeneratedReport,
     ExecutiveSummary,
+    GeneratedReport,
     InvestigationReport,
     ReportCover,
     ReportSection,
     render_html,
     report_file_stem,
 )
-from legacydb_copilot.services.investigation_reports import _executive_report
-from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
-from legacydb_copilot.common import DomainError
-from legacydb_copilot.common import Environment
-from legacydb_copilot.databases import (
-    DatabaseEngine,
-    default_connector_registry,
-    validate_sql_for_execution,
+from legacydb_copilot.services.safe_sql_service import (
+    PlannedQuery,
+    ProductionReadSafetyValidator,
+    plan_safe_queries,
+    validate_read_only_sql,
 )
+from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
 
 def _procedure(

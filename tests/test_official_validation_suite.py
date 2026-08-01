@@ -4,7 +4,6 @@ import json
 from collections import Counter
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SUITE = ROOT / "evaluation" / "validation-suites" / "official-validation-25.json"
 

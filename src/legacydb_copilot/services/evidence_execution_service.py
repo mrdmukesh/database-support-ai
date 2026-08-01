@@ -17,7 +17,6 @@ from legacydb_copilot.services.safe_sql_service import (
 from legacydb_copilot.services.scan_policy_service import ScanPolicy
 from legacydb_copilot.services.sql_dialect_service import resolve_sql_dialect, validate_sql_dialect
 
-
 _evidence_id_sequence = count(1)
 logger = logging.getLogger(__name__)
 

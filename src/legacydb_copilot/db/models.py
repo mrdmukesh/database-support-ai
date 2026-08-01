@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -335,6 +337,20 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     environment_telemetry_json: Mapped[str] = mapped_column(Text, nullable=False)
     policy_version: Mapped[str] = mapped_column(String(40), default="v1", nullable=False)
     policy_audit_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    workflow_engine: Mapped[str] = mapped_column(String(40), default="Legacy", nullable=False)
+    execution_mode: Mapped[str] = mapped_column(String(40), default="LEGACY", nullable=False)
+    graph_version: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    graph_execution_id: Mapped[str] = mapped_column(String(120), default="", nullable=False, index=True)
+    requested_model: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    effective_model: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    execution_provider: Mapped[str] = mapped_column(String(80), default="", nullable=False)
+    reasoning_effort: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    selected_by: Mapped[str] = mapped_column(String(40), default="Automatic", nullable=False)
+    execution_policy_version: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    fallback_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    fallback_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    execution_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     conversation_id: Mapped[str | None] = mapped_column(
         ForeignKey("chat_conversations.id", ondelete="SET NULL"),
         nullable=True,

@@ -6,6 +6,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime, timezone
 from enum import StrEnum
 from typing import Any, Protocol
 
@@ -65,6 +66,7 @@ class OrchestrationResult:
     durable_evidence_created: bool = False
     provider_invoked: bool = False
     failure_stage: str = ""
+    execution_metadata: Mapping[str, Any] = field(default_factory=dict)
 
 
 class InvestigationOrchestrator(Protocol):
@@ -325,6 +327,7 @@ class InvestigationOrchestratorRouter:
     def run(self, context: OrchestrationContext) -> OrchestrationResult:
         decision = select_orchestration_mode(self.settings, context)
         started = time.monotonic()
+        started_at = datetime.now(UTC)
         base_event = {
             "correlation_id": context.correlation_id,
             "mode": decision.mode.value,
@@ -332,17 +335,24 @@ class InvestigationOrchestratorRouter:
             "rollout_cohort": decision.cohort,
             "rollout_key_hash": decision.rollout_key_hash,
             "kill_switch_active": decision.kill_switch_active,
+            "execution_started_at": started_at.isoformat(),
         }
         self.telemetry.record({**base_event, "event": "selected"})
         if decision.mode is OrchestrationMode.DISABLED:
             raise DisabledInvestigationError("Investigation service is temporarily disabled.")
         if decision.mode is OrchestrationMode.LEGACY:
-            return self.legacy.run(replace(context, selected_mode=decision.mode))
+            result = self.legacy.run(replace(context, selected_mode=decision.mode))
+            return self._with_execution_metadata(
+                result, context, decision, started_at=started_at
+            )
         if self.langgraph is None:
             return self._fallback(context, "production_dependencies_unavailable", base_event)
         if decision.mode is OrchestrationMode.LANGGRAPH:
             try:
-                return self.langgraph.run(replace(context, selected_mode=decision.mode))
+                result = self.langgraph.run(replace(context, selected_mode=decision.mode))
+                return self._with_execution_metadata(
+                    result, context, decision, started_at=started_at
+                )
             except OrchestrationFailure as exc:
                 if not self._fallback_allowed(exc):
                     self.telemetry.record(
@@ -405,7 +415,42 @@ class InvestigationOrchestratorRouter:
             self.telemetry.record(
                 {**base_event, "event": "secondary_failed", "error": str(exc)}
             )
-        return graph_result if selected == "langgraph" else legacy_result
+        result = graph_result if selected == "langgraph" else legacy_result
+        return self._with_execution_metadata(
+            result, context, decision, started_at=started_at
+        )
+
+    def _with_execution_metadata(
+        self,
+        result: OrchestrationResult,
+        context: OrchestrationContext,
+        decision: RoutingDecision,
+        *,
+        started_at: datetime,
+        fallback_reason: str = "",
+    ) -> OrchestrationResult:
+        fallback_used = bool(fallback_reason)
+        source = (result.source or "legacy").casefold()
+        workflow_engine = "LangGraph" if source == "langgraph" and not fallback_used else "Legacy"
+        execution_mode = "FALLBACK" if fallback_used else decision.mode.value
+        metadata = {
+            "workflow_engine": workflow_engine,
+            "execution_mode": execution_mode,
+            "graph_version": "langgraph-v1" if workflow_engine == "LangGraph" else "",
+            "graph_execution_id": context.correlation_id,
+            "requested_model": self.settings.llm_requested_model
+            or self.settings.llm_reasoning_model,
+            "effective_model": self.settings.selected_reasoning_model,
+            "provider": self.settings.llm_provider,
+            "reasoning_effort": self.settings.llm_reasoning_effort,
+            "selected_by": "Admin" if decision.reason == "explicit_mode" else "Automatic",
+            "fallback_used": fallback_used,
+            "fallback_reason": fallback_reason,
+            "execution_started_at": started_at,
+            "execution_ended_at": datetime.now(UTC),
+            "selection_reason": decision.reason,
+        }
+        return replace(result, execution_metadata=metadata)
 
     def _fallback_allowed(self, failure: OrchestrationFailure) -> bool:
         if failure.provider_invoked and not self.settings.langgraph_fallback_on_provider_failure:
@@ -431,7 +476,26 @@ class InvestigationOrchestratorRouter:
         if not self.settings.langgraph_fallback_to_legacy:
             raise LangGraphUnavailableError("LangGraph workflow is unavailable.")
         self.telemetry.record({**base_event, "event": "fallback", "fallback_reason": reason})
-        return self.legacy.run(context)
+        result = self.legacy.run(context)
+        decision = RoutingDecision(
+            mode=OrchestrationMode.LANGGRAPH,
+            cohort=base_event.get("rollout_cohort"),
+            rollout_key_hash=str(base_event.get("rollout_key_hash") or ""),
+            reason=str(base_event.get("reason") or "explicit_mode"),
+            kill_switch_active=bool(base_event.get("kill_switch_active")),
+        )
+        raw_started = str(base_event.get("execution_started_at") or "")
+        try:
+            started_at = datetime.fromisoformat(raw_started)
+        except ValueError:
+            started_at = datetime.now(UTC)
+        return self._with_execution_metadata(
+            result,
+            context,
+            decision,
+            started_at=started_at,
+            fallback_reason=reason,
+        )
 
 
 @dataclass(frozen=True)

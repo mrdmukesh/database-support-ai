@@ -43,6 +43,25 @@ export interface InvestigationSubmitResponse {
   environment_type?: string;
   policy_name?: string;
   policy_version?: string;
+  execution_metadata?: ExecutionMetadata;
+}
+
+export interface ExecutionMetadata {
+  workflow_engine: string;
+  execution_mode: string;
+  graph_version: string;
+  graph_execution_id: string;
+  requested_model: string;
+  effective_model: string;
+  provider: string;
+  reasoning_effort: string;
+  selected_by: string;
+  policy_version: string;
+  fallback_used: boolean;
+  fallback_reason: string;
+  execution_started_at: string | null;
+  execution_ended_at: string | null;
+  badge: "LangGraph Verified" | "Legacy Workflow" | "Legacy Fallback";
 }
 
 export interface InvestigationSummary {
@@ -62,12 +81,17 @@ export interface InvestigationSummary {
   report_path: string;
   status: string;
   created_at: string;
+  workflow_engine?: string;
+  execution_mode?: string;
+  fallback_used?: boolean;
+  fallback_reason?: string;
 }
 
 /** Route-compatible detail shape; this backend route does not declare a response model. */
 export interface SavedInvestigation extends Omit<InvestigationSummary, "confidence_score"> {
   confidence_score: number;
   report: ReportLinks;
+  execution_metadata?: ExecutionMetadata;
   [key: string]: unknown;
 }
 

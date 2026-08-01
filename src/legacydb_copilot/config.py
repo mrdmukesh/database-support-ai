@@ -66,6 +66,7 @@ class Settings:
     llm_enabled: bool = False
     llm_provider: str = "openai"
     llm_model: str = "gpt-4.1-mini"
+    llm_requested_model: str = ""
     llm_reasoning_model: str = "gpt-4.1-mini"
     llm_fallback_model: str | None = "gpt-4.1-mini"
     llm_reasoning_effort: str = "medium"
@@ -188,6 +189,7 @@ class Settings:
             in {"1", "true", "yes", "on"},
             llm_provider=os.getenv("LLM_PROVIDER", "openai"),
             llm_model=selected_model,
+            llm_requested_model=requested_model,
             llm_reasoning_model=selected_model,
             llm_fallback_model=selected_fallback,
             llm_reasoning_effort=normalize_reasoning_effort(

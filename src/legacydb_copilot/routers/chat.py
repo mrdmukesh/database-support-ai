@@ -5,7 +5,7 @@ import logging
 import os
 import re
 from dataclasses import asdict, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -163,6 +163,64 @@ from legacydb_copilot.workflow.langgraph.production_facade import (
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 logger = logging.getLogger(__name__)
+
+
+def _execution_badge(metadata: dict[str, Any]) -> str:
+    if metadata.get("fallback_used"):
+        return "Legacy Fallback"
+    if str(metadata.get("workflow_engine") or "").casefold() == "langgraph":
+        return "LangGraph Verified"
+    return "Legacy Workflow"
+
+
+def _execution_metadata_section(metadata: dict[str, Any]) -> ReportSection:
+    def label(value: object, default: str = "Not recorded") -> str:
+        text = str(value or "").strip()
+        return text or default
+
+    items = [
+        f"Workflow Badge: {_execution_badge(metadata)}",
+        f"Workflow Engine: {label(metadata.get('workflow_engine'), 'Legacy')}",
+        f"Execution Mode: {label(metadata.get('execution_mode'), 'LEGACY')}",
+        f"Graph Version: {label(metadata.get('graph_version'))}",
+        f"Graph Execution ID: {label(metadata.get('graph_execution_id'))}",
+        f"Requested Model: {label(metadata.get('requested_model'))}",
+        f"Effective Model: {label(metadata.get('effective_model'))}",
+        f"Provider: {label(metadata.get('provider'))}",
+        f"Reasoning Effort: {label(metadata.get('reasoning_effort'))}",
+        f"Selected By: {label(metadata.get('selected_by'), 'Automatic')}",
+        f"Policy Version: {label(metadata.get('policy_version'))}",
+        f"Fallback Used: {'Yes' if metadata.get('fallback_used') else 'No'}",
+        f"Execution Start Time: {label(metadata.get('execution_started_at'))}",
+        f"Execution End Time: {label(metadata.get('execution_ended_at'))}",
+    ]
+    if metadata.get("fallback_used"):
+        items.append(f"Fallback Reason: {label(metadata.get('fallback_reason'))}")
+    return ReportSection(title="Execution Metadata", items=items)
+
+
+def _attach_execution_metadata_to_report(
+    investigation_metadata: dict[str, Any],
+    execution_metadata: dict[str, Any],
+) -> dict[str, str] | None:
+    raw_snapshot = investigation_metadata.get("report_snapshot") or ""
+    if not raw_snapshot:
+        return None
+    report = report_from_dict(json.loads(raw_snapshot))
+    sections = [
+        section for section in report.sections if section.title != "Execution Metadata"
+    ]
+    sections.insert(1 if sections else 0, _execution_metadata_section(execution_metadata))
+    updated_report = replace(report, sections=sections)
+    generated = generate_investigation_report_files(updated_report)
+    investigation_metadata["report_snapshot"] = json.dumps(
+        report_to_dict(updated_report), default=str
+    )
+    investigation_metadata["report_path"] = str(generated.directory)
+    investigation_metadata["report_storage"] = json.dumps(
+        report_storage_references(generated), default=str
+    )
+    return generated.links()
 
 
 def _definition_relevant_procedures(connector, procedure_names: list[str], relevance_terms: set[str]) -> list[str]:
@@ -3201,6 +3259,31 @@ def ask_chat_question(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     environment_snapshot = environment_resolution.snapshot
     conversation = _get_or_create_conversation(db, payload)
+    runtime_settings = Settings.from_env()
+    execution_started_at = datetime.now(UTC)
+    orchestration_context = OrchestrationContext(
+        environment=environment_snapshot.environment_type.value,
+        workspace_id=payload.workspace_id,
+        user_id=current_user.id,
+        question=payload.question,
+    )
+    execution_metadata: dict[str, Any] = {
+        "workflow_engine": "Legacy",
+        "execution_mode": "LEGACY",
+        "graph_version": "",
+        "graph_execution_id": orchestration_context.correlation_id,
+        "requested_model": runtime_settings.llm_requested_model
+        or runtime_settings.llm_reasoning_model,
+        "effective_model": runtime_settings.selected_reasoning_model,
+        "provider": runtime_settings.llm_provider,
+        "reasoning_effort": runtime_settings.llm_reasoning_effort,
+        "selected_by": "Automatic",
+        "policy_version": selected_policy.policy_version,
+        "fallback_used": False,
+        "fallback_reason": "",
+        "execution_started_at": execution_started_at,
+        "execution_ended_at": execution_started_at,
+    }
     report = analyze_prompt(payload.question, has_sources=True)
     if report.findings:
         answer = _build_placeholder_answer(payload.question, report.findings)
@@ -3210,12 +3293,6 @@ def ask_chat_question(
         investigation_metadata = _empty_investigation_metadata()
     else:
         try:
-            orchestration_context = OrchestrationContext(
-                environment=environment_snapshot.environment_type.value,
-                workspace_id=payload.workspace_id,
-                user_id=current_user.id,
-                question=payload.question,
-            )
             def run_production_investigation() -> tuple:
                 return _run_dynamic_investigation(
                     db,
@@ -3233,11 +3310,13 @@ def ask_chat_question(
             )
             with bind_production_investigation(run_production_investigation):
                 routed = InvestigationOrchestratorRouter(
-                    settings=Settings.from_env(),
+                    settings=runtime_settings,
                     legacy=legacy,
                     langgraph=get_production_langgraph_orchestrator(),
                 ).run(orchestration_context)
             answer, sources, confidence, report_links, investigation_metadata = routed.payload
+            execution_metadata = dict(routed.execution_metadata)
+            execution_metadata["policy_version"] = selected_policy.policy_version
         except DisabledInvestigationError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except Exception as exc:
@@ -3307,6 +3386,22 @@ def ask_chat_question(
     trace["environment_snapshot"] = environment_snapshot.to_dict()
     investigation_metadata["ai_debug_trace"] = json.dumps(trace, default=str)
     terminal_ai_trace = _terminal_ai_trace(investigation_metadata)
+    effective_model = str(
+        terminal_ai_trace.get("model")
+        or terminal_ai_trace.get("effective_model")
+        or execution_metadata.get("effective_model")
+        or ""
+    )
+    execution_metadata["effective_model"] = effective_model
+    execution_metadata["execution_ended_at"] = execution_metadata.get(
+        "execution_ended_at"
+    ) or datetime.now(UTC)
+    execution_metadata["badge"] = _execution_badge(execution_metadata)
+    updated_report_links = _attach_execution_metadata_to_report(
+        investigation_metadata, execution_metadata
+    )
+    if updated_report_links is not None:
+        report_links = updated_report_links
     llm_audit_outcome, llm_audit_reason = _llm_audit_outcome(
         investigation_status, terminal_ai_trace
     )
@@ -3325,6 +3420,20 @@ def ask_chat_question(
         environment_telemetry_json=investigation_metadata["environment_telemetry"],
         policy_version=investigation_metadata["policy_version"],
         policy_audit_json=investigation_metadata["policy_audit"],
+        workflow_engine=str(execution_metadata.get("workflow_engine") or "Legacy"),
+        execution_mode=str(execution_metadata.get("execution_mode") or "LEGACY"),
+        graph_version=str(execution_metadata.get("graph_version") or ""),
+        graph_execution_id=str(execution_metadata.get("graph_execution_id") or ""),
+        requested_model=str(execution_metadata.get("requested_model") or ""),
+        effective_model=str(execution_metadata.get("effective_model") or ""),
+        execution_provider=str(execution_metadata.get("provider") or ""),
+        reasoning_effort=str(execution_metadata.get("reasoning_effort") or ""),
+        selected_by=str(execution_metadata.get("selected_by") or "Automatic"),
+        execution_policy_version=str(execution_metadata.get("policy_version") or ""),
+        fallback_used=bool(execution_metadata.get("fallback_used")),
+        fallback_reason=str(execution_metadata.get("fallback_reason") or ""),
+        execution_started_at=execution_metadata.get("execution_started_at"),
+        execution_ended_at=execution_metadata.get("execution_ended_at"),
         conversation_id=conversation.id,
         created_by_id=current_user.id,
         user_question=payload.question,
@@ -3416,6 +3525,15 @@ def ask_chat_question(
             "environment_type": investigation.environment_type,
             "policy_name": investigation.policy_name,
             "policy_version": investigation.policy_version,
+            "execution_metadata": {
+                **execution_metadata,
+                "execution_started_at": str(
+                    execution_metadata.get("execution_started_at") or ""
+                ),
+                "execution_ended_at": str(
+                    execution_metadata.get("execution_ended_at") or ""
+                ),
+            },
         },
     )
     for check in json.loads(investigation_metadata.get("verification_checks", "[]") or "[]"):
@@ -3462,6 +3580,7 @@ def ask_chat_question(
         "policy_version": investigation.policy_version,
         "safety_profile": investigation.safety_profile,
         "environment_source": investigation.environment_source,
+        "execution_metadata": execution_metadata,
     }
 
 

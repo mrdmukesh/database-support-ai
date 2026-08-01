@@ -16,6 +16,7 @@ describe("migrated page accessibility contracts", () => {
     render(<MemoryRouter><InvestigationHistoryList investigations={[{ id:"I",organization_id:"O",workspace_id:"W",connection_id:"DB",connection_name:"Main DB",user_question:"Why?",detected_intent:"duplicate",ai_answer:"",confidence_score:0,report_path:"",status:"DEVELOPER_REVIEW",created_at:"2026" }]} /></MemoryRouter>);
     for (const header of screen.getAllByRole("columnheader")) expect(header).toHaveAttribute("scope", "col");
     expect(screen.getByText("DEVELOPER_REVIEW")).toBeVisible();
+    expect(screen.getByText("Legacy Workflow")).toBeVisible();
   });
   it("keeps verification SQL non-editable and action buttons explicitly named", () => {
     render(<VerificationCheckCard check={{ id:"C",investigation_id:"I",claim:"Check rows",purpose:"Purpose",claim_being_verified:"Claim",evidence_logic:"",expected_result_explanation:"",interpretation:"",conclusion_template:"",verification_sql:"SELECT 1",expected_result:"one",risk_level:"read",source:"SQL",status:"Pending",actual_result_summary:"",confidence_impact:"",notes:"",verified_by:"",verified_at:null }} onRun={()=>{}} onSkip={()=>{}} />);

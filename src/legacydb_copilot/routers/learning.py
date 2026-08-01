@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import json
 from datetime import timedelta
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-import json
-from pathlib import Path
 
 from legacydb_copilot.db.base import utc_now
 from legacydb_copilot.db.models import (
@@ -17,8 +17,6 @@ from legacydb_copilot.db.models import (
 )
 from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.dependencies import assert_same_organization, require_permission
-from legacydb_copilot.security.access_control import require_resource_owner_workspace, require_workspace_access
-from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.schemas import (
     FeedbackApprovalRequest,
     InvestigationFeedbackCreate,
@@ -28,11 +26,47 @@ from legacydb_copilot.schemas import (
     KnowledgeArticleRead,
     LearningDashboardRead,
 )
+from legacydb_copilot.security.access_control import (
+    require_resource_owner_workspace,
+    require_workspace_access,
+)
+from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.rag_retrieval_service import index_approved_knowledge_article
 from legacydb_copilot.services.report_generator import REPORT_HISTORY_DIR, report_file_stem
 from legacydb_copilot.services.report_snapshot_service import report_from_dict
 
 router = APIRouter(prefix="/learning", tags=["learning"])
+
+
+def _execution_metadata(investigation: InvestigationModel) -> dict[str, object]:
+    workflow_engine = investigation.workflow_engine or "Legacy"
+    fallback_used = bool(investigation.fallback_used)
+    badge = (
+        "Legacy Fallback"
+        if fallback_used
+        else "LangGraph Verified"
+        if workflow_engine.casefold() == "langgraph"
+        else "Legacy Workflow"
+    )
+    return {
+        "workflow_engine": workflow_engine,
+        "execution_mode": investigation.execution_mode or "LEGACY",
+        "graph_version": investigation.graph_version or "",
+        "graph_execution_id": investigation.graph_execution_id or "",
+        "requested_model": investigation.requested_model or "",
+        "effective_model": investigation.effective_model or "",
+        "provider": investigation.execution_provider or "",
+        "reasoning_effort": investigation.reasoning_effort or "",
+        "selected_by": investigation.selected_by or "Automatic",
+        "policy_version": investigation.execution_policy_version
+        or investigation.policy_version
+        or "",
+        "fallback_used": fallback_used,
+        "fallback_reason": investigation.fallback_reason or "",
+        "execution_started_at": investigation.execution_started_at,
+        "execution_ended_at": investigation.execution_ended_at,
+        "badge": badge,
+    }
 
 
 def _persisted_trace_fields(investigation: InvestigationModel) -> dict[str, object]:
@@ -318,6 +352,7 @@ def get_investigation(
         "report": _report_links_for_investigation(investigation),
         "trace": _persisted_trace_fields(investigation),
         "evidence_gap_analysis": _evidence_gap_analysis(investigation),
+        "execution_metadata": _execution_metadata(investigation),
     }
 
 

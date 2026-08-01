@@ -106,6 +106,8 @@ export function InvestigationResultPage() {
     const source = affectedObjects[index]?.split(":")[1]?.trim() || affectedObjects[index]?.split(" ")[0] || "Investigation evidence";
     return { id, source, finding, state: "confirmed", contribution: "Supporting" };
   });
+  const execution = result.execution_metadata;
+  const executionBadge = execution?.badge ?? (result.fallback_used ? "Legacy Fallback" : result.workflow_engine?.toLowerCase() === "langgraph" ? "LangGraph Verified" : "Legacy Workflow");
   return (
     <article className="management-page" aria-labelledby="investigation-result-title">
       <PageHeader eyebrow="Executive RCA report" title={`Investigation ${result.id || normalizedInvestigationId}`} description={result.user_question}
@@ -119,8 +121,25 @@ export function InvestigationResultPage() {
           <Link className="ui-button ui-button-secondary" to="/app/investigations">Back to investigations</Link>
         </div>} />
       <Card className="investigation-overview report-header-metadata">
-        <div className="investigation-overview-badges"><StatusBadge status={result.status} /><strong className="environment-badge">{result.environment_type ? environmentLabel(result.environment_type) : "Unresolved"}</strong><ConfidenceBadge confidence={result.confidence_score} /><RiskBadge risk={risk} /><StatusBadge status="Verification available" /></div>
+        <div className="investigation-overview-badges"><span className="ui-badge" data-tone={executionBadge === "LangGraph Verified" ? "success" : executionBadge === "Legacy Fallback" ? "warning" : undefined}>{executionBadge}</span><StatusBadge status={result.status} /><strong className="environment-badge">{result.environment_type ? environmentLabel(result.environment_type) : "Unresolved"}</strong><ConfidenceBadge confidence={result.confidence_score} /><RiskBadge risk={risk} /><StatusBadge status="Verification available" /></div>
         <dl><dt>Investigation ID</dt><dd>{result.id}</dd><dt>Workspace</dt><dd>{result.workspace_id}</dd><dt>Database</dt><dd><strong>{result.connection_name || "Unavailable"}</strong><small>{result.connection_id}</small></dd><dt>Environment</dt><dd>{result.environment_type ? environmentLabel(result.environment_type) : "Unresolved"}</dd><dt>Generated</dt><dd>{new Date(result.created_at).toLocaleString()}</dd><dt>Report version</dt><dd>1.0</dd><dt>Policy</dt><dd>{result.policy_name ?? "Unresolved"} ({result.policy_version ?? "unknown"})</dd><dt>Investigation type</dt><dd>{humanize(result.detected_intent)}</dd></dl>
+      </Card>
+      <Card className="result-card-wide" title="Execution metadata">
+        <dl className="execution-metadata-grid">
+          <dt>Workflow engine</dt><dd>{execution?.workflow_engine ?? result.workflow_engine ?? "Legacy"}</dd>
+          <dt>Execution mode</dt><dd>{execution?.execution_mode ?? result.execution_mode ?? "LEGACY"}</dd>
+          <dt>Graph version</dt><dd>{execution?.graph_version || "Not recorded"}</dd>
+          <dt>Graph execution ID</dt><dd>{execution?.graph_execution_id || "Not recorded"}</dd>
+          <dt>Requested model</dt><dd>{execution?.requested_model || "Not recorded"}</dd>
+          <dt>Effective model</dt><dd>{execution?.effective_model || "Not recorded"}</dd>
+          <dt>Provider</dt><dd>{execution?.provider || "Not recorded"}</dd>
+          <dt>Reasoning effort</dt><dd>{execution?.reasoning_effort || "Not recorded"}</dd>
+          <dt>Selected by</dt><dd>{execution?.selected_by || "Automatic"}</dd>
+          <dt>Policy version</dt><dd>{execution?.policy_version || result.policy_version || "Not recorded"}</dd>
+          <dt>Started</dt><dd>{execution?.execution_started_at ? new Date(execution.execution_started_at).toLocaleString() : "Not recorded"}</dd>
+          <dt>Ended</dt><dd>{execution?.execution_ended_at ? new Date(execution.execution_ended_at).toLocaleString() : "Not recorded"}</dd>
+          {execution?.fallback_used && <><dt>Fallback reason</dt><dd>{execution.fallback_reason || "Not recorded"}</dd></>}
+        </dl>
       </Card>
       <EnvironmentNotice environment={result.environment_type} />
       <InvestigationProgressPanel investigationId={result.id} />

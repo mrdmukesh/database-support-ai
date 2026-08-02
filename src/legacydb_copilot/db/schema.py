@@ -47,6 +47,16 @@ _INVESTIGATION_COLUMNS: dict[str, str] = {
     "execution_policy_version": "VARCHAR(40) NOT NULL DEFAULT ''",
     "fallback_used": "BOOLEAN NOT NULL DEFAULT 0",
     "fallback_reason": "TEXT NOT NULL DEFAULT ''",
+    "requested_model_mode": "VARCHAR(40) NOT NULL DEFAULT ''",
+    "requested_catalog_model_id": "VARCHAR(36) NOT NULL DEFAULT ''",
+    "effective_catalog_model_id": "VARCHAR(36) NOT NULL DEFAULT ''",
+    "model_snapshot_json": "TEXT NOT NULL DEFAULT '{}'",
+    "model_policy_decision": "VARCHAR(40) NOT NULL DEFAULT ''",
+    "model_policy_decision_reason": "TEXT NOT NULL DEFAULT ''",
+    "model_entitlement_source": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "model_selection_source": "VARCHAR(40) NOT NULL DEFAULT ''",
+    "model_selection_requested_at": "TIMESTAMP",
+    "model_selection_configuration_version": "INTEGER NOT NULL DEFAULT 0",
     "execution_started_at": "TIMESTAMP",
     "execution_ended_at": "TIMESTAMP",
 }
@@ -68,6 +78,15 @@ _VERIFICATION_COLUMNS: dict[str, str] = {
     "expected_result_explanation": "TEXT NOT NULL DEFAULT ''",
     "interpretation": "TEXT NOT NULL DEFAULT ''",
     "conclusion_template": "TEXT NOT NULL DEFAULT ''",
+    "parameters": "TEXT NOT NULL DEFAULT '{}'",
+    "parameter_types": "TEXT NOT NULL DEFAULT '{}'",
+    "evidence_id": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "entity_table": "VARCHAR(255) NOT NULL DEFAULT ''",
+    "resolved_entity_scope": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "identifier_column": "VARCHAR(255) NOT NULL DEFAULT ''",
+    "identifier_value": "TEXT",
+    "read_only": "BOOLEAN NOT NULL DEFAULT 1",
+    "actual_result": "TEXT NOT NULL DEFAULT '{}'",
 }
 
 

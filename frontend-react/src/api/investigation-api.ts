@@ -5,6 +5,7 @@ import type {
   InvestigationSubmitResponse,
   InvestigationSummary,
   InvestigationProgress,
+  AvailableModelsResponse,
   SavedInvestigation,
 } from "../models/investigation";
 import { ApiClientError, apiRequest } from "./client";
@@ -13,6 +14,23 @@ export interface InvestigationScope {
   organizationId: string;
   workspaceId: string;
   userId: string;
+}
+
+export async function loadAvailableModels(
+  workspaceId: string,
+  environment: string,
+  signal?: AbortSignal,
+): Promise<AvailableModelsResponse> {
+  const query = new URLSearchParams({ workspace_id: workspaceId, environment });
+  return (
+    (await apiRequest<AvailableModelsResponse>(`/models/available?${query}`, { signal })) ?? {
+      selection_enabled: false,
+      automatic_enabled: false,
+      default_value: "",
+      policy_version: "0",
+      options: [],
+    }
+  );
 }
 
 function conversationQuery(scope: InvestigationScope): string {

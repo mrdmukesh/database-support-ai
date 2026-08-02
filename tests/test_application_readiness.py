@@ -65,7 +65,7 @@ def test_enabled_langgraph_requires_registered_composition():
 
 def test_invalid_model_configuration_fails_readiness():
     snapshot = application_readiness(
-        settings(llm_reasoning_model="unsupported-model"),
+        settings(llm_reasoning_model="invalid model identifier"),
         langgraph_available=False,
         database_probe=lambda _url: ("0021", "0021"),
     )

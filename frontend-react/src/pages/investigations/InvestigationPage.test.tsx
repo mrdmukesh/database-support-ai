@@ -9,6 +9,7 @@ import { InvestigationPage } from "./InvestigationPage";
 const listWorkspaces = vi.fn();
 const listConnections = vi.fn();
 const submitInvestigation = vi.fn();
+const loadAvailableModels = vi.fn();
 
 vi.mock("../../api/workspace-api", () => ({
   listWorkspaces: (...args: unknown[]) => listWorkspaces(...args),
@@ -18,13 +19,14 @@ vi.mock("../../api/connection-api", () => ({
 }));
 vi.mock("../../api/investigation-api", () => ({
   submitInvestigation: (...args: unknown[]) => submitInvestigation(...args),
+  loadAvailableModels: (...args: unknown[]) => loadAvailableModels(...args),
 }));
 
 const workspaces = [
   { id: "workspace-1", organization_id: "org-1", name: "Finance", slug: "finance", is_active: true },
 ];
 const connections = [
-  { id: "connection-1", organization_id: "org-1", workspace_id: "workspace-1", engine: "sqlserver", name: "Finance DB", is_active: true },
+  { id: "connection-1", organization_id: "org-1", workspace_id: "workspace-1", engine: "sqlserver", name: "Finance DB", environment_type: "production" as const, max_scan_rows: 500, is_active: true },
 ];
 const baseResponse: InvestigationSubmitResponse = {
   conversation: { id: "conversation-1", organization_id: "org-1", workspace_id: "workspace-1", user_id: "user-1", title: "Question" },
@@ -67,6 +69,10 @@ describe("InvestigationPage orchestration", () => {
     listWorkspaces.mockReset().mockResolvedValue(workspaces);
     listConnections.mockReset().mockResolvedValue(connections);
     submitInvestigation.mockReset();
+    loadAvailableModels.mockReset().mockResolvedValue({
+      selection_enabled: false, automatic_enabled: false, default_value: "",
+      policy_version: "0", options: [],
+    });
   });
 
   it("loads form options through services and displays the unchanged form", async () => {

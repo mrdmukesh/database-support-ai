@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
-import { submitInvestigation } from "../../api/investigation-api";
+import { loadAvailableModels, submitInvestigation } from "../../api/investigation-api";
 import { useInvestigation } from "../../features/investigation/use-investigation";
 import { useAuth } from "../../hooks/use-auth";
 import type { DatabaseConnection } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
+import type { AvailableModelsResponse } from "../../models/investigation";
 import { Alert, Card, FormField, InvestigationProgress, PrimaryButton, Select, Textarea } from "../ui";
 import { EnvironmentNotice, environmentLabel } from "./EnvironmentNotice";
 
@@ -18,6 +19,8 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
   const investigation = useInvestigation();
   const [question, setQuestion] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [modelPolicy, setModelPolicy] = useState<AvailableModelsResponse | null>(null);
+  const [selectedModel, setSelectedModel] = useState("");
 
   const availableWorkspaces = workspaces.filter((workspace) => workspace.is_active);
   const availableConnections = connections.filter(
@@ -27,6 +30,29 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
   const selectedConnection = availableConnections.find(
     (connection) => connection.id === investigation.selectedConnectionId,
   );
+
+  useEffect(() => {
+    if (!investigation.selectedWorkspaceId || !selectedConnection) {
+      setModelPolicy(null);
+      setSelectedModel("");
+      return;
+    }
+    const controller = new AbortController();
+    loadAvailableModels(
+      investigation.selectedWorkspaceId,
+      selectedConnection.environment_type,
+      controller.signal,
+    )
+      .then((policy) => {
+        setModelPolicy(policy);
+        setSelectedModel(policy.default_value);
+      })
+      .catch(() => {
+        setModelPolicy(null);
+        setSelectedModel("");
+      });
+    return () => controller.abort();
+  }, [investigation.selectedWorkspaceId, selectedConnection]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -60,6 +86,8 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
         environment_type: selectedConnection.environment_type,
         user_id: user.id,
         question: trimmedQuestion,
+        model_selection_mode: selectedModel === "automatic" ? "automatic" : selectedModel ? "model" : null,
+        catalog_model_id: selectedModel && selectedModel !== "automatic" ? selectedModel : null,
       });
       investigation.completeSubmission(response);
     } catch (error) {
@@ -111,6 +139,32 @@ export function InvestigationForm({ workspaces, connections }: InvestigationForm
         </Select>
       </FormField>
       </div></Card>
+
+      {modelPolicy?.selection_enabled ? (
+        <Card title="Analysis model" description="Choose only from models approved by your administrator. Safety and evidence controls are identical for every option.">
+          <FormField label="Model" htmlFor="investigation-model" hint="Automatic is recommended when enabled.">
+            <Select
+              id="investigation-model"
+              aria-label="Analysis model"
+              value={selectedModel}
+              onChange={(event) => setSelectedModel(event.target.value)}
+              disabled={investigation.isLoading}
+            >
+              {modelPolicy.options.map((option) => (
+                <option key={option.value} value={option.value} disabled={option.disabled}>
+                  {option.display_name} — {option.latency_tier} speed · {option.cost_tier} cost
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          {modelPolicy.options.find((option) => option.value === selectedModel) ? (
+            <p className="model-selection-description" aria-live="polite">
+              {modelPolicy.options.find((option) => option.value === selectedModel)?.description}
+              {" "}{modelPolicy.options.find((option) => option.value === selectedModel)?.recommended_usage}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
 
       <Card title="Describe the database issue" description="Include a business identifier, observed behavior, and what you expected to happen.">
       <FormField label="Investigation question" htmlFor="investigation-question" hint="Example: Payment PAY-9001 was processed twice after retry job execution. Investigate duplicate payment creation." required>

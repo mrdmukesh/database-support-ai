@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiClientError } from "../../api/client";
-import { submitInvestigation } from "../../api/investigation-api";
+import { loadAvailableModels, submitInvestigation } from "../../api/investigation-api";
 import { InvestigationProvider } from "../../features/investigation/investigation-context";
 import type { InvestigationSubmitResponse } from "../../models/investigation";
 import { AuthContext, type AuthState } from "../../stores/auth-store";
@@ -11,9 +11,11 @@ import { InvestigationForm } from "./InvestigationForm";
 
 vi.mock("../../api/investigation-api", () => ({
   submitInvestigation: vi.fn(),
+  loadAvailableModels: vi.fn(),
 }));
 
 const mockedSubmitInvestigation = vi.mocked(submitInvestigation);
+const mockedLoadAvailableModels = vi.mocked(loadAvailableModels);
 
 const workspaces = [
   { id: "workspace-1", organization_id: "org-1", name: "Finance", slug: "finance", is_active: true },
@@ -54,7 +56,13 @@ function fillForm() {
 }
 
 describe("InvestigationForm", () => {
-  beforeEach(() => mockedSubmitInvestigation.mockReset());
+  beforeEach(() => {
+    mockedSubmitInvestigation.mockReset();
+    mockedLoadAvailableModels.mockResolvedValue({
+      selection_enabled: false, automatic_enabled: false, default_value: "",
+      policy_version: "0", options: [],
+    });
+  });
 
   it("filters connections by the selected workspace", () => {
     renderForm();
@@ -92,8 +100,29 @@ describe("InvestigationForm", () => {
       environment_type: "production",
       user_id: "user-1",
       question: "Why is payment duplicated?",
+      model_selection_mode: null,
+      catalog_model_id: null,
     }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Start Investigation" })).toBeEnabled());
+  });
+
+  it("shows only authorized models and submits the catalog identifier", async () => {
+    mockedLoadAvailableModels.mockResolvedValue({
+      selection_enabled: true, automatic_enabled: true, default_value: "automatic",
+      policy_version: "2", options: [
+        { value: "automatic", mode: "automatic", display_name: "Automatic", description: "Recommended", latency_tier: "policy", cost_tier: "policy", recommended_usage: "Default", approval_required: false, disabled: false, disabled_reason: "" },
+        { value: "fast-id", mode: "fast", display_name: "Fast", description: "Routine work", latency_tier: "low", cost_tier: "low", recommended_usage: "Routine investigations", approval_required: false, disabled: false, disabled_reason: "" },
+      ],
+    });
+    mockedSubmitInvestigation.mockResolvedValue(response);
+    renderForm();
+    fillForm();
+    expect(await screen.findByLabelText("Analysis model")).toHaveValue("automatic");
+    fireEvent.change(screen.getByLabelText("Analysis model"), { target: { value: "fast-id" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start Investigation" }));
+    await waitFor(() => expect(mockedSubmitInvestigation).toHaveBeenCalledWith(
+      expect.objectContaining({ model_selection_mode: "model", catalog_model_id: "fast-id" }),
+    ));
   });
 
   it("shows rejected API errors and restores the enabled form", async () => {

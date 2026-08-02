@@ -8,13 +8,23 @@ from types import SimpleNamespace
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
+from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.connector import DatabaseConnector
 from legacydb_copilot.db.models import DatabaseConnectionModel, WorkspaceModel
-from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.routers import chat
 from legacydb_copilot.schemas import ChatAskRequest
-
+from legacydb_copilot.workflow.langgraph.activation import (
+    InvestigationOrchestratorRouter,
+    OrchestrationContext,
+)
+from legacydb_copilot.workflow.langgraph.composition import get_production_langgraph_orchestrator
+from legacydb_copilot.workflow.langgraph.production_facade import (
+    bind_production_investigation,
+    configure_production_langgraph,
+    reset_production_langgraph_for_tests,
+)
 
 DATA = Path(__file__).parent / "regression" / "data" / "payroll_rca_scenarios.json"
 
@@ -48,7 +58,8 @@ class ProcedureAwareSQLiteConnector:
         if name != self.procedure_name:
             raise KeyError(name)
         return """CREATE PROCEDURE calculate_subject_value AS
-SELECT CAST((julianday('now') - julianday(date_of_birth)) / 365.25 AS INTEGER) AS age
+SELECT CASE WHEN date_of_birth IS NULL THEN NULL
+ELSE CAST((julianday('now') - julianday(date_of_birth)) / 365.25 AS INTEGER) END AS age
 FROM employees WHERE employee_id = :employee_id;
 """
 
@@ -99,10 +110,35 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
             organization_id="org-e2e", workspace_id=workspace.id, connection_id=connection.id,
             user_id="regression-user", question=scenario["test_question"],
         )
-        answer, _, confidence, _, metadata = chat._run_dynamic_investigation(db, payload, "regression-user")
+        def callback():
+            return chat._run_dynamic_investigation(db, payload, "regression-user")
+        reset_production_langgraph_for_tests()
+        configure_production_langgraph(Settings.from_env())
+        try:
+            with bind_production_investigation(callback):
+                routed = InvestigationOrchestratorRouter(
+                    settings=Settings.from_env(),
+                    langgraph=get_production_langgraph_orchestrator(),
+                ).run(
+                    OrchestrationContext(
+                        environment="test",
+                        workspace_id=workspace.id,
+                        user_id="regression-user",
+                        question=payload.question,
+                    )
+                )
+        finally:
+            reset_production_langgraph_for_tests()
+        answer, _, confidence, _, metadata = routed.payload
+
+    assert routed.source == "langgraph"
+    assert routed.execution_metadata["workflow_engine"] == "LangGraph"
+    assert routed.execution_metadata["execution_mode"] == "LANGGRAPH"
+    assert routed.execution_metadata["fallback_used"] is False
 
     evidence = json.loads(metadata["evidence"])
     structured = json.loads(metadata["structured_result"])
+    trace = json.loads(metadata["ai_debug_trace"])
     claims = structured["root_cause_claims"]
     root_cause = " ".join(claim["conclusion"] for claim in claims)
     evidence_ids = {item["evidence_id"] for item in evidence}
@@ -111,10 +147,16 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
 
     assert any(row.get("employee_id") == scenario["test_employee_or_key"] for row in record_rows), evidence
     assert any(row.get("date_of_birth", object()) is None for row in record_rows)
-    assert procedure_rows and "date_of_birth" in procedure_rows[0]["definition_excerpt"].lower()
-    assert "age" in procedure_rows[0]["definition_excerpt"].lower()
+    assert len(procedure_rows) == 1
     assert "not found" not in root_cause.lower()
-    assert claims == []
+    assert trace.get("deterministic_stop_reason"), {
+        "entity_resolution": trace.get("entity_resolution"),
+        "procedures": trace.get("raw_metadata_objects", {}).get("procedures"),
+        "first_sql": (trace.get("sql_plan") or [{}])[0],
+    }
+    assert len(claims) == 1, trace
+    assert claims[0]["status"] == "VERIFIED"
+    assert claims[0]["evidence_refs"]
     null_evidence = [
         item
         for item in evidence
@@ -125,9 +167,18 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
     assert all(item["execution_status"] == "succeeded" for item in null_evidence)
     assert all(item["evidence_semantics"] == "null_value" for item in null_evidence), null_evidence
     fixes = " ".join(structured["recommended_fix"]).lower()
-    assert "prerequisite" in fixes
-    assert "no change has been executed" in fixes
+    assert "approved" in fixes
+    assert "rerun" in fixes
     assert structured["ranked_objects"][0]["name"] != "incident_knowledge_base"
+    assert structured["primary_entity"]["table"] == "employees"
+    assert len(structured["procedures"]) == 1
     assert scenario["expected_root_cause_answer"] not in answer
     assert {"employee_record", "calculation_logic"} == set(scenario["required_evidence_types"])
     assert all(claim.replace("_", " ") not in root_cause.lower() for claim in scenario["forbidden_claims"])
+    assert trace["deterministic_stop_reason"] == (
+        "DETERMINISTIC_REQUIRED_SOURCE_NULL_CONFIRMED"
+    )
+    assert trace["prevented_query_count"] > 0
+    assert trace["verified_claim_count"] == 1
+    assert trace["rejected_claim_count"] == 0
+    assert "root cause not established" not in answer.casefold()

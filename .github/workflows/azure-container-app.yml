@@ -367,6 +367,20 @@ jobs:
                   "${OPENAI_ENV_ARGS[@]}"
             fi
 
+            LATEST_READY_REVISION="$(az containerapp show \
+              --name "$AZURE_CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --query "properties.latestReadyRevisionName" \
+              --output tsv)"
+            if [ -z "$LATEST_READY_REVISION" ]; then
+              echo "::error::Container App has no ready revision after deployment."
+              exit 1
+            fi
+            az containerapp ingress traffic set \
+              --name "$AZURE_CONTAINER_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --revision-weight "$LATEST_READY_REVISION=100"
+
       - name: Show app URL
         uses: azure/cli@v2
         with:

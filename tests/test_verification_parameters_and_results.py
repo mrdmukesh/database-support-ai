@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from legacydb_copilot.services.evidence_verification_agent import (
     SuggestedVerificationCheck,
     adjust_confidence_with_verification,
@@ -8,6 +10,8 @@ from legacydb_copilot.services.evidence_verification_agent import (
     _verification_parameters,
 )
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
+from legacydb_copilot.schemas import VerificationCheckRead
+from legacydb_copilot.routers.chat import _verification_json_object
 
 
 class RecordingConnector:
@@ -88,6 +92,27 @@ def test_identifier_scope_recovers_single_missing_named_bind_without_domain_hard
     )
 
     assert _verification_parameters(sql, evidence) == {"device_key": "DEV-9"}
+
+
+def test_text_backed_json_parameters_are_deserialized_for_api_and_execution() -> None:
+    assert _verification_json_object('{"resolved_identifier":"EMP-1001"}') == {
+        "resolved_identifier": "EMP-1001"
+    }
+    check = VerificationCheckRead.model_validate(
+        SimpleNamespace(
+            id="C1", investigation_id="I1", claim="claim", purpose="purpose",
+            claim_being_verified="claim", evidence_logic="", expected_result_explanation="",
+            interpretation="", conclusion_template="", verification_sql="SELECT 1",
+            parameters='{"resolved_identifier":"EMP-1001"}',
+            parameter_types='{"resolved_identifier":"str"}', evidence_id="SQL-1",
+            entity_table="dbo.Employee", resolved_entity_scope="exact_entity",
+            identifier_column="BusinessKey", identifier_value="EMP-1001", read_only=True,
+            expected_result="Rows returned", risk_level="Read-only", source="SQL evidence",
+            status="Pending", actual_result_summary="", actual_result='{}',
+            confidence_impact="", notes="", verified_by="", verified_at=None,
+        )
+    )
+    assert check.parameters == {"resolved_identifier": "EMP-1001"}
 
 
 def test_human_approved_execution_reuses_parameters_and_preserves_typed_rows() -> None:

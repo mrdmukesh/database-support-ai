@@ -3936,6 +3936,18 @@ def _active_connector_for_investigation(db: Session, investigation: Investigatio
         raise HTTPException(status_code=400, detail=f"Verification connection failed: {exc}") from exc
 
 
+def _verification_json_object(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
 @router.get("/investigations/{investigation_id}/verification-checks", response_model=list[VerificationCheckRead])
 def list_verification_checks(
     investigation_id: str,
@@ -4011,7 +4023,7 @@ def run_verification_check(
         expected_result=check.expected_result,
         source=check.source,
         verified_by=current_user.email or current_user.full_name or current_user.id,
-        parameters=check.parameters,
+        parameters=_verification_json_object(check.parameters),
     )[0]
     check.verification_sql = sql
     check.actual_result_summary = result.actual_result_summary
@@ -4139,7 +4151,7 @@ def run_all_verification_checks(
             expected_result=check.expected_result,
             source=check.source,
             verified_by=verified_by,
-            parameters=check.parameters,
+            parameters=_verification_json_object(check.parameters),
         )[0]
         check.actual_result_summary = result.actual_result_summary
         check.actual_result = result.actual_result

@@ -10,7 +10,7 @@ export function VerificationCheckCard({ check, busy = false, onRun, onSkip }: Pr
     {check.claim && check.claim !== check.claim_being_verified ? <p>{check.claim}</p> : null}
     <div className="verification-meta"><p><strong>Purpose</strong><span>{check.purpose || "Not provided"}</span></p><p><strong>Expected result</strong><span>{check.expected_result || "Not provided"}</span></p></div>
     {check.verification_sql ? <SqlCodeBlock sql={check.verification_sql} label="Verification SQL" /> : null}
-    <VerificationResult actualResult={check.actual_result_summary} confidenceImpact={check.confidence_impact} status={check.status} notes={check.notes} />
+    <VerificationResult actualResult={check.actual_result_summary} structuredResult={check.actual_result} confidenceImpact={check.confidence_impact} status={check.status} notes={check.notes} />
     {pending ? <div className="verification-actions"><SecondaryButton disabled={busy} aria-busy={busy} onClick={() => onRun(check.id)}>{busy ? "Running…" : "Run check"}</SecondaryButton><SecondaryButton disabled={busy} onClick={() => onSkip(check.id)}>Skip</SecondaryButton></div>
       : null}
   </article>;

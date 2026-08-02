@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import inspect
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -54,6 +55,14 @@ class SuggestedVerificationCheck:
     expected_result_explanation: str = ""
     interpretation: str = ""
     conclusion_template: str = ""
+    parameters: dict[str, Any] = field(default_factory=dict)
+    parameter_types: dict[str, str] = field(default_factory=dict)
+    evidence_id: str = ""
+    entity_table: str = ""
+    resolved_entity_scope: str = ""
+    identifier_column: str = ""
+    identifier_value: Any = None
+    read_only: bool = True
 
     def __post_init__(self) -> None:
         """
@@ -120,6 +129,8 @@ class VerificationResult:
     expected_result_explanation: str = ""
     interpretation: str = ""
     conclusion_template: str = ""
+    actual_result: dict[str, Any] = field(default_factory=dict)
+    missing_parameters: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """
@@ -210,7 +221,31 @@ def suggest_verification_checks(
     if fix_check:
         checks.append(fix_check)
     checks.append(_suggest_proof_sql_is_read_only(evidence))
-    return checks
+    evidence_by_sql = {item.sql.strip(): item for item in evidence}
+    enriched: list[SuggestedVerificationCheck] = []
+    for check in checks:
+        matched = evidence_by_sql.get(check.verification_sql.strip())
+        if matched is None:
+            enriched.append(check)
+            continue
+        parameters = dict(matched.parameters)
+        enriched.append(
+            SuggestedVerificationCheck(
+                **{
+                    **check.__dict__,
+                    "parameters": parameters,
+                    "parameter_types": {
+                        name: type(value).__name__ for name, value in parameters.items()
+                    },
+                    "evidence_id": matched.evidence_id,
+                    "entity_table": matched.entity_table,
+                    "resolved_entity_scope": matched.row_scope,
+                    "identifier_column": matched.identifier_column,
+                    "identifier_value": matched.identifier_value,
+                }
+            )
+        )
+    return enriched
 
 
 def execute_verification_check(
@@ -221,6 +256,7 @@ def execute_verification_check(
     expected_result: str,
     source: str,
     verified_by: str,
+    parameters: dict[str, Any] | None = None,
 ) -> list[VerificationResult]:
     """
     Owner: Mukesh Dabi
@@ -244,20 +280,31 @@ def execute_verification_check(
         operations are rejected.
     """
 
-    rows, error = _run_verification_sql(connector, verification_sql)
-    status = _status_from_expected(expected_result, rows, error)
+    bound_parameters = dict(parameters or {})
+    required = set(re.findall(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)", verification_sql))
+    missing = tuple(sorted(name for name in required if name not in bound_parameters))
+    if missing:
+        rows, error = [], None
+        status = "VERIFICATION_PARAMETER_MISSING"
+        summary = f"Missing required verification parameter(s): {', '.join(missing)}"
+    else:
+        rows, error = _run_verification_sql(connector, verification_sql, bound_parameters)
+        status = _status_from_expected(expected_result, rows, error)
+        summary = _summary(rows, error)
     return [
         VerificationResult(
             claim=claim,
             verification_sql=verification_sql,
             expected_result=expected_result,
-            actual_result_summary=_summary(rows, error),
+            actual_result_summary=summary,
             status=status,
             confidence_impact=_impact(status),
             notes=f"Source: {source}. Executed only after human approval.",
             timestamp=datetime.now(UTC).isoformat(timespec="seconds"),
             verified_by=verified_by,
-            conclusion_template=_conclusion_for_status(status, claim, _summary(rows, error)),
+            conclusion_template=_conclusion_for_status(status, claim, summary),
+            actual_result=_structured_result(rows),
+            missing_parameters=missing,
         )
     ]
 
@@ -1214,7 +1261,9 @@ def _conclusion_for_status(status: str, claim: str, summary: str) -> str:
     return f"Not enough evidence because the approved read-only check could not fully evaluate the claim: {claim}. Result summary: {summary}"
 
 
-def _run_verification_sql(connector, sql: str) -> tuple[list[dict[str, Any]], str | None]:
+def _run_verification_sql(
+    connector, sql: str, parameters: dict[str, Any] | None = None
+) -> tuple[list[dict[str, Any]], str | None]:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -1237,7 +1286,10 @@ def _run_verification_sql(connector, sql: str) -> tuple[list[dict[str, Any]], st
     """
     try:
         validate_read_only_sql(sql)
-        return connector.execute_read_only_query(sql, limit=25), None
+        execute = connector.execute_read_only_query
+        if "parameters" in inspect.signature(execute).parameters:
+            return execute(sql, limit=25, parameters=parameters or {}), None
+        return execute(sql, limit=25), None
     except Exception as exc:
         return [], str(exc)
 
@@ -1304,7 +1356,7 @@ def _status_from_expected(expected_result: str, rows: list[dict[str, Any]], erro
     if "status/state" in expected_l and rows:
         return "Verified" if _rows_have_status_values(rows) else "Partially Verified"
     if "rows returned" in expected_l:
-        return "Verified" if rows else "Not Verified"
+        return "Verified" if rows else "Not Enough Evidence"
     return "Verified" if rows else "Not Enough Evidence"
 
 
@@ -1333,8 +1385,16 @@ def _summary(rows: list[dict[str, Any]], error: str | None) -> str:
         return f"Verification query failed: {error}"
     if not rows:
         return "No rows returned."
-    preview = rows[0]
-    return f"{len(rows)} row(s) returned; first row: {preview}"
+    rendered = "; ".join(
+        f"{column} = {'NULL' if value is None else value}"
+        for column, value in rows[0].items()
+    )
+    return f"{rendered}. ({len(rows)} row(s) returned)"
+
+
+def _structured_result(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    columns = list(rows[0].keys()) if rows else []
+    return {"columns": columns, "rows": rows, "row_count": len(rows)}
 
 
 def _impact(status: str) -> str:
@@ -1359,7 +1419,7 @@ def _impact(status: str) -> str:
         Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
     """
     return {
-        "Verified": "Increases confidence",
+        "Verified": "No confidence cap. Verification supports the RCA.",
         "Partially Verified": "Slightly limits confidence",
         "Not Verified": "Decreases confidence",
         "Not Enough Evidence": "Caps confidence until more evidence is available",

@@ -68,6 +68,15 @@ _VERIFICATION_COLUMNS: dict[str, str] = {
     "expected_result_explanation": "TEXT NOT NULL DEFAULT ''",
     "interpretation": "TEXT NOT NULL DEFAULT ''",
     "conclusion_template": "TEXT NOT NULL DEFAULT ''",
+    "parameters": "TEXT NOT NULL DEFAULT '{}'",
+    "parameter_types": "TEXT NOT NULL DEFAULT '{}'",
+    "evidence_id": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "entity_table": "VARCHAR(255) NOT NULL DEFAULT ''",
+    "resolved_entity_scope": "VARCHAR(120) NOT NULL DEFAULT ''",
+    "identifier_column": "VARCHAR(255) NOT NULL DEFAULT ''",
+    "identifier_value": "TEXT",
+    "read_only": "BOOLEAN NOT NULL DEFAULT 1",
+    "actual_result": "TEXT NOT NULL DEFAULT '{}'",
 }
 
 

@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -709,11 +710,20 @@ class VerificationCheckModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     interpretation: Mapped[str] = mapped_column(Text, default="", nullable=False)
     conclusion_template: Mapped[str] = mapped_column(Text, default="", nullable=False)
     verification_sql: Mapped[str] = mapped_column(Text, nullable=False)
+    parameters: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    parameter_types: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    evidence_id: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    entity_table: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    resolved_entity_scope: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    identifier_column: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    identifier_value: Mapped[object | None] = mapped_column(JSON)
+    read_only: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     expected_result: Mapped[str] = mapped_column(Text, default="", nullable=False)
     risk_level: Mapped[str] = mapped_column(String(60), default="Read-only", nullable=False)
     source: Mapped[str] = mapped_column(String(80), default="SQL evidence", nullable=False)
     status: Mapped[str] = mapped_column(String(60), default="Pending", nullable=False, index=True)
     actual_result_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    actual_result: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     confidence_impact: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     notes: Mapped[str] = mapped_column(Text, default="", nullable=False)
     verified_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)

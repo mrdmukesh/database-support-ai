@@ -3542,6 +3542,14 @@ def ask_chat_question(
                 interpretation=check.get("interpretation", ""),
                 conclusion_template=check.get("conclusion_template", ""),
                 verification_sql=check.get("verification_sql", ""),
+                parameters=check.get("parameters", {}),
+                parameter_types=check.get("parameter_types", {}),
+                evidence_id=check.get("evidence_id", ""),
+                entity_table=check.get("entity_table", ""),
+                resolved_entity_scope=check.get("resolved_entity_scope", ""),
+                identifier_column=check.get("identifier_column", ""),
+                identifier_value=check.get("identifier_value"),
+                read_only=check.get("read_only", True),
                 expected_result=check.get("expected_result", ""),
                 risk_level=check.get("risk_level", "Read-only"),
                 source=check.get("source", ""),
@@ -3728,9 +3736,11 @@ def run_verification_check(
         expected_result=check.expected_result,
         source=check.source,
         verified_by=current_user.email or current_user.full_name or current_user.id,
+        parameters=check.parameters,
     )[0]
     check.verification_sql = sql
     check.actual_result_summary = result.actual_result_summary
+    check.actual_result = result.actual_result
     check.status = result.status
     check.confidence_impact = result.confidence_impact
     check.notes = result.notes
@@ -3854,8 +3864,10 @@ def run_all_verification_checks(
             expected_result=check.expected_result,
             source=check.source,
             verified_by=verified_by,
+            parameters=check.parameters,
         )[0]
         check.actual_result_summary = result.actual_result_summary
+        check.actual_result = result.actual_result
         check.status = result.status
         check.confidence_impact = result.confidence_impact
         check.notes = result.notes

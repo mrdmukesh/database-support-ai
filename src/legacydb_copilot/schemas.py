@@ -405,11 +405,20 @@ class VerificationCheckRead(BaseModel):
     interpretation: str = ""
     conclusion_template: str = ""
     verification_sql: str
+    parameters: dict[str, object] = {}
+    parameter_types: dict[str, str] = {}
+    evidence_id: str = ""
+    entity_table: str = ""
+    resolved_entity_scope: str = ""
+    identifier_column: str = ""
+    identifier_value: object | None = None
+    read_only: bool = True
     expected_result: str
     risk_level: str
     source: str
     status: str
     actual_result_summary: str
+    actual_result: dict[str, object] = {}
     confidence_impact: str
     notes: str
     verified_by: str

@@ -13,6 +13,7 @@ import { InvestigationHistoryPage } from "../pages/investigations/InvestigationH
 import { LearningPage } from "../pages/learning/LearningPage";
 import { UsersAccessPage } from "../pages/admin/UsersAccessPage";
 import { LLMInvocationAuditPage } from "../pages/admin/LLMInvocationAuditPage";
+import { ModelManagementPage } from "../pages/admin/ModelManagementPage";
 import { EvaluationDashboardPage } from "../pages/evaluation/EvaluationDashboardPage";
 import { EvaluationScenarioPage } from "../pages/evaluation/EvaluationScenarioPage";
 import {
@@ -40,6 +41,7 @@ export function AppRoutes() {
           <Route path="learning" element={<LearningPage />} />
           <Route path="admin/users" element={<UsersAccessPage />} />
           <Route path="admin/llm-audit" element={<LLMInvocationAuditPage />} />
+          <Route path="admin/models" element={<ModelManagementPage />} />
           <Route path="evaluation" element={<EvaluationDashboardPage />} />
           <Route path="evaluation/scenarios/:resultId" element={<EvaluationScenarioPage />} />
         </Route>

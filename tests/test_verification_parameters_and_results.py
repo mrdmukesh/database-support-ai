@@ -4,7 +4,10 @@ from legacydb_copilot.services.evidence_verification_agent import (
     SuggestedVerificationCheck,
     adjust_confidence_with_verification,
     execute_verification_check,
+    _matching_verification_evidence,
+    _verification_parameters,
 )
+from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 
 
 class RecordingConnector:
@@ -49,6 +52,42 @@ def test_suggested_verification_check_persists_named_parameter_context() -> None
     assert check.parameter_types == {"resolved_identifier": "str"}
     assert check.identifier_column == "AssetCode"
     assert check.identifier_value == "AST-2042"
+
+
+def test_normalized_sql_matches_parameter_bearing_evidence_instead_of_empty_duplicate() -> None:
+    sql = "SELECT BusinessKey, DateOfBirth FROM dbo.Employee WHERE BusinessKey = :resolved_identifier"
+    evidence = [
+        EvidenceResult("duplicate", sql, [{"BusinessKey": "wrong"}]),
+        EvidenceResult(
+            "authoritative",
+            "SELECT TOP (25) [BusinessKey], [DateOfBirth] FROM [dbo].[Employee] WHERE [BusinessKey] = :resolved_identifier",
+            [{"BusinessKey": "E1001", "DateOfBirth": None}],
+            parameters={"resolved_identifier": "E1001"},
+            entity_table="dbo.Employee",
+            identifier_column="BusinessKey",
+            identifier_value="E1001",
+        ),
+    ]
+
+    matched = _matching_verification_evidence(sql, evidence)
+
+    assert matched is evidence[1]
+    assert _verification_parameters(sql, matched) == {"resolved_identifier": "E1001"}
+
+
+def test_identifier_scope_recovers_single_missing_named_bind_without_domain_hardcoding() -> None:
+    sql = "SELECT DeviceSerial FROM inventory.Device WHERE DeviceSerial = :device_key"
+    evidence = EvidenceResult(
+        "generic scope",
+        sql,
+        [{"DeviceSerial": "DEV-9"}],
+        parameters={},
+        entity_table="inventory.Device",
+        identifier_column="DeviceSerial",
+        identifier_value="DEV-9",
+    )
+
+    assert _verification_parameters(sql, evidence) == {"device_key": "DEV-9"}
 
 
 def test_human_approved_execution_reuses_parameters_and_preserves_typed_rows() -> None:

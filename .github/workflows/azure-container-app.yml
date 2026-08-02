@@ -26,8 +26,6 @@ env:
   LLM_MAX_OUTPUT_TOKENS: "4000"
   LLM_PROVIDER_TIMEOUT_SECONDS: "60"
   OPENAI_BASE_URL: https://api.openai.com/v1
-  LANGGRAPH_DEMO_WORKSPACE_ID: ${{ vars.LANGGRAPH_DEMO_WORKSPACE_ID }}
-  LANGGRAPH_DEMO_USER_ID: ${{ vars.LANGGRAPH_DEMO_USER_ID }}
 
 jobs:
   deploy:
@@ -275,8 +273,6 @@ jobs:
               --query value \
               --output tsv 2>/dev/null || true)"
             OPENAI_SECRET_ARGS=()
-            : "${LANGGRAPH_DEMO_WORKSPACE_ID:?Configure LANGGRAPH_DEMO_WORKSPACE_ID in azure-low-cost}"
-            : "${LANGGRAPH_DEMO_USER_ID:?Configure LANGGRAPH_DEMO_USER_ID in azure-low-cost}"
             OPENAI_ENV_ARGS=(
               "AI_REASONING_ENABLED=true"
               "LLM_ENABLED=true"
@@ -289,13 +285,10 @@ jobs:
               "LLM_MODEL_ACCESS_VERIFIED=true"
               "INVESTIGATION_ORCHESTRATOR_MODE=LANGGRAPH"
               "LANGGRAPH_ENABLED=true"
-              "LANGGRAPH_ALLOWED_ENVIRONMENTS=evaluation"
-              "LANGGRAPH_ALLOWED_WORKSPACE_IDS=$LANGGRAPH_DEMO_WORKSPACE_ID"
-              "LANGGRAPH_ALLOWED_USER_IDS=$LANGGRAPH_DEMO_USER_ID"
               "LANGGRAPH_MAX_CONCURRENT_RUNS=1"
-              "LANGGRAPH_FALLBACK_TO_LEGACY=true"
+              "LANGGRAPH_FALLBACK_TO_LEGACY=false"
               "LANGGRAPH_KILL_SWITCH=false"
-              "LANGGRAPH_ROLLOUT_PERCENT=0"
+              "LANGGRAPH_ROLLOUT_PERCENT=100"
               "LANGGRAPH_SHADOW_PERCENT=0"
               "LANGGRAPH_SHADOW_LLM_ENABLED=false"
               "EVALUATION_AZURE_CONNECTION_SYNC_ENABLED=true"

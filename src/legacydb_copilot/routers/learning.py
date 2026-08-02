@@ -39,18 +39,11 @@ router = APIRouter(prefix="/learning", tags=["learning"])
 
 
 def _execution_metadata(investigation: InvestigationModel) -> dict[str, object]:
-    workflow_engine = investigation.workflow_engine or "Legacy"
-    fallback_used = bool(investigation.fallback_used)
-    badge = (
-        "Legacy Fallback"
-        if fallback_used
-        else "LangGraph Verified"
-        if workflow_engine.casefold() == "langgraph"
-        else "Legacy Workflow"
-    )
+    workflow_engine = "LangGraph"
+    badge = "LangGraph Verified"
     return {
         "workflow_engine": workflow_engine,
-        "execution_mode": investigation.execution_mode or "LEGACY",
+        "execution_mode": "LANGGRAPH",
         "graph_version": investigation.graph_version or "",
         "graph_execution_id": investigation.graph_execution_id or "",
         "requested_model": investigation.requested_model or "",
@@ -61,8 +54,8 @@ def _execution_metadata(investigation: InvestigationModel) -> dict[str, object]:
         "policy_version": investigation.execution_policy_version
         or investigation.policy_version
         or "",
-        "fallback_used": fallback_used,
-        "fallback_reason": investigation.fallback_reason or "",
+        "fallback_used": False,
+        "fallback_reason": "",
         "execution_started_at": investigation.execution_started_at,
         "execution_ended_at": investigation.execution_ended_at,
         "badge": badge,

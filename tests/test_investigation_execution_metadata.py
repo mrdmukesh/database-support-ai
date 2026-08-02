@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -48,7 +49,6 @@ def _result(source: str) -> OrchestrationResult:
 def test_langgraph_execution_metadata_is_captured_by_the_authoritative_router() -> None:
     router = InvestigationOrchestratorRouter(
         settings=_settings(),
-        legacy=CallableOrchestrator(lambda _: _result("legacy")),
         langgraph=CallableOrchestrator(lambda _: _result("langgraph")),
     )
 
@@ -62,28 +62,23 @@ def test_langgraph_execution_metadata_is_captured_by_the_authoritative_router() 
     assert metadata["effective_model"] == "gpt-5.1"
     assert metadata["provider"] == "openai"
     assert metadata["reasoning_effort"] == "high"
-    assert metadata["selected_by"] == "Admin"
+    assert metadata["selected_by"] == "Automatic"
     assert metadata["fallback_used"] is False
     assert isinstance(metadata["execution_started_at"], datetime)
     assert isinstance(metadata["execution_ended_at"], datetime)
 
 
-def test_langgraph_failure_records_legacy_fallback_and_exact_reason() -> None:
+def test_langgraph_failure_is_propagated_without_legacy_fallback() -> None:
     def fail(_: OrchestrationContext) -> OrchestrationResult:
         raise OrchestrationFailure("unavailable", stage="graph_startup")
 
     router = InvestigationOrchestratorRouter(
         settings=_settings(),
-        legacy=CallableOrchestrator(lambda _: _result("legacy")),
         langgraph=CallableOrchestrator(fail),
     )
 
-    metadata = router.run(_context()).execution_metadata
-
-    assert metadata["workflow_engine"] == "Legacy"
-    assert metadata["execution_mode"] == "FALLBACK"
-    assert metadata["fallback_used"] is True
-    assert metadata["fallback_reason"] == "graph_startup"
+    with pytest.raises(OrchestrationFailure, match="unavailable"):
+        router.run(_context())
 
 
 def test_historical_investigations_receive_backward_compatible_defaults() -> None:
@@ -107,22 +102,16 @@ def test_historical_investigations_receive_backward_compatible_defaults() -> Non
         persisted = db.scalar(select(InvestigationModel))
 
     assert persisted is not None
-    assert persisted.workflow_engine == "Legacy"
-    assert persisted.execution_mode == "LEGACY"
+    assert persisted.workflow_engine == "LangGraph"
+    assert persisted.execution_mode == "LANGGRAPH"
     assert persisted.fallback_used is False
     assert persisted.graph_version == ""
 
 
-def test_executive_report_metadata_includes_fallback_reason() -> None:
-    section = _execution_metadata_section(
-        {
-            "workflow_engine": "Legacy",
-            "execution_mode": "FALLBACK",
-            "fallback_used": True,
-            "fallback_reason": "timeout",
-        }
-    )
+def test_executive_report_metadata_defaults_to_langgraph() -> None:
+    section = _execution_metadata_section({})
 
     assert section.title == "Execution Metadata"
-    assert "Workflow Badge: Legacy Fallback" in section.items
-    assert "Fallback Reason: timeout" in section.items
+    assert "Workflow Badge: LangGraph Verified" in section.items
+    assert "Workflow Engine: LangGraph" in section.items
+    assert "Execution Mode: LANGGRAPH" in section.items

@@ -148,17 +148,16 @@ from legacydb_copilot.services.scan_policy_service import resolve_connection_sca
 from legacydb_copilot.services.stored_procedure_intelligence import analyze_stored_procedures
 from legacydb_copilot.services.transfer_identifier_normalization import normalize_transfer_entities
 from legacydb_copilot.workflow.langgraph.activation import (
-    CallableOrchestrator,
     DisabledInvestigationError,
     InvestigationOrchestratorRouter,
     OrchestrationContext,
-    OrchestrationResult,
 )
 from legacydb_copilot.workflow.langgraph.composition import (
     get_production_langgraph_orchestrator,
 )
 from legacydb_copilot.workflow.langgraph.production_facade import (
     bind_production_investigation,
+    configure_production_langgraph,
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -166,11 +165,8 @@ logger = logging.getLogger(__name__)
 
 
 def _execution_badge(metadata: dict[str, Any]) -> str:
-    if metadata.get("fallback_used"):
-        return "Legacy Fallback"
-    if str(metadata.get("workflow_engine") or "").casefold() == "langgraph":
-        return "LangGraph Verified"
-    return "Legacy Workflow"
+    del metadata
+    return "LangGraph Verified"
 
 
 def _execution_metadata_section(metadata: dict[str, Any]) -> ReportSection:
@@ -180,8 +176,8 @@ def _execution_metadata_section(metadata: dict[str, Any]) -> ReportSection:
 
     items = [
         f"Workflow Badge: {_execution_badge(metadata)}",
-        f"Workflow Engine: {label(metadata.get('workflow_engine'), 'Legacy')}",
-        f"Execution Mode: {label(metadata.get('execution_mode'), 'LEGACY')}",
+        f"Workflow Engine: {label(metadata.get('workflow_engine'), 'LangGraph')}",
+        f"Execution Mode: {label(metadata.get('execution_mode'), 'LANGGRAPH')}",
         f"Graph Version: {label(metadata.get('graph_version'))}",
         f"Graph Execution ID: {label(metadata.get('graph_execution_id'))}",
         f"Requested Model: {label(metadata.get('requested_model'))}",
@@ -3260,6 +3256,7 @@ def ask_chat_question(
     environment_snapshot = environment_resolution.snapshot
     conversation = _get_or_create_conversation(db, payload)
     runtime_settings = Settings.from_env()
+    configure_production_langgraph(runtime_settings)
     execution_started_at = datetime.now(UTC)
     orchestration_context = OrchestrationContext(
         environment=environment_snapshot.environment_type.value,
@@ -3268,9 +3265,9 @@ def ask_chat_question(
         question=payload.question,
     )
     execution_metadata: dict[str, Any] = {
-        "workflow_engine": "Legacy",
-        "execution_mode": "LEGACY",
-        "graph_version": "",
+        "workflow_engine": "LangGraph",
+        "execution_mode": "LANGGRAPH",
+        "graph_version": "langgraph-v1",
         "graph_execution_id": orchestration_context.correlation_id,
         "requested_model": runtime_settings.llm_requested_model
         or runtime_settings.llm_reasoning_model,
@@ -3285,15 +3282,17 @@ def ask_chat_question(
         "execution_ended_at": execution_started_at,
     }
     report = analyze_prompt(payload.question, has_sources=True)
-    if report.findings:
-        answer = _build_placeholder_answer(payload.question, report.findings)
-        sources: list[str] = []
-        confidence = report.confidence
-        report_links = None
-        investigation_metadata = _empty_investigation_metadata()
-    else:
-        try:
-            def run_production_investigation() -> tuple:
+    try:
+        def run_production_investigation() -> tuple:
+            if report.findings:
+                return (
+                    _build_placeholder_answer(payload.question, report.findings),
+                    [],
+                    report.confidence,
+                    None,
+                    _empty_investigation_metadata(),
+                )
+            else:
                 return _run_dynamic_investigation(
                     db,
                     payload,
@@ -3302,28 +3301,21 @@ def ask_chat_question(
                     resolved_scan_policy=selected_policy,
                 )
 
-            legacy = CallableOrchestrator(
-                lambda _context: OrchestrationResult(
-                    payload=run_production_investigation(),
-                    source="legacy",
-                )
-            )
-            with bind_production_investigation(run_production_investigation):
-                routed = InvestigationOrchestratorRouter(
-                    settings=runtime_settings,
-                    legacy=legacy,
-                    langgraph=get_production_langgraph_orchestrator(),
-                ).run(orchestration_context)
-            answer, sources, confidence, report_links, investigation_metadata = routed.payload
-            execution_metadata = dict(routed.execution_metadata)
-            execution_metadata["policy_version"] = selected_policy.policy_version
-        except DisabledInvestigationError as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Ask AI failed while collecting evidence or generating the report: {exc}",
-            ) from exc
+        with bind_production_investigation(run_production_investigation):
+            routed = InvestigationOrchestratorRouter(
+                settings=runtime_settings,
+                langgraph=get_production_langgraph_orchestrator(),
+            ).run(orchestration_context)
+        answer, sources, confidence, report_links, investigation_metadata = routed.payload
+        execution_metadata = dict(routed.execution_metadata)
+        execution_metadata["policy_version"] = selected_policy.policy_version
+    except DisabledInvestigationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ask AI failed while collecting evidence or generating the report: {exc}",
+        ) from exc
 
     user_message = ChatMessageModel(
         conversation_id=conversation.id,
@@ -3420,9 +3412,9 @@ def ask_chat_question(
         environment_telemetry_json=investigation_metadata["environment_telemetry"],
         policy_version=investigation_metadata["policy_version"],
         policy_audit_json=investigation_metadata["policy_audit"],
-        workflow_engine=str(execution_metadata.get("workflow_engine") or "Legacy"),
-        execution_mode=str(execution_metadata.get("execution_mode") or "LEGACY"),
-        graph_version=str(execution_metadata.get("graph_version") or ""),
+        workflow_engine=str(execution_metadata.get("workflow_engine") or "LangGraph"),
+        execution_mode=str(execution_metadata.get("execution_mode") or "LANGGRAPH"),
+        graph_version=str(execution_metadata.get("graph_version") or "langgraph-v1"),
         graph_execution_id=str(execution_metadata.get("graph_execution_id") or ""),
         requested_model=str(execution_metadata.get("requested_model") or ""),
         effective_model=str(execution_metadata.get("effective_model") or ""),

@@ -29,9 +29,8 @@ logs. Relevant names include:
 - `AI_REASONING_ENABLED`, `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`,
   `LLM_REASONING_MODEL`, `LLM_FALLBACK_MODEL`, `LLM_REASONING_EFFORT`, `OPENAI_API_KEY`,
   `OPENAI_BASE_URL`
-- `LANGGRAPH_ENABLED`, `INVESTIGATION_ORCHESTRATOR_MODE`, `LANGGRAPH_KILL_SWITCH`,
-  `LANGGRAPH_ROLLOUT_PERCENT`, `LANGGRAPH_SHADOW_PERCENT`,
-  `LANGGRAPH_SHADOW_LLM_ENABLED`
+- `LANGGRAPH_ENABLED=true`, `INVESTIGATION_ORCHESTRATOR_MODE=LANGGRAPH`,
+  `LANGGRAPH_ROLLOUT_PERCENT=100`, `LANGGRAPH_FALLBACK_TO_LEGACY=false`
 - `EVALUATION_WORKER_ENABLED`, `EVALUATION_SERVICE_CLIENT_ID`,
   `EVALUATION_SERVICE_CLIENT_SECRET`, `EVALUATION_SERVICE_USER_ID`,
   `EVALUATION_SERVICE_ORGANIZATION_ID`, `EVALUATION_SERVICE_WORKSPACE_ID`
@@ -66,6 +65,6 @@ include protected expected answers in prompts.
 ## Shutdown and rollback
 
 Stop the evaluation worker, then stop the API gracefully. Preserve reports and audit records. For
-an immediate orchestration rollback, enable `LANGGRAPH_KILL_SWITCH`, disable LangGraph and rollout,
+an immediate application revision rollback, restore the prior LangGraph-only image,
 select `LEGACY`, restart, and run the approved smoke check. If necessary, revert the release merge
 or redeploy the recorded pre-merge image. Do not delete evidence or manually rewrite migrations.

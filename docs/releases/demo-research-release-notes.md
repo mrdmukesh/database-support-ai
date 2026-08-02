@@ -48,7 +48,7 @@ step. Do not enable unrestricted production traffic or automated data repair.
 ## Rollback guidance
 
 The pre-merge code reference is `47dad9433529c5232165e92b232c4eb68084a284`. Disable
-LangGraph immediately with `LANGGRAPH_KILL_SWITCH=true`, `LANGGRAPH_ENABLED=false`, and
-`INVESTIGATION_ORCHESTRATOR_MODE=LEGACY`. Preserve investigations, evidence, reports, and audits.
+the application revision immediately to the prior LangGraph-only image. Preserve investigations,
+evidence, reports, and audits.
 If code rollback is required, redeploy the recorded pre-merge image/commit or revert the merge
 commit; do not downgrade protected evaluation databases. See `docs/langgraph/rollback-runbook.md`.

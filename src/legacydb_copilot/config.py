@@ -104,9 +104,9 @@ class Settings:
     agentic_max_retries: int = 1
     llm_audit_retention_days: int = 365
     azure_key_vault_url: str | None = None
-    investigation_orchestrator_mode: str = "LEGACY"
-    langgraph_enabled: bool = False
-    langgraph_fallback_to_legacy: bool = True
+    investigation_orchestrator_mode: str = "LANGGRAPH"
+    langgraph_enabled: bool = True
+    langgraph_fallback_to_legacy: bool = False
     langgraph_shadow_percent: int = 0
     langgraph_rollout_percent: int = 0
     langgraph_shadow_llm_enabled: bool = False
@@ -261,11 +261,9 @@ class Settings:
             agentic_max_retries=max(0, int(os.getenv("AGENTIC_MAX_RETRIES", "1"))),
             llm_audit_retention_days=max(1, int(os.getenv("LLM_AUDIT_RETENTION_DAYS", "365"))),
             azure_key_vault_url=os.getenv("AZURE_KEY_VAULT_URL") or None,
-            investigation_orchestrator_mode=os.getenv(
-                "INVESTIGATION_ORCHESTRATOR_MODE", "LEGACY"
-            ).strip().upper(),
-            langgraph_enabled=_env_bool("LANGGRAPH_ENABLED", False),
-            langgraph_fallback_to_legacy=_env_bool("LANGGRAPH_FALLBACK_TO_LEGACY", True),
+            investigation_orchestrator_mode="LANGGRAPH",
+            langgraph_enabled=True,
+            langgraph_fallback_to_legacy=False,
             langgraph_shadow_percent=_env_int(
                 "LANGGRAPH_SHADOW_PERCENT", 0, maximum=100
             ),

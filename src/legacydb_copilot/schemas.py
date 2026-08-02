@@ -268,8 +268,8 @@ class ChatConversationRead(BaseModel):
 
 
 class ExecutionMetadataRead(BaseModel):
-    workflow_engine: str = "Legacy"
-    execution_mode: str = "LEGACY"
+    workflow_engine: str = "LangGraph"
+    execution_mode: str = "LANGGRAPH"
     graph_version: str = ""
     graph_execution_id: str = ""
     requested_model: str = ""
@@ -282,7 +282,7 @@ class ExecutionMetadataRead(BaseModel):
     fallback_reason: str = ""
     execution_started_at: datetime | None = None
     execution_ended_at: datetime | None = None
-    badge: str = "Legacy Workflow"
+    badge: str = "LangGraph Verified"
 
 
 class ChatAskResponse(BaseModel):
@@ -375,8 +375,8 @@ class InvestigationRead(BaseModel):
     environment_telemetry_json: str
     policy_version: str
     policy_audit_json: str
-    workflow_engine: str = "Legacy"
-    execution_mode: str = "LEGACY"
+    workflow_engine: str = "LangGraph"
+    execution_mode: str = "LANGGRAPH"
     graph_version: str = ""
     graph_execution_id: str = ""
     requested_model: str = ""

@@ -82,7 +82,7 @@ def test_preflight_parses_output_and_captures_telemetry_without_exposing_key():
     assert provider.request.timeout_seconds == 60
 
 
-def test_failed_preflight_is_sanitized_and_langgraph_stays_legacy():
+def test_failed_preflight_is_sanitized_and_does_not_change_workflow_engine():
     settings = Settings(
         environment=Environment.TESTING,
         ai_reasoning_enabled=True,
@@ -100,8 +100,8 @@ def test_failed_preflight_is_sanitized_and_langgraph_stays_legacy():
     )
     assert result.error == "RuntimeError"
     assert "super-secret" not in str(result)
-    assert decision.mode is OrchestrationMode.LEGACY
-    assert decision.reason == "model_access_not_verified"
+    assert decision.mode is OrchestrationMode.LANGGRAPH
+    assert decision.reason == "langgraph_only"
 
 
 def test_verified_model_access_allows_configured_langgraph_route():

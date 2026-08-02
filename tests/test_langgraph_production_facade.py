@@ -39,7 +39,7 @@ def test_registered_composition_invokes_bound_production_facade_once():
     reset_production_langgraph_for_tests()
 
 
-def test_registration_does_not_activate_langgraph():
+def test_registration_activates_langgraph_despite_retired_flags():
     reset_production_langgraph_for_tests()
     settings = Settings(
         environment=Environment.TESTING,
@@ -53,7 +53,7 @@ def test_registration_does_not_activate_langgraph():
     )
 
     assert get_production_langgraph_orchestrator() is not None
-    assert decision.mode is OrchestrationMode.LEGACY
+    assert decision.mode is OrchestrationMode.LANGGRAPH
     reset_production_langgraph_for_tests()
 
 
@@ -70,7 +70,7 @@ def test_evaluation_environment_can_be_explicitly_authorized():
     assert decision.mode is OrchestrationMode.LANGGRAPH
 
 
-def test_missing_composition_remains_fail_closed_to_legacy():
+def test_missing_composition_does_not_select_legacy():
     reset_production_langgraph_for_tests()
     settings = Settings(
         environment=Environment.TESTING,
@@ -83,4 +83,4 @@ def test_missing_composition_remains_fail_closed_to_legacy():
     )
 
     assert get_production_langgraph_orchestrator() is None
-    assert decision.mode is OrchestrationMode.LEGACY
+    assert decision.mode is OrchestrationMode.LANGGRAPH

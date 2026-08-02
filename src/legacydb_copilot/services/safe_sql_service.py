@@ -42,6 +42,10 @@ class PlannedQuery:
     column_types: dict[str, str] = field(default_factory=dict)
     nullable_columns: tuple[str, ...] = ()
     exact_cardinality: bool = False
+    entity_table: str = ""
+    identifier_column: str = ""
+    identifier_value: Any = None
+    row_scope: str = ""
 
 
 def _record_plan_event(events: list[dict[str, Any]] | None, *, query: PlannedQuery, status: str, reason: str = "") -> None:
@@ -2271,6 +2275,10 @@ def plan_safe_queries(
             column_types=query.column_types,
             nullable_columns=query.nullable_columns,
             exact_cardinality=query.exact_cardinality,
+            entity_table=query.entity_table,
+            identifier_column=query.identifier_column,
+            identifier_value=query.identifier_value,
+            row_scope=query.row_scope,
         )
         _record_plan_event(debug_events, query=staged_query, status="planned", reason="candidate_created")
         logger.info("evidence_plan planned %s %s", staged_query.query_id, staged_query.purpose)
@@ -2288,6 +2296,10 @@ def plan_safe_queries(
                 column_types=staged_query.column_types,
                 nullable_columns=staged_query.nullable_columns,
                 exact_cardinality=staged_query.exact_cardinality,
+                entity_table=staged_query.entity_table,
+                identifier_column=staged_query.identifier_column,
+                identifier_value=staged_query.identifier_value,
+                row_scope=staged_query.row_scope,
             )
         staged.append(staged_query)
 

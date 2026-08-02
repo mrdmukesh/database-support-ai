@@ -45,6 +45,10 @@ class EvidenceReference:
     column_types: dict[str, str] = field(default_factory=dict)
     nullable_columns: tuple[str, ...] = ()
     exact_cardinality_result: str = ""
+    entity_table: str = ""
+    identifier_column: str = ""
+    identifier_value: Any = None
+    row_scope: str = ""
 
     def to_prompt_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -106,6 +110,10 @@ def build_evidence_registry(
                 column_types=dict(item.column_types),
                 nullable_columns=tuple(item.nullable_columns),
                 exact_cardinality_result=item.exact_cardinality_result,
+                entity_table=item.entity_table,
+                identifier_column=item.identifier_column,
+                identifier_value=item.identifier_value,
+                row_scope=item.row_scope,
             )
         )
     existing = {item.evidence_id for item in registry}
@@ -273,10 +281,14 @@ def verify_claim(
     # Claims are checked against the complete evidence package, not only the
     # references selected by the claimant.  This prevents citation
     # cherry-picking from discarding conflicting collected evidence.
+    claim_scopes = tuple(
+        item for item in prompted if item.row_scope == "exact_entity" and _has_entity_scope(item)
+    )
     contradictory = tuple(
         item.evidence_id
         for item in references.values()
         if item.included_in_prompt and not item.truncated
+        if _eligible_contradiction(item, claim_scopes)
         if _reference_contradicts_statement(claim.statement, item)
     )
     if contradictory:
@@ -292,7 +304,9 @@ def verify_claim(
             **base,
             verification_result="REJECTED",
             rejection_code="UNSUPPORTED_CAUSAL_EXPLANATION",
-            rejection_detail="The cited evidence proves an observed value, not the asserted upstream cause.",
+            rejection_detail=(
+                "The cited evidence proves an observed value, not the asserted upstream cause."
+            ),
         )
     if not supporting:
         return ClaimVerification(
@@ -302,6 +316,38 @@ def verify_claim(
             rejection_detail="Referenced evidence does not contain the columns and values needed.",
         )
     return ClaimVerification(**base, verification_result="VERIFIED")
+
+
+def _has_entity_scope(evidence: EvidenceReference) -> bool:
+    return bool(
+        evidence.entity_table
+        and evidence.identifier_column
+        and evidence.identifier_value is not None
+    )
+
+
+def _matches_any_claim_scope(
+    evidence: EvidenceReference,
+    claim_scopes: tuple[EvidenceReference, ...],
+) -> bool:
+    """Allow uncited contradictions only for a proven identical entity scope."""
+    if evidence.row_scope != "exact_entity" or not _has_entity_scope(evidence):
+        return False
+    return any(
+        evidence.entity_table.casefold() == scope.entity_table.casefold()
+        and evidence.identifier_column.casefold() == scope.identifier_column.casefold()
+        and evidence.identifier_value == scope.identifier_value
+        for scope in claim_scopes
+    )
+
+
+def _eligible_contradiction(
+    evidence: EvidenceReference,
+    claim_scopes: tuple[EvidenceReference, ...],
+) -> bool:
+    if claim_scopes:
+        return _matches_any_claim_scope(evidence, claim_scopes)
+    return True
 
 
 def _unsupported_causal_explanation(

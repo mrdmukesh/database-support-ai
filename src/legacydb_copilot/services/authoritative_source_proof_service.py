@@ -201,6 +201,10 @@ def build_primary_proof_query(
         },
         nullable_columns=(contract.source_field,),
         exact_cardinality=True,
+        entity_table=identifier.table,
+        identifier_column=identifier.column,
+        identifier_value=identifier.value,
+        row_scope="exact_entity",
     )
 
 

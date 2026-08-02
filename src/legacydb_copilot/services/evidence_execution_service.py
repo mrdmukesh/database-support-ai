@@ -59,6 +59,10 @@ class EvidenceResult:
     column_types: dict[str, str] = field(default_factory=dict)
     nullable_columns: tuple[str, ...] = ()
     exact_cardinality_result: str = ""
+    entity_table: str = ""
+    identifier_column: str = ""
+    identifier_value: Any = None
+    row_scope: str = ""
 
     @property
     def row_count(self) -> int:
@@ -200,6 +204,19 @@ def execute_evidence_plan(
                         if query.exact_cardinality and len(rows) > 1
                         else ""
                     ),
+                    entity_table=query.entity_table,
+                    identifier_column=query.identifier_column,
+                    identifier_value=query.identifier_value,
+                    row_scope=(
+                        query.row_scope
+                        or (
+                            "exact_entity"
+                            if query.exact_cardinality
+                            else "aggregate"
+                            if semantics == "aggregate"
+                            else "broad"
+                        )
+                    ),
                 )
             )
         except Exception as exc:
@@ -229,6 +246,13 @@ def execute_evidence_plan(
                     execution_status=execution_status,
                     evidence_semantics="execution_failure",
                     scan_policy_decision=policy_decision,
+                    entity_table=query.entity_table,
+                    identifier_column=query.identifier_column,
+                    identifier_value=query.identifier_value,
+                    row_scope=(
+                        query.row_scope
+                        or ("exact_entity" if query.exact_cardinality else "broad")
+                    ),
                 )
             )
     return evidence

@@ -55,6 +55,10 @@ class EvidenceResult:
     supports_claim: str = ""
     evidence_relevance: Literal["relevant", "irrelevant", "unverified"] = "unverified"
     scan_policy_decision: dict[str, Any] = field(default_factory=dict)
+    parameters: dict[str, Any] = field(default_factory=dict)
+    column_types: dict[str, str] = field(default_factory=dict)
+    nullable_columns: tuple[str, ...] = ()
+    exact_cardinality_result: str = ""
 
     @property
     def row_count(self) -> int:
@@ -125,7 +129,10 @@ def execute_evidence_plan(
                 query_id=query.query_id or f"Q-{index}",
             )
             validate_read_only_sql(execution_sql)
-            safe_read = validator.validate(execution_sql)
+            safe_read = validator.validate(
+                execution_sql,
+                bounded_by_exact_filter=query.exact_cardinality,
+            )
             policy_decision = (
                 safe_read.policy_decision.to_dict()
                 if safe_read.policy_decision is not None
@@ -181,6 +188,18 @@ def execute_evidence_plan(
                     supports_claim=supports_claim,
                     evidence_relevance="relevant",
                     scan_policy_decision=policy_decision,
+                    parameters=dict(query.parameters),
+                    column_types=dict(query.column_types),
+                    nullable_columns=tuple(query.nullable_columns),
+                    exact_cardinality_result=(
+                        "ENTITY_NOT_FOUND"
+                        if query.exact_cardinality and len(rows) == 0
+                        else "ENTITY_RESOLVED"
+                        if query.exact_cardinality and len(rows) == 1
+                        else "AMBIGUOUS_ENTITY"
+                        if query.exact_cardinality and len(rows) > 1
+                        else ""
+                    ),
                 )
             )
         except Exception as exc:

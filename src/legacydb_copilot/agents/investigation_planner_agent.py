@@ -15,6 +15,7 @@ def build_investigation_plan(
     debug_events: list[dict[str, Any]] | None = None,
     *,
     provider: Any | None = None,
+    resolved_entities: list[dict[str, Any]] | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -42,4 +43,5 @@ def build_investigation_plan(
         entities,
         debug_events=debug_events,
         provider=provider,
+        resolved_entities=resolved_entities,
     )

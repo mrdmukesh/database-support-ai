@@ -58,7 +58,8 @@ class ProcedureAwareSQLiteConnector:
         if name != self.procedure_name:
             raise KeyError(name)
         return """CREATE PROCEDURE calculate_subject_value AS
-SELECT CAST((julianday('now') - julianday(date_of_birth)) / 365.25 AS INTEGER) AS age
+SELECT CASE WHEN date_of_birth IS NULL THEN NULL
+ELSE CAST((julianday('now') - julianday(date_of_birth)) / 365.25 AS INTEGER) END AS age
 FROM employees WHERE employee_id = :employee_id;
 """
 
@@ -137,6 +138,7 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
 
     evidence = json.loads(metadata["evidence"])
     structured = json.loads(metadata["structured_result"])
+    trace = json.loads(metadata["ai_debug_trace"])
     claims = structured["root_cause_claims"]
     root_cause = " ".join(claim["conclusion"] for claim in claims)
     evidence_ids = {item["evidence_id"] for item in evidence}
@@ -145,10 +147,16 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
 
     assert any(row.get("employee_id") == scenario["test_employee_or_key"] for row in record_rows), evidence
     assert any(row.get("date_of_birth", object()) is None for row in record_rows)
-    assert procedure_rows and "date_of_birth" in procedure_rows[0]["definition_excerpt"].lower()
-    assert "age" in procedure_rows[0]["definition_excerpt"].lower()
+    assert len(procedure_rows) == 1
     assert "not found" not in root_cause.lower()
-    assert claims == []
+    assert trace.get("deterministic_stop_reason"), {
+        "entity_resolution": trace.get("entity_resolution"),
+        "procedures": trace.get("raw_metadata_objects", {}).get("procedures"),
+        "first_sql": (trace.get("sql_plan") or [{}])[0],
+    }
+    assert len(claims) == 1, trace
+    assert claims[0]["status"] == "VERIFIED"
+    assert claims[0]["evidence_refs"]
     null_evidence = [
         item
         for item in evidence
@@ -159,9 +167,18 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
     assert all(item["execution_status"] == "succeeded" for item in null_evidence)
     assert all(item["evidence_semantics"] == "null_value" for item in null_evidence), null_evidence
     fixes = " ".join(structured["recommended_fix"]).lower()
-    assert "prerequisite" in fixes
-    assert "no change has been executed" in fixes
+    assert "approved" in fixes
+    assert "rerun" in fixes
     assert structured["ranked_objects"][0]["name"] != "incident_knowledge_base"
+    assert structured["primary_entity"]["table"] == "employees"
+    assert len(structured["procedures"]) == 1
     assert scenario["expected_root_cause_answer"] not in answer
     assert {"employee_record", "calculation_logic"} == set(scenario["required_evidence_types"])
     assert all(claim.replace("_", " ") not in root_cause.lower() for claim in scenario["forbidden_claims"])
+    assert trace["deterministic_stop_reason"] == (
+        "DETERMINISTIC_REQUIRED_SOURCE_NULL_CONFIRMED"
+    )
+    assert trace["prevented_query_count"] > 0
+    assert trace["verified_claim_count"] == 1
+    assert trace["rejected_claim_count"] == 0
+    assert "root cause not established" not in answer.casefold()

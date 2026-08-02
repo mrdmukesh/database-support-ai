@@ -720,6 +720,10 @@ def _evidence_to_json(evidence) -> str:
                 "evidence_semantics": item.evidence_semantics,
                 "supports_claim": item.supports_claim,
                 "evidence_relevance": item.evidence_relevance,
+                "entity_table": item.entity_table,
+                "identifier_column": item.identifier_column,
+                "identifier_value": item.identifier_value,
+                "row_scope": item.row_scope,
                 "scan_policy_decision": item.scan_policy_decision,
                 # Keep the complete bounded result as the canonical persisted
                 # evidence.  sample_rows remains for backwards-compatible
@@ -2379,6 +2383,12 @@ def _run_dynamic_investigation(
         correlated_evidence=correlated_evidence,
         procedure_analysis=procedure_analysis,
         documents=context.documents,
+        resolved_identifier_column=(
+            resolved_identifier.column if resolved_identifier is not None else ""
+        ),
+        resolved_identifier_value=(
+            resolved_identifier.value if resolved_identifier is not None else None
+        ),
     )
     report_procedure_analysis = procedure_analysis
     report_ranked_objects = ranking.objects
@@ -2765,6 +2775,10 @@ def _run_dynamic_investigation(
                     "nullable_columns": list(item.nullable_columns),
                     "sample_rows": item.rows[:5],
                     "exact_cardinality_result": item.exact_cardinality_result,
+                    "entity_table": item.entity_table,
+                    "identifier_column": item.identifier_column,
+                    "identifier_value": item.identifier_value,
+                    "row_scope": item.row_scope,
                     "scan_policy_decision": item.scan_policy_decision,
                     "error": item.error,
                 }

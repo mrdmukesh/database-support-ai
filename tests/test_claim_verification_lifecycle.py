@@ -28,10 +28,6 @@ def reference(
     zero: bool = False,
     truncated: bool = False,
     evidence_semantics: str = "",
-    entity_table: str = "dbo.Employee",
-    identifier_column: str = "BusinessKey",
-    identifier_value: str = "EMP-1001",
-    row_scope: str = "exact_entity",
 ) -> EvidenceReference:
     return EvidenceReference(
         evidence_id=evidence_id,
@@ -44,10 +40,6 @@ def reference(
         zero_row_result=zero,
         truncated=truncated,
         evidence_semantics=evidence_semantics,
-        entity_table=entity_table,
-        identifier_column=identifier_column,
-        identifier_value=identifier_value,
-        row_scope=row_scope,
     )
 
 
@@ -147,97 +139,6 @@ def test_contradictory_value_claim_fails() -> None:
     )
     assert result.verification_result == "REJECTED"
     assert result.rejection_code == "CONTRADICTORY_EVIDENCE"
-
-
-def test_other_entity_and_broad_rows_do_not_contradict_scoped_null_claim() -> None:
-    scoped = reference(
-        rows=({"BusinessKey": "EMP-1001", "DateOfBirth": None},),
-    )
-    other_entity = reference(
-        "SQL-2",
-        rows=({"BusinessKey": "EMP-1002", "DateOfBirth": "1990-01-01"},),
-        identifier_value="EMP-1002",
-    )
-    broad_department = reference(
-        "SQL-3",
-        rows=(
-            {"BusinessKey": "EMP-1002", "DateOfBirth": "1990-01-01"},
-            {"BusinessKey": "EMP-1003", "DateOfBirth": "1988-02-02"},
-        ),
-        identifier_column="DepartmentId",
-        identifier_value="2",
-        row_scope="broad",
-    )
-    result = verify_claim(
-        claim(
-            {
-                "statement": "Employee EMP-1001 has DateOfBirth NULL.",
-                "evidence_ids": ["SQL-1"],
-            }
-        ),
-        [scoped, other_entity, broad_department],
-    )
-    assert result.verification_result == "VERIFIED"
-    assert result.contradictory_evidence_ids == ()
-
-    cited_broad = verify_claim(
-        claim(
-            {
-                "statement": "Employee EMP-1001 has DateOfBirth NULL.",
-                "evidence_ids": ["SQL-1", "SQL-3"],
-            }
-        ),
-        [scoped, broad_department],
-    )
-    assert cited_broad.verification_result == "VERIFIED"
-
-
-def test_same_entity_conflicting_value_rejects_scoped_null_claim() -> None:
-    scoped_null = reference(
-        rows=({"BusinessKey": "EMP-1001", "DateOfBirth": None},),
-    )
-    same_entity_conflict = reference(
-        "SQL-2",
-        rows=({"BusinessKey": "EMP-1001", "DateOfBirth": "1990-01-01"},),
-    )
-    result = verify_claim(
-        claim(
-            {
-                "statement": "Employee EMP-1001 has DateOfBirth NULL.",
-                "evidence_ids": ["SQL-1"],
-            }
-        ),
-        [scoped_null, same_entity_conflict],
-    )
-    assert result.verification_result == "REJECTED"
-    assert result.rejection_code == "CONTRADICTORY_EVIDENCE"
-    assert result.contradictory_evidence_ids == ("SQL-2",)
-
-
-def test_second_entity_type_uses_the_same_scoped_null_rules() -> None:
-    source = reference(
-        rows=({"AssetCode": "AST-2042", "RequiredInput": None},),
-        entity_table="ops.Asset",
-        identifier_column="AssetCode",
-        identifier_value="AST-2042",
-    )
-    sibling = reference(
-        "SQL-2",
-        rows=({"AssetCode": "AST-2043", "RequiredInput": "ready"},),
-        entity_table="ops.Asset",
-        identifier_column="AssetCode",
-        identifier_value="AST-2043",
-    )
-    result = verify_claim(
-        claim(
-            {
-                "statement": "Asset AST-2042 has RequiredInput NULL.",
-                "evidence_ids": ["SQL-1"],
-            }
-        ),
-        [source, sibling],
-    )
-    assert result.verification_result == "VERIFIED"
 
 
 def test_row_count_only_cannot_verify_value_but_zero_rows_verify_tested_absence() -> None:

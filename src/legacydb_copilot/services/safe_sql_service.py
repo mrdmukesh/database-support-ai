@@ -10,24 +10,18 @@ from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResu
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.services.diagnostic_object_service import is_diagnostic_object
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.problem_phrase_service import (
-    parse_problem_phrase,
-    resolve_table_from_terms,
-    terms_match_table,
-)
-from legacydb_copilot.services.scan_policy_service import ScanPolicy, ScanPolicyDecision
+from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms, terms_match_table
+from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
 from legacydb_copilot.services.sql_dialect_service import (
     SqlDialect,
     apply_row_limit,
     resolve_sql_dialect,
     validate_sql_dialect,
 )
-from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
+from legacydb_copilot.services.scan_policy_service import ScanPolicy, ScanPolicyDecision
+
 
 logger = logging.getLogger(__name__)
-_QUALIFIED_IDENTIFIER = re.compile(
-    r"^[A-Za-z_][A-Za-z0-9_$]*(?:\.[A-Za-z_][A-Za-z0-9_$]*)*$"
-)
 
 
 @dataclass(frozen=True)
@@ -39,13 +33,6 @@ class PlannedQuery:
     evidence_semantics: str = "not_applicable"
     execution_sql: str = ""
     parameters: dict[str, Any] = field(default_factory=dict)
-    column_types: dict[str, str] = field(default_factory=dict)
-    nullable_columns: tuple[str, ...] = ()
-    exact_cardinality: bool = False
-    entity_table: str = ""
-    identifier_column: str = ""
-    identifier_value: Any = None
-    row_scope: str = ""
 
 
 def _record_plan_event(events: list[dict[str, Any]] | None, *, query: PlannedQuery, status: str, reason: str = "") -> None:
@@ -127,12 +114,7 @@ class ProductionReadSafetyValidator:
         self.row_estimates = {key.lower(): value for key, value in (row_estimates or {}).items()}
         self.dialect = resolve_sql_dialect(engine_type) if engine_type else None
 
-    def validate(
-        self,
-        sql: str,
-        *,
-        bounded_by_exact_filter: bool = False,
-    ) -> ProductionReadSafetyResult:
+    def validate(self, sql: str) -> ProductionReadSafetyResult:
         """
         Owner: Mukesh Dabi
         Purpose:
@@ -177,12 +159,6 @@ class ProductionReadSafetyValidator:
                     original_sql=stripped,
                 ),
                 self.scan_policy.configuration_error,
-            )
-        if bounded_by_exact_filter and _has_where_clause(normalized):
-            return self._allowed(
-                stripped,
-                "exact_cardinality_filtered_query",
-                table=table_name or "",
             )
         if (
             self.scan_policy is not None
@@ -2073,7 +2049,6 @@ def plan_safe_queries(
     debug_events: list[dict[str, Any]] | None = None,
     *,
     provider: Any | None = None,
-    resolved_entities: list[dict[str, Any]] | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -2100,36 +2075,6 @@ def plan_safe_queries(
     dialect_source = provider if provider is not None else metadata.engine_type
     dialect = resolve_sql_dialect(dialect_source) if dialect_source else None
     planned: list[PlannedQuery] = []
-    resolved_table_names: set[str] = set()
-    for resolution in resolved_entities or []:
-        table_name = str(resolution.get("resolved_table") or "")
-        column_name = str(resolution.get("resolved_column") or "")
-        value = resolution.get("matched_value")
-        table = next(
-            (item for item in metadata.tables if item.name.casefold() == table_name.casefold()),
-            None,
-        )
-        if table is None or column_name not in table.columns or value is None:
-            continue
-        if not _QUALIFIED_IDENTIFIER.fullmatch(
-            table.name
-        ) or not _QUALIFIED_IDENTIFIER.fullmatch(column_name):
-            continue
-        selected = _resolved_lookup_columns(table, column_name, entities)
-        escaped = str(value).replace("'", "''")
-        planned.append(
-            PlannedQuery(
-                purpose=f"Resolve one entity in {table.name} by {column_name}",
-                sql=(
-                    f"SELECT {', '.join(selected)} FROM {table.name} "
-                    f"WHERE {column_name} = '{escaped}'"
-                ),
-                evidence_semantics="entity_lookup",
-                column_types={name: table.column_types.get(name, "unknown") for name in selected},
-                exact_cardinality=True,
-            )
-        )
-        resolved_table_names.add(table.name.casefold())
     transfer_primary = _transfer_primary_query(metadata, entities)
     if transfer_primary:
         planned.append(transfer_primary)
@@ -2204,8 +2149,6 @@ def plan_safe_queries(
         else set()
     )
     for table in metadata.tables[:3]:
-        if table.name.casefold() in resolved_table_names:
-            continue
         if table.name.lower() in targeted_duplicate_tables:
             continue
         where_clause = _where_for_table(table, entities, metadata.engine_type)
@@ -2272,13 +2215,6 @@ def plan_safe_queries(
             evidence_semantics=_planned_evidence_semantics(intent, query),
             execution_sql=execution_sql,
             parameters=parameters,
-            column_types=query.column_types,
-            nullable_columns=query.nullable_columns,
-            exact_cardinality=query.exact_cardinality,
-            entity_table=query.entity_table,
-            identifier_column=query.identifier_column,
-            identifier_value=query.identifier_value,
-            row_scope=query.row_scope,
         )
         _record_plan_event(debug_events, query=staged_query, status="planned", reason="candidate_created")
         logger.info("evidence_plan planned %s %s", staged_query.query_id, staged_query.purpose)
@@ -2293,13 +2229,6 @@ def plan_safe_queries(
                 evidence_semantics=staged_query.evidence_semantics,
                 execution_sql=ensure_limit(staged_query.execution_sql),
                 parameters=staged_query.parameters,
-                column_types=staged_query.column_types,
-                nullable_columns=staged_query.nullable_columns,
-                exact_cardinality=staged_query.exact_cardinality,
-                entity_table=staged_query.entity_table,
-                identifier_column=staged_query.identifier_column,
-                identifier_value=staged_query.identifier_value,
-                row_scope=staged_query.row_scope,
             )
         staged.append(staged_query)
 
@@ -2348,35 +2277,6 @@ def plan_safe_queries(
         )
         logger.info("evidence_plan rejected %s max_query_limit", dropped.query_id)
     return safe
-
-
-def _resolved_lookup_columns(
-    table: TableMetadata,
-    identifier_column: str,
-    entities: EntityExtractionResult,
-) -> list[str]:
-    text = " ".join(
-        [entities.suspected_issue or "", *(entities.business_keywords or [])]
-    ).casefold()
-    tokens = set(re.findall(r"[a-z0-9]+", text))
-    compact_text = re.sub(r"[^a-z0-9]+", "", text)
-    relevant = [
-        column
-        for column in table.columns
-        if (
-            set(
-                re.findall(
-                    r"[a-z0-9]+",
-                    re.sub(r"(?<!^)(?=[A-Z])", " ", column).casefold(),
-                )
-            )
-            <= tokens
-            or re.sub(r"[^a-z0-9]+", "", column.casefold()) in compact_text
-        )
-    ]
-    return list(
-        dict.fromkeys([*(table.primary_key or [])[:1], identifier_column, *relevant])
-    )
 
 
 def _parameterize_values(

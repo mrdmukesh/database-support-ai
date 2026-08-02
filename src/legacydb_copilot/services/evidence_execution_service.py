@@ -55,14 +55,6 @@ class EvidenceResult:
     supports_claim: str = ""
     evidence_relevance: Literal["relevant", "irrelevant", "unverified"] = "unverified"
     scan_policy_decision: dict[str, Any] = field(default_factory=dict)
-    parameters: dict[str, Any] = field(default_factory=dict)
-    column_types: dict[str, str] = field(default_factory=dict)
-    nullable_columns: tuple[str, ...] = ()
-    exact_cardinality_result: str = ""
-    entity_table: str = ""
-    identifier_column: str = ""
-    identifier_value: Any = None
-    row_scope: str = ""
 
     @property
     def row_count(self) -> int:
@@ -133,10 +125,7 @@ def execute_evidence_plan(
                 query_id=query.query_id or f"Q-{index}",
             )
             validate_read_only_sql(execution_sql)
-            safe_read = validator.validate(
-                execution_sql,
-                bounded_by_exact_filter=query.exact_cardinality,
-            )
+            safe_read = validator.validate(execution_sql)
             policy_decision = (
                 safe_read.policy_decision.to_dict()
                 if safe_read.policy_decision is not None
@@ -192,31 +181,6 @@ def execute_evidence_plan(
                     supports_claim=supports_claim,
                     evidence_relevance="relevant",
                     scan_policy_decision=policy_decision,
-                    parameters=dict(query.parameters),
-                    column_types=dict(query.column_types),
-                    nullable_columns=tuple(query.nullable_columns),
-                    exact_cardinality_result=(
-                        "ENTITY_NOT_FOUND"
-                        if query.exact_cardinality and len(rows) == 0
-                        else "ENTITY_RESOLVED"
-                        if query.exact_cardinality and len(rows) == 1
-                        else "AMBIGUOUS_ENTITY"
-                        if query.exact_cardinality and len(rows) > 1
-                        else ""
-                    ),
-                    entity_table=query.entity_table,
-                    identifier_column=query.identifier_column,
-                    identifier_value=query.identifier_value,
-                    row_scope=(
-                        query.row_scope
-                        or (
-                            "exact_entity"
-                            if query.exact_cardinality
-                            else "aggregate"
-                            if semantics == "aggregate"
-                            else "broad"
-                        )
-                    ),
                 )
             )
         except Exception as exc:
@@ -246,13 +210,6 @@ def execute_evidence_plan(
                     execution_status=execution_status,
                     evidence_semantics="execution_failure",
                     scan_policy_decision=policy_decision,
-                    entity_table=query.entity_table,
-                    identifier_column=query.identifier_column,
-                    identifier_value=query.identifier_value,
-                    row_scope=(
-                        query.row_scope
-                        or ("exact_entity" if query.exact_cardinality else "broad")
-                    ),
                 )
             )
     return evidence

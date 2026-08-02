@@ -49,13 +49,12 @@ def correlate_evidence(
         if item.error:
             correlated.append(CorrelatedEvidence("SQL", item.purpose, item.error, item.sql, "Low"))
         elif item.rows:
-            typed_finding = typed_evidence_finding(item)
             correlated.append(
                 CorrelatedEvidence(
                     "SQL",
                     item.purpose,
-                    typed_finding or f"{len(item.rows)} row(s) returned",
-                    f"Row count: {len(item.rows)}; {_sample_row(item.rows)}",
+                    f"{len(item.rows)} row(s) returned",
+                    _sample_row(item.rows),
                     "High",
                 )
             )
@@ -119,40 +118,6 @@ def correlate_evidence(
             )
         )
     return correlated
-
-
-def typed_evidence_finding(item: EvidenceResult) -> str:
-    """Summarize identity and question-relevant typed values without losing NULL."""
-    if not item.rows or item.row_scope != "exact_entity":
-        return ""
-    row = item.rows[0]
-    values: list[tuple[str, Any]] = []
-    if item.identifier_column:
-        identifier_value = next(
-            (
-                value
-                for column, value in row.items()
-                if column.casefold() == item.identifier_column.casefold()
-            ),
-            item.identifier_value,
-        )
-        values.append((item.identifier_column, identifier_value))
-    for column in item.nullable_columns:
-        match = next(
-            ((name, value) for name, value in row.items() if name.casefold() == column.casefold()),
-            None,
-        )
-        if match and match[0].casefold() != item.identifier_column.casefold():
-            values.append(match)
-    return "; ".join(f"{column} = {_typed_value(value)}" for column, value in values)
-
-
-def _typed_value(value: Any) -> str:
-    if value is None:
-        return "NULL"
-    if isinstance(value, bool):
-        return "TRUE" if value else "FALSE"
-    return str(value)
 
 
 def _sample_row(rows: list[dict[str, Any]]) -> str:

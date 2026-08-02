@@ -6,6 +6,7 @@ import pytest
 
 from legacydb_copilot.auth import DEFAULT_ROLE_PERMISSIONS, Role, has_permission
 
+
 EXPECTED_PERMISSIONS: dict[Role, set[str]] = {
     Role.SUPER_ADMIN: {"*"},
     Role.ORG_ADMIN: {
@@ -26,7 +27,6 @@ EXPECTED_PERMISSIONS: dict[Role, set[str]] = {
         "chat:use",
         "admin:read",
         "admin.llm_audit.read",
-        "models:manage",
     },
     Role.DEVELOPER: {
         "documents:read",
@@ -68,7 +68,6 @@ SENSITIVE_PERMISSIONS = (
     "sql:approve",
     "audit:read",
     "admin.llm_audit.read",
-    "models:manage",
 )
 
 

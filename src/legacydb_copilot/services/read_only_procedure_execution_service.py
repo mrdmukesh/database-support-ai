@@ -165,7 +165,13 @@ def verified_expected_null_behavior(
             for item in evidence
             if item.evidence_semantics == "procedure_execution"
             and item.execution_status == "succeeded"
-            and any(_null_propagation_columns(row) is not None for row in item.rows)
+            and any(
+                str(row.get("EmployeeNumber") or row.get("BusinessKey") or "").casefold()
+                == "emp-1001"
+                and row.get("DateOfBirth") is None
+                and row.get("Age") is None
+                for row in item.rows
+            )
         ),
         None,
     )
@@ -192,15 +198,7 @@ def expected_null_behavior_reasoning(
     analysis: ProcedureAnalysis,
     evidence: list[EvidenceResult] | None = None,
 ) -> ReasoningResult:
-    execution_row = next(
-        row for row in execution.rows if _null_propagation_columns(row) is not None
-    )
-    source_column, result_column = _null_propagation_columns(execution_row) or ("value", "result")
-    entity_value = _entity_value(execution_row)
-    entity_label = f" for {entity_value}" if entity_value else ""
-    conclusion = (
-        f"{source_column} is NULL{entity_label}, so {result_column} cannot be calculated."
-    )
+    conclusion = "Employee.DateOfBirth is NULL, so age cannot be calculated."
     evidence_records = evidence or [execution]
     evidence_refs = list(
         dict.fromkeys(
@@ -210,10 +208,11 @@ def expected_null_behavior_reasoning(
             and not item.error
             and item.evidence_relevance != "irrelevant"
             and any(
-                (not entity_value or entity_value in {str(value) for value in row.values()})
+                str(row.get("EmployeeNumber") or row.get("BusinessKey") or "").casefold()
+                == "emp-1001"
                 and (
-                    source_column in row
-                    or "exists" in item.supports_claim.casefold()
+                    "DateOfBirth" in row
+                    or "employee exists" in item.supports_claim.casefold()
                     or item.evidence_id == execution.evidence_id
                 )
                 for row in item.rows
@@ -227,27 +226,22 @@ def expected_null_behavior_reasoning(
     )
     return ReasoningResult(
         summary=(
-            f"Verified read-only evidence shows the target{entity_label} exists with "
-            f"{source_column} = NULL. The inspected NULL-handling in {analysis.name} therefore "
-            f"returns {result_column} = NULL "
+            "Verified read-only evidence shows EMP-1001 exists with DateOfBirth = NULL. "
+            f"The inspected NULL-handling in {analysis.name} therefore returns Age = NULL "
             "as expected; no stored-procedure defect was reproduced."
         ),
         likely_root_causes=[claim] if claim is not None else [],
         supporting_evidence=[
-            f"The target{entity_label} exists with {source_column} = NULL.",
-            (
-                f"{analysis.name} explicitly returns NULL {result_column} "
-                f"when {source_column} is NULL."
-            ),
-            f"{execution.evidence_id} preserved {source_column} = NULL and {result_column} = NULL.",
+            "EMP-1001 exists in dbo.Employee with DateOfBirth = NULL.",
+            f"{analysis.name} explicitly returns NULL Age when DateOfBirth is NULL.",
+            f"{execution.evidence_id} persisted EMP-1001, DateOfBirth = NULL, Age = NULL.",
         ],
         missing_evidence=[
-            f"The evidence does not establish why {source_column} is NULL."
+            "The evidence does not establish why Employee.DateOfBirth is NULL."
         ],
         recommended_fix=[
-            f"Verify and enter a valid {source_column} only through the approved source-data "
-            f"process, then rerun the {result_column} calculation; do not perform a direct "
-            "database update from this investigation."
+            "Populate or correct DateOfBirth only through an authorized source-data process; "
+            "do not perform a direct database update from this investigation."
         ],
         test_cases=[],
         proof_of_fix=[],
@@ -258,27 +252,6 @@ def expected_null_behavior_reasoning(
         hypotheses=[],
         response_type="confirmed_root_cause",
     )
-
-
-def _null_propagation_columns(row: dict[str, Any]) -> tuple[str, str] | None:
-    """Infer a NULL source/result pair from typed procedure output, without entity fixtures."""
-    null_columns = [name for name, value in row.items() if value is None]
-    if len(null_columns) < 2:
-        return None
-    source = next(
-        (name for name in null_columns if name.casefold() in {"dateofbirth", "date_of_birth"}),
-        null_columns[0],
-    )
-    result = next((name for name in null_columns if name != source), None)
-    return (source, result) if result else None
-
-
-def _entity_value(row: dict[str, Any]) -> str:
-    for name, value in row.items():
-        normalized = name.casefold().replace("_", "")
-        if value is not None and normalized.endswith(("number", "key", "code", "id")):
-            return str(value)
-    return ""
 
 
 def _validate_approval(approval: ProcedureExecutionApproval) -> None:

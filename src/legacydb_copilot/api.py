@@ -121,7 +121,6 @@ def create_fastapi_app() -> Any:
         investigation_states,
         learning,
         llm_audit,
-        model_management,
         organizations,
         reports,
         system,
@@ -185,8 +184,6 @@ def create_fastapi_app() -> Any:
     app.include_router(billing.router)
     app.include_router(admin.router)
     app.include_router(llm_audit.router)
-    app.include_router(model_management.router)
-    app.include_router(model_management.admin_router)
 
     if react_root:
         @app.get("/react/assets/{asset_path:path}", include_in_schema=False)

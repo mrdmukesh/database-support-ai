@@ -26,8 +26,6 @@ export interface InvestigationSubmitRequest {
   user_id: string;
   question: string;
   conversation_id?: string | null;
-  model_selection_mode?: string | null;
-  catalog_model_id?: string | null;
 }
 
 export interface InvestigationSubmitResponse {
@@ -63,35 +61,7 @@ export interface ExecutionMetadata {
   fallback_reason: string;
   execution_started_at: string | null;
   execution_ended_at: string | null;
-  badge: "LangGraph Verified";
-  requested_model_mode?: string;
-  requested_catalog_model_id?: string;
-  effective_catalog_model_id?: string;
-  model_policy_decision?: string;
-  model_policy_decision_reason?: string;
-  model_entitlement_source?: string;
-  model_selection_configuration_version?: number;
-}
-
-export interface AvailableModelOption {
-  value: string;
-  mode: "automatic" | "fast" | "deep_analysis" | "model";
-  display_name: string;
-  description: string;
-  latency_tier: string;
-  cost_tier: string;
-  recommended_usage: string;
-  approval_required: boolean;
-  disabled: boolean;
-  disabled_reason: string;
-}
-
-export interface AvailableModelsResponse {
-  selection_enabled: boolean;
-  automatic_enabled: boolean;
-  default_value: string;
-  policy_version: string;
-  options: AvailableModelOption[];
+  badge: "LangGraph Verified" | "Legacy Workflow" | "Legacy Fallback";
 }
 
 export interface InvestigationSummary {

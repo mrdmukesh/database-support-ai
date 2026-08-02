@@ -8,13 +8,23 @@ from types import SimpleNamespace
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
+from legacydb_copilot.config import Settings
+from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.db.base import Base
 from legacydb_copilot.db.connector import DatabaseConnector
 from legacydb_copilot.db.models import DatabaseConnectionModel, WorkspaceModel
-from legacydb_copilot.databases import DatabaseEngine
 from legacydb_copilot.routers import chat
 from legacydb_copilot.schemas import ChatAskRequest
-
+from legacydb_copilot.workflow.langgraph.activation import (
+    InvestigationOrchestratorRouter,
+    OrchestrationContext,
+)
+from legacydb_copilot.workflow.langgraph.composition import get_production_langgraph_orchestrator
+from legacydb_copilot.workflow.langgraph.production_facade import (
+    bind_production_investigation,
+    configure_production_langgraph,
+    reset_production_langgraph_for_tests,
+)
 
 DATA = Path(__file__).parent / "regression" / "data" / "payroll_rca_scenarios.json"
 
@@ -99,7 +109,31 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
             organization_id="org-e2e", workspace_id=workspace.id, connection_id=connection.id,
             user_id="regression-user", question=scenario["test_question"],
         )
-        answer, _, confidence, _, metadata = chat._run_dynamic_investigation(db, payload, "regression-user")
+        def callback():
+            return chat._run_dynamic_investigation(db, payload, "regression-user")
+        reset_production_langgraph_for_tests()
+        configure_production_langgraph(Settings.from_env())
+        try:
+            with bind_production_investigation(callback):
+                routed = InvestigationOrchestratorRouter(
+                    settings=Settings.from_env(),
+                    langgraph=get_production_langgraph_orchestrator(),
+                ).run(
+                    OrchestrationContext(
+                        environment="test",
+                        workspace_id=workspace.id,
+                        user_id="regression-user",
+                        question=payload.question,
+                    )
+                )
+        finally:
+            reset_production_langgraph_for_tests()
+        answer, _, confidence, _, metadata = routed.payload
+
+    assert routed.source == "langgraph"
+    assert routed.execution_metadata["workflow_engine"] == "LangGraph"
+    assert routed.execution_metadata["execution_mode"] == "LANGGRAPH"
+    assert routed.execution_metadata["fallback_used"] is False
 
     evidence = json.loads(metadata["evidence"])
     structured = json.loads(metadata["structured_result"])

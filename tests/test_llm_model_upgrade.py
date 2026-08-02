@@ -43,7 +43,7 @@ def test_environment_model_defaults(monkeypatch, environment, expected):
 
 
 def test_configuration_and_invalid_candidate_use_explicit_fallback(monkeypatch):
-    monkeypatch.setenv("LLM_REASONING_MODEL", "not-a-model")
+    monkeypatch.setenv("LLM_REASONING_MODEL", "not a valid model id")
     monkeypatch.setenv("LLM_FALLBACK_MODEL", "gpt-5-mini")
     settings = Settings.from_env()
     assert settings.selected_reasoning_model == "gpt-5-mini"

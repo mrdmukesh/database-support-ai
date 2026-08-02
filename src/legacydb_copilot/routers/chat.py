@@ -35,6 +35,7 @@ from legacydb_copilot.db.models import (
     DatabaseConnectionModel,
     DocumentModel,
     InvestigationModel,
+    LLMModelSelectionAuditModel,
     VerificationCheckModel,
     WorkspaceModel,
 )
@@ -90,6 +91,13 @@ from legacydb_copilot.services.evidence_gate_service import (
 from legacydb_copilot.services.evidence_verification_agent import (
     execute_verification_check,
     suggest_verification_checks,
+)
+from legacydb_copilot.services.governed_model_selection import (
+    GovernedModelSelectionService,
+    ModelSelectionAuthorizationError,
+    ModelSelectionRequest,
+    ResolvedModelSelection,
+    selection_metadata,
 )
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
@@ -2002,6 +2010,7 @@ def _run_dynamic_investigation(
     *,
     environment_snapshot: EnvironmentSnapshot | None = None,
     resolved_scan_policy=None,
+    invocation_settings: Settings | None = None,
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
     """
     Owner: Mukesh Dabi
@@ -2364,7 +2373,7 @@ def _run_dynamic_investigation(
                 "No separate verified evidence proves a stored-procedure defect."
             ],
         )
-    settings = Settings.from_env()
+    settings = invocation_settings or Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
     if expected_null_behavior is not None:
         reasoning = expected_null_behavior_reasoning(
@@ -3257,6 +3266,24 @@ def ask_chat_question(
     conversation = _get_or_create_conversation(db, payload)
     runtime_settings = Settings.from_env()
     configure_production_langgraph(runtime_settings)
+    try:
+        resolved_model_selection = GovernedModelSelectionService(
+            db, runtime_settings
+        ).resolve(
+            user=current_user,
+            workspace_id=payload.workspace_id,
+            environment=environment_snapshot.environment_type.value,
+            request=ModelSelectionRequest(
+                mode=payload.model_selection_mode or "",
+                catalog_model_id=payload.catalog_model_id or "",
+            ),
+            question=payload.question,
+        )
+    except ModelSelectionAuthorizationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    invocation_settings = resolved_model_selection.apply_to_settings(runtime_settings)
     execution_started_at = datetime.now(UTC)
     orchestration_context = OrchestrationContext(
         environment=environment_snapshot.environment_type.value,
@@ -3299,6 +3326,7 @@ def ask_chat_question(
                     current_user.email or current_user.full_name or current_user.id,
                     environment_snapshot=environment_snapshot,
                     resolved_scan_policy=selected_policy,
+                    invocation_settings=invocation_settings,
                 )
 
         with bind_production_investigation(run_production_investigation):
@@ -3308,6 +3336,7 @@ def ask_chat_question(
             ).run(orchestration_context)
         answer, sources, confidence, report_links, investigation_metadata = routed.payload
         execution_metadata = dict(routed.execution_metadata)
+        execution_metadata.update(selection_metadata(resolved_model_selection))
         execution_metadata["policy_version"] = selected_policy.policy_version
     except DisabledInvestigationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -3424,6 +3453,16 @@ def ask_chat_question(
         execution_policy_version=str(execution_metadata.get("policy_version") or ""),
         fallback_used=bool(execution_metadata.get("fallback_used")),
         fallback_reason=str(execution_metadata.get("fallback_reason") or ""),
+        requested_model_mode=resolved_model_selection.requested_mode,
+        requested_catalog_model_id=resolved_model_selection.requested_catalog_model_id,
+        effective_catalog_model_id=resolved_model_selection.effective_catalog_model_id,
+        model_snapshot_json=json.dumps(resolved_model_selection.model_snapshot, default=str),
+        model_policy_decision=resolved_model_selection.policy_decision,
+        model_policy_decision_reason=resolved_model_selection.policy_decision_reason,
+        model_entitlement_source=resolved_model_selection.entitlement_source,
+        model_selection_source=resolved_model_selection.selection_source,
+        model_selection_requested_at=resolved_model_selection.requested_at,
+        model_selection_configuration_version=resolved_model_selection.configuration_version,
         execution_started_at=execution_metadata.get("execution_started_at"),
         execution_ended_at=execution_metadata.get("execution_ended_at"),
         conversation_id=conversation.id,
@@ -3449,6 +3488,12 @@ def ask_chat_question(
     )
     db.add(investigation)
     db.flush()
+    if resolved_model_selection.audit_id:
+        selection_audit = db.get(
+            LLMModelSelectionAuditModel, resolved_model_selection.audit_id
+        )
+        if selection_audit is not None:
+            selection_audit.investigation_id = investigation.id
     if Settings.from_env().feature_agentic_investigation_enabled:
         from legacydb_copilot.services.investigation_state_machine import (
             InvestigationStateService,

@@ -129,6 +129,11 @@ class Settings:
     langgraph_fallback_on_persistence_failure: bool = False
     langgraph_fallback_on_validation_failure: bool = True
     langgraph_compare_response_source: str = "legacy"
+    model_selection_enabled: bool = False
+    model_selection_automatic_enabled: bool = False
+    model_selection_admin_enabled: bool = True
+    model_selection_default_catalog_model_id: str = ""
+    model_selection_fallback_enabled: bool = False
 
     @property
     def selected_reasoning_model(self) -> str:
@@ -311,5 +316,18 @@ class Settings:
                 ).strip().casefold()
                 == "langgraph"
                 else "legacy"
+            ),
+            model_selection_enabled=_env_bool("MODEL_SELECTION_ENABLED", False),
+            model_selection_automatic_enabled=_env_bool(
+                "MODEL_SELECTION_AUTOMATIC_ENABLED", False
+            ),
+            model_selection_admin_enabled=_env_bool(
+                "MODEL_SELECTION_ADMIN_ENABLED", True
+            ),
+            model_selection_default_catalog_model_id=os.getenv(
+                "MODEL_SELECTION_DEFAULT_CATALOG_MODEL_ID", ""
+            ).strip(),
+            model_selection_fallback_enabled=_env_bool(
+                "MODEL_SELECTION_FALLBACK_ENABLED", False
             ),
         )

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 DEFAULT_LLM_MODEL = "gpt-4.1-mini"
+# Provider model identifiers are configuration data. This tuple documents the
+# initial built-in capability profiles; it is not an authorization allowlist.
 SUPPORTED_LLM_MODELS = ("gpt-4.1-mini", "gpt-5-mini", "gpt-5.1")
 SUPPORTED_REASONING_EFFORTS = ("none", "low", "medium", "high")
 
@@ -18,9 +21,7 @@ def normalize_model_name(value: str | None) -> str | None:
     model = (value or "").strip()
     if not model:
         return None
-    if any(model == item or model.startswith(f"{item}-") for item in SUPPORTED_LLM_MODELS):
-        return model
-    return None
+    return model if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{1,159}", model) else None
 
 
 def safe_model_selection(candidate: str | None, fallback: str | None) -> tuple[str, str | None]:
@@ -32,8 +33,12 @@ def safe_model_selection(candidate: str | None, fallback: str | None) -> tuple[s
 def model_capabilities(model: str) -> ModelCapabilities:
     normalized = normalize_model_name(model)
     if normalized is None:
-        raise ValueError("Unsupported LLM model")
-    return ModelCapabilities(True, True, normalized.startswith(("gpt-5.1", "gpt-5-mini")))
+        raise ValueError("Invalid LLM model identifier")
+    return ModelCapabilities(
+        True,
+        True,
+        normalized.startswith(("gpt-5.1", "gpt-5-mini")),
+    )
 
 
 def normalize_reasoning_effort(value: str | None) -> str:

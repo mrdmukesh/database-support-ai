@@ -46,6 +46,7 @@ DEFAULT_ROLE_PERMISSIONS: dict[Role, set[str]] = {
         "chat:use",
         "admin:read",
         "admin.llm_audit.read",
+        "models:manage",
     },
     Role.DEVELOPER: {"documents:read", "chat:use", "incidents:write", "sql:analyze", "learning:feedback", "learning:read"},
     Role.DBA: {"database:manage", "database:read", "sql:approve", "incidents:manage", "documents:read", "learning:approve", "learning:read"},

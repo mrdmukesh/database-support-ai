@@ -796,9 +796,23 @@ def _missing_evidence_items(reasoning: ReasoningResult) -> list[str]:
 
 def _executive_key_findings_section(bundle: DynamicInvestigationBundle) -> ReportSection:
     focus = bundle.evidence_focus
-    current_condition = next((fact for fact in bundle.reasoning.confirmed_facts if " row(s) returned" in fact or " has " in fact), "")
+    deterministic_stop = bool(
+        (bundle.ai_debug_trace or {}).get("deterministic_stop_reason")
+    )
+    current_condition = (
+        bundle.reasoning.confirmed_facts[0]
+        if deterministic_stop and bundle.reasoning.confirmed_facts
+        else next(
+            (
+                fact
+                for fact in bundle.reasoning.confirmed_facts
+                if " row(s) returned" in fact or " has " in fact
+            ),
+            "",
+        )
+    )
     parent_supporting = ""
-    if bundle.metadata.tables:
+    if bundle.metadata.tables and not deterministic_stop:
         related = [
             table.name
             for table in bundle.metadata.tables[:6]
@@ -809,7 +823,14 @@ def _executive_key_findings_section(bundle: DynamicInvestigationBundle) -> Repor
         {"Finding": "Affected object", "Value": focus.affected_object if focus else "Not determined"},
         {"Finding": "Business key", "Value": focus.inferred_business_key if focus and focus.inferred_business_key else "Not determined"},
         {"Finding": "Current status / duplicate / missing condition", "Value": current_condition or "See evidence summary and root cause analysis."},
-        {"Finding": "Parent/supporting object", "Value": parent_supporting or "Not determined from available metadata."},
+        {
+            "Finding": "Parent/supporting object",
+            "Value": (
+                "No additional supporting object required after deterministic confirmation."
+                if deterministic_stop
+                else parent_supporting or "Not determined from available metadata."
+            ),
+        },
     ]
     return ReportSection(
         title="Key Findings",
@@ -1219,7 +1240,7 @@ def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]
     ):
         return ["Root cause not established from verified evidence."]
     if claims:
-        return claims[:3]
+        return [str(claim) for claim in claims[:3]]
     if ai_enabled and evidence_valid and (not llm_invoked or generated == 0 or verified == 0):
         return ["Root cause not established from verified evidence."]
     hypotheses = [

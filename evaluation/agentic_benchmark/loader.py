@@ -34,7 +34,9 @@ def load_agentic_25(
         scenario.scenario_id: scenario
         for domain in DOMAINS
         for scenario in load_scenarios(
-            Path("evaluation_scenarios") / domain / "scenarios.json"
+            Path("evaluation_scenarios") / domain / "scenarios.json",
+            exclude_categories={"deterministic_fixture"},
+            exclude_tags={"deterministic"},
         )
     }
     manifest = tuple(

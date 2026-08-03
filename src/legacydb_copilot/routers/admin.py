@@ -20,6 +20,23 @@ from legacydb_copilot.db.session import get_db_session
 from legacydb_copilot.schemas import AdminUserCreate, AdminUserUpdate, UserRead
 from legacydb_copilot.security import hash_password
 from legacydb_copilot.services.audit_service import record_audit_event
+from legacydb_copilot.config import Settings
+from legacydb_copilot.db.models import (
+    DatabaseConnectionModel,
+    InvestigationModel,
+    InvestigationAgenticStepModel,
+    InvestigationPlannerSelectionModel,
+    ExecutionPathTraceModel,
+    InvestigationFeedbackModel,
+    VerificationCheckModel,
+    WorkspaceModel,
+    WorkspaceMembershipModel,
+        AuditLogModel,
+        LLMInvocationAuditModel,
+)
+from pydantic import BaseModel
+import uuid
+import os
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -126,3 +143,180 @@ def admin_summary(
         ).scalar()
         or 0,
     }
+
+
+class CleanupConfirmation(BaseModel):
+    confirmation: str
+    keep_default_workspace: bool = True
+
+
+@router.post("/test-data-cleanup/preview")
+def preview_test_data_cleanup(
+    organization_id: str,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("admin:read")),
+) -> dict:
+    """Return a dry-run summary of what would be deleted for the organization."""
+    assert_same_organization(current_user, organization_id)
+    settings = Settings.from_env()
+    # Disallow in production
+    if settings.environment.name.lower() == "production":
+        raise HTTPException(status_code=403, detail="Cleanup is not allowed in production environment")
+
+    counts = {}
+    counts["connections"] = db.query(func.count(DatabaseConnectionModel.id)).filter(DatabaseConnectionModel.organization_id == organization_id).scalar() or 0
+    counts["workspaces"] = db.query(func.count(WorkspaceModel.id)).filter(WorkspaceModel.organization_id == organization_id).scalar() or 0
+    counts["workspace_memberships"] = db.query(func.count(WorkspaceMembershipModel.id)).filter(WorkspaceMembershipModel.organization_id == organization_id).scalar() or 0
+    counts["investigations"] = db.query(func.count(InvestigationModel.id)).filter(InvestigationModel.organization_id == organization_id).scalar() or 0
+    counts["agentic_steps"] = db.query(func.count(InvestigationAgenticStepModel.id)).filter(InvestigationAgenticStepModel.organization_id == organization_id).scalar() or 0
+    counts["planner_selections"] = db.query(func.count(InvestigationPlannerSelectionModel.id)).filter(InvestigationPlannerSelectionModel.organization_id == organization_id).scalar() or 0
+    counts["execution_traces"] = db.query(func.count(ExecutionPathTraceModel.id)).filter(ExecutionPathTraceModel.organization_id == organization_id).scalar() or 0
+    counts["feedback"] = db.query(func.count(InvestigationFeedbackModel.id)).filter(InvestigationFeedbackModel.organization_id == organization_id).scalar() or 0
+    counts["verification_checks"] = db.query(func.count(VerificationCheckModel.id)).filter(VerificationCheckModel.organization_id == organization_id).scalar() or 0
+
+    # Determine dependency order (FK-safe)
+    dependency_order = [
+        "reports_and_metadata",
+        "feedback",
+        "evidence",
+        "evidence_packages",
+        "llm_invocation_audit",
+        "prompt_audit",
+        "execution_traces",
+        "agentic_steps",
+        "planner_selections",
+        "verification_and_root_cause",
+        "graph_checkpoints",
+        "investigations",
+        "connection_workspace_mappings",
+        "connection_user_mappings",
+        "stored_credentials",
+        "database_connections",
+        "workspace_memberships",
+        "workspaces",
+    ]
+
+    shared = db.query(DatabaseConnectionModel.workspace_id).filter(DatabaseConnectionModel.organization_id == organization_id).distinct().all()
+    shared_workspaces = [s[0] for s in shared if s[0]]
+
+    return {
+        "counts": counts,
+        "dependency_order": dependency_order,
+        "shared_workspace_ids_sample": shared_workspaces[:10],
+        "zero_workspaces_supported": True,
+        "one_default_workspace_required": False,
+    }
+
+
+@router.post("/test-data-cleanup/execute")
+def execute_test_data_cleanup(
+    organization_id: str,
+    payload: CleanupConfirmation,
+    db: Annotated[Session, Depends(get_db_session)],
+    current_user=Depends(require_permission("admin:read")),
+) -> dict:
+    """Execute the destructive cleanup of test data for the organization.
+
+    This endpoint is protected and requires explicit confirmation text and an environment guard.
+    """
+    assert_same_organization(current_user, organization_id)
+    # Env guard
+    if os.getenv("ALLOW_TEST_DATA_CLEANUP", "false").lower() not in {"1", "true", "yes"}:
+        raise HTTPException(status_code=403, detail="Test data cleanup is disabled by environment")
+    settings = Settings.from_env()
+    if settings.environment.name.lower() == "production":
+        raise HTTPException(status_code=403, detail="Cleanup is not allowed in production environment")
+    if payload.confirmation != "DELETE TEST APP DATA":
+        raise HTTPException(status_code=400, detail="Confirmation text mismatch")
+
+    # perform transactional cleanup and gather detailed before counts
+    before_counts = {}
+    before_counts["connections"] = db.query(func.count(DatabaseConnectionModel.id)).filter(DatabaseConnectionModel.organization_id == organization_id).scalar() or 0
+    before_counts["workspaces"] = db.query(func.count(WorkspaceModel.id)).filter(WorkspaceModel.organization_id == organization_id).scalar() or 0
+    before_counts["investigations"] = db.query(func.count(InvestigationModel.id)).filter(InvestigationModel.organization_id == organization_id).scalar() or 0
+    before_counts["evidence"] = db.query(func.count(DocumentModel.id)).filter(DocumentModel.organization_id == organization_id).scalar() or 0
+    before_counts["reports"] = db.query(func.count(InvestigationModel.id)).filter(InvestigationModel.organization_id == organization_id, InvestigationModel.report_path != "").scalar() or 0
+    before_counts["users"] = db.query(func.count(UserModel.id)).filter(UserModel.organization_id == organization_id).scalar() or 0
+
+    # generate correlation id for structured audit logging
+    correlation_id = str(uuid.uuid4())
+    try:
+        # Use nested transaction when a transaction is already active (test client / request lifecycle)
+        tx = db.begin_nested() if db.in_transaction() else db.begin()
+        with tx:
+            # delete in FK-safe order using ORM model queries
+            db.query(VerificationCheckModel).filter(VerificationCheckModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(InvestigationFeedbackModel).filter(InvestigationFeedbackModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(ExecutionPathTraceModel).filter(ExecutionPathTraceModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(InvestigationAgenticStepModel).filter(InvestigationAgenticStepModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(InvestigationPlannerSelectionModel).filter(InvestigationPlannerSelectionModel.organization_id == organization_id).delete(synchronize_session=False)
+            # LLM invocation audit entries are stored without a FK to investigations; delete explicitly
+            db.query(LLMInvocationAuditModel).filter(LLMInvocationAuditModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(InvestigationModel).filter(InvestigationModel.organization_id == organization_id).delete(synchronize_session=False)
+            # stored credentials are in secret store; here we clear secret_ref values to empty string
+            db.query(DatabaseConnectionModel).filter(DatabaseConnectionModel.organization_id == organization_id).update({DatabaseConnectionModel.secret_ref: ""}, synchronize_session=False)
+            db.query(DatabaseConnectionModel).filter(DatabaseConnectionModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(WorkspaceMembershipModel).filter(WorkspaceMembershipModel.organization_id == organization_id).delete(synchronize_session=False)
+            db.query(WorkspaceModel).filter(WorkspaceModel.organization_id == organization_id).delete(synchronize_session=False)
+
+            # structured audit for start
+            record_audit_event(
+                db,
+                organization_id=organization_id,
+                user_id=current_user.id,
+                action="admin.test_data_cleanup.start",
+                resource_type="organization",
+                resource_id=organization_id,
+                metadata={"keeper_default_workspace": payload.keep_default_workspace, "correlation_id": correlation_id},
+            )
+
+    except Exception as exc:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {exc}") from exc
+
+    # post-check: gather after counts
+    after_counts = {}
+    after_counts["connections"] = db.query(func.count(DatabaseConnectionModel.id)).filter(DatabaseConnectionModel.organization_id == organization_id).scalar() or 0
+    after_counts["workspaces"] = db.query(func.count(WorkspaceModel.id)).filter(WorkspaceModel.organization_id == organization_id).scalar() or 0
+    after_counts["investigations"] = db.query(func.count(InvestigationModel.id)).filter(InvestigationModel.organization_id == organization_id).scalar() or 0
+    after_counts["evidence"] = db.query(func.count(DocumentModel.id)).filter(DocumentModel.organization_id == organization_id).scalar() or 0
+    after_counts["reports"] = db.query(func.count(InvestigationModel.id)).filter(InvestigationModel.organization_id == organization_id, InvestigationModel.report_path != "").scalar() or 0
+    after_counts["users"] = db.query(func.count(UserModel.id)).filter(UserModel.organization_id == organization_id).scalar() or 0
+
+    if after_counts["workspaces"] == 0 and payload.keep_default_workspace:
+        # create Default Workspace and membership
+        ws = WorkspaceModel(organization_id=organization_id, name="Default Workspace", slug="default")
+        db.add(ws)
+        db.flush()
+        membership = WorkspaceMembershipModel(organization_id=organization_id, workspace_id=ws.id, user_id=current_user.id, role="OWNER", is_active=True)
+        db.add(membership)
+        db.commit()
+        after_counts["workspaces"] = 1
+
+    # build summary
+    summary = {
+        "connections_deleted": max(0, before_counts.get("connections", 0) - after_counts.get("connections", 0)),
+        "workspaces_deleted": max(0, before_counts.get("workspaces", 0) - after_counts.get("workspaces", 0)),
+        "investigations_deleted": max(0, before_counts.get("investigations", 0) - after_counts.get("investigations", 0)),
+        "evidence_deleted": max(0, before_counts.get("evidence", 0) - after_counts.get("evidence", 0)),
+        "reports_deleted": max(0, before_counts.get("reports", 0) - after_counts.get("reports", 0)),
+        "users_deleted": max(0, before_counts.get("users", 0) - after_counts.get("users", 0)),
+        # physical DB deletions are not performed by this endpoint
+        "physical_databases_deleted": 0,
+    }
+
+    # final audit log entry via record_audit_event (include correlation id)
+    record_audit_event(
+        db,
+        organization_id=organization_id,
+        user_id=current_user.id,
+        action="admin.test_data_cleanup.final",
+        resource_type="organization",
+        resource_id=organization_id,
+        metadata={"before": before_counts, "after": after_counts, "env": settings.environment.name, "correlation_id": correlation_id, "summary": summary},
+    )
+
+    return {"status": "ok", "before": before_counts, "after": after_counts, "summary": summary, "correlation_id": correlation_id}

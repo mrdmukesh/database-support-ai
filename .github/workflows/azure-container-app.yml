@@ -16,7 +16,7 @@ env:
   AZURE_POSTGRES_ADMIN_USER: appadmin
   AZURE_STORAGE_ACCOUNT_PREFIX: stlegacydbplainapp
   AZURE_STORAGE_CONTAINER: app-artifacts
-  AZURE_KEY_VAULT_PREFIX: kvlegacydbplainapp
+  AZURE_KEY_VAULT_PREFIX: kvlegacydbapp
   LLM_REASONING_MODEL: gpt-5.1
   LLM_FALLBACK_MODEL: gpt-4.1-mini
   LLM_REASONING_EFFORT: medium

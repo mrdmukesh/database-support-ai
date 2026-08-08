@@ -343,8 +343,9 @@ def test_pgvector_schema_failure_is_isolated_to_nested_transaction() -> None:
         def execute(self, statement):
             raise SQLAlchemyError("extension vector is not allow-listed")
 
-    _ensure_pgvector_schema(PostgreSQLSession())  # type: ignore[arg-type]
+    ready = _ensure_pgvector_schema(PostgreSQLSession())  # type: ignore[arg-type]
 
+    assert ready is False
     assert events == ["enter", "rollback-savepoint"]
 
 

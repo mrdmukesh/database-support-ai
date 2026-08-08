@@ -438,7 +438,8 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
             KnowledgeChunkModel.document_version_id == version.id,
         ).delete(synchronize_session=False)
         inferred = infer_metadata(document.title, text_content)
-        _ensure_pgvector_schema(db)
+        if not _ensure_pgvector_schema(db):
+            return self.fallback.index_document(db, **kwargs)
         for index, chunk in enumerate(chunks):
             embedding = create_embedding(chunk, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
             if embedding is None:
@@ -503,7 +504,8 @@ class PgVectorKnowledgeRetriever(KnowledgeRetriever):
         )
         if embedding is None:
             return self.fallback.retrieve(db, query)
-        _ensure_pgvector_schema(db)
+        if not _ensure_pgvector_schema(db):
+            return self.fallback.retrieve(db, query)
         where_sql = [
             "organization_id = :organization_id",
             "workspace_id = :workspace_id",
@@ -720,8 +722,8 @@ def index_approved_knowledge_article(db: Session, article: KnowledgeArticleModel
         KnowledgeChunkModel.document_id.is_(None),
         KnowledgeChunkModel.source_title == article.title,
     ).delete(synchronize_session=False)
-    if use_pgvector:
-        _ensure_pgvector_schema(db)
+    if use_pgvector and not _ensure_pgvector_schema(db):
+        use_pgvector = False
     for index, chunk in enumerate(chunks):
         embedding = (
             create_embedding(chunk, settings=settings, dimensions=OPENAI_EMBEDDING_DIMENSIONS)
@@ -1421,7 +1423,7 @@ def _pgvector_ready(db: Session) -> bool:
     return db.bind is not None and db.bind.dialect.name == "postgresql"
 
 
-def _ensure_pgvector_schema(db: Session) -> None:
+def _ensure_pgvector_schema(db: Session) -> bool:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -1443,7 +1445,7 @@ def _ensure_pgvector_schema(db: Session) -> None:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
     if not _pgvector_ready(db):
-        return
+        return False
     try:
         with db.begin_nested():
             db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
@@ -1455,7 +1457,8 @@ def _ensure_pgvector_schema(db: Session) -> None:
                 )
             )
     except SQLAlchemyError:
-        return
+        return False
+    return True
 
 
 def _store_pgvector_embedding(db: Session, chunk_id: str, vector: list[float]) -> None:

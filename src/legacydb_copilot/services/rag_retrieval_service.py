@@ -1445,16 +1445,16 @@ def _ensure_pgvector_schema(db: Session) -> None:
     if not _pgvector_ready(db):
         return
     try:
-        db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        db.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
-        db.execute(
-            text(
-                "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
-                "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+        with db.begin_nested():
+            db.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            db.execute(text("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(1536)"))
+            db.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_cosine "
+                    "ON knowledge_chunks USING ivfflat (embedding vector_cosine_ops)"
+                )
             )
-        )
     except SQLAlchemyError:
-        db.rollback()
         return
 
 

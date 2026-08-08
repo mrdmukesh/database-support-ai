@@ -88,13 +88,14 @@ def create_document(
             metadata={"title": document.title, "filename": payload.filename},
         )
         try:
-            index_document_knowledge(
-                db,
-                organization_id=payload.organization_id,
-                workspace_id=payload.workspace_id,
-                document=document,
-                version=version,
-            )
+            with db.begin_nested():
+                index_document_knowledge(
+                    db,
+                    organization_id=payload.organization_id,
+                    workspace_id=payload.workspace_id,
+                    document=document,
+                    version=version,
+                )
         except Exception:
             pass
         db.commit()
@@ -186,13 +187,14 @@ async def upload_document(
             metadata={"title": document.title, "filename": filename, "size_bytes": len(content)},
         )
         try:
-            index_document_knowledge(
-                db,
-                organization_id=organization_id,
-                workspace_id=workspace_id,
-                document=document,
-                version=version,
-            )
+            with db.begin_nested():
+                index_document_knowledge(
+                    db,
+                    organization_id=organization_id,
+                    workspace_id=workspace_id,
+                    document=document,
+                    version=version,
+                )
         except Exception:
             pass
         db.commit()

@@ -21,6 +21,7 @@ from legacydb_copilot.services.rag_retrieval_service import (
     KnowledgeQuery,
     PgVectorKnowledgeRetriever,
     SQLiteKnowledgeRetriever,
+    _ensure_pgvector_schema,
     chunk_text,
     embed_text,
     keyword_fallback_retrieve,
@@ -320,6 +321,31 @@ def test_pgvector_schema_setup_is_non_fatal_when_extension_is_unavailable() -> N
             raise SQLAlchemyError("extension vector is not allow-listed")
 
     assert _try_enable_pgvector(UnsupportedVectorConnection()) is False
+
+
+def test_pgvector_schema_failure_is_isolated_to_nested_transaction() -> None:
+    events: list[str] = []
+
+    class NestedTransaction:
+        def __enter__(self):
+            events.append("enter")
+
+        def __exit__(self, exc_type, exc, traceback):
+            events.append("rollback-savepoint" if exc else "commit-savepoint")
+            return False
+
+    class PostgreSQLSession:
+        bind = type("Bind", (), {"dialect": type("Dialect", (), {"name": "postgresql"})()})()
+
+        def begin_nested(self):
+            return NestedTransaction()
+
+        def execute(self, statement):
+            raise SQLAlchemyError("extension vector is not allow-listed")
+
+    _ensure_pgvector_schema(PostgreSQLSession())  # type: ignore[arg-type]
+
+    assert events == ["enter", "rollback-savepoint"]
 
 
 def test_keyword_fallback_returns_documents_when_no_vectors(tmp_path) -> None:

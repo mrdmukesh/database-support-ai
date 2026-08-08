@@ -166,7 +166,8 @@ jobs:
                 --tier Burstable \
                 --storage-size 32 \
                 --version 16 \
-                --public-access 0.0.0.0
+                --public-access 0.0.0.0 \
+                --output none
             fi
 
             POSTGRES_STATE="$(az postgres flexible-server show \
@@ -218,7 +219,7 @@ jobs:
                 echo "::error::database-url secret is missing in Key Vault and AZURE_POSTGRES_ADMIN_PASSWORD was not provided."
                 exit 1
               fi
-              ENCODED_POSTGRES_PASSWORD="$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
+              ENCODED_POSTGRES_PASSWORD="$(POSTGRES_ADMIN_PASSWORD="$POSTGRES_ADMIN_PASSWORD" python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
               DATABASE_URL="postgresql+psycopg://${AZURE_POSTGRES_ADMIN_USER}:${ENCODED_POSTGRES_PASSWORD}@${POSTGRES_SERVER}.postgres.database.azure.com:5432/${AZURE_POSTGRES_DATABASE}?sslmode=require"
               az keyvault secret set \
                 --vault-name "$KEY_VAULT_NAME" \

@@ -134,6 +134,21 @@ jobs:
               --name azure-storage-connection-string \
               --value "$STORAGE_CONNECTION_STRING" >/dev/null
 
+            if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+              POSTGRES_ADMIN_PASSWORD="$(az keyvault secret show \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name postgres-admin-password \
+                --query value \
+                --output tsv 2>/dev/null || true)"
+            fi
+            if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+              POSTGRES_ADMIN_PASSWORD="$(openssl rand -base64 36 | tr -d '\n')Aa1!"
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name postgres-admin-password \
+                --value "$POSTGRES_ADMIN_PASSWORD" >/dev/null
+            fi
+
             if ! az postgres flexible-server show \
               --name "$POSTGRES_SERVER" \
               --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then

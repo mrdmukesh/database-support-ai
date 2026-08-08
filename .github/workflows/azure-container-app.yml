@@ -2,6 +2,9 @@ name: Deploy To Azure Container App
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 env:
   IMAGE_NAME: legacydb-support-copilot

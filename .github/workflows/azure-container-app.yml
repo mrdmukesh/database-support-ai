@@ -407,10 +407,6 @@ jobs:
               echo "::error::Container App has no ready revision after deployment."
               exit 1
             fi
-            az containerapp ingress traffic set \
-              --name "$AZURE_CONTAINER_APP_NAME" \
-              --resource-group "$AZURE_RESOURCE_GROUP" \
-              --revision-weight "$LATEST_READY_REVISION=100"
 
       - name: Show app URL
         uses: azure/cli@v2

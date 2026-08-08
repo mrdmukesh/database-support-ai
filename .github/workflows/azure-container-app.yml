@@ -9,17 +9,17 @@ on:
 env:
   IMAGE_NAME: legacydb-support-copilot
   REGISTRY: ghcr.io
-  AZURE_RESOURCE_GROUP: rg-database-support-ai-dev
+  AZURE_RESOURCE_GROUP: rg-legacydb-plain-app
   AZURE_LOCATION: centralindia
-  AZURE_CONTAINER_APP_NAME: ca-database-support-ai-dev
-  AZURE_CONTAINER_ENV_NAME: cae-database-support-ai-dev
+  AZURE_CONTAINER_APP_NAME: ca-legacydb-plain-app
+  AZURE_CONTAINER_ENV_NAME: cae-legacydb-plain-app
   CONTAINER_PORT: "8000"
-  AZURE_POSTGRES_SERVER_PREFIX: pg-dsai-dev
-  AZURE_POSTGRES_DATABASE: database_support_ai
+  AZURE_POSTGRES_SERVER_PREFIX: pg-legacydb-plain-app
+  AZURE_POSTGRES_DATABASE: legacydb_app
   AZURE_POSTGRES_ADMIN_USER: appadmin
-  AZURE_STORAGE_ACCOUNT_PREFIX: stdsai
+  AZURE_STORAGE_ACCOUNT_PREFIX: stlegacydbplainapp
   AZURE_STORAGE_CONTAINER: app-artifacts
-  AZURE_KEY_VAULT_PREFIX: kv-dsai-dev
+  AZURE_KEY_VAULT_PREFIX: kvlegacydbapp
   LLM_REASONING_MODEL: gpt-5.1
   LLM_FALLBACK_MODEL: gpt-4.1-mini
   LLM_REASONING_EFFORT: medium
@@ -137,6 +137,21 @@ jobs:
               --name azure-storage-connection-string \
               --value "$STORAGE_CONNECTION_STRING" >/dev/null
 
+            if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+              POSTGRES_ADMIN_PASSWORD="$(az keyvault secret show \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name postgres-admin-password \
+                --query value \
+                --output tsv 2>/dev/null || true)"
+            fi
+            if [ -z "${POSTGRES_ADMIN_PASSWORD:-}" ]; then
+              POSTGRES_ADMIN_PASSWORD="$(openssl rand -base64 36 | tr -d '\n')Aa1!"
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name postgres-admin-password \
+                --value "$POSTGRES_ADMIN_PASSWORD" >/dev/null
+            fi
+
             if ! az postgres flexible-server show \
               --name "$POSTGRES_SERVER" \
               --resource-group "$AZURE_RESOURCE_GROUP" >/dev/null 2>&1; then
@@ -154,7 +169,8 @@ jobs:
                 --tier Burstable \
                 --storage-size 32 \
                 --version 16 \
-                --public-access 0.0.0.0
+                --public-access 0.0.0.0 \
+                --output none
             fi
 
             POSTGRES_STATE="$(az postgres flexible-server show \
@@ -206,7 +222,7 @@ jobs:
                 echo "::error::database-url secret is missing in Key Vault and AZURE_POSTGRES_ADMIN_PASSWORD was not provided."
                 exit 1
               fi
-              ENCODED_POSTGRES_PASSWORD="$(python -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
+              ENCODED_POSTGRES_PASSWORD="$(POSTGRES_ADMIN_PASSWORD="$POSTGRES_ADMIN_PASSWORD" python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["POSTGRES_ADMIN_PASSWORD"], safe=""))')"
               DATABASE_URL="postgresql+psycopg://${AZURE_POSTGRES_ADMIN_USER}:${ENCODED_POSTGRES_PASSWORD}@${POSTGRES_SERVER}.postgres.database.azure.com:5432/${AZURE_POSTGRES_DATABASE}?sslmode=require"
               az keyvault secret set \
                 --vault-name "$KEY_VAULT_NAME" \
@@ -221,6 +237,15 @@ jobs:
                 --vault-name "$KEY_VAULT_NAME" \
                 --name jwt-secret \
                 --value "$(openssl rand -base64 48 | tr -d '\n')" >/dev/null
+            fi
+
+            if ! az keyvault secret show \
+              --vault-name "$KEY_VAULT_NAME" \
+              --name bootstrap-admin-password >/dev/null 2>&1; then
+              az keyvault secret set \
+                --vault-name "$KEY_VAULT_NAME" \
+                --name bootstrap-admin-password \
+                --value "$(openssl rand -base64 36 | tr -d '\n')Aa1!" >/dev/null
             fi
 
             if [ -n "${OPENAI_API_KEY:-}" ]; then
@@ -262,6 +287,11 @@ jobs:
               --name jwt-secret \
               --query value \
               --output tsv)"
+            BOOTSTRAP_ADMIN_PASSWORD="$(az keyvault secret show \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name bootstrap-admin-password \
+              --query value \
+              --output tsv)"
             STORAGE_CONNECTION_STRING="$(az keyvault secret show \
               --vault-name "$AZURE_KEY_VAULT_NAME" \
               --name azure-storage-connection-string \
@@ -291,9 +321,7 @@ jobs:
               "LANGGRAPH_ROLLOUT_PERCENT=100"
               "LANGGRAPH_SHADOW_PERCENT=0"
               "LANGGRAPH_SHADOW_LLM_ENABLED=false"
-              "EVALUATION_AZURE_CONNECTION_SYNC_ENABLED=true"
-              "EVAL_SQL_READER=legacydb_eval_reader"
-              "EVAL_SQL_READER_PASSWORD=secretref:eval-reader-password"
+              "EVALUATION_AZURE_CONNECTION_SYNC_ENABLED=false"
               "OPENAI_BASE_URL=$OPENAI_BASE_URL"
             )
             if [ -n "$OPENAI_API_KEY_VALUE" ]; then
@@ -310,6 +338,7 @@ jobs:
                 --secrets \
                   "database-url=$DATABASE_URL" \
                   "jwt-secret=$JWT_SECRET" \
+                  "bootstrap-admin-password=$BOOTSTRAP_ADMIN_PASSWORD" \
                   "storage-connection-string=$STORAGE_CONNECTION_STRING" \
                   "${OPENAI_SECRET_ARGS[@]}"
               az containerapp update \
@@ -321,6 +350,8 @@ jobs:
                   "APP_ENV=production" \
                   "DATABASE_URL=secretref:database-url" \
                   "JWT_SECRET=secretref:jwt-secret" \
+                  "BOOTSTRAP_ADMIN_EMAIL=mrdmukesh@gmail.com" \
+                  "BOOTSTRAP_ADMIN_PASSWORD=secretref:bootstrap-admin-password" \
                   "STORAGE_BACKEND=azure_blob" \
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
@@ -347,6 +378,7 @@ jobs:
                 --secrets \
                   "database-url=$DATABASE_URL" \
                   "jwt-secret=$JWT_SECRET" \
+                  "bootstrap-admin-password=$BOOTSTRAP_ADMIN_PASSWORD" \
                   "storage-connection-string=$STORAGE_CONNECTION_STRING" \
                   "${OPENAI_SECRET_ARGS[@]}" \
                 --env-vars \
@@ -354,6 +386,8 @@ jobs:
                   "APP_ENV=production" \
                   "DATABASE_URL=secretref:database-url" \
                   "JWT_SECRET=secretref:jwt-secret" \
+                  "BOOTSTRAP_ADMIN_EMAIL=mrdmukesh@gmail.com" \
+                  "BOOTSTRAP_ADMIN_PASSWORD=secretref:bootstrap-admin-password" \
                   "STORAGE_BACKEND=azure_blob" \
                   "AZURE_STORAGE_CONNECTION_STRING=secretref:storage-connection-string" \
                   "AZURE_STORAGE_CONTAINER=$AZURE_STORAGE_CONTAINER" \
@@ -376,10 +410,6 @@ jobs:
               echo "::error::Container App has no ready revision after deployment."
               exit 1
             fi
-            az containerapp ingress traffic set \
-              --name "$AZURE_CONTAINER_APP_NAME" \
-              --resource-group "$AZURE_RESOURCE_GROUP" \
-              --revision-weight "$LATEST_READY_REVISION=100"
 
       - name: Show app URL
         uses: azure/cli@v2

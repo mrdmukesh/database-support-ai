@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createConnection, deleteConnection, listConnections, testConnection, updateConnection } from "./connection-api";
+import { createConnection, deleteConnection, listConnections, refreshMetadata, testConnection, updateConnection } from "./connection-api";
 
 const connection = { id: "CONN-1", organization_id: "ORG-1", workspace_id: "WS-1", engine: "mysql", name: "ERP", is_active: true };
 afterEach(() => vi.unstubAllGlobals());
@@ -31,5 +31,16 @@ describe("connection API", () => {
     await deleteConnection("CONN-1");
     await expect(testConnection("CONN-1")).resolves.toMatchObject({ is_valid: false });
     expect(fetchMock.mock.calls[1][0]).toBe("http://127.0.0.1:8001/databases/connections/CONN-1/test");
+  });
+
+  it("refreshes metadata for the exact selected connection ID", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ status: "READY", version: 4, counts: {}, completeness: {}, last_refresh: "2026-08-09T19:30:00Z" })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await refreshMetadata("CONN-A");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://127.0.0.1:8001/databases/connections/CONN-A/metadata/refresh");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("POST");
   });
 });

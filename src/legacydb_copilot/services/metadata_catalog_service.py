@@ -326,7 +326,7 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
 def active_snapshot(
     db: Session, *, organization_id: str, workspace_id: str, connection_id: str
 ) -> MetadataSnapshotModel | None:
-    return (
+    snapshots = (
         db.query(MetadataSnapshotModel)
         .filter_by(
             organization_id=organization_id,
@@ -335,8 +335,15 @@ def active_snapshot(
             is_active=True,
             status="READY",
         )
-        .first()
+        .limit(2)
+        .all()
     )
+    if len(snapshots) > 1:
+        raise RuntimeError(
+            "Metadata catalog integrity violation: multiple active snapshots exist "
+            f"for connection_id={connection_id}"
+        )
+    return snapshots[0] if snapshots else None
 
 
 def refresh_metadata(db: Session, *, connection, connector) -> MetadataSnapshotModel:
@@ -463,6 +470,9 @@ def snapshot_summary(snapshot: MetadataSnapshotModel | None) -> dict[str, Any]:
         }
     return {
         "snapshot_id": snapshot.id,
+        "organization_id": snapshot.organization_id,
+        "workspace_id": snapshot.workspace_id,
+        "connection_id": snapshot.connection_id,
         "status": snapshot.status,
         "version": snapshot.version,
         "last_refresh": snapshot.completed_at,
@@ -537,6 +547,14 @@ def schema_metadata_from_catalog(db: Session, snapshot: MetadataSnapshotModel) -
             "enrichment_loaded": True,
             "relationship_metadata_status": "catalog",
         }
+    refreshed_at = snapshot.completed_at
+    if refreshed_at is not None and refreshed_at.tzinfo is None:
+        refreshed_at = refreshed_at.replace(tzinfo=UTC)
+    metadata_age_seconds = (
+        max(0.0, (datetime.now(UTC) - refreshed_at).total_seconds())
+        if refreshed_at
+        else None
+    )
     return SchemaMetadata(
         "sql_server",
         names("TABLE"),
@@ -546,12 +564,15 @@ def schema_metadata_from_catalog(db: Session, snapshot: MetadataSnapshotModel) -
         cache_diagnostics={
             "cache_hit": True,
             "cache_source": "persistent_metadata_catalog",
+            "connection_id": snapshot.connection_id,
             "metadata_snapshot_id": snapshot.id,
             "metadata_snapshot_version": snapshot.version,
             "metadata_last_refreshed_at": snapshot.completed_at.isoformat()
             if snapshot.completed_at
             else None,
             "schema_hash": snapshot.schema_hash,
+            "metadata_fingerprint": snapshot.schema_hash,
+            "metadata_age_seconds": metadata_age_seconds,
         },
         table_schemas=table_schemas,
     )

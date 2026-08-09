@@ -313,8 +313,18 @@ def test_user_cannot_access_another_workspace_database(
     ).json()
 
     response = client.get(f"/databases/connections/{connection['id']}/schema", headers=scoped_headers_a)
+    metadata_response = client.get(
+        f"/databases/connections/{connection['id']}/metadata",
+        headers=scoped_headers_a,
+    )
+    refresh_response = client.post(
+        f"/databases/connections/{connection['id']}/metadata/refresh",
+        headers=scoped_headers_a,
+    )
 
     assert response.status_code == 403
+    assert metadata_response.status_code == 403
+    assert refresh_response.status_code == 403
 
 
 def test_audit_events_are_written_for_login_and_connection_create(

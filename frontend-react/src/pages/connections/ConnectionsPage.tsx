@@ -113,7 +113,9 @@ export function ConnectionsPage() {
       const summary = await refreshMetadata(connection.id);
       setMetadata((current) => ({ ...current, [connection.id]: summary }));
       setMessage(summary.changes?.structural_change === false ? "Metadata is unchanged." : "Metadata catalog refreshed.");
-    } catch (cause) { setError(messageOf(cause)); }
+    } catch (cause) {
+      setError(`Metadata refresh failed. The previous metadata snapshot remains active. ${messageOf(cause)}`);
+    }
     finally { setRefreshingIds((current) => { const next=new Set(current); next.delete(connection.id); return next; }); }
   }
 

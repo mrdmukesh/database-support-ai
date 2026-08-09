@@ -156,6 +156,14 @@ def test_refresh_activates_complete_snapshot_and_reuses_it(db_and_connection):
     cached = catalog.schema_metadata_from_catalog(db, snapshot)
     assert cached.tables == ["dbo.Orders"]
     assert cached.cache_diagnostics["cache_source"] == "persistent_metadata_catalog"
+    assert cached.cache_diagnostics["connection_id"] == connection.id
+    assert cached.cache_diagnostics["metadata_snapshot_id"] == snapshot.id
+    assert cached.cache_diagnostics["metadata_snapshot_version"] == snapshot.version
+    assert cached.cache_diagnostics["metadata_fingerprint"] == snapshot.schema_hash
+    assert not any(
+        sensitive in str(cached.cache_diagnostics).lower()
+        for sensitive in ("password", "connection_string", "env://test")
+    )
 
     class NoLiveMetadata:
         def __getattr__(self, name):
@@ -220,6 +228,105 @@ def test_tenant_scope_prevents_cross_workspace_lookup(db_and_connection):
         )
         is None
     )
+
+
+def test_same_database_name_remains_isolated_by_connection(db_and_connection):
+    db, connection_a = db_and_connection
+    connection_b = DatabaseConnectionModel(
+        organization_id=connection_a.organization_id,
+        workspace_id=connection_a.workspace_id,
+        engine="sql_server",
+        name="Second Connection",
+        database_name=connection_a.database_name,
+        secret_ref="env://SECOND_TEST",
+        environment_type="test",
+    )
+    db.add(connection_b)
+    db.commit()
+    first = catalog.refresh_metadata(
+        db, connection=connection_a, connector=FakeSqlServerConnector()
+    )
+    second = catalog.refresh_metadata(
+        db,
+        connection=connection_b,
+        connector=FakeSqlServerConnector(
+            definition="CREATE PROCEDURE dbo.FindOrder AS SELECT 2"
+        ),
+    )
+    assert first.connection_id == connection_a.id
+    assert second.connection_id == connection_b.id
+    assert first.schema_hash != second.schema_hash
+    assert db.get(MetadataSnapshotModel, first.id).is_active is True
+    assert db.get(MetadataSnapshotModel, second.id).is_active is True
+
+
+def test_same_display_and_workspace_names_across_tenants_do_not_leak(
+    db_and_connection,
+):
+    db, connection_a = db_and_connection
+    other_org = OrganizationModel(name="Other Org", slug="other-org")
+    db.add(other_org)
+    db.flush()
+    other_workspace = WorkspaceModel(
+        organization_id=other_org.id, name="Workspace", slug="workspace"
+    )
+    db.add(other_workspace)
+    db.flush()
+    connection_b = DatabaseConnectionModel(
+        organization_id=other_org.id,
+        workspace_id=other_workspace.id,
+        engine="sql_server",
+        name=connection_a.name,
+        database_name=connection_a.database_name,
+        secret_ref="env://OTHER_TENANT_TEST",
+        environment_type="test",
+    )
+    db.add(connection_b)
+    db.commit()
+    snapshot_b = catalog.refresh_metadata(
+        db, connection=connection_b, connector=FakeSqlServerConnector()
+    )
+    assert (
+        catalog.active_snapshot(
+            db,
+            organization_id=connection_a.organization_id,
+            workspace_id=connection_a.workspace_id,
+            connection_id=connection_b.id,
+        )
+        is None
+    )
+    assert snapshot_b.organization_id == other_org.id
+    assert snapshot_b.workspace_id == other_workspace.id
+
+
+def test_multiple_active_snapshots_fail_closed(db_and_connection):
+    db, connection = db_and_connection
+    for version in (1, 2):
+        db.add(
+            MetadataSnapshotModel(
+                organization_id=connection.organization_id,
+                workspace_id=connection.workspace_id,
+                connection_id=connection.id,
+                version=version,
+                status="READY",
+                is_active=True,
+            )
+        )
+    db.commit()
+    with pytest.raises(RuntimeError, match="multiple active snapshots"):
+        catalog.active_snapshot(
+            db,
+            organization_id=connection.organization_id,
+            workspace_id=connection.workspace_id,
+            connection_id=connection.id,
+        )
+
+
+def test_catalog_models_do_not_contain_credentials():
+    forbidden = {"connection_string", "password", "secret", "token", "credential"}
+    for model in (MetadataSnapshotModel, MetadataObjectModel):
+        columns = {column.name.lower() for column in model.__table__.columns}
+        assert not any(term in column for column in columns for term in forbidden)
 
 
 def test_concurrent_refresh_returns_active_snapshot(db_and_connection, monkeypatch):

@@ -18,8 +18,16 @@ from legacydb_copilot.services.metadata_search_service import search_metadata
 
 
 class FakeSqlServerConnector:
-    def __init__(self, *, definition="CREATE PROCEDURE dbo.FindOrder AS SELECT * FROM dbo.Orders"):
+    def __init__(
+        self,
+        *,
+        definition="CREATE PROCEDURE dbo.FindOrder AS SELECT * FROM dbo.Orders",
+        dependency_rows=None,
+        reject_column_dependency_query: bool = False,
+    ):
         self.definition = definition
+        self.dependency_rows = dependency_rows
+        self.reject_column_dependency_query = reject_column_dependency_query
         self.queries: list[str] = []
 
     def execute_read_only_query(self, sql, limit=1000):
@@ -50,7 +58,7 @@ class FakeSqlServerConnector:
                     "object_id": 2,
                     "schema_name": "dbo",
                     "object_name": "FindOrder",
-                    "object_code": "P",
+                    "object_code": "P ",
                     "object_type": "SQL_STORED_PROCEDURE",
                     "column_id": None,
                     "column_name": None,
@@ -74,15 +82,21 @@ class FakeSqlServerConnector:
         if "FROM sys.foreign_keys" in sql:
             return []
         if "FROM sys.sql_expression_dependencies" in sql:
-            return [
+            if self.reject_column_dependency_query and "LEFT JOIN sys.columns rc" in sql:
+                raise RuntimeError("optional dependency column detail unavailable")
+            return self.dependency_rows or [
                 {
                     "source_schema": "dbo",
                     "source_name": "FindOrder",
-                    "source_type": "P",
+                    "source_type": "P ",
                     "referenced_database_name": None,
                     "referenced_schema_name": "dbo",
                     "referenced_entity_name": "Orders",
-                    "referenced_minor_name": None,
+                    "referenced_id": 1,
+                    "referenced_minor_id": 1,
+                    "referenced_column_name": "OrderId",
+                    "referenced_class_desc": "OBJECT_OR_COLUMN",
+                    "is_schema_bound_reference": False,
                     "is_ambiguous": False,
                     "is_caller_dependent": False,
                 }
@@ -132,6 +146,104 @@ def test_discovery_is_set_based_read_only_and_builds_graph():
     assert any(r.relationship_type == "READS" for r in found.relationships)
     assert any(r.relationship_type == "INDEX_ON" for r in found.relationships)
     assert len(connector.queries) == 5
+    dependency = next(r for r in found.relationships if r.relationship_type == "READS")
+    assert dependency.target_column == "OrderId"
+    assert dependency.metadata["column_detail_available"] is True
+
+
+def test_dependency_without_optional_column_name_uses_object_level_relationship():
+    connector = FakeSqlServerConnector(
+        reject_column_dependency_query=True,
+        dependency_rows=[
+            {
+                "source_schema": "dbo",
+                "source_name": "FindOrder",
+                "source_type": "P",
+                "referenced_database_name": None,
+                "referenced_schema_name": "dbo",
+                "referenced_entity_name": "Orders",
+                "is_ambiguous": False,
+                "is_caller_dependent": False,
+            }
+        ],
+    )
+
+    found = catalog.discover_sql_server_catalog(connector)
+
+    dependency = next(r for r in found.relationships if r.relationship_type == "READS")
+    assert dependency.target_column == ""
+    assert dependency.metadata["column_detail_available"] is False
+    assert found.completeness["dependency_columns"] == "unavailable"
+    assert all(query.lstrip().upper().startswith("SELECT") for query in connector.queries)
+
+
+def test_external_dependency_without_local_id_remains_object_level():
+    connector = FakeSqlServerConnector(
+        dependency_rows=[
+            {
+                "source_schema": "dbo",
+                "source_name": "FindOrder",
+                "source_type": "P",
+                "referenced_database_name": "ArchiveDb",
+                "referenced_schema_name": "history",
+                "referenced_entity_name": "Orders",
+                "referenced_id": None,
+                "referenced_minor_id": 1,
+                "referenced_column_name": None,
+                "referenced_class_desc": "OBJECT_OR_COLUMN",
+                "is_schema_bound_reference": False,
+                "is_ambiguous": False,
+                "is_caller_dependent": False,
+            }
+        ]
+    )
+
+    found = catalog.discover_sql_server_catalog(connector)
+
+    dependency = next(r for r in found.relationships if r.relationship_type == "READS")
+    assert dependency.target_key.startswith("external:archivedb.history.orders")
+    assert dependency.target_column == ""
+    assert dependency.metadata["external"] is True
+
+
+def test_local_dependency_with_unresolved_minor_id_remains_object_level():
+    connector = FakeSqlServerConnector(
+        dependency_rows=[
+            {
+                "source_schema": "dbo",
+                "source_name": "FindOrder",
+                "source_type": "P",
+                "referenced_database_name": None,
+                "referenced_schema_name": "dbo",
+                "referenced_entity_name": "Orders",
+                "referenced_id": 1,
+                "referenced_minor_id": 99,
+                "referenced_column_name": None,
+                "referenced_class_desc": "OBJECT_OR_COLUMN",
+                "is_schema_bound_reference": False,
+                "is_ambiguous": False,
+                "is_caller_dependent": False,
+            }
+        ]
+    )
+
+    found = catalog.discover_sql_server_catalog(connector)
+
+    dependency = next(r for r in found.relationships if r.relationship_type == "READS")
+    assert dependency.target_key == "object:dbo.orders"
+    assert dependency.target_column == ""
+    assert dependency.metadata["column_detail_available"] is False
+
+
+def test_dynamic_sql_dependency_is_uncertain_even_when_catalog_row_exists():
+    connector = FakeSqlServerConnector(
+        definition="CREATE PROCEDURE dbo.FindOrder AS EXEC(@sql)"
+    )
+
+    found = catalog.discover_sql_server_catalog(connector)
+
+    dependency = next(r for r in found.relationships if r.relationship_type == "READS")
+    assert dependency.metadata["uncertain"] is True
 
 
 def test_stable_fingerprint_and_definition_change():

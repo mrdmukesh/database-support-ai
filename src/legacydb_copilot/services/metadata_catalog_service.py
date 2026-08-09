@@ -114,6 +114,42 @@ def _qname(schema: Any, name: Any) -> str:
     return f"{schema}.{name}" if schema else str(name)
 
 
+def _discover_dependency_rows(connector) -> tuple[list[dict[str, Any]], bool]:
+    """Read dependencies with optional local column resolution."""
+    try:
+        rows = connector.execute_read_only_query(
+            """
+SELECT ss.name source_schema,so.name source_name,so.type source_type,
+       d.referencing_id,d.referencing_minor_id,d.referenced_id,d.referenced_minor_id,
+       d.referenced_database_name,d.referenced_schema_name,d.referenced_entity_name,
+       d.referenced_class_desc,d.is_schema_bound_reference,
+       d.is_ambiguous,d.is_caller_dependent,rc.name referenced_column_name
+FROM sys.sql_expression_dependencies d
+JOIN sys.objects so ON so.object_id=d.referencing_id
+JOIN sys.schemas ss ON ss.schema_id=so.schema_id
+LEFT JOIN sys.columns rc
+  ON rc.object_id=d.referenced_id AND rc.column_id=d.referenced_minor_id
+WHERE so.is_ms_shipped=0""",
+            limit=100000,
+        )
+        return rows, True
+    except Exception:
+        # Column-level catalog detail is optional. Object-level dependencies
+        # remain useful on engines that expose a reduced compatibility view.
+        rows = connector.execute_read_only_query(
+            """
+SELECT ss.name source_schema,so.name source_name,so.type source_type,
+       d.referenced_database_name,d.referenced_schema_name,d.referenced_entity_name,
+       d.is_ambiguous,d.is_caller_dependent
+FROM sys.sql_expression_dependencies d
+JOIN sys.objects so ON so.object_id=d.referencing_id
+JOIN sys.schemas ss ON ss.schema_id=so.schema_id
+WHERE so.is_ms_shipped=0""",
+            limit=100000,
+        )
+        return rows, False
+
+
 def discover_sql_server_catalog(connector) -> DiscoveredCatalog:
     """Read SQL Server structure in bounded, set-based SELECTs; never execute user modules."""
     object_rows = connector.execute_read_only_query(
@@ -147,15 +183,7 @@ JOIN sys.tables st ON st.object_id=fkc.parent_object_id JOIN sys.schemas ss ON s
 JOIN sys.tables tt ON tt.object_id=fkc.referenced_object_id JOIN sys.schemas ts ON ts.schema_id=tt.schema_id JOIN sys.columns tc ON tc.object_id=tt.object_id AND tc.column_id=fkc.referenced_column_id""",
         limit=100000,
     )
-    dependency_rows = connector.execute_read_only_query(
-        """
-SELECT ss.name source_schema,so.name source_name,so.type source_type,
-       d.referenced_database_name,d.referenced_schema_name,d.referenced_entity_name,d.referenced_minor_name,
-       d.is_ambiguous,d.is_caller_dependent
-FROM sys.sql_expression_dependencies d JOIN sys.objects so ON so.object_id=d.referencing_id JOIN sys.schemas ss ON ss.schema_id=so.schema_id
-WHERE so.is_ms_shipped=0""",
-        limit=100000,
-    )
+    dependency_rows, dependency_columns_available = _discover_dependency_rows(connector)
     completeness = {
         "objects": "complete",
         "columns": "complete",
@@ -163,6 +191,9 @@ WHERE so.is_ms_shipped=0""",
         "foreign_keys": "complete",
         "definitions": "complete",
         "dependencies": "complete",
+        "dependency_columns": (
+            "available" if dependency_columns_available else "unavailable"
+        ),
     }
     try:
         module_rows = connector.execute_read_only_query(
@@ -191,7 +222,8 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
     source_database = ""
     for row in object_rows:
         source_database = source_database or str(row.get("source_database") or "")
-        typ = code_map.get(str(row.get("object_code")), str(row.get("object_type") or "OBJECT"))
+        object_code = str(row.get("object_code") or "").strip()
+        typ = code_map.get(object_code, str(row.get("object_type") or "OBJECT"))
         key = (typ, str(row.get("schema_name") or ""), str(row.get("object_name") or ""))
         item = grouped.setdefault(
             key, {"source_object_id": str(row.get("object_id") or ""), "columns": []}
@@ -279,7 +311,7 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
         "TR": "trigger",
     }
     for row in dependency_rows:
-        source_type = type_prefix.get(str(row.get("source_type")), "object")
+        source_type = type_prefix.get(str(row.get("source_type") or "").strip(), "object")
         source = f"{source_type}:{_qname(row.get('source_schema'), row.get('source_name'))}".lower()
         external = bool(row.get("referenced_database_name"))
         target_name = _qname(row.get("referenced_schema_name"), row.get("referenced_entity_name"))
@@ -293,6 +325,14 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
                 (str(row.get("source_schema") or ""), str(row.get("source_name") or ""))
             )
             or ""
+        )
+        dynamic_sql = bool(re.search(r"\b(?:sp_executesql|EXEC\s*\()", definition, re.I))
+        referenced_id = row.get("referenced_id")
+        referenced_minor_id = row.get("referenced_minor_id")
+        referenced_column = (
+            str(row.get("referenced_column_name") or "")
+            if referenced_id and referenced_minor_id
+            else ""
         )
         rel_type = "REFERENCES"
         if source_type == "procedure" and re.search(
@@ -312,11 +352,18 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
                 source,
                 target,
                 rel_type,
-                target_column=str(row.get("referenced_minor_name") or ""),
+                target_column=referenced_column,
                 metadata={
                     "source": "SQL_EXPRESSION_DEPENDENCY",
                     "external": external,
-                    "uncertain": bool(row.get("is_ambiguous") or row.get("is_caller_dependent")),
+                    "uncertain": bool(
+                        row.get("is_ambiguous")
+                        or row.get("is_caller_dependent")
+                        or dynamic_sql
+                    ),
+                    "column_detail_available": bool(referenced_column),
+                    "referenced_class_desc": row.get("referenced_class_desc"),
+                    "is_schema_bound_reference": row.get("is_schema_bound_reference"),
                 },
             )
         )

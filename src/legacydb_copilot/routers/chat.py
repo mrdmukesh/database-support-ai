@@ -710,6 +710,10 @@ def _evidence_to_json(evidence) -> str:
                 "evidence_semantics": item.evidence_semantics,
                 "supports_claim": item.supports_claim,
                 "evidence_relevance": item.evidence_relevance,
+                "entity_table": item.entity_table,
+                "identifier_column": item.identifier_column,
+                "identifier_value": item.identifier_value,
+                "row_scope": item.row_scope,
                 "scan_policy_decision": item.scan_policy_decision,
                 # Keep the complete bounded result as the canonical persisted
                 # evidence.  sample_rows remains for backwards-compatible
@@ -2303,6 +2307,10 @@ def _run_dynamic_investigation(
         procedure_analysis=procedure_analysis,
         documents=context.documents,
     )
+    # The authoritative-source proof path was removed on main. Keep the focus
+    # contract explicit until a database-backed identifier has been resolved by
+    # the active investigation path.
+    resolved_identifier = None
     evidence_focus = build_evidence_focus(
         question=payload.question,
         intent=intent.intent,
@@ -2312,6 +2320,12 @@ def _run_dynamic_investigation(
         correlated_evidence=correlated_evidence,
         procedure_analysis=procedure_analysis,
         documents=context.documents,
+        resolved_identifier_column=(
+            resolved_identifier.column if resolved_identifier is not None else ""
+        ),
+        resolved_identifier_value=(
+            resolved_identifier.value if resolved_identifier is not None else None
+        ),
     )
     evidence_gate = run_evidence_gate(
         question=payload.question,
@@ -2604,6 +2618,15 @@ def _run_dynamic_investigation(
                     "zero_row_result": item.zero_row_result,
                     "evidence_semantics": item.evidence_semantics,
                     "supports_claim": item.supports_claim,
+                    "parameters": item.parameters,
+                    "column_types": item.column_types,
+                    "nullable_columns": list(item.nullable_columns),
+                    "sample_rows": item.rows[:5],
+                    "exact_cardinality_result": item.exact_cardinality_result,
+                    "entity_table": item.entity_table,
+                    "identifier_column": item.identifier_column,
+                    "identifier_value": item.identifier_value,
+                    "row_scope": item.row_scope,
                     "scan_policy_decision": item.scan_policy_decision,
                     "error": item.error,
                 }
@@ -3698,6 +3721,18 @@ def _active_connector_for_investigation(db: Session, investigation: Investigatio
         raise HTTPException(status_code=400, detail=f"Verification connection failed: {exc}") from exc
 
 
+def _verification_json_object(value: object) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
 @router.get("/investigations/{investigation_id}/verification-checks", response_model=list[VerificationCheckRead])
 def list_verification_checks(
     investigation_id: str,
@@ -3773,7 +3808,7 @@ def run_verification_check(
         expected_result=check.expected_result,
         source=check.source,
         verified_by=current_user.email or current_user.full_name or current_user.id,
-        parameters=check.parameters,
+        parameters=_verification_json_object(check.parameters),
     )[0]
     check.verification_sql = sql
     check.actual_result_summary = result.actual_result_summary
@@ -3901,7 +3936,7 @@ def run_all_verification_checks(
             expected_result=check.expected_result,
             source=check.source,
             verified_by=verified_by,
-            parameters=check.parameters,
+            parameters=_verification_json_object(check.parameters),
         )[0]
         check.actual_result_summary = result.actual_result_summary
         check.actual_result = result.actual_result

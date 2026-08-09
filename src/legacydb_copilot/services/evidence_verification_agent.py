@@ -221,14 +221,13 @@ def suggest_verification_checks(
     if fix_check:
         checks.append(fix_check)
     checks.append(_suggest_proof_sql_is_read_only(evidence))
-    evidence_by_sql = {item.sql.strip(): item for item in evidence}
     enriched: list[SuggestedVerificationCheck] = []
     for check in checks:
-        matched = evidence_by_sql.get(check.verification_sql.strip())
+        matched = _matching_verification_evidence(check.verification_sql, evidence)
         if matched is None:
             enriched.append(check)
             continue
-        parameters = dict(getattr(matched, "parameters", {}) or {})
+        parameters = _verification_parameters(check.verification_sql, matched)
         enriched.append(
             SuggestedVerificationCheck(
                 **{
@@ -238,14 +237,76 @@ def suggest_verification_checks(
                         name: type(value).__name__ for name, value in parameters.items()
                     },
                     "evidence_id": matched.evidence_id,
-                    "entity_table": getattr(matched, "entity_table", ""),
-                    "resolved_entity_scope": getattr(matched, "row_scope", ""),
-                    "identifier_column": getattr(matched, "identifier_column", ""),
-                    "identifier_value": getattr(matched, "identifier_value", ""),
+                    "entity_table": matched.entity_table,
+                    "resolved_entity_scope": matched.row_scope,
+                    "identifier_column": matched.identifier_column,
+                    "identifier_value": matched.identifier_value,
                 }
             )
         )
     return enriched
+
+
+def _matching_verification_evidence(
+    sql: str,
+    evidence: list[EvidenceResult],
+) -> EvidenceResult | None:
+    """Find the parameter-bearing evidence behind a displayed verification query."""
+    normalized = _normalized_verification_sql(sql)
+    candidates = [
+        item
+        for item in evidence
+        if normalized
+        in {
+            _normalized_verification_sql(item.sql),
+            _normalized_verification_sql(item.original_sql or ""),
+        }
+    ]
+    if not candidates:
+        bind_names = set(_required_bind_parameters(sql))
+        candidates = [
+            item
+            for item in evidence
+            if bind_names
+            and bind_names.issubset(item.parameters)
+            and (
+                not item.entity_table
+                or item.entity_table.casefold() in sql.casefold()
+            )
+        ]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda item: (
+            bool(item.parameters),
+            item.identifier_value is not None,
+            bool(item.entity_table),
+        ),
+    )
+
+
+def _verification_parameters(sql: str, evidence: EvidenceResult) -> dict[str, Any]:
+    required = _required_bind_parameters(sql)
+    parameters = {
+        name: evidence.parameters[name]
+        for name in required
+        if name in evidence.parameters
+    }
+    missing = [name for name in required if name not in parameters]
+    if len(missing) == 1 and evidence.identifier_value is not None:
+        parameters[missing[0]] = evidence.identifier_value
+    return parameters
+
+
+def _required_bind_parameters(sql: str) -> tuple[str, ...]:
+    return tuple(sorted(set(re.findall(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)", sql))))
+
+
+def _normalized_verification_sql(sql: str) -> str:
+    normalized = re.sub(r"\bselect\s+top\s*\(\s*\d+\s*\)\s+", "select ", sql, flags=re.I)
+    normalized = normalized.replace("[", "").replace("]", "")
+    return re.sub(r"\s+", " ", normalized.strip().rstrip(";")).casefold()
 
 
 def execute_verification_check(
@@ -281,7 +342,7 @@ def execute_verification_check(
     """
 
     bound_parameters = dict(parameters or {})
-    required = set(re.findall(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)", verification_sql))
+    required = set(_required_bind_parameters(verification_sql))
     missing = tuple(sorted(name for name in required if name not in bound_parameters))
     if missing:
         rows, error = [], None

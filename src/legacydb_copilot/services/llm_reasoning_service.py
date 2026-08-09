@@ -1178,6 +1178,9 @@ def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "evidence_type": "SQL",
             "source_object": item.get("purpose"),
             "sql_result_summary": item.get("error") or f"{item.get('row_count', 0)} row(s) returned",
+            "evidence_semantics": item.get("evidence_semantics"),
+            "columns": item.get("columns") or [],
+            "typed_facts": _typed_sql_facts(item),
         }
         for item in (evidence_refs.get("sql") or [])
         if isinstance(item, dict)
@@ -1220,8 +1223,33 @@ def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
         "procedure_evidence": procedure_summary[:20],
         "relationship_evidence": relationship_summary[:20],
         "contains_raw_rows": False,
-        "note": "Summary only; unmasked rows and PII are not persisted in AI debug trace.",
+        "note": "Bounded typed facts are retained; unmasked raw rows and PII are not persisted in AI debug trace.",
     }
+
+
+def _typed_sql_facts(item: dict[str, Any]) -> list[dict[str, Any]]:
+    """Preserve value state without copying unrestricted rows into diagnostics."""
+    facts: list[dict[str, Any]] = []
+    rows = item.get("sample_rows") or item.get("rows") or []
+    for row_index, row in enumerate(rows[:5]):
+        if not isinstance(row, dict):
+            continue
+        for column, value in row.items():
+            facts.append(
+                {
+                    "row": row_index,
+                    "column": str(column),
+                    "value_state": (
+                        "explicit_null" if value is None else "blank" if value == "" else "present"
+                    ),
+                    "value": (
+                        value
+                        if value is None or isinstance(value, bool | int | float)
+                        else str(value)[:200]
+                    ),
+                }
+            )
+    return facts[:50]
 
 
 def _string_list(value: Any) -> list[str]:

@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import json
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from legacydb_copilot.auth import Role
 from legacydb_copilot.billing import Plan
@@ -336,6 +338,17 @@ class VerificationCheckRead(BaseModel):
     notes: str
     verified_by: str
     verified_at: datetime | None
+
+    @field_validator("parameters", "parameter_types", "actual_result", mode="before")
+    @classmethod
+    def parse_json_object_fields(cls, value: object) -> object:
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+            except (TypeError, ValueError):
+                return {}
+            return parsed if isinstance(parsed, dict) else {}
+        return value
 
 
 class VerificationRunRequest(BaseModel):

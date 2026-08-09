@@ -90,13 +90,15 @@ class WorkspaceModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     organization: Mapped["OrganizationModel"] = relationship(back_populates="workspaces")
     database_connections: Mapped[list["DatabaseConnectionModel"]] = relationship(
-        back_populates="workspace"
+        back_populates="workspace",
+        passive_deletes=True,
     )
-    documents: Mapped[list["DocumentModel"]] = relationship(back_populates="workspace")
-    incidents: Mapped[list["IncidentModel"]] = relationship(back_populates="workspace")
-    investigations: Mapped[list["InvestigationModel"]] = relationship(back_populates="workspace")
+    documents: Mapped[list["DocumentModel"]] = relationship(back_populates="workspace", passive_deletes=True)
+    incidents: Mapped[list["IncidentModel"]] = relationship(back_populates="workspace", passive_deletes=True)
+    investigations: Mapped[list["InvestigationModel"]] = relationship(back_populates="workspace", passive_deletes=True)
     memberships: Mapped[list["WorkspaceMembershipModel"]] = relationship(
-        back_populates="workspace"
+        back_populates="workspace",
+        passive_deletes=True,
     )
 
     __table_args__ = (UniqueConstraint("organization_id", "slug", name="uq_workspace_org_slug"),)

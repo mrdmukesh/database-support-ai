@@ -45,4 +45,4 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python -m alembic upgrade head && uvicorn legacydb_copilot.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python -m legacydb_copilot.initialize_database && python -m legacydb_copilot.bootstrap_admin && uvicorn legacydb_copilot.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

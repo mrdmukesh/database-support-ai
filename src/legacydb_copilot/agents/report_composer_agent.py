@@ -8,6 +8,7 @@ from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.agents.reasoning_agent import ReasoningResult, RootCauseSupportStatus
 from legacydb_copilot.agents.recommendation_agent import Recommendation, RecommendationStatus
 from legacydb_copilot.reports.dynamic_report_schema import DynamicInvestigationBundle
+from legacydb_copilot.services.evidence_correlation_service import typed_evidence_finding
 from legacydb_copilot.services.fix_readiness_service import FixReadinessState
 from legacydb_copilot.services.report_generator import (
     REPORT_VERSION,
@@ -111,7 +112,12 @@ def _evidence_only_summary(bundle: DynamicInvestigationBundle) -> str:
         if item.zero_row_result:
             observations.append(f"{item.purpose} returned no matching rows")
         else:
-            observations.append(f"{item.purpose} returned {len(item.rows)} row(s)")
+            typed_finding = typed_evidence_finding(item)
+            observations.append(
+                f"{item.purpose}: {typed_finding} (row count: {len(item.rows)})"
+                if typed_finding
+                else f"{item.purpose} returned {len(item.rows)} row(s)"
+            )
     related = [item.name for item in bundle.procedure_analysis[:3]]
     text = "Verified evidence confirms " + (
         "; ".join(observations) if observations else "the collected deterministic observations"
@@ -758,7 +764,8 @@ def _strongest_evidence_rows(bundle: DynamicInvestigationBundle) -> list[dict[st
                     or "The query executed successfully and found no matching rows for the tested scope."
                 )
             else:
-                summary = item.error or f"{len(item.rows)} row(s) returned"
+                typed_finding = typed_evidence_finding(item)
+                summary = item.error or typed_finding or f"{len(item.rows)} row(s) returned"
             rows.append(
                 {
                     "Evidence": item.purpose,

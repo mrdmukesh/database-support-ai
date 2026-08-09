@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from legacydb_copilot.services.evidence_verification_agent import (
     SuggestedVerificationCheck,
     adjust_confidence_with_verification,
     execute_verification_check,
+    _matching_verification_evidence,
+    _verification_parameters,
 )
+from legacydb_copilot.services.evidence_execution_service import EvidenceResult
+from legacydb_copilot.schemas import VerificationCheckRead
+from legacydb_copilot.routers.chat import _verification_json_object
 
 
 class RecordingConnector:
@@ -49,6 +56,63 @@ def test_suggested_verification_check_persists_named_parameter_context() -> None
     assert check.parameter_types == {"resolved_identifier": "str"}
     assert check.identifier_column == "AssetCode"
     assert check.identifier_value == "AST-2042"
+
+
+def test_normalized_sql_matches_parameter_bearing_evidence_instead_of_empty_duplicate() -> None:
+    sql = "SELECT BusinessKey, DateOfBirth FROM dbo.Employee WHERE BusinessKey = :resolved_identifier"
+    evidence = [
+        EvidenceResult("duplicate", sql, [{"BusinessKey": "wrong"}]),
+        EvidenceResult(
+            "authoritative",
+            "SELECT TOP (25) [BusinessKey], [DateOfBirth] FROM [dbo].[Employee] WHERE [BusinessKey] = :resolved_identifier",
+            [{"BusinessKey": "E1001", "DateOfBirth": None}],
+            parameters={"resolved_identifier": "E1001"},
+            entity_table="dbo.Employee",
+            identifier_column="BusinessKey",
+            identifier_value="E1001",
+        ),
+    ]
+
+    matched = _matching_verification_evidence(sql, evidence)
+
+    assert matched is evidence[1]
+    assert _verification_parameters(sql, matched) == {"resolved_identifier": "E1001"}
+
+
+def test_identifier_scope_recovers_single_missing_named_bind_without_domain_hardcoding() -> None:
+    sql = "SELECT DeviceSerial FROM inventory.Device WHERE DeviceSerial = :device_key"
+    evidence = EvidenceResult(
+        "generic scope",
+        sql,
+        [{"DeviceSerial": "DEV-9"}],
+        parameters={},
+        entity_table="inventory.Device",
+        identifier_column="DeviceSerial",
+        identifier_value="DEV-9",
+    )
+
+    assert _verification_parameters(sql, evidence) == {"device_key": "DEV-9"}
+
+
+def test_text_backed_json_parameters_are_deserialized_for_api_and_execution() -> None:
+    assert _verification_json_object('{"resolved_identifier":"EMP-1001"}') == {
+        "resolved_identifier": "EMP-1001"
+    }
+    check = VerificationCheckRead.model_validate(
+        SimpleNamespace(
+            id="C1", investigation_id="I1", claim="claim", purpose="purpose",
+            claim_being_verified="claim", evidence_logic="", expected_result_explanation="",
+            interpretation="", conclusion_template="", verification_sql="SELECT 1",
+            parameters='{"resolved_identifier":"EMP-1001"}',
+            parameter_types='{"resolved_identifier":"str"}', evidence_id="SQL-1",
+            entity_table="dbo.Employee", resolved_entity_scope="exact_entity",
+            identifier_column="BusinessKey", identifier_value="EMP-1001", read_only=True,
+            expected_result="Rows returned", risk_level="Read-only", source="SQL evidence",
+            status="Pending", actual_result_summary="", actual_result='{}',
+            confidence_impact="", notes="", verified_by="", verified_at=None,
+        )
+    )
+    assert check.parameters == {"resolved_identifier": "EMP-1001"}
 
 
 def test_human_approved_execution_reuses_parameters_and_preserves_typed_rows() -> None:

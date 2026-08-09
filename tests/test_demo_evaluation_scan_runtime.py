@@ -95,4 +95,10 @@ def test_local_sql_server_bootstrap_sets_evaluation_policy_and_read_only_metadat
 def test_container_runs_migrations_before_starting_the_api() -> None:
     dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
 
-    assert "python -m alembic upgrade head && uvicorn" in dockerfile
+    initialize = "python -m legacydb_copilot.initialize_database"
+    bootstrap = "python -m legacydb_copilot.bootstrap_admin"
+    api = "uvicorn legacydb_copilot.main:app"
+    assert initialize in dockerfile
+    assert bootstrap in dockerfile
+    assert api in dockerfile
+    assert dockerfile.index(initialize) < dockerfile.index(bootstrap) < dockerfile.index(api)

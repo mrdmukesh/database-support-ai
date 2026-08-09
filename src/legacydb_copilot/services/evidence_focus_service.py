@@ -6,10 +6,16 @@ from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
-from legacydb_copilot.services.evidence_correlation_service import CorrelatedEvidence
+from legacydb_copilot.services.evidence_correlation_service import (
+    CorrelatedEvidence,
+    typed_evidence_finding,
+)
 from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
-from legacydb_copilot.services.problem_phrase_service import parse_problem_phrase, resolve_table_from_terms
+from legacydb_copilot.services.problem_phrase_service import (
+    parse_problem_phrase,
+    resolve_table_from_terms,
+)
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 from legacydb_copilot.services.transfer_identifier_normalization import typed_transfer_identifier
@@ -53,6 +59,8 @@ def build_evidence_focus(
     correlated_evidence: list[CorrelatedEvidence],
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
+    resolved_identifier_column: str = "",
+    resolved_identifier_value: Any = None,
 ) -> EvidenceFocus:
     """
     Owner: Mukesh Dabi
@@ -74,8 +82,17 @@ def build_evidence_focus(
     Safety considerations:
         Must preserve read-only investigation behavior and avoid modifying customer databases.
     """
-    affected_object, affected_reason = _identify_affected_object(question, entities, metadata, evidence)
-    business_key, business_key_reason = _infer_business_key(intent, affected_object, entities, metadata, evidence)
+    affected_object, affected_reason = _identify_affected_object(
+        question, entities, metadata, evidence
+    )
+    business_key, business_key_reason = _infer_business_key(
+        intent, affected_object, entities, metadata, evidence
+    )
+    if resolved_identifier_column:
+        business_key = resolved_identifier_column
+        business_key_reason = (
+            "Preserved from the resolved typed identifier used for entity resolution."
+        )
     write_graph = _write_path_graph(affected_object, procedure_analysis)
     ranked_procedures = _rank_procedures(
         affected_object=affected_object,
@@ -101,7 +118,11 @@ def build_evidence_focus(
         inferred_findings=inferred,
         hypotheses=hypotheses,
         self_validation=validation,
-        selected_business_key_value=_selected_business_key_value(entities, affected_object),
+        selected_business_key_value=(
+            str(resolved_identifier_value)
+            if resolved_identifier_value is not None
+            else _selected_business_key_value(entities, affected_object)
+        ),
     )
 
 
@@ -531,7 +552,12 @@ def _confirmed_facts(evidence: list[EvidenceResult], ranked_procedures: list[Pro
     for item in evidence:
         if not item.rows:
             continue
-        facts.append(f"{item.purpose}: {len(item.rows)} row(s) returned.")
+        typed_finding = typed_evidence_finding(item)
+        facts.append(
+            f"{item.purpose}: {typed_finding}. Row count: {len(item.rows)}."
+            if typed_finding
+            else f"{item.purpose}: {len(item.rows)} row(s) returned."
+        )
         if "duplicate" in item.purpose.lower():
             facts.extend(_duplicate_facts_from_rows(item.rows, affected_object))
     direct_writers = [item.procedure for item in ranked_procedures if item.writes_affected_object]

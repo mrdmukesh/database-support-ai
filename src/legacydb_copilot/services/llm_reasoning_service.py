@@ -72,8 +72,13 @@ Restrictions:
 - Distinguish clearly between verified findings, verified absence, evidence gaps, inference, and hypothesis.
 - If deterministic evidence contradicts a possible explanation, reject that explanation.
 - Never fabricate a root cause.
+- Treat object-name and semantic similarity as weak candidate evidence only; it must never override
+  a matching entity row, direct affected-column evidence, object definitions, or dependencies.
+- Verify read paths and write paths separately. Do not assume the same routine is responsible
+  for both.
+- Evaluate multiple plausible hypotheses against read-only evidence before selecting a cause.
 - If multiple explanations remain possible, explain why they cannot yet be distinguished.
-- If evidence is insufficient, explicitly state that the root cause is not established.
+- If evidence is insufficient, return exactly: Root cause not established from available evidence.
 - Never contradict the deterministic investigation pipeline.
 
 Recommendations:

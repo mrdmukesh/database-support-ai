@@ -40,7 +40,10 @@ def test_reasoning_prompt_preserves_evidence_and_execution_boundaries() -> None:
         "only when its evidence_semantics is",
         "otherwise describe it as an evidence gap",
         "never fabricate a root cause",
-        "root cause is not established",
+        "root cause not established from available evidence",
+        "semantic similarity as weak candidate evidence",
+        "verify read paths and write paths separately",
+        "multiple plausible hypotheses",
         "never contradict the deterministic investigation pipeline",
         "return only valid json matching the requested schema",
     ):

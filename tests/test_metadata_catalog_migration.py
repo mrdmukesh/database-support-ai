@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from alembic import command
@@ -18,9 +19,12 @@ def _run_alembic(action, config: Config, revision: str) -> None:
         for name, logger in logging.Logger.manager.loggerDict.items()
         if isinstance(logger, logging.Logger)
     }
+    database_url = os.environ.pop("DATABASE_URL", None)
     try:
         action(config, revision)
     finally:
+        if database_url is not None:
+            os.environ["DATABASE_URL"] = database_url
         for name, disabled in existing.items():
             logger = logging.Logger.manager.loggerDict.get(name)
             if isinstance(logger, logging.Logger):

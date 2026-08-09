@@ -39,10 +39,12 @@ def _config(database: Path) -> Config:
 
 def test_revision_graph_has_one_linear_head_after_verification_migration() -> None:
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["0026"]
+    assert script.get_heads() == ["0027"]
+    pgvector = script.get_revision("0027")
     metadata = script.get_revision("0026")
     verification = script.get_revision("0025")
     governed = script.get_revision("0024")
+    assert pgvector.down_revision == "0026"
     assert metadata.down_revision == "0025"
     assert verification.down_revision == "0024"
     assert governed.down_revision == "0023"
@@ -64,7 +66,7 @@ def test_fresh_application_bootstrap_at_head_contains_metadata_tables(
     with engine.connect() as connection:
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0026"
+            == "0027"
         )
 
 
@@ -171,7 +173,7 @@ def test_deployed_0025_upgrades_without_losing_tenant_or_knowledge_data(
         )
         assert (
             connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            == "0026"
+            == "0027"
         )
     inspector = inspect(engine)
     assert inspector.has_table("metadata_snapshots")

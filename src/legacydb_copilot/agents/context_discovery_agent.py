@@ -8,6 +8,7 @@ from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResu
 from legacydb_copilot.services.metadata_search_service import MetadataSearchContext, MetadataSearchResult, search_metadata
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument, retrieve_documents
 from legacydb_copilot.services.llm_invocation_audit_service import InvocationContext
+from legacydb_copilot.services.metadata_catalog_service import active_snapshot, schema_metadata_from_catalog
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,10 @@ def discover_context(
         knowledge retriever; live evidence collection happens later through validated SQL.
     """
 
+    if schema_metadata is None and metadata_context is not None:
+        snapshot = active_snapshot(db, organization_id=organization_id, workspace_id=workspace_id, connection_id=metadata_context.connection_id)
+        if snapshot is not None:
+            schema_metadata = schema_metadata_from_catalog(db, snapshot)
     metadata = search_metadata(connector, question, entities, context=metadata_context, schema_metadata=schema_metadata)
     documents = retrieve_documents(
         db, organization_id, workspace_id, question, audit_context=audit_context

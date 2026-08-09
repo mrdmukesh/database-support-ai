@@ -81,6 +81,14 @@ class LangGraphInvestigationOrchestrator:
             state["provider_call_required"] = False
             state["llm_skip_reason"] = "shadow_llm_disabled"
             state["deterministic_fallback_reason"] = "shadow_llm_disabled"
+        state["max_candidate_tables"] = self._settings.langgraph_max_candidate_tables
+        state["max_candidate_columns"] = self._settings.langgraph_max_candidate_columns
+        state["max_candidate_code_objects"] = (
+            self._settings.langgraph_max_candidate_code_objects
+        )
+        state["max_backtracks"] = self._settings.langgraph_max_backtracks
+        state["max_expansions"] = self._settings.langgraph_max_expansions
+        state["max_graph_steps"] = self._settings.langgraph_max_graph_steps
         return state
 
     def run(self, context: OrchestrationContext) -> OrchestrationResult:

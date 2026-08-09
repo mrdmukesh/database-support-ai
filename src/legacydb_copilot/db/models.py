@@ -165,6 +165,66 @@ class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class MetadataSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Immutable, tenant-scoped structural metadata discovery run."""
+
+    __tablename__ = "metadata_snapshots"
+
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    connection_id: Mapped[str] = mapped_column(ForeignKey("database_connections.id", ondelete="CASCADE"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    started_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    schema_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    source_database: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    discovery_version: Mapped[str] = mapped_column(String(32), default="1", nullable=False)
+    counts_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    completeness_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    changes_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    error_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("connection_id", "version", name="uq_metadata_snapshot_connection_version"),
+        Index("ix_metadata_snapshot_tenant_active", "organization_id", "workspace_id", "connection_id", "is_active"),
+    )
+
+
+class MetadataObjectModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "metadata_objects"
+
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("metadata_snapshots.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    schema_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    object_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_object_id: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    definition_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    definition: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("snapshot_id", "object_type", "schema_name", "object_name", name="uq_metadata_object_identity"),
+        Index("ix_metadata_object_snapshot_name", "snapshot_id", "schema_name", "object_name"),
+    )
+
+
+class MetadataRelationshipModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "metadata_relationships"
+
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("metadata_snapshots.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_key: Mapped[str] = mapped_column(String(800), nullable=False)
+    target_key: Mapped[str] = mapped_column(String(800), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    source_column: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    target_column: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    dependency_distance: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+
+    __table_args__ = (Index("ix_metadata_relationship_source", "snapshot_id", "source_key", "relationship_type"),)
+
+
 class EvaluationJobModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Durable, tenant-scoped request to execute a new immutable evaluation run."""
 
@@ -352,16 +412,6 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     execution_policy_version: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     fallback_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     fallback_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    requested_model_mode: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    requested_catalog_model_id: Mapped[str] = mapped_column(String(36), default="", nullable=False)
-    effective_catalog_model_id: Mapped[str] = mapped_column(String(36), default="", nullable=False)
-    model_snapshot_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
-    model_policy_decision: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    model_policy_decision_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    model_entitlement_source: Mapped[str] = mapped_column(String(120), default="", nullable=False)
-    model_selection_source: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    model_selection_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    model_selection_configuration_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     execution_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     conversation_id: Mapped[str | None] = mapped_column(
@@ -885,111 +935,6 @@ class AuditLogModel(UUIDPrimaryKeyMixin, Base):
     metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
     created_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
     occurred_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class LLMModelCatalogModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "llm_model_catalog"
-    __table_args__ = (
-        UniqueConstraint("organization_id", "provider", "provider_model_id", name="uq_llm_catalog_provider_model"),
-    )
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    provider: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    provider_model_id: Mapped[str] = mapped_column(String(160), nullable=False)
-    model_category: Mapped[str] = mapped_column(String(40), default="custom", nullable=False, index=True)
-    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
-    default_reasoning_effort: Mapped[str] = mapped_column(String(40), default="medium", nullable=False)
-    maximum_reasoning_effort: Mapped[str] = mapped_column(String(40), default="high", nullable=False)
-    context_limit: Mapped[int | None] = mapped_column(Integer)
-    cost_tier: Mapped[str] = mapped_column(String(40), default="standard", nullable=False)
-    latency_tier: Mapped[str] = mapped_column(String(40), default="standard", nullable=False)
-    recommended_usage: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    availability_status: Mapped[str] = mapped_column(String(40), default="available", nullable=False, index=True)
-    retirement_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    sort_order: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
-    premium: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    automatic_eligible: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    configuration_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-
-
-class LLMModelPolicyModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "llm_model_policy"
-    __table_args__ = (UniqueConstraint("organization_id", name="uq_llm_model_policy_org"),)
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_selection_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    automatic_mode_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    admin_management_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    global_default_model_id: Mapped[str | None] = mapped_column(ForeignKey("llm_model_catalog.id", ondelete="SET NULL"))
-    automatic_candidate_ids_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    fallback_model_id: Mapped[str | None] = mapped_column(ForeignKey("llm_model_catalog.id", ondelete="SET NULL"))
-    fallback_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    require_premium_approval: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    allowed_environments_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    selection_roles_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    cost_ceiling_tier: Mapped[str] = mapped_column(String(40), default="premium", nullable=False)
-    latency_preference: Mapped[str] = mapped_column(String(40), default="balanced", nullable=False)
-    configuration_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-
-
-class LLMModelRoleEntitlementModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "llm_model_role_entitlement"
-    __table_args__ = (UniqueConstraint("organization_id", "model_id", "role", name="uq_llm_role_entitlement"),)
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_id: Mapped[str] = mapped_column(ForeignKey("llm_model_catalog.id", ondelete="CASCADE"), nullable=False, index=True)
-    role: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
-    allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-
-class LLMModelUserEntitlementModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "llm_model_user_entitlement"
-    __table_args__ = (UniqueConstraint("organization_id", "model_id", "user_id", name="uq_llm_user_entitlement"),)
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_id: Mapped[str] = mapped_column(ForeignKey("llm_model_catalog.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    approved_by_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    approval_starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    approval_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
-
-
-class LLMModelWorkspaceEntitlementModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    __tablename__ = "llm_model_workspace_entitlement"
-    __table_args__ = (UniqueConstraint("organization_id", "model_id", "workspace_id", name="uq_llm_workspace_entitlement"),)
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    model_id: Mapped[str] = mapped_column(ForeignKey("llm_model_catalog.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
-    allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-
-
-class LLMModelSelectionAuditModel(UUIDPrimaryKeyMixin, Base):
-    __tablename__ = "llm_model_selection_audit"
-
-    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
-    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    investigation_id: Mapped[str | None] = mapped_column(String(36), index=True)
-    requested_mode: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    requested_catalog_model_id: Mapped[str | None] = mapped_column(String(36), index=True)
-    effective_catalog_model_id: Mapped[str | None] = mapped_column(String(36), index=True)
-    effective_provider: Mapped[str] = mapped_column(String(80), default="", nullable=False)
-    effective_provider_model_id: Mapped[str] = mapped_column(String(160), default="", nullable=False)
-    reasoning_effort: Mapped[str] = mapped_column(String(40), default="", nullable=False)
-    selection_source: Mapped[str] = mapped_column(String(40), nullable=False)
-    policy_decision: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
-    policy_decision_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    entitlement_source: Mapped[str] = mapped_column(String(120), default="", nullable=False)
-    fallback_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    candidate_model_ids_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
-    routing_factors_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
-    model_snapshot_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
-    configuration_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
 
 class LLMInvocationAuditModel(UUIDPrimaryKeyMixin, Base):

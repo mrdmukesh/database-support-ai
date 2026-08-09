@@ -60,6 +60,14 @@ class ObjectDisposition(StrEnum):
     INACCESSIBLE = "INACCESSIBLE"
 
 
+class CandidateStatus(StrEnum):
+    UNVERIFIED = "UNVERIFIED"
+    SUPPORTED = "SUPPORTED"
+    CONTRADICTED = "CONTRADICTED"
+    INSUFFICIENT = "INSUFFICIENT"
+    REJECTED = "REJECTED"
+
+
 class RelationshipVerification(StrEnum):
     VERIFIED = "VERIFIED"
     INFERRED = "INFERRED"

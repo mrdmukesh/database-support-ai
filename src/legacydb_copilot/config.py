@@ -123,17 +123,18 @@ class Settings:
     langgraph_allowed_user_ids: tuple[str, ...] = ()
     langgraph_max_concurrent_runs: int = 2
     langgraph_timeout_seconds: float = 120.0
+    langgraph_max_candidate_tables: int = 8
+    langgraph_max_candidate_columns: int = 24
+    langgraph_max_candidate_code_objects: int = 20
+    langgraph_max_backtracks: int = 4
+    langgraph_max_expansions: int = 3
+    langgraph_max_graph_steps: int = 50
     langgraph_shadow_timeout_seconds: float = 120.0
     langgraph_fallback_on_timeout: bool = True
     langgraph_fallback_on_provider_failure: bool = False
     langgraph_fallback_on_persistence_failure: bool = False
     langgraph_fallback_on_validation_failure: bool = True
     langgraph_compare_response_source: str = "legacy"
-    model_selection_enabled: bool = False
-    model_selection_automatic_enabled: bool = False
-    model_selection_admin_enabled: bool = True
-    model_selection_default_catalog_model_id: str = ""
-    model_selection_fallback_enabled: bool = False
 
     @property
     def selected_reasoning_model(self) -> str:
@@ -294,6 +295,14 @@ class Settings:
                 "LANGGRAPH_MAX_CONCURRENT_RUNS", 2, minimum=1
             ),
             langgraph_timeout_seconds=_env_float("LANGGRAPH_TIMEOUT_SECONDS", 120.0),
+            langgraph_max_candidate_tables=_env_int("LANGGRAPH_MAX_CANDIDATE_TABLES", 8),
+            langgraph_max_candidate_columns=_env_int("LANGGRAPH_MAX_CANDIDATE_COLUMNS", 24),
+            langgraph_max_candidate_code_objects=_env_int(
+                "LANGGRAPH_MAX_CANDIDATE_CODE_OBJECTS", 20
+            ),
+            langgraph_max_backtracks=_env_int("LANGGRAPH_MAX_BACKTRACKS", 4),
+            langgraph_max_expansions=_env_int("LANGGRAPH_MAX_EXPANSIONS", 3),
+            langgraph_max_graph_steps=_env_int("LANGGRAPH_MAX_GRAPH_STEPS", 50),
             langgraph_shadow_timeout_seconds=_env_float(
                 "LANGGRAPH_SHADOW_TIMEOUT_SECONDS", 120.0
             ),
@@ -316,18 +325,5 @@ class Settings:
                 ).strip().casefold()
                 == "langgraph"
                 else "legacy"
-            ),
-            model_selection_enabled=_env_bool("MODEL_SELECTION_ENABLED", False),
-            model_selection_automatic_enabled=_env_bool(
-                "MODEL_SELECTION_AUTOMATIC_ENABLED", False
-            ),
-            model_selection_admin_enabled=_env_bool(
-                "MODEL_SELECTION_ADMIN_ENABLED", True
-            ),
-            model_selection_default_catalog_model_id=os.getenv(
-                "MODEL_SELECTION_DEFAULT_CATALOG_MODEL_ID", ""
-            ).strip(),
-            model_selection_fallback_enabled=_env_bool(
-                "MODEL_SELECTION_FALLBACK_ENABLED", False
             ),
         )

@@ -111,15 +111,24 @@ def _classify(
                 else EvidenceOutcome.OPTIONAL_VALUE_NULL
             )
             values.append(_finding(outcome, result, f"{column} is NULL.", column=column))
+            step = next(
+                (
+                    item
+                    for item in state["investigation_plan"]
+                    if item.step_id == result.plan_step_id
+                ),
+                None,
+            )
             if (
                 outcome == EvidenceOutcome.REQUIRED_VALUE_MISSING
-                and "dateofbirth" in column.casefold()
+                and step is not None
+                and "CALCULATION" in step.query_intent.upper()
             ):
                 values.append(
                     _finding(
                         EvidenceOutcome.CALCULATION_NOT_POSSIBLE,
                         result,
-                        "Age calculation is not possible because DateOfBirth is NULL.",
+                        "A required calculation input is NULL.",
                         column=column,
                     )
                 )

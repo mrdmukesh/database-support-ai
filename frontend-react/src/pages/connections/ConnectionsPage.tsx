@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { createConnection, deleteConnection, listConnections, testConnection, updateConnection } from "../../api/connection-api";
+import { createConnection, deleteConnection, getMetadataSummary, listConnections, refreshMetadata, testConnection, updateConnection } from "../../api/connection-api";
 import { listWorkspaces } from "../../api/workspace-api";
 import { ConnectionForm } from "../../components/connections/ConnectionForm";
 import { ConnectionList } from "../../components/connections/ConnectionList";
 import { useAuth } from "../../hooks/use-auth";
-import type { ConnectionValidationResult, DatabaseConnection, DatabaseConnectionCreate, EnvironmentType } from "../../models/connection";
+import type { ConnectionValidationResult, DatabaseConnection, DatabaseConnectionCreate, EnvironmentType, MetadataCatalogSummary } from "../../models/connection";
 import type { Workspace } from "../../models/workspace";
 
 function messageOf(cause: unknown): string {
@@ -21,6 +21,8 @@ export function ConnectionsPage() {
   const [testingIds, setTestingIds] = useState<Set<string>>(new Set());
   const [testResults, setTestResults] = useState<Record<string, ConnectionValidationResult | undefined>>({});
   const [testErrors, setTestErrors] = useState<Record<string, string | undefined>>({});
+  const [metadata, setMetadata] = useState<Record<string, MetadataCatalogSummary | undefined>>({});
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,8 @@ export function ConnectionsPage() {
       ]);
       setWorkspaces(workspaceRows);
       setConnections(connectionRows);
+      const summaries = await Promise.all(connectionRows.map(async (connection) => [connection.id, await getMetadataSummary(connection.id, signal)] as const));
+      setMetadata(Object.fromEntries(summaries));
       setMessage("Database connections loaded.");
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === "AbortError") return;
@@ -102,6 +106,19 @@ export function ConnectionsPage() {
     }
   }
 
+  async function refreshCatalog(connection: DatabaseConnection) {
+    setRefreshingIds((current) => new Set(current).add(connection.id));
+    setError(null);
+    try {
+      const summary = await refreshMetadata(connection.id);
+      setMetadata((current) => ({ ...current, [connection.id]: summary }));
+      setMessage(summary.changes?.structural_change === false ? "Metadata is unchanged." : "Metadata catalog refreshed.");
+    } catch (cause) {
+      setError(`Metadata refresh failed. The previous metadata snapshot remains active. ${messageOf(cause)}`);
+    }
+    finally { setRefreshingIds((current) => { const next=new Set(current); next.delete(connection.id); return next; }); }
+  }
+
   return (
     <section className="management-page" aria-labelledby="connections-page-title">
       <div className="management-page-heading"><p className="eyebrow">Administration</p><h2 id="connections-page-title">Connections</h2></div>
@@ -115,7 +132,7 @@ export function ConnectionsPage() {
       <div className="management-grid connections-grid">
         <ConnectionForm organizationId={organizationId ?? ""} workspaces={workspaces} isSubmitting={isSubmitting} onSubmit={create} />
         {isLoading ? <p>Loading database connections...</p> : (
-          <ConnectionList connections={connections} testingIds={testingIds} testResults={testResults} testErrors={testErrors} onEdit={edit} onDelete={remove} onTest={validate} />
+          <ConnectionList connections={connections} testingIds={testingIds} testResults={testResults} testErrors={testErrors} onEdit={edit} onDelete={remove} onTest={validate} metadata={metadata} refreshingIds={refreshingIds} onRefreshMetadata={refreshCatalog} />
         )}
       </div>
     </section>

@@ -175,6 +175,13 @@ class RelationshipDiscoveryAdapter:
                     contains_mutation=mutates,
                     contains_dynamic_sql=procedure.dynamic_sql,
                     unsafe_to_execute=mutates or procedure.dynamic_sql,
+                    path_role=(
+                        "BOTH"
+                        if procedure.tables_read and procedure.tables_written
+                        else "WRITE"
+                        if procedure.tables_written
+                        else "READ"
+                    ),
                 )
             )
             for dependency in dependencies:
@@ -331,7 +338,7 @@ def _key(name: str) -> str:
 
 
 def _object(
-    name: str, object_type: str, reason: str, required: bool, **flags: bool
+    name: str, object_type: str, reason: str, required: bool, **flags: Any
 ) -> DatabaseObjectRef:
     database, schema, object_name = _parts(name)
     return DatabaseObjectRef(

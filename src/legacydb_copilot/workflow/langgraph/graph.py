@@ -7,6 +7,10 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 
+from legacydb_copilot.workflow.langgraph.adapters.candidates import (
+    candidate_route,
+    rejection_route,
+)
 from legacydb_copilot.workflow.langgraph.adapters.coverage import coverage_route
 from legacydb_copilot.workflow.langgraph.contracts import (
     EvidenceDrivenWorkflowHandlers,
@@ -348,25 +352,69 @@ def build_reasoning_reporting_graph(
 ):
     """Compile LG-07 reasoning/reporting flow without activating production routing."""
     recorder = telemetry or NullTelemetryRecorder()
-    names = tuple(ReasoningReportingWorkflowHandlers.__dataclass_fields__)
+    names = (
+        "initialize",
+        "resolve_entity",
+        "discover_objects",
+        "select_candidate",
+        "create_plan",
+        "validate_sql",
+        "execute_sql",
+        "preserve_evidence",
+        "classify_results",
+        "evaluate_candidate",
+        "reject_candidate",
+        "expand_discovery",
+        "check_coverage",
+        "assess_evidence",
+        "apply_evidence_gate",
+        "invoke_reasoning",
+        "validate_reasoning",
+        "compose_report",
+        "validate_report",
+        "finalize",
+    )
     builder = StateGraph(InvestigationState)
     for node_name in names:
+        handler = getattr(handlers, node_name, None) or (lambda _state: {})
         builder.add_node(
             node_name,
-            wrap_node(node_name, getattr(handlers, node_name), telemetry=recorder),
+            wrap_node(node_name, handler, telemetry=recorder),
         )
     for source, target in (
         (START, "initialize"),
         ("initialize", "resolve_entity"),
         ("resolve_entity", "discover_objects"),
-        ("discover_objects", "create_plan"),
+        ("discover_objects", "select_candidate"),
+        ("select_candidate", "create_plan"),
         ("create_plan", "validate_sql"),
         ("validate_sql", "execute_sql"),
         ("execute_sql", "preserve_evidence"),
         ("preserve_evidence", "classify_results"),
-        ("classify_results", "check_coverage"),
+        ("classify_results", "evaluate_candidate"),
     ):
         builder.add_edge(source, target)
+    builder.add_conditional_edges(
+        "evaluate_candidate",
+        candidate_route,
+        {
+            "select_candidate": "select_candidate",
+            "reject_candidate": "reject_candidate",
+            "expand_discovery": "expand_discovery",
+            "check_coverage": "check_coverage",
+            "assess_evidence": "assess_evidence",
+        },
+    )
+    builder.add_conditional_edges(
+        "reject_candidate",
+        rejection_route,
+        {
+            "select_candidate": "select_candidate",
+            "expand_discovery": "expand_discovery",
+            "assess_evidence": "assess_evidence",
+        },
+    )
+    builder.add_edge("expand_discovery", "discover_objects")
     builder.add_conditional_edges(
         "check_coverage",
         coverage_route,

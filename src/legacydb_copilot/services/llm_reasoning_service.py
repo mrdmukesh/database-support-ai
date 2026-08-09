@@ -72,8 +72,13 @@ Restrictions:
 - Distinguish clearly between verified findings, verified absence, evidence gaps, inference, and hypothesis.
 - If deterministic evidence contradicts a possible explanation, reject that explanation.
 - Never fabricate a root cause.
+- Treat object-name and semantic similarity as weak candidate evidence only; it must never override
+  a matching entity row, direct affected-column evidence, object definitions, or dependencies.
+- Verify read paths and write paths separately. Do not assume the same routine is responsible
+  for both.
+- Evaluate multiple plausible hypotheses against read-only evidence before selecting a cause.
 - If multiple explanations remain possible, explain why they cannot yet be distinguished.
-- If evidence is insufficient, explicitly state that the root cause is not established.
+- If evidence is insufficient, return exactly: Root cause not established from available evidence.
 - Never contradict the deterministic investigation pipeline.
 
 Recommendations:
@@ -1218,10 +1223,7 @@ def _payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
         "procedure_evidence": procedure_summary[:20],
         "relationship_evidence": relationship_summary[:20],
         "contains_raw_rows": False,
-        "note": (
-            "Bounded typed facts are retained; unmasked raw rows and PII are not persisted "
-            "in AI debug trace."
-        ),
+        "note": "Bounded typed facts are retained; unmasked raw rows and PII are not persisted in AI debug trace.",
     }
 
 
@@ -1238,13 +1240,13 @@ def _typed_sql_facts(item: dict[str, Any]) -> list[dict[str, Any]]:
                     "row": row_index,
                     "column": str(column),
                     "value_state": (
-                        "explicit_null"
-                        if value is None
-                        else "blank"
-                        if value == ""
-                        else "present"
+                        "explicit_null" if value is None else "blank" if value == "" else "present"
                     ),
-                    "value": value if value is None or isinstance(value, bool | int | float) else str(value)[:200],
+                    "value": (
+                        value
+                        if value is None or isinstance(value, bool | int | float)
+                        else str(value)[:200]
+                    ),
                 }
             )
     return facts[:50]

@@ -238,8 +238,6 @@ class SubscriptionRead(BaseModel):
 
 
 class ChatAskRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
     organization_id: str
     workspace_id: str
     connection_id: str | None = None
@@ -247,84 +245,6 @@ class ChatAskRequest(BaseModel):
     user_id: str
     question: str = Field(min_length=1, max_length=4000)
     conversation_id: str | None = None
-    model_selection_mode: str | None = Field(default=None, max_length=40)
-    catalog_model_id: str | None = Field(default=None, max_length=36)
-
-
-class ModelCatalogCreate(BaseModel):
-    organization_id: str
-    display_name: str = Field(min_length=1, max_length=120)
-    provider: str = Field(min_length=1, max_length=80)
-    provider_model_id: str = Field(min_length=1, max_length=160)
-    model_category: str = Field(default="custom", pattern=r"^(fast|deep_analysis|custom)$")
-    description: str = Field(default="", max_length=2000)
-    enabled: bool = True
-    default_reasoning_effort: str = "medium"
-    maximum_reasoning_effort: str = "high"
-    context_limit: int | None = Field(default=None, ge=1)
-    cost_tier: str = "standard"
-    latency_tier: str = "standard"
-    recommended_usage: str = Field(default="", max_length=2000)
-    availability_status: str = "available"
-    retirement_date: datetime | None = None
-    sort_order: int = 100
-    premium: bool = False
-    automatic_eligible: bool = False
-
-
-class ModelCatalogUpdate(BaseModel):
-    display_name: str | None = Field(default=None, min_length=1, max_length=120)
-    provider: str | None = Field(default=None, min_length=1, max_length=80)
-    provider_model_id: str | None = Field(default=None, min_length=1, max_length=160)
-    model_category: str | None = Field(default=None, pattern=r"^(fast|deep_analysis|custom)$")
-    description: str | None = Field(default=None, max_length=2000)
-    enabled: bool | None = None
-    default_reasoning_effort: str | None = None
-    maximum_reasoning_effort: str | None = None
-    context_limit: int | None = Field(default=None, ge=1)
-    cost_tier: str | None = None
-    latency_tier: str | None = None
-    recommended_usage: str | None = Field(default=None, max_length=2000)
-    availability_status: str | None = None
-    retirement_date: datetime | None = None
-    sort_order: int | None = None
-    premium: bool | None = None
-    automatic_eligible: bool | None = None
-
-
-class ModelCatalogRead(ModelCatalogCreate):
-    model_config = ConfigDict(from_attributes=True)
-    id: str
-    configuration_version: int
-    created_at: datetime
-    updated_at: datetime
-
-
-class ModelPolicyUpdate(BaseModel):
-    user_selection_enabled: bool | None = None
-    automatic_mode_enabled: bool | None = None
-    admin_management_enabled: bool | None = None
-    global_default_model_id: str | None = None
-    automatic_candidate_ids: list[str] | None = None
-    fallback_model_id: str | None = None
-    fallback_enabled: bool | None = None
-    require_premium_approval: bool | None = None
-    allowed_environments: list[str] | None = None
-    selection_roles: list[str] | None = None
-    cost_ceiling_tier: str | None = None
-    latency_preference: str | None = None
-
-
-class ModelEntitlementUpdate(BaseModel):
-    model_id: str
-    allowed: bool = True
-    approval_starts_at: datetime | None = None
-    approval_expires_at: datetime | None = None
-
-
-class UserModelAccessUpdate(BaseModel):
-    organization_id: str
-    entitlements: list[ModelEntitlementUpdate]
 
 
 class ChatMessageRead(BaseModel):
@@ -362,13 +282,6 @@ class ExecutionMetadataRead(BaseModel):
     policy_version: str = ""
     fallback_used: bool = False
     fallback_reason: str = ""
-    requested_model_mode: str = ""
-    requested_catalog_model_id: str = ""
-    effective_catalog_model_id: str = ""
-    model_policy_decision: str = ""
-    model_policy_decision_reason: str = ""
-    model_entitlement_source: str = ""
-    model_selection_configuration_version: int = 0
     execution_started_at: datetime | None = None
     execution_ended_at: datetime | None = None
     badge: str = "LangGraph Verified"

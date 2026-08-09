@@ -168,6 +168,7 @@ def rank_relevant_objects(
     entities: EntityExtractionResult,
     metadata: MetadataSearchResult,
     max_tables: int = 6,
+    include_fallback_candidates: bool = False,
 ) -> ObjectRankingResult:
     """
     Owner: Mukesh Dabi
@@ -222,6 +223,14 @@ def rank_relevant_objects(
             ranked_tables.append((score, table, reason))
     ranked_tables.sort(key=lambda item: (item[0], item[1].name), reverse=True)
     selected_tables = [table for _, table, _ in ranked_tables[:max_tables]]
+    if include_fallback_candidates and len(selected_tables) < max_tables:
+        selected_names = {table.name.casefold() for table in selected_tables}
+        selected_tables.extend(
+            table
+            for table in eligible_tables
+            if table.name.casefold() not in selected_names
+        )
+        selected_tables = selected_tables[:max_tables]
     for required in (target_table, parent_table):
         if required and required.name not in {table.name for table in selected_tables}:
             selected_tables = [required, *selected_tables[: max_tables - 1]]

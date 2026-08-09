@@ -35,7 +35,6 @@ from legacydb_copilot.db.models import (
     DatabaseConnectionModel,
     DocumentModel,
     InvestigationModel,
-    LLMModelSelectionAuditModel,
     VerificationCheckModel,
     WorkspaceModel,
 )
@@ -61,15 +60,6 @@ from legacydb_copilot.security.access_control import (
     require_workspace_access,
 )
 from legacydb_copilot.services.audit_service import record_audit_event
-from legacydb_copilot.services.authoritative_source_proof_service import (
-    AuthoritativeProof,
-    build_primary_proof_query,
-    classify_authoritative_proof,
-    infer_dependency_contract,
-    reasoning_from_authoritative_proof,
-    resolved_identifier_from_metadata,
-    should_stop_after_proof,
-)
 from legacydb_copilot.services.confidence_scoring_service import (
     confidence_factors,
     score_confidence,
@@ -100,13 +90,6 @@ from legacydb_copilot.services.evidence_gate_service import (
 from legacydb_copilot.services.evidence_verification_agent import (
     execute_verification_check,
     suggest_verification_checks,
-)
-from legacydb_copilot.services.governed_model_selection import (
-    GovernedModelSelectionService,
-    ModelSelectionAuthorizationError,
-    ModelSelectionRequest,
-    ResolvedModelSelection,
-    selection_metadata,
 )
 from legacydb_copilot.services.investigation_mode_service import (
     InvestigationMode,
@@ -469,7 +452,7 @@ def _active_database_name(connector, expected_engine: DatabaseEngine) -> str:
     )
 
 
-def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine):
+def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine, db: Session | None = None):
     actual_database = _active_database_name(connector, expected_engine)
     if actual_database and metadata_context.connection_string_database and actual_database.lower() != metadata_context.connection_string_database.lower():
         raise DatabaseConnectionError(
@@ -487,11 +470,18 @@ def _load_and_validate_active_schema(connector, metadata_context: MetadataSearch
             actual_database=actual_database,
             connector_cache_key=metadata_context.connector_cache_key,
         )
-    force_refresh = os.getenv("EVAL_FORCE_METADATA_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
-    try:
-        metadata = connector.get_schema_metadata(force_refresh=force_refresh)
-    except TypeError:  # compatibility for connector test doubles and older plugins
-        metadata = connector.get_schema_metadata()
+    metadata = None
+    if db is not None:
+        from legacydb_copilot.services.metadata_catalog_service import active_snapshot, schema_metadata_from_catalog
+        snapshot = active_snapshot(db, organization_id=metadata_context.organization_id, workspace_id=metadata_context.workspace_id, connection_id=metadata_context.connection_id)
+        if snapshot is not None:
+            metadata = schema_metadata_from_catalog(db, snapshot)
+    if metadata is None:
+        force_refresh = os.getenv("EVAL_FORCE_METADATA_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
+        try:
+            metadata = connector.get_schema_metadata(force_refresh=force_refresh)
+        except TypeError:  # compatibility for connector test doubles and older plugins
+            metadata = connector.get_schema_metadata()
     logger.info(
         "RCA metadata context workspace_id=%s connection_id=%s database=%s schema=%s engine=%s "
         "connection_string_database=%s metadata_cache_key=%s tables=%s procedures=%s",
@@ -578,7 +568,7 @@ def _run_metadata_validation(
             connection_string,
             connector_cache_key=connector_cache_key,
         )
-        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine, db)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "TARGET_OBJECT_NOT_FOUND\n\n"
@@ -2023,7 +2013,7 @@ def _run_dynamic_investigation(
     *,
     environment_snapshot: EnvironmentSnapshot | None = None,
     resolved_scan_policy=None,
-    invocation_settings: Settings | None = None,
+    excluded_candidate_names: frozenset[str] = frozenset(),
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
     """
     Owner: Mukesh Dabi
@@ -2088,7 +2078,7 @@ def _run_dynamic_investigation(
             connection_string,
             connector_cache_key=connector_cache_key,
         )
-        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine, db)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "I could not investigate the live database because the saved connection failed: "
@@ -2161,6 +2151,32 @@ def _run_dynamic_investigation(
         entities=entities,
         metadata=context.metadata,
     )
+    if excluded_candidate_names:
+        excluded = {name.casefold() for name in excluded_candidate_names}
+        remaining_tables = [
+            table
+            for table in ranking.metadata.tables
+            if table.name.casefold() not in excluded
+        ]
+        expansion_tables = [
+            table
+            for table in resolution_metadata.tables
+            if table.name.casefold() not in excluded
+            and table.name.casefold()
+            not in {candidate.name.casefold() for candidate in remaining_tables}
+        ]
+        expanded_metadata = replace(
+            ranking.metadata,
+            tables=[*remaining_tables, *expansion_tables][:12],
+        )
+        ranking = rank_relevant_objects(
+            question=payload.question,
+            intent=intent,
+            entities=entities,
+            metadata=expanded_metadata,
+            max_tables=8,
+            include_fallback_candidates=True,
+        )
     ranked_metadata = metadata_with_resolved_tables(
         ranking.metadata, resolution_metadata, entity_resolution
     )
@@ -2195,55 +2211,8 @@ def _run_dynamic_investigation(
             metadata,
         )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
-    authoritative_proof: AuthoritativeProof | None = None
-    primary_evidence: list[EvidenceResult] = []
-    dependency_contract = infer_dependency_contract(
-        ranking.metadata,
-        procedure_analysis,
-        payload.question,
-    )
-    resolved_identifier = next(
-        (
-            value
-            for resolution in entity_resolution.resolutions
-            if (
-                value := resolved_identifier_from_metadata(
-                    asdict(resolution),
-                    ranking.metadata,
-                    preferred_table=(
-                        dependency_contract.source_table if dependency_contract else ""
-                    ),
-                )
-            )
-        ),
-        None,
-    )
-    primary_query = None
-    if dependency_contract is not None and resolved_identifier is not None:
-        try:
-            primary_query = build_primary_proof_query(
-                resolved_identifier,
-                dependency_contract,
-            )
-            primary_evidence = execute_evidence_plan(
-                connector,
-                [primary_query],
-                provider=connection.engine,
-                scan_policy=scan_policy,
-                workspace_id=payload.workspace_id,
-                connection_id=connection.id,
-            )
-            authoritative_proof = classify_authoritative_proof(
-                primary_evidence[0],
-                resolved_identifier,
-                dependency_contract,
-            )
-        except ValueError:
-            primary_query = None
-            primary_evidence = []
     planning_warning = ""
     evidence_plan_statuses: list[dict[str, Any]] = []
-    stop_after_authoritative_proof = should_stop_after_proof(authoritative_proof)
     try:
         plan = build_investigation_plan(
             intent.intent,
@@ -2251,7 +2220,6 @@ def _run_dynamic_investigation(
             entities,
             debug_events=evidence_plan_statuses,
             provider=connection.engine,
-            resolved_entities=[asdict(item) for item in entity_resolution.resolutions],
         )
     except Exception as exc:
         plan = []
@@ -2275,46 +2243,16 @@ def _run_dynamic_investigation(
                 "sql": "",
             }
         )
-    prevented_query_count = max(len(plan) - 1, 0) if stop_after_authoritative_proof else 0
-    if stop_after_authoritative_proof:
-        plan = [primary_query] if primary_query else []
-        evidence = primary_evidence
-        evidence_plan_statuses.append(
-            {
-                "query_id": "DETERMINISTIC-STOP",
-                "purpose": "Stop unrelated exploration",
-                "status": "prevented",
-                "reason": authoritative_proof.stop_reason,
-                "sql": "",
-            }
-        )
-    else:
-        remaining_plan = [
-            item
-            for item in plan
-            if primary_query is None or item.execution_sql != primary_query.execution_sql
-        ]
-        evidence = [
-            *primary_evidence,
-            *execute_evidence_plan(
-                connector,
-                remaining_plan,
-                plan_statuses=evidence_plan_statuses,
-                provider=connection.engine,
-                scan_policy=scan_policy,
-                workspace_id=payload.workspace_id,
-                connection_id=connection.id,
-            ),
-        ]
-    procedures_for_evidence = procedure_analysis
-    if stop_after_authoritative_proof and dependency_contract is not None:
-        procedures_for_evidence = [
-            procedure
-            for procedure in procedure_analysis
-            if procedure.name.casefold()
-            == dependency_contract.calculation_object.casefold()
-        ]
-    for index, procedure in enumerate(procedures_for_evidence, start=1):
+    evidence = execute_evidence_plan(
+        connector,
+        plan,
+        plan_statuses=evidence_plan_statuses,
+        provider=connection.engine,
+        scan_policy=scan_policy,
+        workspace_id=payload.workspace_id,
+        connection_id=connection.id,
+    )
+    for index, procedure in enumerate(procedure_analysis, start=1):
         if not procedure.definition_available:
             continue
         evidence.append(
@@ -2330,11 +2268,7 @@ def _run_dynamic_investigation(
                 evidence_id=f"PROC-{index}",
             )
         )
-    if (
-        not stop_after_authoritative_proof
-        and environment_snapshot is not None
-        and environment_snapshot.procedure_execution_permitted
-    ):
+    if environment_snapshot is not None and environment_snapshot.procedure_execution_permitted:
         explicit_procedures = set(ranking.metadata.exact_procedures_found)
         evidence.extend(
             execute_approved_procedures(
@@ -2356,24 +2290,27 @@ def _run_dynamic_investigation(
                 ),
             )
         )
-    if not stop_after_authoritative_proof:
-        evidence.extend(
-            _expand_related_id_evidence(
-                connector,
-                ranking.metadata,
-                evidence,
-                active_metadata=resolution_metadata,
-                provider=connection.engine,
-                scan_policy=scan_policy,
-                workspace_id=payload.workspace_id,
-                connection_id=connection.id,
-            )
+    evidence.extend(
+        _expand_related_id_evidence(
+            connector,
+            ranking.metadata,
+            evidence,
+            active_metadata=resolution_metadata,
+            provider=connection.engine,
+            scan_policy=scan_policy,
+            workspace_id=payload.workspace_id,
+            connection_id=connection.id,
         )
+    )
     correlated_evidence = correlate_evidence(
         evidence=evidence,
         procedure_analysis=procedure_analysis,
         documents=context.documents,
     )
+    # The authoritative-source proof path was removed on main. Keep the focus
+    # contract explicit until a database-backed identifier has been resolved by
+    # the active investigation path.
+    resolved_identifier = None
     evidence_focus = build_evidence_focus(
         question=payload.question,
         intent=intent.intent,
@@ -2390,54 +2327,6 @@ def _run_dynamic_investigation(
             resolved_identifier.value if resolved_identifier is not None else None
         ),
     )
-    report_procedure_analysis = procedure_analysis
-    report_ranked_objects = ranking.objects
-    if stop_after_authoritative_proof and authoritative_proof is not None:
-        contract = authoritative_proof.contract
-        identifier = authoritative_proof.identifier
-        report_procedure_analysis = procedures_for_evidence
-        report_ranked_objects = [
-            item
-            for item in ranking.objects
-            if item.name.casefold()
-            in {
-                identifier.table.casefold(),
-                contract.calculation_object.casefold(),
-            }
-        ]
-        related_procedure_names = {
-            procedure.name.casefold() for procedure in report_procedure_analysis
-        }
-        evidence_focus = replace(
-            evidence_focus,
-            affected_object=identifier.table,
-            affected_object_reason=(
-                "Selected from the exact-cardinality authoritative source proof."
-            ),
-            inferred_business_key=identifier.column,
-            business_key_reason=(
-                "Preserved from the resolved typed identifier used by the proof query."
-            ),
-            write_path_graph=[
-                edge
-                for edge in evidence_focus.write_path_graph
-                if any(name in " ".join(edge).casefold() for name in related_procedure_names)
-            ],
-            ranked_procedures=[
-                item
-                for item in evidence_focus.ranked_procedures
-                if item.procedure.casefold() in related_procedure_names
-            ],
-            confirmed_facts=[
-                (
-                    f"{contract.derived_output} is unavailable because its required "
-                    f"authoritative source {contract.source_field} is explicitly NULL."
-                )
-            ],
-            inferred_findings=[],
-            hypotheses=[],
-            selected_business_key_value=str(identifier.value),
-        )
     evidence_gate = run_evidence_gate(
         question=payload.question,
         intent=intent.intent,
@@ -2500,23 +2389,11 @@ def _run_dynamic_investigation(
             intent.intent == InvestigationIntent.GENERAL_DATABASE_QUESTION
         ),
     )
-    expected_null_behavior = verified_expected_null_behavior(evidence, procedure_analysis)
-    if authoritative_proof and authoritative_proof.deterministic_cause_confirmed:
-        reasoning_dispatch = ReasoningDispatchDecision(
-            permission=ReasoningPermission.ALLOW_REASONING,
-            mode=ReasoningMode.NORMAL_ROOT_CAUSE,
-            reason="A required authoritative source is explicitly NULL in exact evidence.",
-            invoke_llm=False,
-            verified_evidence_count=max(reasoning_dispatch.verified_evidence_count, 1),
-            reproduction_status=ReproductionStatus.REPRODUCED,
-            root_cause_support=RootCauseSupport.SUPPORTED,
-            reason_code=authoritative_proof.stop_reason,
-            evidence_categories=[*reasoning_dispatch.evidence_categories, "authoritative_source"],
-            evidence_gaps=[
-                f"The upstream origin of {authoritative_proof.contract.source_field} is unproven."
-            ],
-        )
-    elif expected_null_behavior is not None:
+    expected_null_behavior = verified_expected_null_behavior(
+        evidence,
+        procedure_analysis,
+    )
+    if expected_null_behavior is not None:
         execution_evidence, expected_procedure = expected_null_behavior
         reasoning_dispatch = ReasoningDispatchDecision(
             permission=ReasoningPermission.ALLOW_REASONING,
@@ -2535,11 +2412,9 @@ def _run_dynamic_investigation(
                 "No separate verified evidence proves a stored-procedure defect."
             ],
         )
-    settings = invocation_settings or Settings.from_env()
+    settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
-    if authoritative_proof and authoritative_proof.deterministic_cause_confirmed:
-        reasoning = reasoning_from_authoritative_proof(authoritative_proof)
-    elif expected_null_behavior is not None:
+    if expected_null_behavior is not None:
         reasoning = expected_null_behavior_reasoning(
             execution_evidence,
             expected_procedure,
@@ -2693,33 +2568,6 @@ def _run_dynamic_investigation(
             for item in evidence
         ),
     )
-    final_claims = reasoning.likely_root_causes
-    final_verified_claim_count = sum(
-        claim.status is RootCauseSupportStatus.VERIFIED for claim in final_claims
-    )
-    final_rejected_claim_count = sum(
-        claim.status
-        in {
-            RootCauseSupportStatus.UNSUPPORTED,
-            RootCauseSupportStatus.CONTRADICTED,
-        }
-        for claim in final_claims
-    )
-    ai_debug_trace.update(
-        {
-            "generated_claim_count": len(final_claims),
-            "verified_claim_count": final_verified_claim_count,
-            "rejected_claim_count": final_rejected_claim_count,
-            "verification_status": (
-                "passed"
-                if final_verified_claim_count and not final_rejected_claim_count
-                else "failed"
-                if final_rejected_claim_count
-                else "not_applicable"
-            ),
-            "final_report_claims": [asdict(claim) for claim in final_claims],
-        }
-    )
     logger.info(
         "evidence_gate_decision investigation_id=%s run_id=%s entity_key=%s database=%s "
         "evidence_item_count=%s sql_count=%s successful_sql_count=%s row_count=%s "
@@ -2785,12 +2633,6 @@ def _run_dynamic_investigation(
                 for item in evidence
             ],
             "evidence_gate": asdict(evidence_gate),
-            "deterministic_stop_reason": (
-                authoritative_proof.stop_reason if stop_after_authoritative_proof else ""
-            ),
-            "prevented_query_count": (
-                prevented_query_count
-            ),
             "scan_policy": asdict(scan_policy),
         })
     recommendation = recommend_actions(
@@ -2798,12 +2640,6 @@ def _run_dynamic_investigation(
         reasoning=reasoning,
         correlated_evidence=correlated_evidence,
     )
-    if authoritative_proof and authoritative_proof.deterministic_cause_confirmed:
-        recommendation = replace(
-            recommendation,
-            immediate_fix=list(reasoning.recommended_fix),
-            permanent_fix=list(reasoning.recommended_fix),
-        )
     confidence = score_confidence(
         ranking.metadata,
         evidence,
@@ -2867,11 +2703,11 @@ def _run_dynamic_investigation(
         question=payload.question,
         intent=intent,
         entities=entities.entities,
-        ranked_objects=report_ranked_objects,
+        ranked_objects=ranking.objects,
         metadata=ranking.metadata,
         evidence=evidence,
         correlated_evidence=correlated_evidence,
-        procedure_analysis=report_procedure_analysis,
+        procedure_analysis=procedure_analysis,
         hypothesis_reasoning=hypothesis_reasoning,
         documents=context.documents,
         reasoning=reasoning,
@@ -2909,22 +2745,7 @@ def _run_dynamic_investigation(
     source_names = [connection.name, "schema metadata"]
     source_names.extend(table.name for table in ranking.metadata.tables[:5])
     source_names.extend(document.title for document in context.documents[:5])
-    target_context = _discovered_target_context(ranking, report_procedure_analysis)
-    if stop_after_authoritative_proof and authoritative_proof is not None:
-        target_context = {
-            "supporting": ", ".join(
-                value
-                for value in (
-                    authoritative_proof.identifier.table,
-                    authoritative_proof.contract.calculation_object,
-                )
-                if value
-            ),
-            "upstream": "Origin remains an evidence gap",
-            "downstream": authoritative_proof.contract.derived_output,
-            "write_path": "No write path investigated after deterministic confirmation",
-            "read_path": authoritative_proof.contract.calculation_object or "None discovered",
-        }
+    target_context = _discovered_target_context(ranking, procedure_analysis)
     self_validation = evidence_focus.self_validation or _self_validation_lines(
         target_context=target_context,
         evidence=evidence,
@@ -3001,9 +2822,6 @@ def _run_dynamic_investigation(
         for index, item in enumerate(hypothesis_reasoning.ranked_root_causes, start=1)
     )
     event_chain_text = "\n".join(f"- {item}" for item in hypothesis_reasoning.event_chain)
-    if stop_after_authoritative_proof:
-        hypothesis_rank_text = "- No further hypotheses were explored after deterministic confirmation."
-        event_chain_text = "- Unrelated exploration stopped after the authoritative proof."
     summary_only_report = reasoning_dispatch.mode in {
         ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
         ReasoningMode.EVIDENCE_GAP_SUMMARY,
@@ -3236,8 +3054,8 @@ def _run_dynamic_investigation(
         "relationship_proof": json.dumps(relationship_proof, default=str),
         "evidence_gate_reason": evidence_gate_reason,
         "structured_result": json.dumps({
-            "ranked_objects": [asdict(item) for item in report_ranked_objects],
-            "procedures": [asdict(item) for item in report_procedure_analysis],
+            "ranked_objects": [asdict(item) for item in ranking.objects],
+            "procedures": [asdict(item) for item in procedure_analysis],
             "root_cause_claims": [asdict(item) for item in reasoning.likely_root_causes],
             "recommended_fix": reasoning.recommended_fix,
             "response_type": reasoning.response_type,
@@ -3496,24 +3314,6 @@ def ask_chat_question(
     conversation = _get_or_create_conversation(db, payload)
     runtime_settings = Settings.from_env()
     configure_production_langgraph(runtime_settings)
-    try:
-        resolved_model_selection = GovernedModelSelectionService(
-            db, runtime_settings
-        ).resolve(
-            user=current_user,
-            workspace_id=payload.workspace_id,
-            environment=environment_snapshot.environment_type.value,
-            request=ModelSelectionRequest(
-                mode=payload.model_selection_mode or "",
-                catalog_model_id=payload.catalog_model_id or "",
-            ),
-            question=payload.question,
-        )
-    except ModelSelectionAuthorizationError as exc:
-        raise HTTPException(status_code=403, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    invocation_settings = resolved_model_selection.apply_to_settings(runtime_settings)
     execution_started_at = datetime.now(UTC)
     orchestration_context = OrchestrationContext(
         environment=environment_snapshot.environment_type.value,
@@ -3540,7 +3340,9 @@ def ask_chat_question(
     }
     report = analyze_prompt(payload.question, has_sources=True)
     try:
-        def run_production_investigation() -> tuple:
+        def run_production_investigation(
+            excluded_candidate_names: frozenset[str] = frozenset(),
+        ) -> tuple:
             if report.findings:
                 return (
                     _build_placeholder_answer(payload.question, report.findings),
@@ -3556,7 +3358,7 @@ def ask_chat_question(
                     current_user.email or current_user.full_name or current_user.id,
                     environment_snapshot=environment_snapshot,
                     resolved_scan_policy=selected_policy,
-                    invocation_settings=invocation_settings,
+                    excluded_candidate_names=excluded_candidate_names,
                 )
 
         with bind_production_investigation(run_production_investigation):
@@ -3566,7 +3368,6 @@ def ask_chat_question(
             ).run(orchestration_context)
         answer, sources, confidence, report_links, investigation_metadata = routed.payload
         execution_metadata = dict(routed.execution_metadata)
-        execution_metadata.update(selection_metadata(resolved_model_selection))
         execution_metadata["policy_version"] = selected_policy.policy_version
     except DisabledInvestigationError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
@@ -3683,16 +3484,6 @@ def ask_chat_question(
         execution_policy_version=str(execution_metadata.get("policy_version") or ""),
         fallback_used=bool(execution_metadata.get("fallback_used")),
         fallback_reason=str(execution_metadata.get("fallback_reason") or ""),
-        requested_model_mode=resolved_model_selection.requested_mode,
-        requested_catalog_model_id=resolved_model_selection.requested_catalog_model_id,
-        effective_catalog_model_id=resolved_model_selection.effective_catalog_model_id,
-        model_snapshot_json=json.dumps(resolved_model_selection.model_snapshot, default=str),
-        model_policy_decision=resolved_model_selection.policy_decision,
-        model_policy_decision_reason=resolved_model_selection.policy_decision_reason,
-        model_entitlement_source=resolved_model_selection.entitlement_source,
-        model_selection_source=resolved_model_selection.selection_source,
-        model_selection_requested_at=resolved_model_selection.requested_at,
-        model_selection_configuration_version=resolved_model_selection.configuration_version,
         execution_started_at=execution_metadata.get("execution_started_at"),
         execution_ended_at=execution_metadata.get("execution_ended_at"),
         conversation_id=conversation.id,
@@ -3711,19 +3502,13 @@ def ask_chat_question(
         report_path=investigation_metadata["report_path"],
         report_storage_json=investigation_metadata.get("report_storage", "{}"),
         report_snapshot_json=investigation_metadata.get("report_snapshot", ""),
-        ai_debug_trace_json=investigation_metadata.get("ai_debug_trace", "{}"),
+        ai_debug_trace_json=json.dumps(sanitize_ai_trace(terminal_ai_trace), default=str),
         llm_audit_outcome=llm_audit_outcome,
         llm_audit_reason=llm_audit_reason,
         status=investigation_status,
     )
     db.add(investigation)
     db.flush()
-    if resolved_model_selection.audit_id:
-        selection_audit = db.get(
-            LLMModelSelectionAuditModel, resolved_model_selection.audit_id
-        )
-        if selection_audit is not None:
-            selection_audit.investigation_id = investigation.id
     if Settings.from_env().feature_agentic_investigation_enabled:
         from legacydb_copilot.services.investigation_state_machine import (
             InvestigationStateService,

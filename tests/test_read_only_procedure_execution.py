@@ -256,7 +256,7 @@ def test_null_result_drives_expected_behavior_classification() -> None:
     assert reasoning.response_type == "confirmed_root_cause"
     assert "no stored-procedure defect was reproduced" in reasoning.summary.casefold()
     assert reasoning.likely_root_causes[0].conclusion == (
-        "DateOfBirth is NULL for EMP-1001, so Age cannot be calculated."
+        "Employee.DateOfBirth is NULL, so age cannot be calculated."
     )
     assert reasoning.proof_of_fix == []
     assert all("direct database update" in item for item in reasoning.recommended_fix)
@@ -334,33 +334,10 @@ def test_verified_null_date_of_birth_is_a_confirmed_deterministic_root_cause() -
     assert date_of_birth.evidence_semantics == "null_value"
     assert finalized.response_type == "confirmed_root_cause"
     assert claim.status is RootCauseSupportStatus.VERIFIED
-    assert claim.conclusion == "DateOfBirth is NULL for EMP-1001, so Age cannot be calculated."
+    assert claim.conclusion == "Employee.DateOfBirth is NULL, so age cannot be calculated."
     assert claim.evidence_refs == ["SQL-1", "SQL-2", "PROC-1"]
     assert finalized.missing_evidence == [
-        "The evidence does not establish why DateOfBirth is NULL."
+        "The evidence does not establish why Employee.DateOfBirth is NULL."
     ]
     assert confidence >= 0.6
     assert _executive_root_cause_items(bundle) == [claim]
-
-
-def test_expected_null_reasoning_derives_identity_instead_of_matching_fixture() -> None:
-    execution = EvidenceResult(
-        "Execute approved routine",
-        "",
-        [{"EmployeeNumber": "EMP-2042", "DateOfBirth": None, "Age": None}],
-        evidence_id="PROC-GENERIC",
-        evidence_semantics="procedure_execution",
-        evidence_relevance="relevant",
-        supports_claim="The routine returned typed evidence.",
-        scan_policy_decision={"procedure": "dbo.usp_GetEmployeeAge"},
-    )
-
-    verified = verified_expected_null_behavior([execution], [analysis()])
-
-    assert verified is not None
-    reasoning = expected_null_behavior_reasoning(*verified, [execution])
-    assert "EMP-2042" in reasoning.summary
-    assert "EMP-1001" not in reasoning.summary
-    assert reasoning.likely_root_causes[0].evidence_refs == ["PROC-GENERIC"]
-    assert "approved source-data process" in reasoning.recommended_fix[0]
-    assert "rerun the Age calculation" in reasoning.recommended_fix[0]

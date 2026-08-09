@@ -63,6 +63,10 @@ class ReasoningReportingWorkflowHandlers:
     compose_report: NodeHandler
     validate_report: NodeHandler
     finalize: NodeHandler
+    select_candidate: NodeHandler | None = None
+    evaluate_candidate: NodeHandler | None = None
+    reject_candidate: NodeHandler | None = None
+    expand_discovery: NodeHandler | None = None
 
 
 @dataclass(frozen=True)

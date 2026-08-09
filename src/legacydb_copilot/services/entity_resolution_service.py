@@ -132,18 +132,7 @@ def _resolve_one(connector, metadata: MetadataSearchResult, value: str, sequence
     if exact_values:
         matching = [candidate for candidate in exact_values if candidate.identifier.casefold() == value.casefold()]
         if matching:
-            matching.sort(key=_candidate_rank)
             match = matching[0]
-            if len(matching) > 1 and _candidate_rank(matching[1]) == _candidate_rank(match):
-                return EntityResolution(
-                    value,
-                    None,
-                    "ambiguous",
-                    0.0,
-                    match.evidence_id,
-                    matching,
-                    "Equally ranked exact matches require user selection or human review.",
-                )
             return EntityResolution(value, match.identifier, "exact", 1.0, match.evidence_id, matching, "Exact database evidence match.", match.table, match.column)
     partial_candidates, partial_error = _execute_lookup(connector, targets, value, exact=False, sequence=sequence)
     if partial_error:
@@ -178,7 +167,7 @@ def _resolve_one(connector, metadata: MetadataSearchResult, value: str, sequence
 def _execute_lookup(connector, targets: list[tuple[TableMetadata, str]], value: str, *, exact: bool, sequence: int):
     escaped = value.replace("'", "''").replace("%", "[%]").replace("_", "[_]")
     plan: list[PlannedQuery] = []
-    target_map: list[tuple[str, str, list[str], float]] = []
+    target_map: list[tuple[str, list[str]]] = []
     for table, column in targets:
         if not _IDENTIFIER.fullmatch(table.name) or not _IDENTIFIER.fullmatch(column):
             continue
@@ -199,7 +188,7 @@ def _execute_lookup(connector, targets: list[tuple[TableMetadata, str]], value: 
             else f"{comparable} LIKE '%{escaped}%'"
         )
         plan.append(PlannedQuery(f"Entity {'exact' if exact else 'candidate'} lookup", f"SELECT {', '.join(safe_columns)} FROM {table.name} WHERE {comparison}"))
-        target_map.append((table.name, column, safe_columns, table.score))
+        target_map.append((table.name, column, safe_columns))
     evidence = execute_evidence_plan(connector, plan)
     candidates: list[EntityCandidate] = []
     errors: list[tuple[str, str]] = []
@@ -208,23 +197,12 @@ def _execute_lookup(connector, targets: list[tuple[TableMetadata, str]], value: 
         if item.error:
             errors.append((evidence_id, item.error))
             continue
-        table_name, key_column, safe_columns, table_score = target_map[offset]
+        table_name, key_column, safe_columns = target_map[offset]
         for row in item.rows:
             identifier = str(row.get(key_column) or "").strip()
             if not identifier:
                 continue
-            candidates.append(
-                EntityCandidate(
-                    identifier,
-                    {
-                        **{key: row.get(key) for key in safe_columns if key != key_column},
-                        "_table_score": table_score,
-                    },
-                    evidence_id,
-                    table_name,
-                    key_column,
-                )
-            )
+            candidates.append(EntityCandidate(identifier, {key: row.get(key) for key in safe_columns if key != key_column}, evidence_id, table_name, key_column))
     if errors and not candidates:
         return [], errors[0]
     return candidates, None
@@ -265,26 +243,10 @@ def _safe_candidate_columns(table: TableMetadata, key_column: str) -> list[str]:
 
 
 def _unique_candidates(candidates: list[EntityCandidate]) -> list[EntityCandidate]:
-    unique: dict[tuple[str, str, str], EntityCandidate] = {}
+    unique: dict[str, EntityCandidate] = {}
     for candidate in candidates:
-        unique.setdefault(
-            (
-                candidate.identifier.casefold(),
-                candidate.table.casefold(),
-                candidate.column.casefold(),
-            ),
-            candidate,
-        )
+        unique.setdefault(candidate.identifier.casefold(), candidate)
     return list(unique.values())
-
-
-def _candidate_rank(candidate: EntityCandidate) -> tuple[float, int, str, str]:
-    return (
-        -float(candidate.metadata.get("_table_score") or 0.0),
-        _identifier_column_rank(candidate.column)[0],
-        candidate.table.casefold(),
-        candidate.column.casefold(),
-    )
 
 
 def _is_direct_canonical_extension(extracted: str, candidate: str) -> bool:

@@ -30,6 +30,7 @@ from legacydb_copilot.security.access_control import (
 )
 from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.secrets_service import get_secret_store
+from legacydb_copilot.services.metadata_catalog_service import active_snapshot, refresh_metadata, snapshot_summary
 
 router = APIRouter(prefix="/databases", tags=["databases"])
 _ENVIRONMENT_ADMIN_ROLES = {
@@ -325,6 +326,34 @@ def get_database_schema(
         return metadata.to_dict()
     except DatabaseConnectionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/connections/{connection_id}/metadata")
+def get_metadata_catalog_summary(connection_id: str, db: Annotated[Session, Depends(get_db_session)], current_user=Depends(get_current_user)) -> dict[str, Any]:
+    connection = db.get(DatabaseConnectionModel, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    require_resource_owner_workspace(db, current_user, connection, action="read")
+    snapshot = active_snapshot(db, organization_id=connection.organization_id, workspace_id=connection.workspace_id, connection_id=connection.id)
+    return snapshot_summary(snapshot)
+
+
+@router.post("/connections/{connection_id}/metadata/refresh")
+def refresh_metadata_catalog(connection_id: str, db: Annotated[Session, Depends(get_db_session)], current_user=Depends(get_current_user)) -> dict[str, Any]:
+    connection = db.get(DatabaseConnectionModel, connection_id)
+    if connection is None:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    require_resource_owner_workspace(db, current_user, connection, action="database")
+    _require_environment_admin(db, current_user, connection.workspace_id)
+    try:
+        connector = get_connection_pool().get_or_create(connection.id, DatabaseEngine(connection.engine), _build_connection_string(connection))
+        connector.connect()
+        snapshot = refresh_metadata(db, connection=connection, connector=connector)
+        record_audit_event(db, organization_id=connection.organization_id, workspace_id=connection.workspace_id, user_id=current_user.id, action="database_connection.metadata_refresh", resource_type="metadata_snapshot", resource_id=snapshot.id, metadata={"connection_id":connection.id,"version":snapshot.version,"schema_hash":snapshot.schema_hash})
+        db.commit()
+        return snapshot_summary(snapshot)
+    except (DatabaseConnectionError, ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=f"Metadata refresh failed; previous active snapshot was preserved: {exc}") from exc
 
 
 @router.get("/connections/{connection_id}/table/{table_name}")

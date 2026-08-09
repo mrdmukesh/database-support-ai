@@ -3,6 +3,7 @@ import type {
   DatabaseConnection,
   DatabaseConnectionCreate,
   DatabaseConnectionUpdate,
+  MetadataCatalogSummary,
 } from "../models/connection";
 import { ApiClientError, apiRequest } from "./client";
 
@@ -14,6 +15,18 @@ export async function listConnections(
   const query = new URLSearchParams({ organization_id: organizationId });
   if (workspaceId) query.set("workspace_id", workspaceId);
   return (await apiRequest<DatabaseConnection[]>(`/databases/connections?${query}`, { signal })) ?? [];
+}
+
+export async function getMetadataSummary(connectionId: string, signal?: AbortSignal): Promise<MetadataCatalogSummary> {
+  const result = await apiRequest<MetadataCatalogSummary>(`/databases/connections/${encodeURIComponent(connectionId)}/metadata`, { signal });
+  if (!result) throw new ApiClientError("Metadata summary returned an empty response.", 200);
+  return result;
+}
+
+export async function refreshMetadata(connectionId: string): Promise<MetadataCatalogSummary> {
+  const result = await apiRequest<MetadataCatalogSummary>(`/databases/connections/${encodeURIComponent(connectionId)}/metadata/refresh`, { method: "POST" });
+  if (!result) throw new ApiClientError("Metadata refresh returned an empty response.", 200);
+  return result;
 }
 
 export async function createConnection(

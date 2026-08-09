@@ -17,14 +17,20 @@ from legacydb_copilot.workflow.langgraph.state import (
 )
 
 
-def state(status=QueryExecutionStatus.SUCCEEDED, rows=({"value": 1},), objects=("Employee",)):
+def state(
+    status=QueryExecutionStatus.SUCCEEDED,
+    rows=({"value": 1},),
+    objects=("Employee",),
+    query_intent="ENTITY_LOOKUP",
+    evidence_sought="RequiredValue",
+):
     value = create_initial_investigation_state(investigation_id="i", workspace_id="w", question="q")
     value["investigation_plan"] = [
         InvestigationPlanStep(
             step_id="p1",
-            objective="DOB",
-            evidence_sought="DateOfBirth",
-            query_intent="ENTITY_LOOKUP",
+            objective="Required source value",
+            evidence_sought=evidence_sought,
+            query_intent=query_intent,
         )
     ]
     value["query_results"] = [
@@ -77,7 +83,7 @@ def test_tc_ev_06_no_matching_row_classification():
 
 
 def test_tc_ev_07_required_null():
-    output = preserve(state(QueryExecutionStatus.SUCCEEDED_WITH_NULLS, ({"DateOfBirth": None},)))
+    output = preserve(state(QueryExecutionStatus.SUCCEEDED_WITH_NULLS, ({"RequiredValue": None},)))
     assert EvidenceOutcome.REQUIRED_VALUE_MISSING in {
         item.finding_type for item in output["findings"]
     }
@@ -89,7 +95,14 @@ def test_tc_ev_08_optional_null():
 
 
 def test_tc_ev_09_calculation_not_possible():
-    output = preserve(state(QueryExecutionStatus.SUCCEEDED_WITH_NULLS, ({"DateOfBirth": None},)))
+    output = preserve(
+        state(
+            QueryExecutionStatus.SUCCEEDED_WITH_NULLS,
+            ({"SourceValue": None},),
+            query_intent="CALCULATION_SOURCE",
+            evidence_sought="SourceValue",
+        )
+    )
     assert EvidenceOutcome.CALCULATION_NOT_POSSIBLE in {
         item.finding_type for item in output["findings"]
     }

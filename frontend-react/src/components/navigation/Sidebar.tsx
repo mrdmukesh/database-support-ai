@@ -27,7 +27,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      {canReadLLMAudit && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span>{canManageUsers && <><NavLink to="/app/admin/users">Users &amp; Access</NavLink><NavLink to="/app/admin/models">Model Management</NavLink><NavLink to="/app/evaluation">Evaluation</NavLink></>}<NavLink to="/app/admin/llm-audit">LLM Invocation Audit</NavLink></nav>}
+      {canReadLLMAudit && <nav aria-label="Administration navigation"><span className="navigation-label">Administration</span>{canManageUsers && <><NavLink to="/app/admin/users">Users &amp; Access</NavLink><NavLink to="/app/evaluation">Evaluation</NavLink></>}<NavLink to="/app/admin/llm-audit">LLM Invocation Audit</NavLink></nav>}
     </aside>
   );
 }

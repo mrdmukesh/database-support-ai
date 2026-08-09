@@ -746,6 +746,9 @@ def _evidence_to_json(evidence) -> str:
                 "identifier_column": item.identifier_column,
                 "identifier_value": item.identifier_value,
                 "row_scope": item.row_scope,
+                "exact_cardinality_result": item.exact_cardinality_result,
+                "match_count": item.row_count if item.row_scope == "exact_identifier" else None,
+                "parameters": item.parameters,
                 "scan_policy_decision": item.scan_policy_decision,
                 # Keep the complete bounded result as the canonical persisted
                 # evidence.  sample_rows remains for backwards-compatible
@@ -2252,6 +2255,7 @@ def _run_dynamic_investigation(
             entities,
             debug_events=evidence_plan_statuses,
             provider=connection.engine,
+            resolved_entities=[asdict(item) for item in entity_resolution.resolutions],
         )
     except Exception as exc:
         plan = []
@@ -2633,6 +2637,9 @@ def _run_dynamic_investigation(
             },
             "metadata_candidates": ranking.metadata.candidate_trace,
             "entity_resolution": [asdict(item) for item in entity_resolution.resolutions],
+            "structured_business_identifiers": [
+                asdict(item) for item in (entities.structured_identifiers or [])
+            ],
             "transfer_identifier_normalization": asdict(transfer_normalization_trace),
             "extracted_business_entities": [
                 asdict(item) for item in extract_entities(payload.question).entities
@@ -3018,6 +3025,12 @@ def _run_dynamic_investigation(
                     "value": entity.value,
                 }
                 for entity in entities.entities
+            ] + [
+                {
+                    "entity_type": "structured_business_identifier",
+                    **asdict(identifier),
+                }
+                for identifier in (entities.structured_identifiers or [])
             ] + [
                 {
                     "entity_type": "resolved_business_entity",

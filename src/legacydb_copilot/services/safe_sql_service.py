@@ -2101,10 +2101,10 @@ def plan_safe_queries(
     dialect = resolve_sql_dialect(dialect_source) if dialect_source else None
     planned: list[PlannedQuery] = []
     resolved_table_names: set[str] = set()
-    for resolution in resolved_entities or []:
+    for resolution_index, resolution in enumerate(resolved_entities or [], start=1):
         table_name = str(resolution.get("resolved_table") or "")
         column_name = str(resolution.get("resolved_column") or "")
-        value = resolution.get("matched_value")
+        value = resolution.get("identifier_value", resolution.get("matched_value"))
         table = next(
             (item for item in metadata.tables if item.name.casefold() == table_name.casefold()),
             None,
@@ -2115,18 +2115,25 @@ def plan_safe_queries(
             table.name
         ) or not _QUALIFIED_IDENTIFIER.fullmatch(column_name):
             continue
-        selected = _resolved_lookup_columns(table, column_name, entities)
-        escaped = str(value).replace("'", "''")
+        selected = list(dict.fromkeys([column_name, *table.columns[:12]]))
+        parameter_name = f"resolved_identifier_{resolution_index}"
+        exact_sql = (
+            f"SELECT {', '.join(selected)} FROM {table.name} "
+            f"WHERE {column_name} = :{parameter_name}"
+        )
         planned.append(
             PlannedQuery(
-                purpose=f"Resolve one entity in {table.name} by {column_name}",
-                sql=(
-                    f"SELECT {', '.join(selected)} FROM {table.name} "
-                    f"WHERE {column_name} = '{escaped}'"
-                ),
+                purpose=f"Entity exact lookup in {table.name} by {column_name}",
+                sql=exact_sql,
+                execution_sql=exact_sql,
+                parameters={parameter_name: value},
                 evidence_semantics="entity_lookup",
                 column_types={name: table.column_types.get(name, "unknown") for name in selected},
                 exact_cardinality=True,
+                entity_table=table.name,
+                identifier_column=column_name,
+                identifier_value=value,
+                row_scope="exact_identifier",
             )
         )
         resolved_table_names.add(table.name.casefold())
@@ -2260,10 +2267,13 @@ def plan_safe_queries(
         }
     ]
     for index, query in enumerate(planned, start=1):
-        execution_sql, parameters = _parameterize_values(
+        execution_sql, inferred_parameters = _parameterize_values(
             query.sql,
             parameter_values,
         )
+        parameters = {**query.parameters, **inferred_parameters}
+        if query.execution_sql:
+            execution_sql = query.execution_sql
         staged_query = PlannedQuery(
             purpose=query.purpose,
             sql=query.sql,

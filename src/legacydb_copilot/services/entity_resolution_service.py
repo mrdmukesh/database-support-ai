@@ -4,7 +4,10 @@ import re
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
+from legacydb_copilot.agents.entity_extraction_agent import (
+    EntityExtractionResult,
+    StructuredBusinessIdentifier,
+)
 from legacydb_copilot.services.evidence_execution_service import execute_evidence_plan
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.safe_sql_service import PlannedQuery
@@ -30,6 +33,12 @@ class EntityResolution:
     reason: str = ""
     resolved_table: str = ""
     resolved_column: str = ""
+    identifier_field: str = ""
+    identifier_value: Any = None
+    value_type: str = ""
+    source_text: str = ""
+    match_count: int = 0
+    entity_probe: bool = False
 
 
 @dataclass(frozen=True)
@@ -103,6 +112,20 @@ def metadata_with_resolved_tables(
 
 def resolve_entities(connector, metadata: MetadataSearchResult, entities: EntityExtractionResult) -> EntityResolutionResult:
     """Resolve extracted identifiers using validated, bounded, read-only evidence queries."""
+    structured = entities.structured_identifiers or []
+    if structured:
+        resolutions = [
+            _resolve_structured(connector, metadata, identifier, index)
+            for index, identifier in enumerate(structured, 1)
+        ]
+        statuses = {item.match_type for item in resolutions}
+        status = (
+            "ambiguous" if "ambiguous" in statuses
+            else "blocked" if "blocked" in statuses
+            else "not_found" if "not_found" in statuses
+            else "resolved"
+        )
+        return EntityResolutionResult(status, resolutions)
     values = list(dict.fromkeys(
         entity.value for entity in entities.entities
         if entity.entity_type in {"business_identifier", "exact_id_or_code", "business_key"}
@@ -118,6 +141,129 @@ def resolve_entities(connector, metadata: MetadataSearchResult, entities: Entity
     else:
         status = "resolved"
     return EntityResolutionResult(status, resolutions)
+
+
+def _canonical_identifier(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.casefold())
+
+
+def _qualified_table_parts(value: str) -> tuple[str, str]:
+    parts = [part.strip("[]\"") for part in value.split(".")]
+    return (parts[-2], parts[-1]) if len(parts) >= 2 else ("", parts[-1])
+
+
+def _resolve_structured(
+    connector,
+    metadata: MetadataSearchResult,
+    identifier: StructuredBusinessIdentifier,
+    sequence: int,
+) -> EntityResolution:
+    targets: list[tuple[TableMetadata, str]] = []
+    requested_column = _canonical_identifier(identifier.field_name)
+    for table in metadata.tables:
+        schema_name, table_name = _qualified_table_parts(table.name)
+        if identifier.schema_name and schema_name.casefold() != identifier.schema_name.casefold():
+            continue
+        if identifier.table_name and table_name.casefold() != identifier.table_name.casefold():
+            continue
+        for column in table.columns:
+            if _canonical_identifier(column) == requested_column:
+                targets.append((table, column))
+    if not targets:
+        return EntityResolution(
+            str(identifier.value), None, "not_found", 0.0, "",
+            reason="The supplied identifier column was not found in active metadata.",
+            identifier_field=identifier.field_name,
+            identifier_value=identifier.value,
+            value_type=identifier.value_type,
+            source_text=identifier.source_text,
+            entity_probe=True,
+        )
+    candidates, error = _execute_structured_lookup(
+        connector, targets, identifier, sequence=sequence
+    )
+    if error:
+        return EntityResolution(
+            str(identifier.value), None, "blocked", 0.0, error[0], reason=error[1],
+            identifier_field=identifier.field_name, identifier_value=identifier.value,
+            value_type=identifier.value_type, source_text=identifier.source_text,
+            entity_probe=True,
+        )
+    if len(candidates) == 1:
+        match = candidates[0]
+        return EntityResolution(
+            str(identifier.value), match.identifier, "exact", identifier.confidence,
+            match.evidence_id, candidates, "Exact metadata-validated field/value match.",
+            match.table, match.column, identifier.field_name, identifier.value,
+            identifier.value_type, identifier.source_text, 1, True,
+        )
+    if len(candidates) > 1:
+        return EntityResolution(
+            str(identifier.value), None, "ambiguous", 0.0, candidates[0].evidence_id,
+            candidates, "Multiple exact rows or candidate tables matched the supplied identifier.",
+            identifier_field=identifier.field_name, identifier_value=identifier.value,
+            value_type=identifier.value_type, source_text=identifier.source_text,
+            match_count=len(candidates), entity_probe=True,
+        )
+    return EntityResolution(
+        str(identifier.value), None, "not_found", 0.0, "",
+        reason="No row matched the supplied metadata-validated identifier.",
+        identifier_field=identifier.field_name, identifier_value=identifier.value,
+        value_type=identifier.value_type, source_text=identifier.source_text,
+        match_count=0, entity_probe=True,
+    )
+
+
+def _execute_structured_lookup(
+    connector,
+    targets: list[tuple[TableMetadata, str]],
+    identifier: StructuredBusinessIdentifier,
+    *,
+    sequence: int,
+):
+    plan: list[PlannedQuery] = []
+    target_map: list[tuple[str, str, list[str]]] = []
+    for table, column in targets:
+        if not _IDENTIFIER.fullmatch(table.name) or not _IDENTIFIER.fullmatch(column):
+            continue
+        safe_columns = list(dict.fromkeys([column, *table.columns[:12]]))
+        plan.append(
+            PlannedQuery(
+                purpose=f"Entity exact lookup in {table.name} by {column}",
+                sql=f"SELECT {', '.join(safe_columns)} FROM {table.name} WHERE {column} = :entity_value",
+                execution_sql=f"SELECT {', '.join(safe_columns)} FROM {table.name} WHERE {column} = :entity_value",
+                parameters={"entity_value": identifier.value},
+                evidence_semantics="entity_lookup",
+                exact_cardinality=True,
+                entity_table=table.name,
+                identifier_column=column,
+                identifier_value=identifier.value,
+                row_scope="exact_identifier",
+            )
+        )
+        target_map.append((table.name, column, safe_columns))
+    evidence = execute_evidence_plan(connector, plan)
+    candidates: list[EntityCandidate] = []
+    errors: list[tuple[str, str]] = []
+    for offset, item in enumerate(evidence):
+        evidence_id = f"ENTITY-{sequence}-EXACT-{offset + 1}"
+        if item.error:
+            errors.append((evidence_id, item.error))
+            continue
+        table_name, key_column, safe_columns = target_map[offset]
+        for row in item.rows:
+            candidates.append(
+                EntityCandidate(
+                    str(row.get(key_column)),
+                    {key: row.get(key) for key in safe_columns if key != key_column},
+                    evidence_id,
+                    table_name,
+                    key_column,
+                )
+            )
+    if errors and not candidates:
+        return [], errors[0]
+    return candidates, None
 
 
 def _resolve_one(connector, metadata: MetadataSearchResult, value: str, sequence: int) -> EntityResolution:

@@ -240,12 +240,22 @@ def _proven_entity_target(
         leaves.setdefault(table.name.casefold().split(".")[-1], []).append(table.name)
     proven: set[str] = set()
     for item in evidence:
-        purpose = item.purpose.casefold()
-        if not item.rows or not any(
-            marker in purpose
-            for marker in ("prove requested entity exists", "entity exact lookup")
-        ):
+        legacy_entity_proof = (
+            "prove requested entity exists" in item.purpose.casefold()
+            and bool(item.rows)
+        )
+        exact_entity_proof = (
+            bool(item.rows)
+            and item.row_scope == "exact_identifier"
+            and item.exact_cardinality_result == "ENTITY_RESOLVED"
+        )
+        if not (legacy_entity_proof or exact_entity_proof):
             continue
+        if item.entity_table:
+            resolved = known.get(item.entity_table.casefold())
+            if resolved:
+                proven.add(resolved)
+                continue
         for sql_table in _tables_in_sql(item.sql):
             resolved = known.get(sql_table.casefold())
             if resolved is None:
@@ -427,9 +437,14 @@ def _rank_procedures(
         written = {_clean_identifier(table).lower() for table in proc.tables_written}
         read = {_clean_identifier(table).lower() for table in proc.tables_read}
         proc_text = " ".join([proc.definition_excerpt or "", *proc.business_rules]).lower()
-        writes_affected = affected_l in written
-        reads_affected = affected_l in read
-        relationship = "direct write" if writes_affected else "direct read" if reads_affected else "related object" if (written | read) & related else "none confirmed"
+        writes_affected = any(_objects_match(affected_l, item) for item in written)
+        reads_affected = any(_objects_match(affected_l, item) for item in read)
+        touches_related = any(
+            _objects_match(candidate, related_object)
+            for candidate in written | read
+            for related_object in related
+        )
+        relationship = "direct write" if writes_affected else "direct read" if reads_affected else "related object" if touches_related else "none confirmed"
         evidence_found: list[str] = []
         historical: list[str] = []
         error_support = _error_log_supports(proc.name, affected_object, evidence)
@@ -447,11 +462,11 @@ def _rank_procedures(
         if job_support:
             score += 6.0
             evidence_found.append("Job/history evidence references this procedure.")
-        if (written | read) & related:
+        if touches_related:
             score += 2.0
             evidence_found.append("Procedure touches an upstream/downstream related object.")
         column_hits = {column for column in requested_columns if column.lower() in proc_text}
-        if column_hits and (writes_affected or reads_affected or (written | read) & related):
+        if column_hits and (writes_affected or reads_affected or touches_related):
             score += 3.0 + len(column_hits)
             evidence_found.append("Procedure text references requested column(s): " + ", ".join(sorted(column_hits)) + ".")
         id_hits = {value for value in business_ids if value and value in proc_text}
@@ -912,15 +927,25 @@ def _error_log_supports(procedure_name: str, affected_object: str, evidence: lis
     proc_l = procedure_name.lower()
     affected_terms = _object_terms(affected_object)
     for item in evidence:
-        source = f"{item.purpose} {item.sql}".lower()
-        if "error" not in source and "log" not in source:
+        queried_tables = {
+            table.casefold().split(".")[-1] for table in _tables_in_sql(item.sql)
+        }
+        if not any("error" in table and "log" in table for table in queried_tables):
             continue
+        source = f"{item.purpose} {item.sql}".lower()
         for row in item.rows:
             row_text = " ".join(str(value) for value in row.values()).lower()
             row_proc = str(row.get("procedure_name") or row.get("procedure") or "").lower()
             if (row_proc == proc_l or proc_l in row_text) and any(term in row_text or term in source for term in affected_terms):
                 return True
     return False
+
+
+def _objects_match(left: str, right: str) -> bool:
+    """Compare catalog objects without letting qualification style hide a direct dependency."""
+    left_clean = _clean_identifier(left).casefold()
+    right_clean = _clean_identifier(right).casefold()
+    return left_clean == right_clean or left_clean.split(".")[-1] == right_clean.split(".")[-1]
 
 
 def _job_history_supports(procedure_name: str, evidence: list[EvidenceResult]) -> bool:

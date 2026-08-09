@@ -223,3 +223,84 @@ def test_resolution_is_generic_across_domain_identifier_shapes(identifier: str) 
         extract_entities(f"Investigate {identifier}"),
     )
     assert result.status == "resolved"
+
+
+@dataclass
+class ParameterRecordingConnector:
+    rows: list[dict]
+    engine_type: str = "sql_server"
+    calls: list[tuple[str, dict]] = None
+
+    def __post_init__(self):
+        self.calls = []
+
+    def execute_read_only_query(self, sql: str, limit: int = 100, parameters=None):
+        self.calls.append((sql, dict(parameters or {})))
+        return self.rows[:limit]
+
+    def estimate_table_rows(self, _table: str) -> int:
+        return 10
+
+
+def test_structured_identifier_uses_metadata_validated_parameterized_exact_probe() -> None:
+    connector = ParameterRecordingConnector([{"EmployeeId": 7, "Status": "ACTIVE"}])
+    table = TableMetadata(
+        "hr.Employees", ["EmployeeId", "Status"], 0, ["EmployeeId"], [], []
+    )
+
+    result = resolve_entities(
+        connector,
+        metadata(table),
+        extract_entities("Why is salary NULL for EmployeeId = 7?"),
+    )
+
+    assert result.status == "resolved"
+    resolution = result.resolutions[0]
+    assert resolution.entity_probe is True
+    assert resolution.identifier_field == "EmployeeId"
+    assert resolution.identifier_value == 7
+    assert resolution.value_type == "integer"
+    assert resolution.match_count == 1
+    assert resolution.resolved_table == "hr.Employees"
+    assert "WHERE EmployeeId = :entity_value" in connector.calls[0][0]
+    assert connector.calls[0][1] == {"entity_value": 7}
+
+
+def test_qualified_identifier_limits_probe_to_exact_catalog_object() -> None:
+    connector = ParameterRecordingConnector([{"SomeId": 2}])
+    matching = TableMetadata("audit.SomeTable", ["SomeId"], 0, ["SomeId"], [], [])
+    unrelated = TableMetadata("other.SomeTable", ["SomeId"], 0, ["SomeId"], [], [])
+
+    result = resolve_entities(
+        connector,
+        metadata(unrelated, matching),
+        extract_entities("Investigate audit.SomeTable.SomeId = 2"),
+    )
+
+    assert result.status == "resolved"
+    assert result.resolutions[0].resolved_table == "audit.SomeTable"
+    assert len(connector.calls) == 1
+
+
+def test_zero_exact_matches_is_not_found() -> None:
+    connector = ParameterRecordingConnector([])
+    table = TableMetadata("ops.Orders", ["OrderId"], 0, ["OrderId"], [], [])
+
+    result = resolve_entities(
+        connector, metadata(table), extract_entities("OrderId 1")
+    )
+
+    assert result.status == "not_found"
+    assert result.resolutions[0].match_count == 0
+
+
+def test_multiple_exact_matches_are_ambiguous() -> None:
+    connector = ParameterRecordingConnector([{"FacilityId": 5}, {"FacilityId": 5}])
+    table = TableMetadata("ops.Facilities", ["FacilityId"], 0, ["FacilityId"], [], [])
+
+    result = resolve_entities(
+        connector, metadata(table), extract_entities("FacilityId: 5")
+    )
+
+    assert result.status == "ambiguous"
+    assert result.resolutions[0].match_count == 2

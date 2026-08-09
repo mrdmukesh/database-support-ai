@@ -264,7 +264,47 @@ class ProductionInvestigationServiceFacade:
                 "PRODUCTION_FACADE_RESULT_MISSING",
                 "The production investigation facade returned no result.",
             )
-        return request.result
+        result = request.result
+        payload = result.payload
+        if isinstance(payload, tuple) and len(payload) >= 5 and isinstance(payload[4], dict):
+            parts = list(payload)
+            metadata = dict(parts[4])
+            raw_trace = metadata.get("ai_debug_trace", "{}")
+            try:
+                trace = json.loads(raw_trace) if isinstance(raw_trace, str) else dict(raw_trace)
+            except (TypeError, ValueError):
+                trace = {}
+            trace["candidate_transition_trace"] = list(
+                _state.get("candidate_transition_trace") or []
+            )
+            trace["backtrack_count"] = int(_state.get("backtrack_count") or 0)
+            trace["expansion_count"] = int(_state.get("expansion_count") or 0)
+            trace["workflow_ranked_candidates"] = [
+                {
+                    "candidate_id": item.candidate_id,
+                    "qualified_name": item.qualified_name,
+                    "rank": item.rank,
+                    "score": item.score,
+                    "status": item.status.value,
+                    "attempt_count": item.attempt_count,
+                    "reasons": list(item.reasons),
+                }
+                for item in (_state.get("ranked_candidates") or [])
+            ]
+            metadata["ai_debug_trace"] = json.dumps(trace, default=str)
+            parts[4] = metadata
+            result = OrchestrationResult(
+                payload=tuple(parts),
+                investigation_id=result.investigation_id,
+                source=result.source,
+                metrics=result.metrics,
+                durable_evidence_created=result.durable_evidence_created,
+                provider_invoked=result.provider_invoked,
+                failure_stage=result.failure_stage,
+                execution_metadata=result.execution_metadata,
+            )
+            request.result = result
+        return result
 
     def handlers(self) -> ReasoningReportingWorkflowHandlers:
         return ReasoningReportingWorkflowHandlers(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -11,12 +12,95 @@ class ExtractedEntity:
 
 
 @dataclass(frozen=True)
+class StructuredBusinessIdentifier:
+    field_name: str
+    value: Any
+    value_type: str
+    source_text: str
+    confidence: float
+    schema_name: str = ""
+    table_name: str = ""
+    qualified_field_name: str = ""
+
+
+@dataclass(frozen=True)
 class EntityExtractionResult:
     entities: list[ExtractedEntity]
     suspected_issue: str | None
     likely_module: str | None
     application_name: str | None = None
     business_keywords: list[str] | None = None
+    structured_identifiers: list[StructuredBusinessIdentifier] | None = None
+    affected_attributes: list[str] | None = None
+    symptoms: list[str] | None = None
+
+
+_IDENTIFIER_FIELD_SUFFIX = re.compile(
+    r"(?:id|number|code|key|ref|reference)$", re.IGNORECASE
+)
+
+
+def _typed_identifier_value(raw: str) -> tuple[Any, str]:
+    value = raw.strip().strip("'\"")
+    if re.fullmatch(r"[-+]?\d+", value):
+        return int(value), "integer"
+    if re.fullmatch(r"[-+]?\d+\.\d+", value):
+        return float(value), "number"
+    return value, "string"
+
+
+def extract_structured_identifiers(question: str) -> list[StructuredBusinessIdentifier]:
+    """Extract explicit identifier-field/value pairs without interpreting their domain."""
+    identifier = r"[A-Za-z_][A-Za-z0-9_$]*"
+    identifier_field = (
+        r"(?:[A-Za-z_][A-Za-z0-9_$]*?"
+        r"(?:id|number|code|key|ref|reference)|[A-Za-z_][A-Za-z0-9_$]*\s+ID)"
+    )
+    qualified = rf"(?:{identifier}\.){{0,2}}{identifier_field}"
+    value = r"(?:'[^']+'|\"[^\"]+\"|[A-Za-z0-9][A-Za-z0-9_.\-/]*)"
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_$])(?P<field>{qualified})\s*(?P<operator>=|:|\s)\s*(?P<value>{value})",
+        re.IGNORECASE,
+    )
+    found: list[StructuredBusinessIdentifier] = []
+    seen: set[tuple[str, str]] = set()
+    for match in pattern.finditer(question):
+        raw_field = re.sub(r"\s+ID$", "Id", match.group("field"), flags=re.IGNORECASE)
+        parts = raw_field.split(".")
+        field_name = parts[-1]
+        if not _IDENTIFIER_FIELD_SUFFIX.search(field_name):
+            continue
+        if (
+            len(parts) == 1
+            and "_" not in field_name
+            and " " not in match.group("field")
+            and not re.search(r"[a-z][A-Z]", field_name)
+            and not re.search(r"[A-Z].*[A-Z]", field_name)
+        ):
+            continue
+        raw_value = match.group("value")
+        if raw_value.casefold().strip("'\"") == "null":
+            continue
+        typed_value, value_type = _typed_identifier_value(raw_value)
+        key = (raw_field.casefold(), str(typed_value).casefold())
+        if key in seen:
+            continue
+        seen.add(key)
+        schema_name = parts[-3] if len(parts) == 3 else ""
+        table_name = parts[-2] if len(parts) >= 2 else ""
+        found.append(
+            StructuredBusinessIdentifier(
+                field_name=field_name,
+                schema_name=schema_name,
+                table_name=table_name,
+                qualified_field_name=raw_field if len(parts) >= 2 else "",
+                value=typed_value,
+                value_type=value_type,
+                source_text=match.group(0),
+                confidence=1.0 if len(parts) >= 2 or match.group("operator") in {"=", ":"} else 0.95,
+            )
+        )
+    return found
 
 
 def is_explicit_routine_identifier(value: str) -> bool:
@@ -146,6 +230,9 @@ def extract_entities(question: str) -> EntityExtractionResult:
     """
 
     entities: list[ExtractedEntity] = []
+    structured_identifiers = extract_structured_identifiers(question)
+    for identifier in structured_identifiers:
+        entities.append(ExtractedEntity("business_identifier", str(identifier.value)))
     application_name = None
     app_match = re.search(r"\b([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+)*)\s+(System|Application|App|Database|DB)\b", question)
     if app_match:
@@ -239,4 +326,13 @@ def extract_entities(question: str) -> EntityExtractionResult:
         likely_module=module,
         application_name=application_name,
         business_keywords=business_keywords,
+        structured_identifiers=structured_identifiers,
+        affected_attributes=[
+            entity.value
+            for entity in _unique(entities)
+            if entity.entity_type == "possible_table_or_column"
+            and entity.value.casefold() not in {"why", "is", "the"}
+            and not _IDENTIFIER_FIELD_SUFFIX.search(entity.value)
+        ],
+        symptoms=["NULL"] if re.search(r"\bNULL\b", question, re.IGNORECASE) else [],
     )

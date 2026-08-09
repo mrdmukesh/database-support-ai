@@ -246,10 +246,42 @@ def run_evidence_gate(
     key_values = [
         entity.value
         for entity in entities.entities
-        if entity.entity_type in {"business_key", "exact_id_or_code", "status_or_code"}
+        if entity.entity_type in {"business_key", "exact_id_or_code"}
     ]
     business_key_exists = True
-    if key_values:
+    structured_identifiers = entities.structured_identifiers or []
+    if structured_identifiers:
+        exact_matches = [
+            item
+            for item in evidence
+            if item.execution_status == "succeeded"
+            and item.row_scope == "exact_identifier"
+            and item.exact_cardinality_result == "ENTITY_RESOLVED"
+            and any(
+                item.identifier_column.casefold() == identifier.field_name.casefold()
+                and item.identifier_value == identifier.value
+                for identifier in structured_identifiers
+            )
+        ]
+        business_key_exists = bool(exact_matches)
+        key_values = [str(item.value) for item in structured_identifiers]
+        if business_key_exists:
+            facts.append(
+                "Supplied business identifier was confirmed by a parameterized exact entity probe: "
+                + ", ".join(
+                    f"{item.field_name} = {item.value}" for item in structured_identifiers[:3]
+                )
+                + "."
+            )
+        else:
+            blockers.append(
+                "Supplied business identifier was not confirmed by an exact entity probe: "
+                + ", ".join(
+                    f"{item.field_name} = {item.value}" for item in structured_identifiers[:3]
+                )
+                + "."
+            )
+    elif key_values:
         business_key_exists = any(_row_contains(row, value) for item in evidence for row in item.rows for value in key_values)
         if business_key_exists:
             facts.append(f"Supplied business key found in returned evidence: {', '.join(key_values[:3])}.")

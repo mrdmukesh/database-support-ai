@@ -282,6 +282,16 @@ class ExecutionMetadataRead(BaseModel):
     policy_version: str = ""
     fallback_used: bool = False
     fallback_reason: str = ""
+    requested_model_mode: str = ""
+    requested_catalog_model_id: str = ""
+    effective_catalog_model_id: str = ""
+    model_snapshot_json: str = "{}"
+    model_policy_decision: str = ""
+    model_policy_decision_reason: str = ""
+    model_entitlement_source: str = ""
+    model_selection_source: str = ""
+    model_selection_requested_at: datetime | None = None
+    model_selection_configuration_version: int = 0
     execution_started_at: datetime | None = None
     execution_ended_at: datetime | None = None
     badge: str = "LangGraph Verified"
@@ -409,6 +419,16 @@ class InvestigationRead(BaseModel):
     execution_policy_version: str = ""
     fallback_used: bool = False
     fallback_reason: str = ""
+    requested_model_mode: str = ""
+    requested_catalog_model_id: str = ""
+    effective_catalog_model_id: str = ""
+    model_snapshot_json: str = "{}"
+    model_policy_decision: str = ""
+    model_policy_decision_reason: str = ""
+    model_entitlement_source: str = ""
+    model_selection_source: str = ""
+    model_selection_requested_at: datetime | None = None
+    model_selection_configuration_version: int = 0
     execution_started_at: datetime | None = None
     execution_ended_at: datetime | None = None
     user_question: str

@@ -54,8 +54,20 @@ def _execution_metadata(investigation: InvestigationModel) -> dict[str, object]:
         "policy_version": investigation.execution_policy_version
         or investigation.policy_version
         or "",
-        "fallback_used": False,
-        "fallback_reason": "",
+        "fallback_used": investigation.fallback_used,
+        "fallback_reason": investigation.fallback_reason or "",
+        "requested_model_mode": investigation.requested_model_mode or "",
+        "requested_catalog_model_id": investigation.requested_catalog_model_id or "",
+        "effective_catalog_model_id": investigation.effective_catalog_model_id or "",
+        "model_snapshot_json": investigation.model_snapshot_json or "{}",
+        "model_policy_decision": investigation.model_policy_decision or "",
+        "model_policy_decision_reason": investigation.model_policy_decision_reason or "",
+        "model_entitlement_source": investigation.model_entitlement_source or "",
+        "model_selection_source": investigation.model_selection_source or "",
+        "model_selection_requested_at": investigation.model_selection_requested_at,
+        "model_selection_configuration_version": (
+            investigation.model_selection_configuration_version
+        ),
         "execution_started_at": investigation.execution_started_at,
         "execution_ended_at": investigation.execution_ended_at,
         "badge": badge,

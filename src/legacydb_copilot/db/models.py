@@ -412,6 +412,18 @@ class InvestigationModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     execution_policy_version: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     fallback_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     fallback_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    requested_model_mode: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    requested_catalog_model_id: Mapped[str] = mapped_column(String(36), default="", nullable=False)
+    effective_catalog_model_id: Mapped[str] = mapped_column(String(36), default="", nullable=False)
+    model_snapshot_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    model_policy_decision: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    model_policy_decision_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    model_entitlement_source: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    model_selection_source: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    model_selection_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    model_selection_configuration_version: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
     execution_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     execution_ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     conversation_id: Mapped[str | None] = mapped_column(

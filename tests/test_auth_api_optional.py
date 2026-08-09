@@ -303,6 +303,11 @@ def test_chat_safe_question_is_saved_with_history(client: TestClient) -> None:
     assert body["requires_human_review"] is False
     assert body["connection_id"] == connection["id"]
     assert body["connection_name"] == connection["name"]
+    execution = body["execution_metadata"]
+    assert execution["requested_model_mode"] == "automatic"
+    assert execution["model_policy_decision"] == "allowed"
+    assert execution["model_entitlement_source"] == "existing_configuration"
+    assert execution["model_selection_source"] == "administrator_default"
 
     conversations = client.get(
         f"/chat/conversations?organization_id={org['id']}&workspace_id={workspace['id']}&user_id={user['id']}",
@@ -317,6 +322,14 @@ def test_chat_safe_question_is_saved_with_history(client: TestClient) -> None:
     ).json()
     assert [message["role"] for message in messages] == ["user", "assistant"]
     assert body["investigation_id"]
+    detail = client.get(
+        f"/learning/investigations/{body['investigation_id']}", headers=headers
+    )
+    assert detail.status_code == 200
+    persisted = detail.json()["execution_metadata"]
+    assert persisted["requested_model_mode"] == "automatic"
+    assert persisted["model_policy_decision"] == "allowed"
+    assert persisted["model_selection_source"] == "administrator_default"
 
 
 def test_synchronous_chat_persists_canonical_terminal_outcome(

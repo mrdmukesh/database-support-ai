@@ -452,7 +452,7 @@ def _active_database_name(connector, expected_engine: DatabaseEngine) -> str:
     )
 
 
-def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine):
+def _load_and_validate_active_schema(connector, metadata_context: MetadataSearchContext, expected_engine: DatabaseEngine, db: Session | None = None):
     actual_database = _active_database_name(connector, expected_engine)
     if actual_database and metadata_context.connection_string_database and actual_database.lower() != metadata_context.connection_string_database.lower():
         raise DatabaseConnectionError(
@@ -470,11 +470,18 @@ def _load_and_validate_active_schema(connector, metadata_context: MetadataSearch
             actual_database=actual_database,
             connector_cache_key=metadata_context.connector_cache_key,
         )
-    force_refresh = os.getenv("EVAL_FORCE_METADATA_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
-    try:
-        metadata = connector.get_schema_metadata(force_refresh=force_refresh)
-    except TypeError:  # compatibility for connector test doubles and older plugins
-        metadata = connector.get_schema_metadata()
+    metadata = None
+    if db is not None:
+        from legacydb_copilot.services.metadata_catalog_service import active_snapshot, schema_metadata_from_catalog
+        snapshot = active_snapshot(db, organization_id=metadata_context.organization_id, workspace_id=metadata_context.workspace_id, connection_id=metadata_context.connection_id)
+        if snapshot is not None:
+            metadata = schema_metadata_from_catalog(db, snapshot)
+    if metadata is None:
+        force_refresh = os.getenv("EVAL_FORCE_METADATA_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
+        try:
+            metadata = connector.get_schema_metadata(force_refresh=force_refresh)
+        except TypeError:  # compatibility for connector test doubles and older plugins
+            metadata = connector.get_schema_metadata()
     logger.info(
         "RCA metadata context workspace_id=%s connection_id=%s database=%s schema=%s engine=%s "
         "connection_string_database=%s metadata_cache_key=%s tables=%s procedures=%s",
@@ -561,7 +568,7 @@ def _run_metadata_validation(
             connection_string,
             connector_cache_key=connector_cache_key,
         )
-        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine, db)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "TARGET_OBJECT_NOT_FOUND\n\n"
@@ -2067,7 +2074,7 @@ def _run_dynamic_investigation(
             connection_string,
             connector_cache_key=connector_cache_key,
         )
-        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine)
+        active_schema_metadata, metadata_context = _load_and_validate_active_schema(connector, metadata_context, engine, db)
     except (DatabaseConnectionError, ValueError) as exc:
         return (
             "I could not investigate the live database because the saved connection failed: "

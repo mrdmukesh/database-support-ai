@@ -163,6 +163,66 @@ class DatabaseConnectionModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class MetadataSnapshotModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """Immutable, tenant-scoped structural metadata discovery run."""
+
+    __tablename__ = "metadata_snapshots"
+
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    connection_id: Mapped[str] = mapped_column(ForeignKey("database_connections.id", ondelete="CASCADE"), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    started_at: Mapped[object] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    completed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True))
+    schema_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    source_database: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    discovery_version: Mapped[str] = mapped_column(String(32), default="1", nullable=False)
+    counts_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    completeness_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    changes_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+    error_summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("connection_id", "version", name="uq_metadata_snapshot_connection_version"),
+        Index("ix_metadata_snapshot_tenant_active", "organization_id", "workspace_id", "connection_id", "is_active"),
+    )
+
+
+class MetadataObjectModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "metadata_objects"
+
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("metadata_snapshots.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    schema_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    object_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_object_id: Mapped[str] = mapped_column(String(128), default="", nullable=False)
+    definition_hash: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    definition: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("snapshot_id", "object_type", "schema_name", "object_name", name="uq_metadata_object_identity"),
+        Index("ix_metadata_object_snapshot_name", "snapshot_id", "schema_name", "object_name"),
+    )
+
+
+class MetadataRelationshipModel(UUIDPrimaryKeyMixin, Base):
+    __tablename__ = "metadata_relationships"
+
+    snapshot_id: Mapped[str] = mapped_column(ForeignKey("metadata_snapshots.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_key: Mapped[str] = mapped_column(String(800), nullable=False)
+    target_key: Mapped[str] = mapped_column(String(800), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    source_column: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    target_column: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    dependency_distance: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
+
+    __table_args__ = (Index("ix_metadata_relationship_source", "snapshot_id", "source_key", "relationship_type"),)
+
+
 class EvaluationJobModel(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Durable, tenant-scoped request to execute a new immutable evaluation run."""
 

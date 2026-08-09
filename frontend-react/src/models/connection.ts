@@ -39,3 +39,15 @@ export interface ConnectionValidationResult {
   message: string;
   [key: string]: unknown;
 }
+
+export interface MetadataCatalogSummary {
+  snapshot_id?: string;
+  status: "NOT_DISCOVERED" | "DISCOVERING" | "READY" | "FAILED" | "STALE";
+  version: number | null;
+  last_refresh: string | null;
+  schema_hash?: string;
+  counts: Record<string, number>;
+  completeness: Record<string, string>;
+  changes?: { structural_change?: boolean; added?: number; removed?: number };
+  error_summary?: string;
+}

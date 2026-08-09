@@ -1,4 +1,4 @@
-import type { ConnectionValidationResult, DatabaseConnection } from "../../models/connection";
+import type { ConnectionValidationResult, DatabaseConnection, MetadataCatalogSummary } from "../../models/connection";
 import { ConnectionTestResult } from "./ConnectionTestResult";
 import { useState } from "react";
 import { ConfirmationDialog } from "../common/ConfirmationDialog";
@@ -15,9 +15,12 @@ interface ConnectionListProps {
   onEdit: (connection: DatabaseConnection, name: string, environment: EnvironmentType, connectionString?: string) => Promise<void> | void;
   onDelete: (connection: DatabaseConnection) => Promise<void> | void;
   onTest: (connection: DatabaseConnection) => Promise<void> | void;
+  metadata?: Record<string, MetadataCatalogSummary | undefined>;
+  refreshingIds?: Set<string>;
+  onRefreshMetadata?: (connection: DatabaseConnection) => Promise<void> | void;
 }
 
-export function ConnectionList({ connections, testingIds, testResults, testErrors, onEdit, onDelete, onTest }: ConnectionListProps) {
+export function ConnectionList({ connections, testingIds, testResults, testErrors, onEdit, onDelete, onTest, metadata = {}, refreshingIds = new Set(), onRefreshMetadata = () => undefined }: ConnectionListProps) {
   const [pendingDelete, setPendingDelete] = useState<DatabaseConnection | null>(null);
   function edit(connection: DatabaseConnection) {
     const name = window.prompt("Connection name", connection.name);
@@ -40,7 +43,7 @@ export function ConnectionList({ connections, testingIds, testResults, testError
     <div className="connection-list">
       <h2>Connection list</h2>
       <table>
-        <thead><tr><th>Name</th><th>Engine</th><th>Environment</th><th>Status</th><th>Test</th><th>Actions</th><th>Result</th></tr></thead>
+        <thead><tr><th>Name</th><th>Engine</th><th>Environment</th><th>Status</th><th>Metadata catalog</th><th>Test</th><th>Actions</th><th>Result</th></tr></thead>
         <tbody>
           {connections.map((connection) => (
             <tr key={connection.id}>
@@ -48,6 +51,7 @@ export function ConnectionList({ connections, testingIds, testResults, testError
               <td>{connection.engine}</td>
               <td><strong className="environment-badge">{environmentLabel(connection.environment_type)}</strong> ({connection.max_scan_rows} rows)</td>
               <td><StatusBadge status={connection.is_active ? "Active" : "Inactive"} /></td>
+              <td>{(() => { const summary=metadata[connection.id]; const counts=summary?.counts ?? {}; return <><StatusBadge status={summary?.status ?? "NOT_DISCOVERED"} /><div>Version: {summary?.version ?? "—"}</div><div>Tables: {counts.tables ?? 0}; Columns: {counts.columns ?? 0}; Views: {counts.views ?? 0}; Procedures: {counts.procedures ?? 0}; Functions: {counts.functions ?? 0}; Triggers: {counts.triggers ?? 0}; Relationships: {counts.relationships ?? 0}</div><div>Last refresh: {summary?.last_refresh ? new Date(summary.last_refresh).toLocaleString() : "Never"}</div><button type="button" disabled={!connection.is_active || connection.engine !== "sql_server" || refreshingIds.has(connection.id)} onClick={() => void onRefreshMetadata(connection)}>{refreshingIds.has(connection.id) ? "Refreshing..." : "Refresh Metadata"}</button></>; })()}</td>
               <td><button type="button" onClick={() => void onTest(connection)} disabled={!connection.is_active || testingIds.has(connection.id)}>{testingIds.has(connection.id) ? "Testing..." : "Test"}</button></td>
               <td>
                 <button type="button" onClick={() => edit(connection)}>Edit</button>

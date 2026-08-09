@@ -54,6 +54,7 @@ class SchemaMetadata:
         procedures: list[str],
         version: str,
         cache_diagnostics: dict[str, Any] | None = None,
+        table_schemas: dict[str, dict[str, Any]] | None = None,
     ):
         self.engine_type = engine_type
         self.tables = tables
@@ -61,6 +62,7 @@ class SchemaMetadata:
         self.procedures = procedures
         self.version = version
         self.cache_diagnostics = cache_diagnostics or {}
+        self.table_schemas = table_schemas or {}
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -411,12 +411,20 @@ def search_metadata(
         enrichment_loaded = True
         relationship_metadata_status = "loaded"
         try:
+            cached_schema = getattr(metadata, "table_schemas", {}).get(table_name)
             lightweight_columns = (
                 getattr(connector, "get_table_columns", None)
-                if use_lightweight_candidate_search
+                if use_lightweight_candidate_search and cached_schema is None
                 else None
             )
-            if callable(lightweight_columns):
+            if cached_schema is not None:
+                columns = [column["name"] for column in cached_schema["columns"]]
+                column_types = {str(column["name"]): str(column.get("type") or "unknown") for column in cached_schema["columns"]}
+                primary_key = cached_schema.get("primary_key", [])
+                foreign_keys = cached_schema.get("foreign_keys", [])
+                indexes = cached_schema.get("indexes", [])
+                relationship_metadata_status = "catalog"
+            elif callable(lightweight_columns):
                 raw_columns = lightweight_columns(table_name)
                 columns = [column["name"] for column in raw_columns]
                 column_types = {
@@ -486,7 +494,7 @@ def search_metadata(
             trace[-1]["reason"] += "; exact user table match exists, so semantic alternative was not selected"
             continue
         if score > 0:
-            if callable(lightweight_columns):
+            if callable(lightweight_columns) and cached_schema is None:
                 try:
                     search_schema = (
                         connector.get_table_schema
@@ -557,7 +565,7 @@ def search_metadata(
             if table_name not in fallback_names:
                 continue
             try:
-                schema = connector.get_table_schema(table_name)
+                schema = getattr(metadata, "table_schemas", {}).get(table_name) or connector.get_table_schema(table_name)
                 columns = [column["name"] for column in schema["columns"]]
                 primary_key = schema.get("primary_key", [])
                 foreign_keys = schema.get("foreign_keys", [])

@@ -9,6 +9,7 @@ from typing_extensions import TypedDict
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
 from legacydb_copilot.services.pii_masking_service import sanitize_ai_trace
 from legacydb_copilot.workflow.langgraph.enums import (
+    CandidateStatus,
     CoverageStatus,
     EntityResolutionStatus,
     EvidenceOutcome,
@@ -68,11 +69,37 @@ class DatabaseObjectRef(StateRecord):
     contains_mutation: bool = False
     contains_dynamic_sql: bool = False
     unsafe_to_execute: bool = False
+    path_role: str = "UNKNOWN"
 
     @property
     def qualified_name(self) -> str:
         parts = (self.database, self.schema_name, self.object_name)
         return ".".join(part for part in parts if part)
+
+
+class CandidateObjectRecord(StateRecord):
+    candidate_id: str
+    object_type: str
+    object_name: str
+    schema_name: str = ""
+    rank: int = Field(ge=1)
+    score: float = 0.0
+    lexical_relevance: float = 0.0
+    semantic_relevance: float = 0.0
+    knowledge_relevance: float = 0.0
+    structural_relevance: float = 0.0
+    path_role: str = "UNKNOWN"
+    entity_probe_result: str = "NOT_PROBED"
+    supporting_evidence_ids: tuple[str, ...] = ()
+    contradicting_evidence_ids: tuple[str, ...] = ()
+    reasons: tuple[str, ...] = ()
+    attempt_count: int = Field(default=0, ge=0)
+    decision_reason: str = ""
+    status: CandidateStatus = CandidateStatus.UNVERIFIED
+
+    @property
+    def qualified_name(self) -> str:
+        return ".".join(part for part in (self.schema_name, self.object_name) if part)
 
 
 class RelationshipEdge(StateRecord):
@@ -287,6 +314,18 @@ class InvestigationState(TypedDict):
     entity_ambiguities: list[str]
     # Database object discovery
     candidate_objects: list[DatabaseObjectRef]
+    ranked_candidates: list[CandidateObjectRecord]
+    active_candidate_id: str
+    backtrack_count: int
+    expansion_count: int
+    graph_step_count: int
+    max_backtracks: int
+    max_expansions: int
+    max_candidate_tables: int
+    max_candidate_columns: int
+    max_candidate_code_objects: int
+    max_graph_steps: int
+    candidate_transition_trace: list[dict[str, Any]]
     selected_objects: list[DatabaseObjectRef]
     required_objects: list[DatabaseObjectRef]
     optional_objects: list[DatabaseObjectRef]
@@ -431,6 +470,18 @@ def create_initial_investigation_state(
         "entity_resolution_explanation": "",
         "entity_ambiguities": [],
         "candidate_objects": [],
+        "ranked_candidates": [],
+        "active_candidate_id": "",
+        "backtrack_count": 0,
+        "expansion_count": 0,
+        "graph_step_count": 0,
+        "max_backtracks": 4,
+        "max_expansions": 3,
+        "max_candidate_tables": 8,
+        "max_candidate_columns": 24,
+        "max_candidate_code_objects": 20,
+        "max_graph_steps": 50,
+        "candidate_transition_trace": [],
         "selected_objects": [],
         "required_objects": [],
         "optional_objects": [],

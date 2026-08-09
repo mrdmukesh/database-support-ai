@@ -123,6 +123,12 @@ class Settings:
     langgraph_allowed_user_ids: tuple[str, ...] = ()
     langgraph_max_concurrent_runs: int = 2
     langgraph_timeout_seconds: float = 120.0
+    langgraph_max_candidate_tables: int = 8
+    langgraph_max_candidate_columns: int = 24
+    langgraph_max_candidate_code_objects: int = 20
+    langgraph_max_backtracks: int = 4
+    langgraph_max_expansions: int = 3
+    langgraph_max_graph_steps: int = 50
     langgraph_shadow_timeout_seconds: float = 120.0
     langgraph_fallback_on_timeout: bool = True
     langgraph_fallback_on_provider_failure: bool = False
@@ -289,6 +295,14 @@ class Settings:
                 "LANGGRAPH_MAX_CONCURRENT_RUNS", 2, minimum=1
             ),
             langgraph_timeout_seconds=_env_float("LANGGRAPH_TIMEOUT_SECONDS", 120.0),
+            langgraph_max_candidate_tables=_env_int("LANGGRAPH_MAX_CANDIDATE_TABLES", 8),
+            langgraph_max_candidate_columns=_env_int("LANGGRAPH_MAX_CANDIDATE_COLUMNS", 24),
+            langgraph_max_candidate_code_objects=_env_int(
+                "LANGGRAPH_MAX_CANDIDATE_CODE_OBJECTS", 20
+            ),
+            langgraph_max_backtracks=_env_int("LANGGRAPH_MAX_BACKTRACKS", 4),
+            langgraph_max_expansions=_env_int("LANGGRAPH_MAX_EXPANSIONS", 3),
+            langgraph_max_graph_steps=_env_int("LANGGRAPH_MAX_GRAPH_STEPS", 50),
             langgraph_shadow_timeout_seconds=_env_float(
                 "LANGGRAPH_SHADOW_TIMEOUT_SECONDS", 120.0
             ),

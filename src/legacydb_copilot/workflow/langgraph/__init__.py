@@ -2,6 +2,7 @@
 
 from legacydb_copilot.workflow.langgraph.enums import (
     CoverageStatus,
+    CandidateStatus,
     EntityResolutionStatus,
     EvidenceOutcome,
     ObjectDisposition,
@@ -19,6 +20,7 @@ from legacydb_copilot.workflow.langgraph.graph import (
 )
 from legacydb_copilot.workflow.langgraph.state import (
     ClaimEvidenceLink,
+    CandidateObjectRecord,
     DatabaseObjectRef,
     EntityCandidateRecord,
     EnvironmentPolicyRecord,
@@ -39,6 +41,8 @@ from legacydb_copilot.workflow.langgraph.state import (
 
 __all__ = [
     "CoverageStatus",
+    "CandidateStatus",
+    "CandidateObjectRecord",
     "ClaimEvidenceLink",
     "DatabaseObjectRef",
     "EntityCandidateRecord",

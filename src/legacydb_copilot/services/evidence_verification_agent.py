@@ -228,7 +228,7 @@ def suggest_verification_checks(
         if matched is None:
             enriched.append(check)
             continue
-        parameters = dict(matched.parameters)
+        parameters = dict(getattr(matched, "parameters", {}) or {})
         enriched.append(
             SuggestedVerificationCheck(
                 **{
@@ -238,10 +238,10 @@ def suggest_verification_checks(
                         name: type(value).__name__ for name, value in parameters.items()
                     },
                     "evidence_id": matched.evidence_id,
-                    "entity_table": matched.entity_table,
-                    "resolved_entity_scope": matched.row_scope,
-                    "identifier_column": matched.identifier_column,
-                    "identifier_value": matched.identifier_value,
+                    "entity_table": getattr(matched, "entity_table", ""),
+                    "resolved_entity_scope": getattr(matched, "row_scope", ""),
+                    "identifier_column": getattr(matched, "identifier_column", ""),
+                    "identifier_value": getattr(matched, "identifier_value", ""),
                 }
             )
         )

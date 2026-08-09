@@ -2002,6 +2002,7 @@ def _run_dynamic_investigation(
     *,
     environment_snapshot: EnvironmentSnapshot | None = None,
     resolved_scan_policy=None,
+    excluded_candidate_names: frozenset[str] = frozenset(),
 ) -> tuple[str, list[str], float, dict[str, str] | None, dict[str, Any]]:
     """
     Owner: Mukesh Dabi
@@ -2139,6 +2140,32 @@ def _run_dynamic_investigation(
         entities=entities,
         metadata=context.metadata,
     )
+    if excluded_candidate_names:
+        excluded = {name.casefold() for name in excluded_candidate_names}
+        remaining_tables = [
+            table
+            for table in ranking.metadata.tables
+            if table.name.casefold() not in excluded
+        ]
+        expansion_tables = [
+            table
+            for table in resolution_metadata.tables
+            if table.name.casefold() not in excluded
+            and table.name.casefold()
+            not in {candidate.name.casefold() for candidate in remaining_tables}
+        ]
+        expanded_metadata = replace(
+            ranking.metadata,
+            tables=[*remaining_tables, *expansion_tables][:12],
+        )
+        ranking = rank_relevant_objects(
+            question=payload.question,
+            intent=intent,
+            entities=entities,
+            metadata=expanded_metadata,
+            max_tables=8,
+            include_fallback_candidates=True,
+        )
     ranked_metadata = metadata_with_resolved_tables(
         ranking.metadata, resolution_metadata, entity_resolution
     )
@@ -3283,7 +3310,9 @@ def ask_chat_question(
     }
     report = analyze_prompt(payload.question, has_sources=True)
     try:
-        def run_production_investigation() -> tuple:
+        def run_production_investigation(
+            excluded_candidate_names: frozenset[str] = frozenset(),
+        ) -> tuple:
             if report.findings:
                 return (
                     _build_placeholder_answer(payload.question, report.findings),
@@ -3299,6 +3328,7 @@ def ask_chat_question(
                     current_user.email or current_user.full_name or current_user.id,
                     environment_snapshot=environment_snapshot,
                     resolved_scan_policy=selected_policy,
+                    excluded_candidate_names=excluded_candidate_names,
                 )
 
         with bind_production_investigation(run_production_investigation):

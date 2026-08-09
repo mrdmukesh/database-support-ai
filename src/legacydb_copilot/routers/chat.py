@@ -169,6 +169,38 @@ def _execution_badge(metadata: dict[str, Any]) -> str:
     return "LangGraph Verified"
 
 
+def _governed_model_persistence_metadata(
+    execution_metadata: dict[str, Any],
+) -> dict[str, Any]:
+    """Map the active legacy/default model choice to migration 0024's contract."""
+    requested_at = execution_metadata.get("execution_started_at") or datetime.now(UTC)
+    provider = str(execution_metadata.get("provider") or "")
+    effective_model = str(execution_metadata.get("effective_model") or "")
+    selected_by = str(execution_metadata.get("selected_by") or "Automatic")
+    fallback_used = bool(execution_metadata.get("fallback_used"))
+    selection_source = "fallback" if fallback_used else "administrator_default"
+    policy_decision = "fallback" if fallback_used else "allowed"
+    policy_reason = (
+        str(execution_metadata.get("fallback_reason") or "configured_model_fallback")
+        if fallback_used
+        else "feature_disabled_existing_configuration"
+    )
+    return {
+        "requested_model_mode": selected_by.casefold(),
+        "requested_catalog_model_id": "",
+        "effective_catalog_model_id": "",
+        "model_snapshot_json": json.dumps(
+            {"provider": provider, "provider_model_id": effective_model}
+        ),
+        "model_policy_decision": policy_decision,
+        "model_policy_decision_reason": policy_reason,
+        "model_entitlement_source": "existing_configuration",
+        "model_selection_source": selection_source,
+        "model_selection_requested_at": requested_at,
+        "model_selection_configuration_version": 0,
+    }
+
+
 def _execution_metadata_section(metadata: dict[str, Any]) -> ReportSection:
     def label(value: object, default: str = "Not recorded") -> str:
         text = str(value or "").strip()
@@ -3457,6 +3489,8 @@ def ask_chat_question(
     llm_audit_outcome, llm_audit_reason = _llm_audit_outcome(
         investigation_status, terminal_ai_trace
     )
+    governed_model_metadata = _governed_model_persistence_metadata(execution_metadata)
+    execution_metadata.update(governed_model_metadata)
     investigation = InvestigationModel(
         id=investigation_id,
         organization_id=payload.organization_id,
@@ -3484,6 +3518,7 @@ def ask_chat_question(
         execution_policy_version=str(execution_metadata.get("policy_version") or ""),
         fallback_used=bool(execution_metadata.get("fallback_used")),
         fallback_reason=str(execution_metadata.get("fallback_reason") or ""),
+        **governed_model_metadata,
         execution_started_at=execution_metadata.get("execution_started_at"),
         execution_ended_at=execution_metadata.get("execution_ended_at"),
         conversation_id=conversation.id,

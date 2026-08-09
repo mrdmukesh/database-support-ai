@@ -361,7 +361,8 @@ jobs:
                   "VERIFICATION_AGENT_ENABLED=true" \
                   "FEATURE_AUDIT_LOGGING_ENABLED=true" \
                   "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \
-                  "FEATURE_KEYVAULT_SECRETS_ENABLED=false" \
+                  "FEATURE_KEYVAULT_SECRETS_ENABLED=true" \
+                  "AZURE_KEY_VAULT_URL=https://${AZURE_KEY_VAULT_NAME}.vault.azure.net/" \
                   "${OPENAI_ENV_ARGS[@]}"
             else
               az containerapp create \
@@ -397,7 +398,8 @@ jobs:
                   "VERIFICATION_AGENT_ENABLED=true" \
                   "FEATURE_AUDIT_LOGGING_ENABLED=true" \
                   "FEATURE_ENTERPRISE_RBAC_ENABLED=false" \
-                  "FEATURE_KEYVAULT_SECRETS_ENABLED=false" \
+                  "FEATURE_KEYVAULT_SECRETS_ENABLED=true" \
+                  "AZURE_KEY_VAULT_URL=https://${AZURE_KEY_VAULT_NAME}.vault.azure.net/" \
                   "${OPENAI_ENV_ARGS[@]}"
             fi
 

@@ -55,7 +55,7 @@ class SchemaMetadata:
         version: str,
         cache_diagnostics: dict[str, Any] | None = None,
         table_schemas: dict[str, dict[str, Any]] | None = None,
-        result_set_lineages: dict[str, dict[str, Any]] | None = None,
+        result_set_lineages: dict[str, list[dict[str, Any]]] | None = None,
     ):
         self.engine_type = engine_type
         self.tables = tables

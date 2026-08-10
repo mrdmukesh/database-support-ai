@@ -18,7 +18,7 @@ from legacydb_copilot.db.models import (
     MetadataRelationshipModel,
     MetadataSnapshotModel,
 )
-from legacydb_copilot.services.result_set_lineage_service import parse_result_set_lineage
+from legacydb_copilot.services.result_set_lineage_service import parse_result_set_lineages
 
 DISCOVERY_VERSION = "2"
 _locks_guard = threading.Lock()
@@ -207,6 +207,22 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
     except Exception:
         module_rows = []
         completeness["definitions"] = "partial"
+    try:
+        parameter_rows = connector.execute_read_only_query(
+            """
+SELECT s.name schema_name,o.name object_name,p.name parameter_name,
+       ty.name data_type,p.max_length,p.precision,p.scale,p.is_output
+FROM sys.objects o
+JOIN sys.schemas s ON s.schema_id=o.schema_id
+JOIN sys.parameters p ON p.object_id=o.object_id
+JOIN sys.types ty ON ty.user_type_id=p.user_type_id
+WHERE o.is_ms_shipped=0 AND o.type IN ('P','FN','IF','TF')
+ORDER BY o.object_id,p.parameter_id""",
+            limit=50000,
+        )
+    except Exception:
+        parameter_rows = []
+        completeness["parameter_types"] = "partial"
 
     code_map = {
         "U": "TABLE",
@@ -250,14 +266,24 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
         (str(r.get("schema_name") or ""), str(r.get("object_name") or "")): r.get("definition")
         for r in module_rows
     }
+    parameter_types: dict[tuple[str, str], dict[str, str]] = {}
+    for row in parameter_rows:
+        parameter_types.setdefault(
+            (str(row.get("schema_name") or ""), str(row.get("object_name") or "")),
+            {},
+        )[str(row.get("parameter_name") or "")] = str(row.get("data_type") or "")
     objects: list[CatalogObject] = []
     for (t, s, n), v in grouped.items():
         definition = definitions.get((s, n))
         qualified_name = _qname(s, n)
-        lineage = (
-            parse_result_set_lineage(qualified_name, str(definition or ""))
+        lineages = (
+            parse_result_set_lineages(
+                qualified_name,
+                str(definition or ""),
+                parameter_types=parameter_types.get((s, n), {}),
+            )
             if t in {"PROCEDURE", "VIEW", "FUNCTION"}
-            else None
+            else []
         )
         objects.append(CatalogObject(
             t, s, n, v["source_object_id"], definition,
@@ -265,7 +291,9 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
                 "columns": v["columns"],
                 "definition_available": (s, n) in definitions and definition is not None,
                 "dynamic_sql": bool(re.search(r"\b(?:sp_executesql|EXEC\s*\()", str(definition or ""), re.I)),
-                "result_set_lineage": lineage.to_dict() if lineage else None,
+                "result_set_lineage": lineages[0].to_dict() if lineages else None,
+                "result_set_lineages": [lineage.to_dict() for lineage in lineages],
+                "parameter_types": parameter_types.get((s, n), {}),
             },
         ))
     relationships: list[CatalogRelationship] = []
@@ -476,7 +504,7 @@ def refresh_metadata(db: Session, *, connection, connector) -> MetadataSnapshotM
         counts["relationships"] = len(catalog.relationships)
         counts["objects"] = len(catalog.objects)
         counts["result_set_lineages"] = sum(
-            bool(o.metadata.get("result_set_lineage")) for o in catalog.objects
+            len(o.metadata.get("result_set_lineages") or []) for o in catalog.objects
         )
         candidate.schema_hash = fingerprint
         candidate.counts_json = json.dumps(counts)
@@ -548,12 +576,15 @@ def schema_metadata_from_catalog(db: Session, snapshot: MetadataSnapshotModel) -
         ]
 
     table_schemas: dict[str, dict[str, Any]] = {}
-    result_set_lineages: dict[str, dict[str, Any]] = {}
+    result_set_lineages: dict[str, list[dict[str, Any]]] = {}
     for obj in objects:
         detail = json.loads(obj.metadata_json)
-        if detail.get("result_set_lineage"):
+        persisted_lineages = detail.get("result_set_lineages") or (
+            [detail["result_set_lineage"]] if detail.get("result_set_lineage") else []
+        )
+        if persisted_lineages:
             name = f"{obj.schema_name}.{obj.object_name}" if obj.schema_name else obj.object_name
-            result_set_lineages[name] = detail["result_set_lineage"]
+            result_set_lineages[name] = persisted_lineages
         if obj.object_type != "TABLE":
             continue
         name = f"{obj.schema_name}.{obj.object_name}" if obj.schema_name else obj.object_name

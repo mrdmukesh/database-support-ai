@@ -5,7 +5,9 @@ from legacydb_copilot.services.result_set_lineage_service import (
     evaluate_row_exclusion_candidates,
     extract_output_target,
     parse_result_set_lineage,
+    parse_result_set_lineages,
     plan_row_exclusion_verification,
+    preprocess_sql_definition,
     resolve_output_producers,
     row_exclusion_reasoning,
 )
@@ -227,3 +229,131 @@ def test_having_rejection_preserves_grouped_output_semantics() -> None:
         item for item in candidates if item.candidate_type == "HAVING_PREDICATE_REJECTION"
     )
     assert "GROUP BY r.RecordId" in having.verification_query
+
+
+def test_block_and_line_comments_cannot_supply_from_or_join_tokens() -> None:
+    definition = """
+/* FROM fake.Report JOIN fake.Rows ON 1=1 */
+CREATE PROCEDURE dbo.usp_Output AS
+BEGIN
+-- FROM ignored.Line JOIN ignored.Other ON 1=1
+SELECT r.RecordId FROM dbo.Records r
+INNER JOIN dbo.Details d ON d.RecordId=r.RecordId;
+END
+"""
+    lineage = parse_result_set_lineage("dbo.usp_Output", definition)
+    assert lineage.base_object == "dbo.Records"
+    assert lineage.joins[0].right_object == "dbo.Details"
+    assert lineage.joins[0].join_type == "INNER"
+
+
+def test_comment_markers_inside_string_literals_are_preserved() -> None:
+    cleaned = preprocess_sql_definition(
+        "CREATE PROC dbo.p AS SELECT '/* keep */ -- keep' AS TextValue; -- remove"
+    )
+    assert "'/* keep */ -- keep'" in cleaned
+    assert "-- remove" not in cleaned
+
+
+def test_parser_starts_after_header_and_preserves_multiple_selects() -> None:
+    definition = """
+CREATE PROCEDURE dbo.usp_Output @Value int AS
+BEGIN
+SELECT a.Id FROM dbo.FirstTable a;
+SELECT b.Id FROM dbo.SecondTable b;
+END
+"""
+    lineages = parse_result_set_lineages("dbo.usp_Output", definition)
+    assert [item.base_object for item in lineages] == ["dbo.FirstTable", "dbo.SecondTable"]
+
+
+def test_year_qualifier_becomes_typed_date_range_only_for_temporal_parameters() -> None:
+    definition = (
+        "CREATE PROC dbo.usp_Output @RangeStart date, @RangeEnd datetime2 AS "
+        "SELECT r.Id FROM dbo.Records r "
+        "WHERE r.CreatedAt >= @RangeStart AND r.CreatedAt < DATEADD(DAY,1,@RangeEnd)"
+    )
+    lineage = parse_result_set_lineages(
+        "dbo.usp_Output",
+        definition,
+        parameter_types={"@RangeStart": "date", "@RangeEnd": "datetime2"},
+    )[0]
+    target = extract_output_target("Why is RecordId 8 missing from the output summary for 2026?")
+    producer = resolve_output_producers(
+        target,
+        [_procedure("dbo.usp_OutputSummary", definition, reads=("dbo.Records",))],
+        entity_table="dbo.Records",
+        persisted_lineages={"dbo.usp_OutputSummary": [lineage.to_dict()]},
+    )[0]
+    _, queries = plan_row_exclusion_verification(
+        target=target,
+        producer=producer,
+        entity_table="dbo.Records",
+        identifier_column="Id",
+        identifier_value=8,
+    )
+    assert queries[0].parameters["output_rangestart"] == "2026-01-01"
+    assert queries[0].parameters["output_rangeend"] == "2026-12-31"
+
+
+def test_year_is_not_coerced_for_incompatible_or_ambiguous_temporal_parameters() -> None:
+    definition = (
+        "CREATE PROC dbo.usp_Output @Code int, @EffectiveDate date AS "
+        "SELECT r.Id FROM dbo.Records r "
+        "WHERE r.Code=@Code AND r.CreatedAt>=@EffectiveDate"
+    )
+    lineage = parse_result_set_lineages(
+        "dbo.usp_Output",
+        definition,
+        parameter_types={"@Code": "int", "@EffectiveDate": "date"},
+    )[0]
+    target = extract_output_target("Why is RecordId 8 missing from the output summary for 2026?")
+    producer = resolve_output_producers(
+        target,
+        [_procedure("dbo.usp_OutputSummary", definition, reads=("dbo.Records",))],
+        entity_table="dbo.Records",
+        persisted_lineages={"dbo.usp_OutputSummary": [lineage.to_dict()]},
+    )[0]
+    candidates, _ = plan_row_exclusion_verification(
+        target=target,
+        producer=producer,
+        entity_table="dbo.Records",
+        identifier_column="Id",
+        identifier_value=8,
+    )
+    where = next(item for item in candidates if item.candidate_type == "WHERE_PREDICATE_REJECTION")
+    assert "output_code" not in where.verification_parameters
+    assert "output_effectivedate" not in where.verification_parameters
+    assert "@Code" in where.verification_query
+    assert "@EffectiveDate" in where.verification_query
+
+
+def test_explicit_date_range_binds_confirmed_temporal_range_roles() -> None:
+    definition = (
+        "CREATE PROC dbo.usp_Output @BeginDate date, @EndDate date AS "
+        "SELECT r.Id FROM dbo.Records r "
+        "WHERE r.CreatedAt BETWEEN @BeginDate AND @EndDate"
+    )
+    lineage = parse_result_set_lineages(
+        "dbo.usp_Output",
+        definition,
+        parameter_types={"@BeginDate": "date", "@EndDate": "date"},
+    )[0]
+    target = extract_output_target(
+        "Why is RecordId 8 missing from the output summary for 2026-02-01 through 2026-03-31?"
+    )
+    producer = resolve_output_producers(
+        target,
+        [_procedure("dbo.usp_OutputSummary", definition, reads=("dbo.Records",))],
+        entity_table="dbo.Records",
+        persisted_lineages={"dbo.usp_OutputSummary": [lineage.to_dict()]},
+    )[0]
+    _, queries = plan_row_exclusion_verification(
+        target=target,
+        producer=producer,
+        entity_table="dbo.Records",
+        identifier_column="Id",
+        identifier_value=8,
+    )
+    assert queries[0].parameters["output_begindate"] == "2026-02-01"
+    assert queries[0].parameters["output_enddate"] == "2026-03-31"

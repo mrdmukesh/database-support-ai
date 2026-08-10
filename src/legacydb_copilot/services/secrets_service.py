@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Protocol
 from uuid import uuid4
 
 from legacydb_copilot.common import Environment
 from legacydb_copilot.config import Settings
+
+logger = logging.getLogger(__name__)
+_KEY_VAULT_ATTEMPTS = 3
+_KEY_VAULT_BACKOFF_SECONDS = 0.25
 
 
 class SecretStore(Protocol):
@@ -151,7 +158,7 @@ class LocalSecretStore:
 
 
 class AzureKeyVaultSecretStore:
-    def __init__(self, vault_url: str) -> None:
+    def __init__(self, vault_url: str, *, use_managed_identity: bool = True) -> None:
         """
         Owner: Mukesh Dabi
         Purpose:
@@ -173,13 +180,19 @@ class AzureKeyVaultSecretStore:
             Secrets must be resolved internally and never exposed in API responses.
         """
         try:
-            from azure.identity import DefaultAzureCredential
+            from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
             from azure.keyvault.secrets import SecretClient
         except ImportError as exc:  # pragma: no cover - optional dependency
             raise RuntimeError(
                 "Azure Key Vault secrets require azure-identity and azure-keyvault-secrets"
             ) from exc
-        self._client = SecretClient(vault_url=vault_url, credential=DefaultAzureCredential())
+        credential = (
+            ManagedIdentityCredential()
+            if use_managed_identity
+            else DefaultAzureCredential()
+        )
+        self._credential = credential
+        self._client = SecretClient(vault_url=vault_url, credential=credential)
 
     def store_secret(self, *, name: str, value: str) -> str:
         """
@@ -228,13 +241,15 @@ class AzureKeyVaultSecretStore:
             Secrets must be resolved internally and never exposed in API responses.
         """
         secret_name = reference.removeprefix("keyvault://")
-        for attempt in range(3):
+        for attempt in range(1, _KEY_VAULT_ATTEMPTS + 1):
             try:
                 return self._client.get_secret(secret_name).value
             except Exception as exc:
-                if attempt == 2 or not _is_transient_key_vault_error(exc):
+                transient = _is_transient_key_vault_error(exc)
+                _log_key_vault_failure(exc, attempt=attempt, transient=transient)
+                if attempt == _KEY_VAULT_ATTEMPTS or not transient:
                     raise RuntimeError("Secure secret retrieval failed") from exc
-                time.sleep(0.1 * (attempt + 1))
+                time.sleep(_KEY_VAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)))
         raise RuntimeError("Secure secret retrieval failed")  # pragma: no cover
 
 
@@ -248,6 +263,35 @@ def _is_transient_key_vault_error(exc: Exception) -> bool:
     headers = getattr(response, "headers", {}) or {}
     content_type = str(headers.get("content-type", headers.get("Content-Type", ""))).lower()
     return "text/html" in content_type
+
+
+def _log_key_vault_failure(exc: Exception, *, attempt: int, transient: bool) -> None:
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", {}) or {}
+    logger.warning(
+        "key_vault_secret_read_failed",
+        extra={
+            "key_vault_http_status": getattr(exc, "status_code", None),
+            "key_vault_content_type": headers.get("content-type", headers.get("Content-Type")),
+            "key_vault_request_id": headers.get("x-ms-request-id"),
+            "key_vault_region": headers.get("x-ms-keyvault-region"),
+            "key_vault_exception_class": type(exc).__name__,
+            "key_vault_retry_attempt": attempt,
+            "key_vault_transient": transient,
+            "key_vault_failure_timestamp": datetime.now(UTC).isoformat(),
+        },
+    )
+
+
+@lru_cache(maxsize=8)
+def _shared_azure_secret_store(
+    vault_url: str,
+    use_managed_identity: bool,
+) -> AzureKeyVaultSecretStore:
+    return AzureKeyVaultSecretStore(
+        vault_url,
+        use_managed_identity=use_managed_identity,
+    )
 
 
 def get_secret_store(settings: Settings | None = None) -> SecretStore:
@@ -276,7 +320,10 @@ def get_secret_store(settings: Settings | None = None) -> SecretStore:
     if resolved.feature_keyvault_secrets_enabled:
         if not resolved.azure_key_vault_url:
             raise RuntimeError("AZURE_KEY_VAULT_URL is required when Key Vault secrets are enabled")
-        return AzureKeyVaultSecretStore(resolved.azure_key_vault_url)
+        return _shared_azure_secret_store(
+            resolved.azure_key_vault_url,
+            resolved.environment == Environment.PRODUCTION,
+        )
     return LocalSecretStore(allow_raw_storage=resolved.environment != Environment.PRODUCTION)
 
 

@@ -73,7 +73,10 @@ def _looks_like_connection_string(value: str) -> bool:
 
 def _build_connection_string(connection: DatabaseConnectionModel) -> str:
     """Build SQLAlchemy connection string from model data."""
-    secret_value = get_secret_store().get_secret(connection.secret_ref)
+    try:
+        secret_value = get_secret_store().get_secret(connection.secret_ref)
+    except RuntimeError as exc:
+        raise DatabaseConnectionError("Secure database credentials could not be resolved") from exc
     if _looks_like_connection_string(secret_value):
         return secret_value
 

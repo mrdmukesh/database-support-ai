@@ -17,6 +17,14 @@ export function VerificationPanel({ investigationId }: { investigationId: string
     finally { if (!signal?.aborted) setLoading(false); }
   }
   useEffect(() => { const controller = new AbortController(); void refresh(controller.signal); return () => controller.abort(); }, [investigationId]);
+  async function runOne(checkId: string) {
+    setBusy(true); setError(null);
+    try {
+      const updated = await runVerificationCheck(checkId);
+      setChecks((current) => current.map((check) => check.id === updated.id ? updated : check));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Verification action failed."); }
+    finally { setBusy(false); }
+  }
   async function action(work: () => Promise<unknown>) { setBusy(true); setError(null); try { await work(); await refresh(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Verification action failed."); } finally { setBusy(false); } }
   if (!investigationId) return <p>Generate an investigation to see verification checks.</p>;
   if (loading) return <LoadingState message="Loading verification checks..." />;
@@ -24,7 +32,7 @@ export function VerificationPanel({ investigationId }: { investigationId: string
     {error ? <ErrorMessage message={error} /> : null}
     {checks.length ? <><SecondaryButton disabled={busy} onClick={() => void action(async () => { const result = await runAllVerificationChecks(investigationId); setChecks(result.checks); })}>Run all pending safe checks</SecondaryButton>
       <div className="verification-list">{checks.map((check) => <VerificationCheckCard key={check.id} check={check} busy={busy}
-        onRun={(id) => void action(() => runVerificationCheck(id))} onSkip={(id) => void action(() => skipVerificationCheck(id))} />)}</div></>
+        onRun={(id) => void runOne(id)} onSkip={(id) => void action(() => skipVerificationCheck(id))} />)}</div></>
       : <EmptyState message="No verification checks were suggested." />}
   </section>;
 }

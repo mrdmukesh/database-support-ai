@@ -130,6 +130,7 @@ def create_fastapi_app() -> Any:
         EvaluationWorkerRuntime,
         evaluation_worker_enabled,
     )
+    from legacydb_copilot.services.secrets_service import log_key_vault_network_environment
 
     @app.on_event("startup")
     def _initialize_database_schema() -> None:
@@ -143,6 +144,7 @@ def create_fastapi_app() -> Any:
         started_at = datetime.now(UTC).isoformat()
         app.state.process_started_at = started_at
         settings = Settings.from_env()
+        log_key_vault_network_environment(settings)
         initialize_application_schema(settings.database_url)
         sync_azure_evaluation_connections(settings)
         configure_production_langgraph(settings)

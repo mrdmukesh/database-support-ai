@@ -310,3 +310,35 @@ def test_rest_failure_logging_never_contains_sensitive_material(monkeypatch, cap
     assert all("request_id=safe-request-id" in record.getMessage() for record in caplog.records)
     assert all("region=centralindia" in record.getMessage() for record in caplog.records)
     assert all("classification=upstream_non_json" in record.getMessage() for record in caplog.records)
+
+
+def test_startup_proxy_diagnostics_log_presence_without_values(monkeypatch, caplog) -> None:
+    proxy_value = "http://private-user:private-password@proxy.internal:8443"
+    no_proxy_value = "private.internal,kvlegacydbapp-56ab486d.vault.azure.net"
+    for name in secrets_service._KEY_VAULT_PROXY_ENVIRONMENT_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTPS_PROXY", proxy_value)
+    monkeypatch.setenv("NO_PROXY", no_proxy_value)
+
+    with caplog.at_level("INFO"):
+        secrets_service.log_key_vault_network_environment(production_settings())
+
+    output = caplog.text
+    assert "HTTPS_PROXY present=true" in output
+    assert "NO_PROXY present=true" in output
+    assert "HTTP_PROXY present=false" in output
+    assert "httpx trust_env=true" in output
+    assert proxy_value not in output
+    assert no_proxy_value not in output
+    assert "private-user" not in output
+    assert "private-password" not in output
+    assert "proxy.internal" not in output
+    assert "kvlegacydbapp-56ab486d.vault.azure.net" not in output
+
+
+def test_startup_proxy_diagnostics_are_production_only(caplog) -> None:
+    settings = production_settings()
+    settings.environment = Environment.TESTING
+    with caplog.at_level("INFO"):
+        secrets_service.log_key_vault_network_environment(settings)
+    assert "KeyVault network environment" not in caplog.text

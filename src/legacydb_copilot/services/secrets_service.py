@@ -23,6 +23,16 @@ _KEY_VAULT_BACKOFF_SECONDS = 0.25
 _KEY_VAULT_MAX_RETRY_DELAY_SECONDS = 5.0
 _KEY_VAULT_SCOPE = "https://vault.azure.net/.default"
 _KEY_VAULT_STORE_LOCK = Lock()
+_KEY_VAULT_PROXY_ENVIRONMENT_NAMES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+)
 
 
 class SecretStore(Protocol):
@@ -92,6 +102,19 @@ class SecretStore(Protocol):
             Secrets must be resolved internally and never exposed in API responses.
         """
         ...
+
+
+def log_key_vault_network_environment(settings: Settings) -> None:
+    """Log presence-only proxy diagnostics for the production Key Vault client."""
+    if not (
+        settings.environment == Environment.PRODUCTION
+        and settings.feature_keyvault_secrets_enabled
+    ):
+        return
+    logger.info("KeyVault network environment:")
+    for name in _KEY_VAULT_PROXY_ENVIRONMENT_NAMES:
+        logger.info("%s present=%s", name, str(name in os.environ).lower())
+    logger.info("httpx trust_env=true")
 
 
 @dataclass

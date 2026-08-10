@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
+from threading import Lock
 from typing import Protocol
 from uuid import uuid4
 
@@ -15,6 +16,7 @@ from legacydb_copilot.config import Settings
 logger = logging.getLogger(__name__)
 _KEY_VAULT_ATTEMPTS = 3
 _KEY_VAULT_BACKOFF_SECONDS = 0.25
+_KEY_VAULT_STORE_LOCK = Lock()
 
 
 class SecretStore(Protocol):
@@ -284,7 +286,7 @@ def _log_key_vault_failure(exc: Exception, *, attempt: int, transient: bool) -> 
 
 
 @lru_cache(maxsize=8)
-def _shared_azure_secret_store(
+def _cached_azure_secret_store(
     vault_url: str,
     use_managed_identity: bool,
 ) -> AzureKeyVaultSecretStore:
@@ -292,6 +294,17 @@ def _shared_azure_secret_store(
         vault_url,
         use_managed_identity=use_managed_identity,
     )
+
+
+def _shared_azure_secret_store(
+    vault_url: str,
+    use_managed_identity: bool,
+) -> AzureKeyVaultSecretStore:
+    # lru_cache may invoke its wrapped function more than once for concurrent
+    # first-time misses. Serialize lookup plus construction so one credential
+    # and client exist for each process-local configuration key.
+    with _KEY_VAULT_STORE_LOCK:
+        return _cached_azure_secret_store(vault_url, use_managed_identity)
 
 
 def get_secret_store(settings: Settings | None = None) -> SecretStore:

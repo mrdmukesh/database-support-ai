@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pytest
@@ -77,13 +78,32 @@ def test_process_wide_store_and_client_are_reused(monkeypatch) -> None:
         created.append((vault_url, use_managed_identity))
         return Store()
 
-    secrets_service._shared_azure_secret_store.cache_clear()
+    secrets_service._cached_azure_secret_store.cache_clear()
     monkeypatch.setattr(secrets_service, "AzureKeyVaultSecretStore", build)
     first = get_secret_store(production_settings())
     second = get_secret_store(production_settings())
     assert first is second
     assert created == [("https://example.vault.azure.net/", True)]
-    secrets_service._shared_azure_secret_store.cache_clear()
+    secrets_service._cached_azure_secret_store.cache_clear()
+
+
+def test_concurrent_first_access_creates_one_store(monkeypatch) -> None:
+    created = []
+
+    class Store:
+        pass
+
+    def build(vault_url, *, use_managed_identity):
+        created.append((vault_url, use_managed_identity))
+        return Store()
+
+    secrets_service._cached_azure_secret_store.cache_clear()
+    monkeypatch.setattr(secrets_service, "AzureKeyVaultSecretStore", build)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        stores = list(executor.map(lambda _: get_secret_store(production_settings()), range(16)))
+    assert all(store is stores[0] for store in stores)
+    assert created == [("https://example.vault.azure.net/", True)]
+    secrets_service._cached_azure_secret_store.cache_clear()
 
 
 def test_non_production_azure_store_preserves_default_credential_path(monkeypatch) -> None:
@@ -95,11 +115,11 @@ def test_non_production_azure_store_preserves_default_credential_path(monkeypatc
 
     settings = production_settings()
     settings.environment = Environment.TESTING
-    secrets_service._shared_azure_secret_store.cache_clear()
+    secrets_service._cached_azure_secret_store.cache_clear()
     monkeypatch.setattr(secrets_service, "AzureKeyVaultSecretStore", build)
     get_secret_store(settings)
     assert calls == [("https://example.vault.azure.net/", False)]
-    secrets_service._shared_azure_secret_store.cache_clear()
+    secrets_service._cached_azure_secret_store.cache_clear()
 
 
 def test_retry_backoff_is_exponential(monkeypatch) -> None:

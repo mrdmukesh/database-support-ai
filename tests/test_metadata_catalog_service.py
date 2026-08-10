@@ -23,10 +23,12 @@ class FakeSqlServerConnector:
         *,
         definition="CREATE PROCEDURE dbo.FindOrder AS SELECT * FROM dbo.Orders",
         dependency_rows=None,
+        parameter_rows=None,
         reject_column_dependency_query: bool = False,
     ):
         self.definition = definition
         self.dependency_rows = dependency_rows
+        self.parameter_rows = parameter_rows
         self.reject_column_dependency_query = reject_column_dependency_query
         self.queries: list[str] = []
 
@@ -110,6 +112,8 @@ class FakeSqlServerConnector:
                     "definition": self.definition,
                 }
             ]
+        if "JOIN sys.parameters p" in sql:
+            return self.parameter_rows or []
         raise AssertionError(sql)
 
 
@@ -145,7 +149,7 @@ def test_discovery_is_set_based_read_only_and_builds_graph():
     assert {o.object_type for o in found.objects} == {"TABLE", "PROCEDURE"}
     assert any(r.relationship_type == "READS" for r in found.relationships)
     assert any(r.relationship_type == "INDEX_ON" for r in found.relationships)
-    assert len(connector.queries) == 5
+    assert len(connector.queries) == 6
     dependency = next(r for r in found.relationships if r.relationship_type == "READS")
     assert dependency.target_column == "OrderId"
     assert dependency.metadata["column_detail_available"] is True
@@ -275,7 +279,7 @@ def test_refresh_activates_complete_snapshot_and_reuses_it(db_and_connection):
     assert cached.cache_diagnostics["metadata_snapshot_version"] == snapshot.version
     assert cached.cache_diagnostics["metadata_fingerprint"] == snapshot.schema_hash
     assert "dbo.FindOrder" in cached.result_set_lineages
-    assert cached.result_set_lineages["dbo.FindOrder"]["base_object"] == "dbo.Orders"
+    assert cached.result_set_lineages["dbo.FindOrder"][0]["base_object"] == "dbo.Orders"
     persisted_procedure = db.query(MetadataObjectModel).filter_by(
         snapshot_id=snapshot.id, object_type="PROCEDURE"
     ).one()
@@ -297,6 +301,43 @@ def test_refresh_activates_complete_snapshot_and_reuses_it(db_and_connection):
     )
     assert result.tables[0].name == "dbo.Orders"
     assert result.tables[0].relationship_metadata_status == "catalog"
+
+
+def test_refresh_persists_typed_routine_parameters_with_cleaned_lineage(db_and_connection):
+    db, connection = db_and_connection
+    connector = FakeSqlServerConnector(
+        definition=(
+            "/* FROM fake.Report JOIN fake.Rows ON 1=1 */ "
+            "CREATE PROCEDURE dbo.FindOrder @RangeStart date, @RangeEnd date AS "
+            "SELECT o.OrderId FROM dbo.Orders o "
+            "INNER JOIN dbo.OrderDetails d ON d.OrderId=o.OrderId "
+            "WHERE o.CreatedAt BETWEEN @RangeStart AND @RangeEnd"
+        ),
+        parameter_rows=[
+            {
+                "schema_name": "dbo",
+                "object_name": "FindOrder",
+                "parameter_name": "@RangeStart",
+                "data_type": "date",
+            },
+            {
+                "schema_name": "dbo",
+                "object_name": "FindOrder",
+                "parameter_name": "@RangeEnd",
+                "data_type": "date",
+            },
+        ],
+    )
+    snapshot = catalog.refresh_metadata(db, connection=connection, connector=connector)
+    lineage = catalog.schema_metadata_from_catalog(db, snapshot).result_set_lineages[
+        "dbo.FindOrder"
+    ][0]
+    assert lineage["base_object"] == "dbo.Orders"
+    assert lineage["joins"][0]["right_object"] == "dbo.OrderDetails"
+    assert lineage["parameter_types"] == {
+        "@RangeStart": "date",
+        "@RangeEnd": "date",
+    }
 
 
 def test_unchanged_refresh_versions_snapshot_without_structural_rebuild(db_and_connection):

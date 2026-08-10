@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass, field, replace
+from datetime import date
 from enum import StrEnum
 from typing import Any
 
@@ -49,6 +50,7 @@ class ResultSetLineage:
     group_by: tuple[str, ...]
     output_aliases: tuple[str, ...]
     parameters: tuple[str, ...]
+    parameter_types: dict[str, str]
     anti_join_predicates: tuple[str, ...]
     from_clause: str
 
@@ -93,6 +95,13 @@ def extract_output_target(question: str) -> OutputTarget | None:
     if not phrase:
         return None
     years = [int(value) for value in re.findall(r"\b(?:19|20)\d{2}\b", question)]
+    dates = re.findall(r"\b(?:19|20)\d{2}-\d{2}-\d{2}\b", question)
+    ranges = re.findall(
+        r"\b((?:19|20)\d{2}-\d{2}-\d{2})\s+(?:through|to|until)\s+"
+        r"((?:19|20)\d{2}-\d{2}-\d{2})\b",
+        question,
+        re.I,
+    )
     named_parameters = {
         name.casefold(): int(value)
         for name, value in re.findall(
@@ -105,7 +114,12 @@ def extract_output_target(question: str) -> OutputTarget | None:
         output_phrase=phrase,
         source_text=match.group(0),
         confidence=0.94,
-        qualifiers={"years": years, "parameters": named_parameters},
+        qualifiers={
+            "years": years,
+            "dates": dates,
+            "date_ranges": ranges,
+            "parameters": named_parameters,
+        },
     )
 
 
@@ -118,9 +132,87 @@ def _clause(definition: str, start: str, stops: str) -> str:
     return " ".join(match.group(1).split()) if match else ""
 
 
-def parse_result_set_lineage(producer_object: str, definition: str) -> ResultSetLineage | None:
-    if not definition or not re.search(r"\bselect\b", definition, re.I):
-        return None
+def preprocess_sql_definition(definition: str) -> str:
+    """Remove SQL comments without altering quoted string literal contents."""
+    output: list[str] = []
+    index = 0
+    in_string = False
+    while index < len(definition):
+        if definition[index] == "'":
+            output.append("'")
+            if in_string and index + 1 < len(definition) and definition[index + 1] == "'":
+                output.append("'")
+                index += 2
+                continue
+            in_string = not in_string
+            index += 1
+            continue
+        if not in_string and definition.startswith("/*", index):
+            end = definition.find("*/", index + 2)
+            index = len(definition) if end < 0 else end + 2
+            output.append(" ")
+            continue
+        if not in_string and definition.startswith("--", index):
+            end = definition.find("\n", index + 2)
+            index = len(definition) if end < 0 else end
+            output.append("\n")
+            continue
+        output.append(definition[index])
+        index += 1
+    return "".join(output)
+
+
+def _executable_body(definition: str) -> str:
+    match = re.search(
+        r"\b(?:CREATE|ALTER)\s+(?:OR\s+ALTER\s+)?(?:PROCEDURE|PROC)\b"
+        r"[\s\S]*?\bAS\b",
+        definition,
+        re.I,
+    )
+    body = definition[match.end() :] if match else definition
+    return re.sub(r"^\s*BEGIN\b", "", body, count=1, flags=re.I)
+
+
+def _select_statements(body: str) -> list[str]:
+    starts: list[int] = []
+    depth = 0
+    in_string = False
+    index = 0
+    while index < len(body):
+        char = body[index]
+        if char == "'":
+            if in_string and index + 1 < len(body) and body[index + 1] == "'":
+                index += 2
+                continue
+            in_string = not in_string
+        elif not in_string:
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth = max(0, depth - 1)
+            elif depth == 0 and re.match(r"SELECT\b", body[index:], re.I):
+                starts.append(index)
+                index += 5
+        index += 1
+    statements: list[str] = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(body)
+        statement = re.split(
+            r";|\bEND\b",
+            body[start:end],
+            maxsplit=1,
+            flags=re.I,
+        )[0].strip()
+        if statement:
+            statements.append(statement)
+    return statements
+
+
+def _parse_select_lineage(
+    producer_object: str,
+    definition: str,
+    parameter_types: dict[str, str] | None = None,
+) -> ResultSetLineage | None:
     select_match = re.search(r"\bselect\b\s+(.*?)\s+\bfrom\b", definition, re.I | re.S)
     from_match = re.search(
         r"\bfrom\b\s+(.*?)(?=\bwhere\b|\bgroup\s+by\b|\bhaving\b|\border\s+by\b|;|$)",
@@ -183,9 +275,36 @@ def parse_result_set_lineage(producer_object: str, definition: str) -> ResultSet
         group_by=tuple(part.strip() for part in group_text.split(",") if part.strip()),
         output_aliases=output_aliases,
         parameters=tuple(dict.fromkeys(re.findall(r"@[A-Za-z_][A-Za-z0-9_]*", definition))),
+        parameter_types=dict(parameter_types or {}),
         anti_join_predicates=anti_joins,
         from_clause=from_clause,
     )
+
+
+def parse_result_set_lineages(
+    producer_object: str,
+    definition: str,
+    *,
+    parameter_types: dict[str, str] | None = None,
+) -> list[ResultSetLineage]:
+    cleaned = preprocess_sql_definition(definition)
+    body = _executable_body(cleaned)
+    return [
+        lineage
+        for statement in _select_statements(body)
+        if (
+            lineage := _parse_select_lineage(
+                producer_object,
+                statement,
+                parameter_types,
+            )
+        )
+        is not None
+    ]
+
+
+def parse_result_set_lineage(producer_object: str, definition: str) -> ResultSetLineage | None:
+    return next(iter(parse_result_set_lineages(producer_object, definition)), None)
 
 
 def _terms(value: str) -> set[str]:
@@ -198,53 +317,57 @@ def resolve_output_producers(
     procedures: list[ProcedureAnalysis],
     *,
     entity_table: str = "",
-    persisted_lineages: dict[str, dict[str, Any]] | None = None,
+    persisted_lineages: dict[str, Any] | None = None,
 ) -> list[OutputProducerCandidate]:
     target_terms = _terms(target.output_phrase)
     candidates: list[OutputProducerCandidate] = []
     persisted = {key.casefold(): value for key, value in (persisted_lineages or {}).items()}
     for procedure in procedures:
         raw = persisted.get(procedure.name.casefold())
-        lineage = (
+        raw_lineages = raw if isinstance(raw, list) else [raw] if raw else []
+        lineages = [
             ResultSetLineage(
-                producer_object=raw["producer_object"],
-                base_object=raw["base_object"],
-                base_alias=raw["base_alias"],
-                joins=tuple(JoinLineage(**item) for item in raw.get("joins", [])),
-                where_predicate=raw.get("where_predicate", ""),
-                having_predicate=raw.get("having_predicate", ""),
-                group_by=tuple(raw.get("group_by", [])),
-                output_aliases=tuple(raw.get("output_aliases", [])),
-                parameters=tuple(raw.get("parameters", [])),
-                anti_join_predicates=tuple(raw.get("anti_join_predicates", [])),
-                from_clause=raw.get("from_clause", ""),
+                producer_object=item["producer_object"],
+                base_object=item["base_object"],
+                base_alias=item["base_alias"],
+                joins=tuple(JoinLineage(**join) for join in item.get("joins", [])),
+                where_predicate=item.get("where_predicate", ""),
+                having_predicate=item.get("having_predicate", ""),
+                group_by=tuple(item.get("group_by", [])),
+                output_aliases=tuple(item.get("output_aliases", [])),
+                parameters=tuple(item.get("parameters", [])),
+                parameter_types=dict(item.get("parameter_types", {})),
+                anti_join_predicates=tuple(item.get("anti_join_predicates", [])),
+                from_clause=item.get("from_clause", ""),
             )
-            if raw
-            else parse_result_set_lineage(procedure.name, procedure.definition)
-        )
-        if lineage is None:
-            continue
-        name_hits = target_terms & _terms(procedure.name)
-        alias_hits = (
-            target_terms & set().union(*(_terms(item) for item in lineage.output_aliases))
-            if lineage.output_aliases
-            else set()
-        )
-        reads_entity = bool(entity_table) and any(
-            item.casefold().split(".")[-1] == entity_table.casefold().split(".")[-1]
-            for item in (lineage.base_object, *(join.right_object for join in lineage.joins))
-        )
-        score = len(name_hits) * 25.0 + len(alias_hits) * 8.0 + (12.0 if reads_entity else 0.0)
-        if score <= 0:
-            continue
-        reasons = (
-            [f"Output-name terms matched: {', '.join(sorted(name_hits))}."] if name_hits else []
-        )
-        if reads_entity:
-            reasons.append(f"SELECT-producing routine reads resolved entity table {entity_table}.")
-        if alias_hits:
-            reasons.append(f"Returned output aliases matched: {', '.join(sorted(alias_hits))}.")
-        candidates.append(OutputProducerCandidate(procedure.name, score, tuple(reasons), lineage))
+            for item in raw_lineages
+        ] or parse_result_set_lineages(procedure.name, procedure.definition)
+        for lineage in lineages:
+            name_hits = target_terms & _terms(procedure.name)
+            alias_hits = (
+                target_terms & set().union(*(_terms(item) for item in lineage.output_aliases))
+                if lineage.output_aliases
+                else set()
+            )
+            reads_entity = bool(entity_table) and any(
+                item.casefold().split(".")[-1] == entity_table.casefold().split(".")[-1]
+                for item in (lineage.base_object, *(join.right_object for join in lineage.joins))
+            )
+            score = len(name_hits) * 25.0 + len(alias_hits) * 8.0 + (12.0 if reads_entity else 0.0)
+            if score <= 0:
+                continue
+            reasons = (
+                [f"Output-name terms matched: {', '.join(sorted(name_hits))}."] if name_hits else []
+            )
+            if reads_entity:
+                reasons.append(
+                    f"SELECT-producing routine reads resolved entity table {entity_table}."
+                )
+            if alias_hits:
+                reasons.append(f"Returned output aliases matched: {', '.join(sorted(alias_hits))}.")
+            candidates.append(
+                OutputProducerCandidate(procedure.name, score, tuple(reasons), lineage)
+            )
     candidates.sort(key=lambda item: (item.score, item.producer_object), reverse=True)
     return [replace(item, selected=index == 0) for index, item in enumerate(candidates)]
 
@@ -255,6 +378,8 @@ def _parameterize(
     values: dict[str, Any] = {}
     result = predicate
     years = list(target.qualifiers.get("years") or [])
+    dates = list(target.qualifiers.get("dates") or [])
+    ranges = list(target.qualifiers.get("date_ranges") or [])
     supplied = {
         str(key).casefold(): value
         for key, value in (target.qualifiers.get("parameters") or {}).items()
@@ -262,7 +387,36 @@ def _parameterize(
     for parameter in lineage.parameters:
         key = parameter[1:].casefold()
         value = supplied.get(key)
-        if value is None and years and any(marker in key for marker in ("year", "date")):
+        sql_type = next(
+            (
+                value
+                for name, value in lineage.parameter_types.items()
+                if name.casefold() == parameter.casefold()
+            ),
+            "",
+        ).casefold()
+        temporal = sql_type in {
+            "date",
+            "datetime",
+            "datetime2",
+            "smalldatetime",
+            "datetimeoffset",
+        }
+        start_role = any(marker in key for marker in ("from", "start", "begin", "lower"))
+        end_role = any(marker in key for marker in ("to", "end", "until", "through", "upper"))
+        if value is None and temporal and ranges and (start_role or end_role):
+            value = ranges[0][0] if start_role else ranges[0][1]
+        elif value is None and temporal and years and (start_role or end_role):
+            year = years[0]
+            value = date(year, 1, 1).isoformat() if start_role else date(year, 12, 31).isoformat()
+        elif value is None and temporal and len(dates) == 1 and len(lineage.parameters) == 1:
+            value = dates[0]
+        elif (
+            value is None
+            and not temporal
+            and years
+            and any(marker in key for marker in ("year", "yyyy"))
+        ):
             value = years[0]
         if value is not None:
             bind = f"output_{key}"

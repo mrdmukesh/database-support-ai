@@ -5,10 +5,14 @@ import os
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from functools import lru_cache
 from threading import Lock
 from typing import Protocol
+from urllib.parse import quote
 from uuid import uuid4
+
+import httpx
 
 from legacydb_copilot.common import Environment
 from legacydb_copilot.config import Settings
@@ -16,6 +20,8 @@ from legacydb_copilot.config import Settings
 logger = logging.getLogger(__name__)
 _KEY_VAULT_ATTEMPTS = 3
 _KEY_VAULT_BACKOFF_SECONDS = 0.25
+_KEY_VAULT_MAX_RETRY_DELAY_SECONDS = 5.0
+_KEY_VAULT_SCOPE = "https://vault.azure.net/.default"
 _KEY_VAULT_STORE_LOCK = Lock()
 
 
@@ -195,6 +201,9 @@ class AzureKeyVaultSecretStore:
         )
         self._credential = credential
         self._client = SecretClient(vault_url=vault_url, credential=credential)
+        self._vault_url = vault_url.rstrip("/")
+        self._use_rest_for_reads = use_managed_identity
+        self._http_client = httpx.Client(timeout=10.0)
 
     def store_secret(self, *, name: str, value: str) -> str:
         """
@@ -242,6 +251,8 @@ class AzureKeyVaultSecretStore:
         Safety considerations:
             Secrets must be resolved internally and never exposed in API responses.
         """
+        if self._use_rest_for_reads:
+            return self._get_secret_with_rest(reference)
         secret_name = reference.removeprefix("keyvault://")
         for attempt in range(1, _KEY_VAULT_ATTEMPTS + 1):
             try:
@@ -253,6 +264,109 @@ class AzureKeyVaultSecretStore:
                     raise RuntimeError("Secure secret retrieval failed") from exc
                 time.sleep(_KEY_VAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)))
         raise RuntimeError("Secure secret retrieval failed")  # pragma: no cover
+
+    def _get_secret_with_rest(self, reference: str) -> str:
+        secret_name = reference.removeprefix("keyvault://")
+        secret_url = f"{self._vault_url}/secrets/{quote(secret_name, safe='')}"
+        for attempt in range(1, _KEY_VAULT_ATTEMPTS + 1):
+            response = None
+            try:
+                access_token = self._credential.get_token(_KEY_VAULT_SCOPE)
+                response = self._http_client.get(
+                    secret_url,
+                    params={"api-version": "7.4"},
+                    headers={"Authorization": f"Bearer {access_token.token}"},
+                )
+                classification = _classify_key_vault_response(response)
+                if classification == "success_json":
+                    payload = response.json()
+                    if not isinstance(payload, dict) or not isinstance(payload.get("value"), str):
+                        raise _KeyVaultProtocolError("missing_secret_value", response=response)
+                    return payload["value"]
+                raise _KeyVaultProtocolError(classification, response=response)
+            except Exception as exc:
+                classification = getattr(exc, "classification", "transport_or_token_error")
+                transient = _is_transient_rest_failure(exc, response, classification)
+                _log_key_vault_failure(
+                    exc,
+                    attempt=attempt,
+                    transient=transient,
+                    response=response,
+                    classification=classification,
+                )
+                if attempt == _KEY_VAULT_ATTEMPTS or not transient:
+                    raise RuntimeError("Secure secret retrieval failed") from exc
+                time.sleep(_key_vault_retry_delay(response, attempt))
+        raise RuntimeError("Secure secret retrieval failed")  # pragma: no cover
+
+
+class _KeyVaultProtocolError(Exception):
+    def __init__(self, classification: str, *, response: httpx.Response) -> None:
+        super().__init__(classification)
+        self.classification = classification
+        self.response = response
+
+
+def _classify_key_vault_response(response: httpx.Response) -> str:
+    content_type = response.headers.get("content-type", "").lower()
+    is_json = "application/json" in content_type or "+json" in content_type
+    if response.status_code == 200:
+        if not is_json:
+            return "success_non_json"
+        try:
+            payload = response.json()
+        except (TypeError, ValueError):
+            return "success_malformed_json"
+        if not isinstance(payload, dict) or not isinstance(payload.get("value"), str):
+            return "success_missing_secret_value"
+        return "success_json"
+    if response.status_code in {401, 403}:
+        return "authorization_error"
+    if response.status_code in {408, 429, 500, 502, 503, 504}:
+        return "transient_http_error"
+    if not is_json:
+        return "upstream_non_json"
+    return "non_retryable_http_error"
+
+
+def _is_transient_rest_failure(
+    exc: Exception,
+    response: httpx.Response | None,
+    classification: str,
+) -> bool:
+    if isinstance(exc, (httpx.TransportError, TimeoutError)):
+        return True
+    if response is None:
+        return _is_transient_key_vault_error(exc) or type(exc).__name__ in {
+            "ServiceRequestError",
+            "ServiceResponseError",
+        }
+    return classification in {
+        "success_non_json",
+        "success_malformed_json",
+        "success_missing_secret_value",
+        "transient_http_error",
+        "upstream_non_json",
+    }
+
+
+def _key_vault_retry_delay(response: httpx.Response | None, attempt: int) -> float:
+    if response is not None:
+        retry_after = response.headers.get("retry-after")
+        if retry_after:
+            try:
+                delay = float(retry_after)
+            except ValueError:
+                try:
+                    delay = (parsedate_to_datetime(retry_after) - datetime.now(UTC)).total_seconds()
+                except (TypeError, ValueError, OverflowError):
+                    delay = 0.0
+            if delay > 0:
+                return min(delay, _KEY_VAULT_MAX_RETRY_DELAY_SECONDS)
+    return min(
+        _KEY_VAULT_BACKOFF_SECONDS * (2 ** (attempt - 1)),
+        _KEY_VAULT_MAX_RETRY_DELAY_SECONDS,
+    )
 
 
 def _is_transient_key_vault_error(exc: Exception) -> bool:
@@ -267,19 +381,32 @@ def _is_transient_key_vault_error(exc: Exception) -> bool:
     return "text/html" in content_type
 
 
-def _log_key_vault_failure(exc: Exception, *, attempt: int, transient: bool) -> None:
-    response = getattr(exc, "response", None)
+def _log_key_vault_failure(
+    exc: Exception,
+    *,
+    attempt: int,
+    transient: bool,
+    response=None,
+    classification: str = "sdk_error",
+) -> None:
+    if response is None:
+        response = getattr(exc, "response", None)
     headers = getattr(response, "headers", {}) or {}
     logger.warning(
         "key_vault_secret_read_failed",
         extra={
-            "key_vault_http_status": getattr(exc, "status_code", None),
+            "key_vault_http_status": getattr(
+                exc,
+                "status_code",
+                getattr(response, "status_code", None),
+            ),
             "key_vault_content_type": headers.get("content-type", headers.get("Content-Type")),
             "key_vault_request_id": headers.get("x-ms-request-id"),
             "key_vault_region": headers.get("x-ms-keyvault-region"),
             "key_vault_exception_class": type(exc).__name__,
             "key_vault_retry_attempt": attempt,
             "key_vault_transient": transient,
+            "key_vault_response_classification": classification,
             "key_vault_failure_timestamp": datetime.now(UTC).isoformat(),
         },
     )

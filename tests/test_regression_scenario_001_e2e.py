@@ -75,7 +75,7 @@ def test_missing_dob_scenario_runs_through_real_backend_pipeline(tmp_path, monke
         def connector_cache_key(self, *_args):
             return "scenario-001-real-sqlite"
 
-        def get_or_create(self, *_args):
+        def get_or_create(self, *_args, **_kwargs):
             return connector
 
     generated = SimpleNamespace(directory=tmp_path / "reports", links=lambda: {"investigation_id": "INV-E2E"})

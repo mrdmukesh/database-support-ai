@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -457,6 +458,20 @@ def _connection_string_database(connection_string: str) -> str:
         return ""
 
 
+def _connection_configuration_key(connection: DatabaseConnectionModel) -> str:
+    payload = {
+        "organization_id": getattr(connection, "organization_id", ""),
+        "workspace_id": getattr(connection, "workspace_id", ""),
+        "engine": getattr(connection, "engine", ""),
+        "host": getattr(connection, "host", ""),
+        "port": getattr(connection, "port", None),
+        "database_name": getattr(connection, "database_name", ""),
+        "secret_ref": getattr(connection, "secret_ref", ""),
+        "is_active": getattr(connection, "is_active", True),
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
 def _metadata_context_for_connection(
     payload: ChatAskRequest,
     connection: DatabaseConnectionModel,
@@ -606,7 +621,12 @@ def _run_metadata_validation(
         engine = DatabaseEngine(connection.engine)
         pool = get_connection_pool()
         connector_cache_key = pool.connector_cache_key(engine, connection_string)
-        connector = pool.get_or_create(connection.id, engine, connection_string)
+        connector = pool.get_or_create(
+            connection.id,
+            engine,
+            connection_string,
+            configuration_key=_connection_configuration_key(connection),
+        )
         connector.connect()
         metadata_context = _metadata_context_for_connection(
             payload,
@@ -1561,6 +1581,7 @@ def _run_business_rule_discovery(
                 connection.id,
                 DatabaseEngine(connection.engine),
                 _build_connection_string(connection),
+                configuration_key=_connection_configuration_key(connection),
             )
             connector.connect()
             context = discover_context(
@@ -2127,6 +2148,7 @@ def _run_dynamic_investigation(
             connection.id,
             engine,
             connection_string,
+            configuration_key=_connection_configuration_key(connection),
         )
         connector.connect()
         metadata_context = _metadata_context_for_connection(
@@ -3851,13 +3873,18 @@ def _active_connector_for_investigation(db: Session, investigation: Investigatio
         raise HTTPException(status_code=404, detail="Investigation database connection was not found")
     try:
         pool = get_connection_pool()
-        connector = pool.get_existing(connection.id)
+        configuration_key = _connection_configuration_key(connection)
+        connector = pool.get_existing(
+            connection.id,
+            configuration_key=configuration_key,
+        )
         if connector is not None:
             return connector
         connector = pool.get_or_create(
             connection.id,
             DatabaseEngine(connection.engine),
             _build_connection_string(connection),
+            configuration_key=configuration_key,
         )
         connector.connect()
         return connector

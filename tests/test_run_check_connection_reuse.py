@@ -64,6 +64,10 @@ def connection(**overrides):
         "organization_id": "organization-1",
         "workspace_id": "workspace-1",
         "engine": "sql_server",
+        "host": "sql.example.test",
+        "port": 1433,
+        "database_name": "ExampleDatabase",
+        "secret_ref": "keyvault://example-connection",
         "is_active": True,
     }
     values.update(overrides)
@@ -74,7 +78,9 @@ def test_run_check_reuses_exact_investigation_connector_without_secret_resolutio
     monkeypatch,
 ) -> None:
     existing = RecordingConnector()
-    pool = SimpleNamespace(get_existing=lambda connection_id: existing)
+    pool = SimpleNamespace(
+        get_existing=lambda connection_id, configuration_key: existing,
+    )
     db = FakeDatabase(connection=connection())
     monkeypatch.setattr(chat, "get_connection_pool", lambda: pool)
     monkeypatch.setattr(
@@ -96,13 +102,21 @@ def test_run_check_securely_builds_connector_only_when_pool_has_no_existing_entr
     created = RecordingConnector()
 
     class Pool:
-        def get_existing(self, connection_id):
+        def get_existing(self, connection_id, *, configuration_key):
             assert connection_id == "connection-1"
             return None
 
-        def get_or_create(self, connection_id, engine, connection_string):
+        def get_or_create(
+            self,
+            connection_id,
+            engine,
+            connection_string,
+            *,
+            configuration_key,
+        ):
             assert connection_id == "connection-1"
             assert connection_string == "resolved-securely"
+            assert configuration_key
             return created
 
     monkeypatch.setattr(chat, "get_connection_pool", Pool)
@@ -133,7 +147,7 @@ def test_run_check_rejects_connection_outside_investigation_workspace(monkeypatc
 
 def test_run_check_connection_failure_remains_controlled(monkeypatch) -> None:
     pool = SimpleNamespace(
-        get_existing=lambda _connection_id: None,
+        get_existing=lambda _connection_id, configuration_key: None,
         get_or_create=lambda *_args: pytest.fail("failed resolution must not create a connector"),
     )
     monkeypatch.setattr(chat, "get_connection_pool", lambda: pool)
@@ -193,8 +207,12 @@ def test_run_check_route_preserves_parameters_and_returns_result_rows(monkeypatc
 
 def test_connection_pool_exposes_existing_connector_without_connection_material() -> None:
     pool = ConnectionPool()
-    connector = object()
-    pool._connections["connection-1"] = connector
+    connector = pool.get_or_create(
+        "connection-1",
+        chat.DatabaseEngine.SQLITE,
+        "sqlite:///:memory:",
+        configuration_key="configuration-1",
+    )
 
-    assert pool.get_existing("connection-1") is connector
-    assert pool.get_existing("missing") is None
+    assert pool.get_existing("connection-1", configuration_key="configuration-1") is connector
+    assert pool.get_existing("missing", configuration_key="configuration-1") is None

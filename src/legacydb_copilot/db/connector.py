@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import time
+from threading import RLock
 from typing import Any
 
 from sqlalchemy import create_engine, event, text
@@ -386,28 +387,59 @@ class ConnectionPool:
     def __init__(self):
         self._connections: dict[str, DatabaseConnector] = {}
         self._cache_keys: dict[str, str] = {}
+        self._lock = RLock()
 
-    def get_or_create(self, connection_id: str, database_engine: DatabaseEngine, connection_string: str) -> DatabaseConnector:
+    def get_or_create(
+        self,
+        connection_id: str,
+        database_engine: DatabaseEngine,
+        connection_string: str,
+        *,
+        configuration_key: str | None = None,
+    ) -> DatabaseConnector:
         """Get or create a connection."""
-        cache_key = self.connector_cache_key(database_engine, connection_string)
-        existing = self._connections.get(connection_id)
-        if existing and (
-            existing.database_engine != database_engine
-            or existing.connection_string != connection_string
-            or self._cache_keys.get(connection_id) != cache_key
-        ):
-            existing.disconnect()
-            del self._connections[connection_id]
-            self._cache_keys.pop(connection_id, None)
+        cache_key = configuration_key or self.connector_cache_key(
+            database_engine,
+            connection_string,
+        )
+        superseded = None
+        with self._lock:
+            existing = self._connections.get(connection_id)
+            if existing and (
+                existing.database_engine != database_engine
+                or existing.connection_string != connection_string
+                or self._cache_keys.get(connection_id) != cache_key
+            ):
+                superseded = self._connections.pop(connection_id)
+                self._cache_keys.pop(connection_id, None)
+                existing = None
+            if existing is None:
+                existing = DatabaseConnector(database_engine, connection_string)
+                self._connections[connection_id] = existing
+                self._cache_keys[connection_id] = cache_key
+        if superseded is not None:
+            superseded.disconnect()
+        return existing
 
-        if connection_id not in self._connections:
-            self._connections[connection_id] = DatabaseConnector(database_engine, connection_string)
-            self._cache_keys[connection_id] = cache_key
-        return self._connections[connection_id]
-
-    def get_existing(self, connection_id: str) -> DatabaseConnector | None:
-        """Return the process-local connector already established for a connection."""
-        return self._connections.get(connection_id)
+    def get_existing(
+        self,
+        connection_id: str,
+        *,
+        configuration_key: str,
+    ) -> DatabaseConnector | None:
+        """Return a cached connector only when its current configuration matches."""
+        stale = None
+        with self._lock:
+            existing = self._connections.get(connection_id)
+            if existing is None:
+                return None
+            if self._cache_keys.get(connection_id) != configuration_key:
+                stale = self._connections.pop(connection_id)
+                self._cache_keys.pop(connection_id, None)
+                existing = None
+        if stale is not None:
+            stale.disconnect()
+        return existing
 
     def connector_cache_key(self, database_engine: DatabaseEngine, connection_string: str) -> str:
         url = make_url(connection_string)
@@ -425,17 +457,20 @@ class ConnectionPool:
 
     def close(self, connection_id: str) -> None:
         """Close a specific connection."""
-        if connection_id in self._connections:
-            self._connections[connection_id].disconnect()
-            del self._connections[connection_id]
+        with self._lock:
+            connector = self._connections.pop(connection_id, None)
             self._cache_keys.pop(connection_id, None)
+        if connector is not None:
+            connector.disconnect()
 
     def close_all(self) -> None:
         """Close all connections."""
-        for connector in self._connections.values():
+        with self._lock:
+            connectors = list(self._connections.values())
+            self._connections.clear()
+            self._cache_keys.clear()
+        for connector in connectors:
             connector.disconnect()
-        self._connections.clear()
-        self._cache_keys.clear()
 
 
 # Global connection pool

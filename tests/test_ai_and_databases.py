@@ -1863,7 +1863,7 @@ def test_metadata_validation_flow_uses_active_metadata_only(monkeypatch) -> None
         def connector_cache_key(self, engine, connection_string):
             return "mysql|localhost|3306|EmployeePayrollRcaDemo|user|masked"
 
-        def get_or_create(self, connection_id, engine, connection_string):
+        def get_or_create(self, connection_id, engine, connection_string, **_kwargs):
             return FakeConnector()
 
     monkeypatch.setattr(chat_router, "_find_workspace_connection", lambda db, request: connection)
@@ -1916,7 +1916,7 @@ def test_metadata_validation_flow_returns_target_object_not_found(monkeypatch) -
         def connector_cache_key(self, engine, connection_string):
             return "mysql|localhost|3306|ShippingDemo|user|masked"
 
-        def get_or_create(self, connection_id, engine, connection_string):
+        def get_or_create(self, connection_id, engine, connection_string, **_kwargs):
             return FakeConnector()
 
     monkeypatch.setattr(chat_router, "_find_workspace_connection", lambda db, request: connection)

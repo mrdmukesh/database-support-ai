@@ -22,6 +22,7 @@ from legacydb_copilot.services.report_generator import (
     now_label,
 )
 from legacydb_copilot.services.root_cause_hypothesis_service import HypothesisStatus
+from legacydb_copilot.services.report_outcome_service import compose_report_outcome
 
 
 @dataclass(frozen=True)
@@ -1186,6 +1187,9 @@ def _executive_ai_reasoning_section(bundle: DynamicInvestigationBundle) -> Repor
 
 
 def _report_completion_status(bundle: DynamicInvestigationBundle) -> str:
+    reasoning = getattr(bundle, "reasoning", None)
+    if reasoning is not None and compose_report_outcome(reasoning).root_cause_verified:
+        return "Investigation Complete"
     trace = bundle.ai_debug_trace or {}
     invocation_status = str(trace.get("invocation_status") or "")
     if invocation_status == "provider_failure":
@@ -1196,6 +1200,9 @@ def _report_completion_status(bundle: DynamicInvestigationBundle) -> str:
 
 
 def _executive_root_cause_items(bundle: DynamicInvestigationBundle) -> list[str]:
+    outcome = compose_report_outcome(bundle.reasoning)
+    if outcome.root_cause_verified:
+        return list(outcome.root_cause_items)
     trace = bundle.ai_debug_trace or {}
     ai_enabled = bool(trace.get("ai_enabled"))
     evidence_valid = bool(trace.get("evidence_package_valid"))
@@ -1267,6 +1274,9 @@ def _executive_recommendation_items(recommendations: list[str | Recommendation])
 
 
 def _executive_fix_items(bundle: DynamicInvestigationBundle) -> list[str]:
+    outcome = compose_report_outcome(bundle.reasoning)
+    if outcome.root_cause_verified:
+        return list(outcome.recommendation_items)
     trace = bundle.ai_debug_trace or {}
     if (
         trace.get("evidence_package_valid")
@@ -1636,6 +1646,7 @@ def compose_report(
         investigation_id or bundle.investigation_id,
     )
     final_root_cause_items = _executive_root_cause_items(bundle)
+    report_outcome = compose_report_outcome(bundle.reasoning)
     evidence_only = (
         not safe_input.identity_valid
         or (
@@ -1653,7 +1664,7 @@ def compose_report(
         executive_summary_text = (
             _evidence_only_summary(bundle)
             if evidence_only
-            else bundle.reasoning.summary
+            else report_outcome.summary
         )
     confidence_items = [f"Overall confidence: {int(bundle.confidence * 100)}%"]
     confidence_items.extend(bundle.confidence_factors or ["Based on available evidence; no unsupported objects were fabricated."])
@@ -1761,9 +1772,10 @@ def compose_report(
         ReportSection(
             title="Why It Happened",
             items=(
-                list(safe_input.verified_claims)
-                if root_verification is not None
+                list(report_outcome.why_it_happened_items)
+                if report_outcome.root_cause_verified
                 else bundle.hypothesis_reasoning.event_chain
+                or list(report_outcome.why_it_happened_items)
             ),
         ),
         ReportSection(title="Business Process Graph", paragraphs=["Execution-order graph inferred from stored procedure read/write metadata only."], tables=[ReportTable(title="Inferred Execution Graph", columns=["From", "To"], rows=process_rows or [{"From": "Unable to infer", "To": "Additional procedure read/write evidence required"}])]),

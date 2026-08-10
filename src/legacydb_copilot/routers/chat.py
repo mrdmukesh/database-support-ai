@@ -88,6 +88,7 @@ from legacydb_copilot.services.evidence_execution_service import (
     execute_evidence_plan,
 )
 from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
+from legacydb_copilot.services.report_outcome_service import compose_report_outcome
 from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
 from legacydb_copilot.services.evidence_gate_service import (
     run_evidence_gate,
@@ -2862,7 +2863,8 @@ def _run_dynamic_investigation(
             *[f"- Blocked: {item}" for item in evidence_gate.blocking_reasons],
         ]
     )
-    final_root_cause_text = "\n".join(f"- {item}" for item in reasoning.likely_root_causes) or "- No root cause generated."
+    report_outcome = compose_report_outcome(reasoning)
+    final_root_cause_text = "\n".join(f"- {item}" for item in report_outcome.root_cause_items)
     confidence_text = "\n".join(f"- {item}" for item in confidence_notes)
     verification_text = "\n".join(
         f"- Pending: {item.claim} | Source: {item.source} | Risk: {item.risk_level} | Expected: {item.expected_result}"
@@ -2886,13 +2888,15 @@ def _run_dynamic_investigation(
         f"- Rank {index}: {item.hypothesis_id} {int(item.confidence * 100)}% - {item.description}; {item.reason}"
         for index, item in enumerate(hypothesis_reasoning.ranked_root_causes, start=1)
     )
-    event_chain_text = "\n".join(f"- {item}" for item in hypothesis_reasoning.event_chain)
+    event_chain_text = "\n".join(f"- {item}" for item in report_outcome.why_it_happened_items)
     summary_only_report = reasoning_dispatch.mode in {
         ReasoningMode.EVIDENCE_SUMMARY_NOT_REPRODUCED,
         ReasoningMode.EVIDENCE_GAP_SUMMARY,
         ReasoningMode.PARTIAL_EVIDENCE_SUMMARY,
     }
-    if summary_only_report:
+    if report_outcome.root_cause_verified:
+        hypothesis_rank_text = final_root_cause_text
+    if summary_only_report and not report_outcome.root_cause_verified:
         final_root_cause_text = "- Root cause not established from the available evidence."
         hypothesis_rank_text = "- Root-cause hypotheses were not ranked because the available evidence does not support a cause."
         event_chain_text = "- No causal event chain was established from the available evidence."
@@ -2901,13 +2905,17 @@ def _run_dynamic_investigation(
             "- Collect the missing evidence identified above before proposing a fix."
         )
     else:
-        recommendation_text = "\n".join(
-            [
-                "- Immediate Fix: " + " ".join(recommendation.immediate_fix),
-                "- Permanent Fix: " + " ".join(recommendation.permanent_fix),
-                "- Monitoring: " + " ".join(recommendation.monitoring),
-                f"- Risk: {recommendation.risk}",
-            ]
+        recommendation_text = (
+            "\n".join(f"- {item}" for item in report_outcome.recommendation_items)
+            if report_outcome.root_cause_verified
+            else "\n".join(
+                [
+                    "- Immediate Fix: " + " ".join(recommendation.immediate_fix),
+                    "- Permanent Fix: " + " ".join(recommendation.permanent_fix),
+                    "- Monitoring: " + " ".join(recommendation.monitoring),
+                    f"- Risk: {recommendation.risk}",
+                ]
+            )
         )
     answer = (
         "Investigation Complete.\n\n"
@@ -2958,7 +2966,7 @@ def _run_dynamic_investigation(
         "## Relevant Objects Investigated\n"
         f"{ranked_text}\n\n"
         "## Stage 6 - Reason\n"
-        f"{reasoning.summary}\n\n"
+        f"{report_outcome.summary}\n\n"
         + (
             "## AI-assisted reasoning over collected evidence\n"
             "OpenAI reasoning was applied only after deterministic intent detection, metadata discovery, safe SQL validation, and evidence collection. The model did not connect to the database, execute SQL, or override SQL evidence.\n\n"

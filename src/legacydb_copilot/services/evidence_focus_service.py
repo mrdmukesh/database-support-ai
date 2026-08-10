@@ -63,6 +63,7 @@ def build_evidence_focus(
     resolved_identifier_column: str = "",
     resolved_identifier_value: Any = None,
     attribute_lineage: list[AttributeLineageCandidate] | None = None,
+    output_producer: str = "",
 ) -> EvidenceFocus:
     """
     Owner: Mukesh Dabi
@@ -105,6 +106,7 @@ def build_evidence_focus(
         procedure_analysis=procedure_analysis,
         documents=documents,
         attribute_lineage=attribute_lineage or [],
+        output_producer=output_producer,
     )
     confirmed = _confirmed_facts(evidence, ranked_procedures, affected_object, business_key)
     inferred = _inferred_findings(intent, ranked_procedures, evidence, documents)
@@ -403,6 +405,7 @@ def _rank_procedures(
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
     attribute_lineage: list[AttributeLineageCandidate],
+    output_producer: str = "",
 ) -> list[ProcedureRank]:
     """
     Owner: Mukesh Dabi
@@ -466,6 +469,10 @@ def _rank_procedures(
                 + (", ".join(lineage.source_columns) or "expression without a catalog column")
                 + "."
             )
+        produces_requested_output = bool(output_producer) and _objects_match(output_producer, proc.name)
+        if produces_requested_output:
+            score += 50.0
+            evidence_found.append("Routine is the resolved producer of the requested output.")
         if writes_affected:
             score += 20.0
             evidence_found.append(f"Procedure writes affected object {affected_object}.")
@@ -530,6 +537,7 @@ def _rank_procedures(
     return sorted(
         ranks,
         key=lambda item: (
+            bool(output_producer) and _objects_match(output_producer, item.procedure),
             any(
                 _objects_match(candidate.producer, item.procedure)
                 for candidate in attribute_lineage

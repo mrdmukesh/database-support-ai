@@ -18,8 +18,9 @@ from legacydb_copilot.db.models import (
     MetadataRelationshipModel,
     MetadataSnapshotModel,
 )
+from legacydb_copilot.services.result_set_lineage_service import parse_result_set_lineage
 
-DISCOVERY_VERSION = "1"
+DISCOVERY_VERSION = "2"
 _locks_guard = threading.Lock()
 _connection_locks: dict[str, threading.Lock] = {}
 
@@ -249,25 +250,24 @@ WHERE o.is_ms_shipped=0 AND o.type IN ('V','P','FN','IF','TF','TR')""",
         (str(r.get("schema_name") or ""), str(r.get("object_name") or "")): r.get("definition")
         for r in module_rows
     }
-    objects = [
-        CatalogObject(
-            t,
-            s,
-            n,
-            v["source_object_id"],
-            definitions.get((s, n)),
+    objects: list[CatalogObject] = []
+    for (t, s, n), v in grouped.items():
+        definition = definitions.get((s, n))
+        qualified_name = _qname(s, n)
+        lineage = (
+            parse_result_set_lineage(qualified_name, str(definition or ""))
+            if t in {"PROCEDURE", "VIEW", "FUNCTION"}
+            else None
+        )
+        objects.append(CatalogObject(
+            t, s, n, v["source_object_id"], definition,
             {
                 "columns": v["columns"],
-                "definition_available": (s, n) in definitions and definitions[(s, n)] is not None,
-                "dynamic_sql": bool(
-                    re.search(
-                        r"\b(?:sp_executesql|EXEC\s*\()", str(definitions.get((s, n)) or ""), re.I
-                    )
-                ),
+                "definition_available": (s, n) in definitions and definition is not None,
+                "dynamic_sql": bool(re.search(r"\b(?:sp_executesql|EXEC\s*\()", str(definition or ""), re.I)),
+                "result_set_lineage": lineage.to_dict() if lineage else None,
             },
-        )
-        for (t, s, n), v in grouped.items()
-    ]
+        ))
     relationships: list[CatalogRelationship] = []
     for row in index_rows:
         table_key = f"table:{_qname(row.get('schema_name'), row.get('table_name'))}".lower()
@@ -427,6 +427,7 @@ def refresh_metadata(db: Session, *, connection, connector) -> MetadataSnapshotM
         version=version,
         status="DISCOVERING",
         source_database=connection.database_name,
+        discovery_version=DISCOVERY_VERSION,
     )
     db.add(candidate)
     db.commit()
@@ -474,6 +475,9 @@ def refresh_metadata(db: Session, *, connection, connector) -> MetadataSnapshotM
         counts["columns"] = sum(len(o.metadata.get("columns", [])) for o in catalog.objects)
         counts["relationships"] = len(catalog.relationships)
         counts["objects"] = len(catalog.objects)
+        counts["result_set_lineages"] = sum(
+            bool(o.metadata.get("result_set_lineage")) for o in catalog.objects
+        )
         candidate.schema_hash = fingerprint
         candidate.counts_json = json.dumps(counts)
         candidate.completeness_json = json.dumps(catalog.completeness)
@@ -544,11 +548,15 @@ def schema_metadata_from_catalog(db: Session, snapshot: MetadataSnapshotModel) -
         ]
 
     table_schemas: dict[str, dict[str, Any]] = {}
+    result_set_lineages: dict[str, dict[str, Any]] = {}
     for obj in objects:
+        detail = json.loads(obj.metadata_json)
+        if detail.get("result_set_lineage"):
+            name = f"{obj.schema_name}.{obj.object_name}" if obj.schema_name else obj.object_name
+            result_set_lineages[name] = detail["result_set_lineage"]
         if obj.object_type != "TABLE":
             continue
         name = f"{obj.schema_name}.{obj.object_name}" if obj.schema_name else obj.object_name
-        detail = json.loads(obj.metadata_json)
         columns = [
             {
                 "name": c.get("column_name"),
@@ -622,4 +630,5 @@ def schema_metadata_from_catalog(db: Session, snapshot: MetadataSnapshotModel) -
             "metadata_age_seconds": metadata_age_seconds,
         },
         table_schemas=table_schemas,
+        result_set_lineages=result_set_lineages,
     )

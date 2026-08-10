@@ -87,9 +87,8 @@ from legacydb_copilot.services.evidence_execution_service import (
     EvidenceResult,
     execute_evidence_plan,
 )
-from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
-from legacydb_copilot.services.report_outcome_service import compose_report_outcome
 from legacydb_copilot.services.evidence_gap_detection_service import detect_evidence_gaps
+from legacydb_copilot.services.evidence_focus_service import build_evidence_focus
 from legacydb_copilot.services.evidence_gate_service import (
     run_evidence_gate,
     unreproduced_reasoning,
@@ -138,6 +137,14 @@ from legacydb_copilot.services.reasoning_dispatch_service import (
     ReproductionStatus,
     RootCauseSupport,
     dispatch_reasoning,
+)
+from legacydb_copilot.services.report_outcome_service import compose_report_outcome
+from legacydb_copilot.services.result_set_lineage_service import (
+    evaluate_row_exclusion_candidates,
+    extract_output_target,
+    plan_row_exclusion_verification,
+    resolve_output_producers,
+    row_exclusion_reasoning,
 )
 from legacydb_copilot.services.report_generator import (
     REPORT_VERSION,
@@ -2079,6 +2086,14 @@ def _run_dynamic_investigation(
     """
     investigation_id = new_investigation_id()
     intent = detect_intent(payload.question)
+    output_target = extract_output_target(payload.question)
+    if output_target is not None:
+        intent = replace(
+            intent,
+            intent=InvestigationIntent.MISSING_FROM_OUTPUT,
+            confidence=max(intent.confidence, output_target.confidence),
+            rationale="Question asks why an existing entity is absent from a named output.",
+        )
     entities = extract_entities(payload.question)
     mode = classify_investigation_mode(payload.question, intent)
     if intent.intent == InvestigationIntent.METADATA_VALIDATION:
@@ -2254,6 +2269,31 @@ def _run_dynamic_investigation(
         )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
     resolved_entity_payload = [asdict(item) for item in entity_resolution.resolutions]
+    resolved_entity = next(
+        (item for item in entity_resolution.resolutions if item.entity_probe and item.match_count == 1),
+        None,
+    )
+    output_producers = (
+        resolve_output_producers(
+            output_target,
+            procedure_analysis,
+            entity_table=resolved_entity.resolved_table if resolved_entity else "",
+            persisted_lineages=getattr(active_schema_metadata, "result_set_lineages", {}),
+        )
+        if output_target is not None
+        else []
+    )
+    selected_output_producer = next((item for item in output_producers if item.selected), None)
+    row_exclusion_candidates = []
+    row_exclusion_queries = []
+    if selected_output_producer is not None and resolved_entity is not None:
+        row_exclusion_candidates, row_exclusion_queries = plan_row_exclusion_verification(
+            target=output_target,
+            producer=selected_output_producer,
+            entity_table=resolved_entity.resolved_table,
+            identifier_column=resolved_entity.resolved_column,
+            identifier_value=resolved_entity.identifier_value,
+        )
     attribute_lineage, attribute_lineage_queries = resolve_attribute_lineage(
         entities=entities,
         metadata=ranking.metadata,
@@ -2275,7 +2315,7 @@ def _run_dynamic_investigation(
             debug_events=evidence_plan_statuses,
             provider=connection.engine,
             resolved_entities=resolved_entity_payload,
-            attribute_lineage_queries=[*attribute_lineage_queries, *causal_queries],
+            attribute_lineage_queries=[*attribute_lineage_queries, *causal_queries, *row_exclusion_queries],
         )
     except Exception as exc:
         plan = []
@@ -2347,6 +2387,10 @@ def _run_dynamic_investigation(
             )
         )
     causal_candidates = evaluate_causal_candidates(causal_candidates, evidence)
+    if selected_output_producer is not None:
+        row_exclusion_candidates = evaluate_row_exclusion_candidates(
+            row_exclusion_candidates, evidence, selected_output_producer
+        )
     evidence.extend(
         _expand_related_id_evidence(
             connector,
@@ -2384,6 +2428,11 @@ def _run_dynamic_investigation(
             resolved_identifier.value if resolved_identifier is not None else None
         ),
         attribute_lineage=attribute_lineage,
+        output_producer=(
+            selected_output_producer.producer_object
+            if selected_output_producer is not None
+            else ""
+        ),
     )
     evidence_gate = run_evidence_gate(
         question=payload.question,
@@ -2452,6 +2501,11 @@ def _run_dynamic_investigation(
         procedure_analysis,
     )
     verified_causal_reasoning = causal_reasoning(causal_candidates, evidence)
+    verified_row_exclusion_reasoning = (
+        row_exclusion_reasoning(row_exclusion_candidates, selected_output_producer, evidence)
+        if selected_output_producer is not None
+        else None
+    )
     if expected_null_behavior is not None and verified_causal_reasoning is None:
         execution_evidence, expected_procedure = expected_null_behavior
         reasoning_dispatch = ReasoningDispatchDecision(
@@ -2473,7 +2527,9 @@ def _run_dynamic_investigation(
         )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
-    if verified_causal_reasoning is not None:
+    if verified_row_exclusion_reasoning is not None:
+        reasoning = verified_row_exclusion_reasoning
+    elif verified_causal_reasoning is not None:
         reasoning = verified_causal_reasoning
     elif expected_null_behavior is not None:
         reasoning = expected_null_behavior_reasoning(
@@ -2667,6 +2723,9 @@ def _run_dynamic_investigation(
             ],
             "attribute_lineage": [item.to_trace() for item in attribute_lineage],
             "causal_candidates": [item.to_trace() for item in causal_candidates],
+            "output_target": asdict(output_target) if output_target else None,
+            "output_producers": [asdict(item) for item in output_producers],
+            "row_exclusion_candidates": [asdict(item) for item in row_exclusion_candidates],
             "transfer_identifier_normalization": asdict(transfer_normalization_trace),
             "extracted_business_entities": [
                 asdict(item) for item in extract_entities(payload.question).entities

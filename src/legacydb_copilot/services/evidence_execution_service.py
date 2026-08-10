@@ -49,6 +49,7 @@ class EvidenceResult:
         "null_value",
         "procedure_definition",
         "procedure_execution",
+        "row_exclusion_verification",
         "not_applicable",
         "execution_failure",
     ] = "not_applicable"

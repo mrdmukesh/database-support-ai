@@ -392,22 +392,41 @@ def _log_key_vault_failure(
     if response is None:
         response = getattr(exc, "response", None)
     headers = getattr(response, "headers", {}) or {}
+    status_code = getattr(
+        exc,
+        "status_code",
+        getattr(response, "status_code", None),
+    )
+    content_type = headers.get("content-type", headers.get("Content-Type"))
+    request_id = headers.get("x-ms-request-id")
+    region = headers.get("x-ms-keyvault-region")
+    exception_class = type(exc).__name__
+    timestamp = datetime.now(UTC).isoformat()
     logger.warning(
-        "key_vault_secret_read_failed",
+        (
+            "key_vault_secret_read_failed timestamp=%s attempt=%s status=%s "
+            "content_type=%s request_id=%s region=%s exception_class=%s "
+            "classification=%s transient=%s"
+        ),
+        timestamp,
+        attempt,
+        status_code,
+        content_type,
+        request_id,
+        region,
+        exception_class,
+        classification,
+        transient,
         extra={
-            "key_vault_http_status": getattr(
-                exc,
-                "status_code",
-                getattr(response, "status_code", None),
-            ),
-            "key_vault_content_type": headers.get("content-type", headers.get("Content-Type")),
-            "key_vault_request_id": headers.get("x-ms-request-id"),
-            "key_vault_region": headers.get("x-ms-keyvault-region"),
-            "key_vault_exception_class": type(exc).__name__,
+            "key_vault_http_status": status_code,
+            "key_vault_content_type": content_type,
+            "key_vault_request_id": request_id,
+            "key_vault_region": region,
+            "key_vault_exception_class": exception_class,
             "key_vault_retry_attempt": attempt,
             "key_vault_transient": transient,
             "key_vault_response_classification": classification,
-            "key_vault_failure_timestamp": datetime.now(UTC).isoformat(),
+            "key_vault_failure_timestamp": timestamp,
         },
     )
 

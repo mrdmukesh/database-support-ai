@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult, ExtractedEntity
 
@@ -58,16 +58,10 @@ def normalize_transfer_entities(
             continue
         seen.add(key)
         deduped.append(entity)
-    return (
-        EntityExtractionResult(
-            entities=deduped,
-            suspected_issue=entities.suspected_issue,
-            likely_module=entities.likely_module,
-            application_name=entities.application_name,
-            business_keywords=entities.business_keywords,
-        ),
-        trace,
-    )
+    # Preserve the complete extraction context.  This stage owns normalization
+    # of legacy transfer entity values only; reconstructing the dataclass field
+    # by field silently discards newly added investigation signals.
+    return replace(entities, entities=deduped), trace
 
 
 def typed_transfer_identifier(entities: EntityExtractionResult) -> str | None:

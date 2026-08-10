@@ -140,6 +140,60 @@ def test_invalid_msg_wrapped_identifier_does_not_normalize_to_transfer() -> None
     assert trace.normalized_entity is None
 
 
+@pytest.mark.parametrize(
+    "question,field,value",
+    [
+        ("Why is Age NULL for CustomerId 2?", "CustomerId", 2),
+        ("Why is Status NULL for EmployeeId 7?", "EmployeeId", 7),
+    ],
+)
+def test_non_transfer_structured_context_survives_transfer_normalization(
+    question: str, field: str, value: int
+) -> None:
+    extracted = extract_entities(question)
+
+    normalized, trace = normalize_transfer_entities(extracted)
+
+    assert normalized.structured_identifiers == extracted.structured_identifiers
+    assert normalized.structured_identifiers[0].field_name == field
+    assert normalized.structured_identifiers[0].value == value
+    assert normalized.affected_attributes == extracted.affected_attributes
+    assert any(item.casefold() == question.split()[2].casefold() for item in normalized.affected_attributes)
+    assert normalized.symptoms == ["NULL"]
+    assert normalized.structured_identifiers[0].value != "NULL for CustomerId 2"
+    assert trace.normalized_entity is None
+
+
+def test_qualified_structured_identifier_survives_transfer_normalization() -> None:
+    extracted = extract_entities(
+        "Why is Amount NULL for audit.LedgerEntries.EntryId = 2?"
+    )
+
+    normalized, _ = normalize_transfer_entities(extracted)
+
+    identifier = normalized.structured_identifiers[0]
+    assert identifier.schema_name == "audit"
+    assert identifier.table_name == "LedgerEntries"
+    assert identifier.field_name == "EntryId"
+    assert identifier.value == 2
+    assert normalized.affected_attributes == extracted.affected_attributes
+    assert normalized.symptoms == ["NULL"]
+
+
+def test_legacy_transfer_identifier_behavior_is_preserved_with_enriched_context() -> None:
+    extracted = extract_entities(
+        "Why is SettlementStatus NULL for TransferId TRF-3101?"
+    )
+
+    normalized, trace = normalize_transfer_entities(extracted)
+
+    assert any(item.value == "TRF-3101" for item in normalized.entities)
+    assert normalized.structured_identifiers == extracted.structured_identifiers
+    assert normalized.affected_attributes == extracted.affected_attributes
+    assert normalized.symptoms == extracted.symptoms
+    assert trace.normalized_entity == "TRF-3101"
+
+
 def test_unrelated_msg_identifier_does_not_normalize_to_transfer() -> None:
     entities = extract_entities("Investigate message MSG-9001 timeout in gateway")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from typing import Protocol
 from uuid import uuid4
@@ -227,7 +228,26 @@ class AzureKeyVaultSecretStore:
             Secrets must be resolved internally and never exposed in API responses.
         """
         secret_name = reference.removeprefix("keyvault://")
-        return self._client.get_secret(secret_name).value
+        for attempt in range(3):
+            try:
+                return self._client.get_secret(secret_name).value
+            except Exception as exc:
+                if attempt == 2 or not _is_transient_key_vault_error(exc):
+                    raise RuntimeError("Secure secret retrieval failed") from exc
+                time.sleep(0.1 * (attempt + 1))
+        raise RuntimeError("Secure secret retrieval failed")  # pragma: no cover
+
+
+def _is_transient_key_vault_error(exc: Exception) -> bool:
+    status_code = getattr(exc, "status_code", None)
+    if status_code in {408, 429} or (isinstance(status_code, int) and status_code >= 500):
+        return True
+    if status_code != 400:
+        return False
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", {}) or {}
+    content_type = str(headers.get("content-type", headers.get("Content-Type", ""))).lower()
+    return "text/html" in content_type
 
 
 def get_secret_store(settings: Settings | None = None) -> SecretStore:

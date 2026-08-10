@@ -60,6 +60,7 @@ from legacydb_copilot.security.access_control import (
     require_workspace_access,
 )
 from legacydb_copilot.services.audit_service import record_audit_event
+from legacydb_copilot.services.attribute_lineage_service import resolve_attribute_lineage
 from legacydb_copilot.services.confidence_scoring_service import (
     confidence_factors,
     score_confidence,
@@ -2246,6 +2247,13 @@ def _run_dynamic_investigation(
             metadata,
         )
     procedure_analysis = analyze_stored_procedures(connector, ranking.metadata.procedures)
+    resolved_entity_payload = [asdict(item) for item in entity_resolution.resolutions]
+    attribute_lineage, attribute_lineage_queries = resolve_attribute_lineage(
+        entities=entities,
+        metadata=ranking.metadata,
+        procedures=procedure_analysis,
+        resolved_entities=resolved_entity_payload,
+    )
     planning_warning = ""
     evidence_plan_statuses: list[dict[str, Any]] = []
     try:
@@ -2255,7 +2263,8 @@ def _run_dynamic_investigation(
             entities,
             debug_events=evidence_plan_statuses,
             provider=connection.engine,
-            resolved_entities=[asdict(item) for item in entity_resolution.resolutions],
+            resolved_entities=resolved_entity_payload,
+            attribute_lineage_queries=attribute_lineage_queries,
         )
     except Exception as exc:
         plan = []
@@ -2362,6 +2371,7 @@ def _run_dynamic_investigation(
         resolved_identifier_value=(
             resolved_identifier.value if resolved_identifier is not None else None
         ),
+        attribute_lineage=attribute_lineage,
     )
     evidence_gate = run_evidence_gate(
         question=payload.question,
@@ -2640,6 +2650,7 @@ def _run_dynamic_investigation(
             "structured_business_identifiers": [
                 asdict(item) for item in (entities.structured_identifiers or [])
             ],
+            "attribute_lineage": [item.to_trace() for item in attribute_lineage],
             "transfer_identifier_normalization": asdict(transfer_normalization_trace),
             "extracted_business_entities": [
                 asdict(item) for item in extract_entities(payload.question).entities

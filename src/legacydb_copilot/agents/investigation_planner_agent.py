@@ -119,6 +119,7 @@ def build_investigation_plan(
     *,
     provider: Any | None = None,
     resolved_entities: list[dict[str, Any]] | None = None,
+    attribute_lineage_queries: list[PlannedQuery] | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -147,6 +148,7 @@ def build_investigation_plan(
         debug_events=debug_events,
         provider=provider,
         resolved_entities=resolved_entities,
+        attribute_lineage_queries=attribute_lineage_queries,
     )
     if debug_events is not None:
         debug_events.append(_internal_plan(intent, metadata, entities, plan))

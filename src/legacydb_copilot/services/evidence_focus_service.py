@@ -6,6 +6,7 @@ from typing import Any
 
 from legacydb_copilot.agents.entity_extraction_agent import EntityExtractionResult
 from legacydb_copilot.agents.intent_agent import InvestigationIntent
+from legacydb_copilot.services.attribute_lineage_service import AttributeLineageCandidate
 from legacydb_copilot.services.evidence_correlation_service import (
     CorrelatedEvidence,
     typed_evidence_finding,
@@ -61,6 +62,7 @@ def build_evidence_focus(
     documents: list[RetrievedDocument],
     resolved_identifier_column: str = "",
     resolved_identifier_value: Any = None,
+    attribute_lineage: list[AttributeLineageCandidate] | None = None,
 ) -> EvidenceFocus:
     """
     Owner: Mukesh Dabi
@@ -102,6 +104,7 @@ def build_evidence_focus(
         correlated_evidence=correlated_evidence,
         procedure_analysis=procedure_analysis,
         documents=documents,
+        attribute_lineage=attribute_lineage or [],
     )
     confirmed = _confirmed_facts(evidence, ranked_procedures, affected_object, business_key)
     inferred = _inferred_findings(intent, ranked_procedures, evidence, documents)
@@ -399,6 +402,7 @@ def _rank_procedures(
     correlated_evidence: list[CorrelatedEvidence],
     procedure_analysis: list[ProcedureAnalysis],
     documents: list[RetrievedDocument],
+    attribute_lineage: list[AttributeLineageCandidate],
 ) -> list[ProcedureRank]:
     """
     Owner: Mukesh Dabi
@@ -450,6 +454,18 @@ def _rank_procedures(
         error_support = _error_log_supports(proc.name, affected_object, evidence)
         job_support = _job_history_supports(proc.name, evidence)
         score = 0.0
+        lineage = next(
+            (item for item in attribute_lineage if _objects_match(item.producer, proc.name)),
+            None,
+        )
+        if lineage is not None:
+            score += 30.0 + len(lineage.source_columns)
+            evidence_found.append(
+                "Routine definition produces affected attribute "
+                f"{lineage.attribute} from source column(s): "
+                + (", ".join(lineage.source_columns) or "expression without a catalog column")
+                + "."
+            )
         if writes_affected:
             score += 20.0
             evidence_found.append(f"Procedure writes affected object {affected_object}.")
@@ -514,6 +530,10 @@ def _rank_procedures(
     return sorted(
         ranks,
         key=lambda item: (
+            any(
+                _objects_match(candidate.producer, item.procedure)
+                for candidate in attribute_lineage
+            ),
             item.writes_affected_object,
             item.error_log_support,
             item.job_history_support,

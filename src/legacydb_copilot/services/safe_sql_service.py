@@ -2074,6 +2074,7 @@ def plan_safe_queries(
     *,
     provider: Any | None = None,
     resolved_entities: list[dict[str, Any]] | None = None,
+    attribute_lineage_queries: list[PlannedQuery] | None = None,
 ) -> list[PlannedQuery]:
     """
     Owner: Mukesh Dabi
@@ -2137,6 +2138,9 @@ def plan_safe_queries(
             )
         )
         resolved_table_names.add(table.name.casefold())
+    # Once exact entity context exists, code-derived attribute inputs are the
+    # next evidence priority. Broad anomaly exploration remains a fallback.
+    planned.extend(attribute_lineage_queries or [])
     transfer_primary = _transfer_primary_query(metadata, entities)
     if transfer_primary:
         planned.append(transfer_primary)

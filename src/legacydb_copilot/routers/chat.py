@@ -3838,20 +3838,23 @@ def _active_connector_for_investigation(db: Session, investigation: Investigatio
     Safety considerations:
         Keep tenant/workspace boundaries and do not introduce unsafe database or secret handling.
     """
-    connection = (
-        db.query(DatabaseConnectionModel)
-        .filter(
-            DatabaseConnectionModel.organization_id == investigation.organization_id,
-            DatabaseConnectionModel.workspace_id == investigation.workspace_id,
-            DatabaseConnectionModel.is_active.is_(True),
-        )
-        .order_by(DatabaseConnectionModel.updated_at.desc())
-        .first()
-    )
-    if connection is None:
-        raise HTTPException(status_code=404, detail="No active database connection found for verification")
+    connection_id = str(investigation.connection_id or "").strip()
+    if not connection_id:
+        raise HTTPException(status_code=404, detail="Investigation database connection was not found")
+    connection = db.get(DatabaseConnectionModel, connection_id)
+    if (
+        connection is None
+        or connection.organization_id != investigation.organization_id
+        or connection.workspace_id != investigation.workspace_id
+        or not connection.is_active
+    ):
+        raise HTTPException(status_code=404, detail="Investigation database connection was not found")
     try:
-        connector = get_connection_pool().get_or_create(
+        pool = get_connection_pool()
+        connector = pool.get_existing(connection.id)
+        if connector is not None:
+            return connector
+        connector = pool.get_or_create(
             connection.id,
             DatabaseEngine(connection.engine),
             _build_connection_string(connection),

@@ -405,6 +405,10 @@ class ConnectionPool:
             self._cache_keys[connection_id] = cache_key
         return self._connections[connection_id]
 
+    def get_existing(self, connection_id: str) -> DatabaseConnector | None:
+        """Return the process-local connector already established for a connection."""
+        return self._connections.get(connection_id)
+
     def connector_cache_key(self, database_engine: DatabaseEngine, connection_string: str) -> str:
         url = make_url(connection_string)
         safe_components = {

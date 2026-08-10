@@ -61,6 +61,11 @@ from legacydb_copilot.security.access_control import (
 )
 from legacydb_copilot.services.audit_service import record_audit_event
 from legacydb_copilot.services.attribute_lineage_service import resolve_attribute_lineage
+from legacydb_copilot.services.causal_hypothesis_service import (
+    causal_reasoning,
+    evaluate_causal_candidates,
+    generate_causal_candidates,
+)
 from legacydb_copilot.services.confidence_scoring_service import (
     confidence_factors,
     score_confidence,
@@ -2254,6 +2259,11 @@ def _run_dynamic_investigation(
         procedures=procedure_analysis,
         resolved_entities=resolved_entity_payload,
     )
+    causal_candidates, causal_queries = generate_causal_candidates(
+        entities=entities,
+        lineage=attribute_lineage,
+        procedures=procedure_analysis,
+    )
     planning_warning = ""
     evidence_plan_statuses: list[dict[str, Any]] = []
     try:
@@ -2264,7 +2274,7 @@ def _run_dynamic_investigation(
             debug_events=evidence_plan_statuses,
             provider=connection.engine,
             resolved_entities=resolved_entity_payload,
-            attribute_lineage_queries=attribute_lineage_queries,
+            attribute_lineage_queries=[*attribute_lineage_queries, *causal_queries],
         )
     except Exception as exc:
         plan = []
@@ -2335,6 +2345,7 @@ def _run_dynamic_investigation(
                 ),
             )
         )
+    causal_candidates = evaluate_causal_candidates(causal_candidates, evidence)
     evidence.extend(
         _expand_related_id_evidence(
             connector,
@@ -2439,7 +2450,8 @@ def _run_dynamic_investigation(
         evidence,
         procedure_analysis,
     )
-    if expected_null_behavior is not None:
+    verified_causal_reasoning = causal_reasoning(causal_candidates, evidence)
+    if expected_null_behavior is not None and verified_causal_reasoning is None:
         execution_evidence, expected_procedure = expected_null_behavior
         reasoning_dispatch = ReasoningDispatchDecision(
             permission=ReasoningPermission.ALLOW_REASONING,
@@ -2460,7 +2472,9 @@ def _run_dynamic_investigation(
         )
     settings = Settings.from_env()
     llm_configured = llm_reasoning_enabled(settings)
-    if expected_null_behavior is not None:
+    if verified_causal_reasoning is not None:
+        reasoning = verified_causal_reasoning
+    elif expected_null_behavior is not None:
         reasoning = expected_null_behavior_reasoning(
             execution_evidence,
             expected_procedure,
@@ -2651,6 +2665,7 @@ def _run_dynamic_investigation(
                 asdict(item) for item in (entities.structured_identifiers or [])
             ],
             "attribute_lineage": [item.to_trace() for item in attribute_lineage],
+            "causal_candidates": [item.to_trace() for item in causal_candidates],
             "transfer_identifier_normalization": asdict(transfer_normalization_trace),
             "extracted_business_entities": [
                 asdict(item) for item in extract_entities(payload.question).entities

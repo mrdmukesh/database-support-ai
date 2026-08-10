@@ -305,3 +305,8 @@ def test_rest_failure_logging_never_contains_sensitive_material(monkeypatch, cap
     assert all(record.key_vault_http_status == 400 for record in caplog.records)
     assert all(record.key_vault_request_id == "safe-request-id" for record in caplog.records)
     assert all(record.key_vault_region == "centralindia" for record in caplog.records)
+    assert all("status=400" in record.getMessage() for record in caplog.records)
+    assert all("content_type=text/html" in record.getMessage() for record in caplog.records)
+    assert all("request_id=safe-request-id" in record.getMessage() for record in caplog.records)
+    assert all("region=centralindia" in record.getMessage() for record in caplog.records)
+    assert all("classification=upstream_non_json" in record.getMessage() for record in caplog.records)

@@ -4,6 +4,9 @@ from legacydb_copilot.services.evidence_execution_service import EvidenceResult
 from legacydb_copilot.services.evidence_gate_service import run_evidence_gate
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult, TableMetadata
 from legacydb_copilot.services.safe_sql_service import plan_safe_queries, validate_read_only_sql
+from legacydb_copilot.services.transfer_identifier_normalization import (
+    normalize_transfer_entities,
+)
 
 
 def _metadata(*tables: TableMetadata) -> MetadataSearchResult:
@@ -39,7 +42,9 @@ def test_exact_identifier_probe_is_parameterized_and_planned_first() -> None:
 
 
 def test_broad_rows_cannot_prove_an_explicit_identifier() -> None:
-    entities = extract_entities("Why is ResultValue NULL for WorkItemId 2?")
+    entities, _ = normalize_transfer_entities(
+        extract_entities("Why is ResultValue NULL for WorkItemId 2?")
+    )
     gate = run_evidence_gate(
         question="Why is ResultValue NULL for WorkItemId 2?",
         intent=InvestigationIntent.PRODUCTION_INVESTIGATION,
@@ -61,7 +66,9 @@ def test_broad_rows_cannot_prove_an_explicit_identifier() -> None:
 
 
 def test_one_row_exact_probe_proves_the_explicit_identifier() -> None:
-    entities = extract_entities("Why is ResultValue NULL for WorkItemId 2?")
+    entities, _ = normalize_transfer_entities(
+        extract_entities("Why is ResultValue NULL for WorkItemId 2?")
+    )
     gate = run_evidence_gate(
         question="Why is ResultValue NULL for WorkItemId 2?",
         intent=InvestigationIntent.PRODUCTION_INVESTIGATION,

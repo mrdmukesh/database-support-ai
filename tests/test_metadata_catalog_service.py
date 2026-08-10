@@ -264,6 +264,8 @@ def test_refresh_activates_complete_snapshot_and_reuses_it(db_and_connection):
         db, connection=connection, connector=FakeSqlServerConnector()
     )
     assert snapshot.status == "READY" and snapshot.is_active
+    assert snapshot.discovery_version == "2"
+    assert catalog.snapshot_summary(snapshot)["counts"]["result_set_lineages"] == 1
     assert db.query(MetadataObjectModel).filter_by(snapshot_id=snapshot.id).count() == 2
     cached = catalog.schema_metadata_from_catalog(db, snapshot)
     assert cached.tables == ["dbo.Orders"]
@@ -272,6 +274,12 @@ def test_refresh_activates_complete_snapshot_and_reuses_it(db_and_connection):
     assert cached.cache_diagnostics["metadata_snapshot_id"] == snapshot.id
     assert cached.cache_diagnostics["metadata_snapshot_version"] == snapshot.version
     assert cached.cache_diagnostics["metadata_fingerprint"] == snapshot.schema_hash
+    assert "dbo.FindOrder" in cached.result_set_lineages
+    assert cached.result_set_lineages["dbo.FindOrder"]["base_object"] == "dbo.Orders"
+    persisted_procedure = db.query(MetadataObjectModel).filter_by(
+        snapshot_id=snapshot.id, object_type="PROCEDURE"
+    ).one()
+    assert '"result_set_lineage"' in persisted_procedure.metadata_json
     assert not any(
         sensitive in str(cached.cache_diagnostics).lower()
         for sensitive in ("password", "connection_string", "env://test")

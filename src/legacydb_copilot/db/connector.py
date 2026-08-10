@@ -55,6 +55,7 @@ class SchemaMetadata:
         version: str,
         cache_diagnostics: dict[str, Any] | None = None,
         table_schemas: dict[str, dict[str, Any]] | None = None,
+        result_set_lineages: dict[str, dict[str, Any]] | None = None,
     ):
         self.engine_type = engine_type
         self.tables = tables
@@ -63,6 +64,7 @@ class SchemaMetadata:
         self.version = version
         self.cache_diagnostics = cache_diagnostics or {}
         self.table_schemas = table_schemas or {}
+        self.result_set_lineages = result_set_lineages or {}
 
     def to_dict(self) -> dict[str, Any]:
         return {

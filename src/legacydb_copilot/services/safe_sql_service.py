@@ -594,7 +594,7 @@ def _add_exploration_limit(sql: str, limit: int, engine_type: str | None = None)
     return apply_row_limit(sql, limit, resolve_sql_dialect(engine_type))
 
 
-def validate_read_only_sql(sql: str) -> None:
+def validate_read_only_sql(sql: str, engine_type: str | None = None) -> None:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -624,6 +624,18 @@ def validate_read_only_sql(sql: str) -> None:
         raise ValueError("Unsafe SQL command rejected")
     if command not in _ALLOWED_COMMANDS:
         raise ValueError("Only SELECT, SHOW, DESCRIBE, and EXPLAIN statements are allowed")
+    normalized_engine = resolve_sql_dialect(engine_type).value if engine_type else ""
+    dialect_commands = {
+        "sql_server": {"select"},
+        "mysql": {"select", "show", "describe", "desc", "explain"},
+        "postgresql": {"select", "explain"},
+        "sqlite": {"select", "explain"},
+        "oracle": {"select", "explain"},
+    }
+    if normalized_engine and command not in dialect_commands.get(normalized_engine, {"select"}):
+        raise ValueError(
+            f"{command.upper()} is not supported for read-only {normalized_engine} execution"
+        )
     if ";" in normalized:
         raise ValueError("Multiple SQL statements are not allowed")
     if command == "explain":

@@ -511,7 +511,7 @@ def _suggest_affected_object(metadata: MetadataSearchResult, evidence_focus: Evi
         notes=(
             evidence_focus.affected_object_reason
             if supported
-            else f"Metadata verification is unsupported for engine {metadata.engine_type or 'unknown'}."
+            else _metadata_verification_unsupported_note(metadata.engine_type)
         ),
         parameters=parameters,
         parameter_types={name: type(value).__name__ for name, value in parameters.items()},
@@ -571,7 +571,7 @@ def _suggest_parent_object(
         notes=(
             "Parent object is inferred from parent-child join evidence."
             if candidate or supported
-            else f"Metadata verification is unsupported for engine {engine_type or 'unknown'}."
+            else _metadata_verification_unsupported_note(engine_type)
         ),
         parameters={} if candidate else fallback_parameters,
         parameter_types=(
@@ -597,12 +597,7 @@ def _metadata_verification_sql(
         return "", {}, False
     schema_name, table_name = (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
     if not engine_type:
-        return (
-            "SELECT 'metadata verification unavailable because engine type is unknown' "
-            "AS verification_note",
-            {},
-            True,
-        )
+        return "", {}, False
     try:
         dialect = resolve_sql_dialect(engine_type)
     except ValueError:
@@ -621,6 +616,12 @@ def _metadata_verification_sql(
         qualified = f"{schema_name}.{table_name}" if schema_name else table_name
         return f"DESCRIBE {qualified}", {}, True
     return "", {}, False
+
+
+def _metadata_verification_unsupported_note(engine_type: str | None) -> str:
+    if not engine_type:
+        return "Metadata verification unavailable because database engine type is unknown."
+    return f"Metadata verification is unsupported for engine {engine_type}."
 
 
 def _suggest_gate(evidence: list[EvidenceResult], evidence_gate: EvidenceGateResult) -> SuggestedVerificationCheck | None:

@@ -205,6 +205,43 @@ def test_run_check_route_preserves_parameters_and_returns_result_rows(monkeypatc
     assert db.committed is True
 
 
+def test_run_check_rejects_unsupported_check_without_connection_or_database_call(
+    monkeypatch,
+) -> None:
+    inv = investigation()
+    check = SimpleNamespace(
+        id="check-unsupported",
+        investigation_id=inv.id,
+        organization_id=inv.organization_id,
+        workspace_id=inv.workspace_id,
+        claim="Metadata object exists",
+        verification_sql="",
+        expected_result="Rows returned",
+        source="metadata",
+        parameters={},
+        status="Unsupported",
+        read_only=False,
+    )
+    db = FakeDatabase(check=check)
+    monkeypatch.setattr(chat, "_get_verification_investigation", lambda *_args: inv)
+    monkeypatch.setattr(
+        chat,
+        "_active_connector_for_investigation",
+        lambda *_args: pytest.fail("unsupported check must not resolve or call the database"),
+    )
+
+    with pytest.raises(HTTPException) as raised:
+        chat.run_verification_check(
+            check.id,
+            VerificationRunRequest(verification_sql=""),
+            db,
+            SimpleNamespace(id="user-1", email="reviewer@example.com", full_name="Reviewer"),
+        )
+
+    assert raised.value.status_code == 400
+    assert "unsupported" in raised.value.detail.lower()
+
+
 def test_connection_pool_exposes_existing_connector_without_connection_material() -> None:
     pool = ConnectionPool()
     connector = pool.get_or_create(

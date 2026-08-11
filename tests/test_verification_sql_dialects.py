@@ -120,6 +120,17 @@ def test_unsupported_engine_does_not_fall_back_to_mysql() -> None:
     assert check.verification_sql == ""
 
 
+def test_unknown_engine_is_non_executable_with_explanation_outside_sql() -> None:
+    check = _suggest_affected_object(_metadata(""), _focus())
+
+    assert check.verification_sql == ""
+    assert check.status == "Unsupported"
+    assert check.read_only is False
+    assert check.notes == (
+        "Metadata verification unavailable because database engine type is unknown."
+    )
+
+
 def test_exact_generated_sql_and_parameters_are_executed_unchanged() -> None:
     check = _suggest_affected_object(_metadata("sql_server"), _focus())
 

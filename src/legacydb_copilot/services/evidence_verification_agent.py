@@ -15,6 +15,7 @@ from legacydb_copilot.services.evidence_gate_service import EvidenceGateResult
 from legacydb_copilot.services.metadata_search_service import MetadataSearchResult
 from legacydb_copilot.services.rag_retrieval_service import RetrievedDocument
 from legacydb_copilot.services.safe_sql_service import validate_read_only_sql
+from legacydb_copilot.services.sql_dialect_service import SqlDialect, resolve_sql_dialect
 from legacydb_copilot.services.stored_procedure_intelligence import ProcedureAnalysis
 
 
@@ -197,7 +198,11 @@ def suggest_verification_checks(
     checks: list[SuggestedVerificationCheck] = []
     if evidence_focus:
         checks.append(_suggest_affected_object(metadata, evidence_focus))
-        parent_check = _suggest_parent_object(evidence, evidence_focus)
+        parent_check = _suggest_parent_object(
+            evidence,
+            evidence_focus,
+            metadata.engine_type,
+        )
         if parent_check:
             checks.append(parent_check)
     if evidence_gate:
@@ -489,18 +494,37 @@ def _suggest_affected_object(metadata: MetadataSearchResult, evidence_focus: Evi
         Verification checks are suggested first and executed only after user approval through SafeSQLValidator.
     """
     table = next((table for table in metadata.tables if table.name.lower() == evidence_focus.affected_object.lower()), None)
-    sql = f"DESCRIBE {evidence_focus.affected_object}" if table else "SELECT 'affected object not present in metadata' AS verification_note"
+    sql, parameters, supported = _metadata_verification_sql(
+        evidence_focus.affected_object,
+        metadata.engine_type,
+    ) if table else (
+        "SELECT 'affected object not present in metadata' AS verification_note",
+        {},
+        True,
+    )
     return SuggestedVerificationCheck(
         claim=f"{evidence_focus.affected_object} is the affected object.",
         verification_sql=sql,
         expected_result="Rows returned",
         risk_level="Read-only",
         source="metadata",
-        notes=evidence_focus.affected_object_reason,
+        notes=(
+            evidence_focus.affected_object_reason
+            if supported
+            else _metadata_verification_unsupported_note(metadata.engine_type)
+        ),
+        parameters=parameters,
+        parameter_types={name: type(value).__name__ for name, value in parameters.items()},
+        status="Pending" if supported else "Unsupported",
+        read_only=supported,
     )
 
 
-def _suggest_parent_object(evidence: list[EvidenceResult], evidence_focus: EvidenceFocus) -> SuggestedVerificationCheck | None:
+def _suggest_parent_object(
+    evidence: list[EvidenceResult],
+    evidence_focus: EvidenceFocus,
+    engine_type: str | None,
+) -> SuggestedVerificationCheck | None:
     """
     Owner: Mukesh Dabi
     Purpose:
@@ -534,14 +558,70 @@ def _suggest_parent_object(evidence: list[EvidenceResult], evidence_focus: Evide
         ),
         None,
     )
+    fallback_sql, fallback_parameters, supported = _metadata_verification_sql(
+        parent_table,
+        engine_type,
+    )
     return SuggestedVerificationCheck(
         claim=f"{parent_table} is the parent/supporting object for {evidence_focus.affected_object}.",
-        verification_sql=candidate.sql if candidate else f"DESCRIBE {parent_table}",
+        verification_sql=candidate.sql if candidate else fallback_sql,
         expected_result="Rows returned",
         risk_level="Read-only",
         source="SQL evidence",
-        notes="Parent object is inferred from parent-child join evidence.",
+        notes=(
+            "Parent object is inferred from parent-child join evidence."
+            if candidate or supported
+            else _metadata_verification_unsupported_note(engine_type)
+        ),
+        parameters={} if candidate else fallback_parameters,
+        parameter_types=(
+            {}
+            if candidate
+            else {name: type(value).__name__ for name, value in fallback_parameters.items()}
+        ),
+        status="Pending" if candidate or supported else "Unsupported",
+        read_only=bool(candidate or supported),
     )
+
+
+_METADATA_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_$#@]*$")
+
+
+def _metadata_verification_sql(
+    object_name: str,
+    engine_type: str | None,
+) -> tuple[str, dict[str, Any], bool]:
+    """Build a dialect-correct metadata probe without interpolating SQL Server names."""
+    parts = [part.strip() for part in object_name.split(".")]
+    if len(parts) not in {1, 2} or any(not _METADATA_IDENTIFIER.fullmatch(part) for part in parts):
+        return "", {}, False
+    schema_name, table_name = (parts[0], parts[1]) if len(parts) == 2 else ("", parts[0])
+    if not engine_type:
+        return "", {}, False
+    try:
+        dialect = resolve_sql_dialect(engine_type)
+    except ValueError:
+        return "", {}, False
+    if dialect is SqlDialect.SQL_SERVER:
+        return (
+            "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, "
+            "CHARACTER_MAXIMUM_LENGTH, NUMERIC_PRECISION, NUMERIC_SCALE "
+            "FROM INFORMATION_SCHEMA.COLUMNS "
+            "WHERE TABLE_SCHEMA = :schema_name AND TABLE_NAME = :table_name "
+            "ORDER BY ORDINAL_POSITION",
+            {"schema_name": schema_name or "dbo", "table_name": table_name},
+            True,
+        )
+    if dialect is SqlDialect.MYSQL:
+        qualified = f"{schema_name}.{table_name}" if schema_name else table_name
+        return f"DESCRIBE {qualified}", {}, True
+    return "", {}, False
+
+
+def _metadata_verification_unsupported_note(engine_type: str | None) -> str:
+    if not engine_type:
+        return "Metadata verification unavailable because database engine type is unknown."
+    return f"Metadata verification is unsupported for engine {engine_type}."
 
 
 def _suggest_gate(evidence: list[EvidenceResult], evidence_gate: EvidenceGateResult) -> SuggestedVerificationCheck | None:
@@ -1346,7 +1426,9 @@ def _run_verification_sql(
         Must preserve read-only SQL behavior and never allow write commands or stored procedure execution.
     """
     try:
-        validate_read_only_sql(sql)
+        database_engine = getattr(connector, "database_engine", None)
+        engine_type = getattr(database_engine, "value", database_engine)
+        validate_read_only_sql(sql, engine_type=engine_type)
         execute = connector.execute_read_only_query
         if "parameters" in inspect.signature(execute).parameters:
             return execute(sql, limit=25, parameters=parameters or {}), None

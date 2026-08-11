@@ -3970,6 +3970,15 @@ def run_verification_check(
     if check is None:
         raise HTTPException(status_code=404, detail="Verification check not found")
     investigation = _get_verification_investigation(db, check.investigation_id, current_user)
+    if (
+        not getattr(check, "read_only", True)
+        or check.status == "Unsupported"
+        or not check.verification_sql.strip()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="This verification check is unsupported and has no executable SQL.",
+        )
     connector = _active_connector_for_investigation(db, investigation)
     sql = (payload.verification_sql or check.verification_sql).strip()
     result = execute_verification_check(

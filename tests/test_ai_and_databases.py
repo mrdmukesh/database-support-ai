@@ -870,6 +870,7 @@ def test_evidence_verification_agent_checks_duplicate_incident_claims() -> None:
         views=[],
         procedures=["sp_retry_failed_lab_orders"],
         version="test",
+        engine_type="mysql",
     )
     duplicate_sql = """
 SELECT
